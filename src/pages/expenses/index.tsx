@@ -81,7 +81,7 @@ export function ExpensesPage() {
         if (file) {
             const reader = new FileReader()
             reader.onloadend = () => {
-                setNewExpense({ ...newExpense, receipt: reader.result as string })
+                setNewExpense(prev => ({ ...prev, receipt: reader.result as string }))
                 toast({ description: "Receipt attached" })
             }
             reader.readAsDataURL(file)
@@ -105,7 +105,7 @@ export function ExpensesPage() {
         return acc
     }, {} as Record<string, number>)
     const topCategory = Object.entries(categoryExpenses).sort((a, b) => b[1] - a[1])[0]
-    const highestExpense = Math.max(...expenses.map(e => e.amount))
+    const highestExpense = expenses.length ? Math.max(...expenses.map(e => e.amount)) : 0
 
 
     // Fetch Expenses
@@ -194,7 +194,7 @@ export function ExpensesPage() {
 
     // Filter Expenses
     const filteredExpenses = expenses.filter(expense => {
-        const matchesSearch = expense.note.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesSearch = (expense.note ?? '').toLowerCase().includes(searchQuery.toLowerCase())
         const matchesCategory = !filterCategory || expense.category === filterCategory
         const matchesPayment = !filterPaymentMode || expense.paymentMode === filterPaymentMode
         const expenseDate = new Date(expense.date)

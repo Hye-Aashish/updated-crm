@@ -100,7 +100,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         alert('✅ Expense Added!')
         setLastCategory(expense.category)
         setIsExpenseDialogOpen(false)
-        resetForm()
+        resetForm(expense.category)
     }
 
     const handleSaveAndAddAnother = () => {
@@ -112,14 +112,14 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         // eslint-disable-next-line no-alert
         alert('✅ Expense Added!')
         setLastCategory(expense.category)
-        resetForm()
+        resetForm(expense.category)
         setTimeout(() => amountInputRef.current?.focus(), 100)
     }
 
-    const resetForm = () => {
+    const resetForm = (category = lastCategory) => {
         setExpense({
             amount: '',
-            category: lastCategory,
+            category,
             paymentMode: 'UPI',
             note: ''
         })
