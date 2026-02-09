@@ -1,17 +1,16 @@
 import axios from 'axios';
 
 const getBaseURL = () => {
+    // 1. Try VITE_API_URL from environment
     const envURL = (import.meta as any).env.VITE_API_URL;
     if (envURL) return envURL;
 
-    // In production (on Vercel), if no VITE_API_URL is set, 
-    // we should NOT default to localhost as it triggers browser security warnings.
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-        console.warn('⚠️ VITE_API_URL is not defined in Production environment variables!');
-        // Return a relative path or an empty string to avoid "Private Network Access" popup
+    // 2. Production: Use relative path (avoids localhost security issues)
+    if (import.meta.env.PROD) {
         return '/api';
     }
 
+    // 3. Development: Default to localhost
     return 'http://localhost:5000/api';
 };
 
