@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-require('dotenv').config();
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
 
 const connectDB = require('./config/db');
 const User = require('./models/User');
