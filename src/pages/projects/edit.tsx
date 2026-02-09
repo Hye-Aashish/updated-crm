@@ -17,7 +17,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { ChevronLeft, Info } from 'lucide-react'
 import type { ProjectStatus, ProjectType, PaymentModel } from '@/types'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import {
     Popover,
     PopoverContent,
@@ -54,7 +54,7 @@ export function EditProjectPage() {
             // For now redirect or show loading
             const fetchProjects = async () => {
                 try {
-                    const response = await axios.get('http://localhost:5000/api/projects')
+                    const response = await api.get('/projects')
                     const backendProjects = response.data.map((p: any) => ({
                         id: p._id,
                         name: p.name,
@@ -110,7 +110,7 @@ export function EditProjectPage() {
 
         try {
             // Send data to Backend API
-            const response = await axios.put(`http://localhost:5000/api/projects/${project.id}`, {
+            const response = await api.put(`/projects/${project.id}`, {
                 ...formData,
                 dueDate: formData.deadline
             })

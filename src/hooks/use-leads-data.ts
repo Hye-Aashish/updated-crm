@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useAppStore } from '@/store'
 import { useToast } from '@/hooks/use-toast'
 import type { PipelineStage, LeadForm } from '@/types'
@@ -13,9 +13,9 @@ export function useLeadsData() {
     const fetchData = async () => {
         try {
             const [stagesRes, leadsRes, formsRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/leads/stages'),
-                axios.get('http://localhost:5000/api/leads'),
-                axios.get('http://localhost:5000/api/lead-forms')
+                api.get('/leads/stages'),
+                api.get('/leads'),
+                api.get('/lead-forms')
             ])
 
             setStages(stagesRes.data)
@@ -48,7 +48,7 @@ export function useLeadsData() {
         setLeads(leads.map(lead => lead.id === leadId ? { ...lead, stage: targetStage } : lead))
 
         try {
-            await axios.put(`http://localhost:5000/api/leads/${leadId}`, { stage: targetStage })
+            await api.put(`/leads/${leadId}`, { stage: targetStage })
             toast({ description: "Lead stage updated" })
         } catch (error) {
             setLeads(previousLeads)
@@ -58,7 +58,7 @@ export function useLeadsData() {
 
     const deleteLead = async (leadId: string) => {
         try {
-            await axios.delete(`http://localhost:5000/api/leads/${leadId}`)
+            await api.delete(`/leads/${leadId}`)
             setLeads(leads.filter(l => l.id !== leadId))
             toast({ description: "Lead deleted successfully" })
         } catch (error) {
@@ -68,7 +68,7 @@ export function useLeadsData() {
 
     const addActivity = async (leadId: string, content: string) => {
         try {
-            const res = await axios.post(`http://localhost:5000/api/leads/${leadId}/activities`, {
+            const res = await api.post(`/leads/${leadId}/activities`, {
                 content,
                 type: 'note'
             })

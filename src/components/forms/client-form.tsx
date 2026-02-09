@@ -26,7 +26,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, X, Upload, FileIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useAppStore } from '@/store'
 
 // --- Data Lists (Static for now, can be moved to DB later) ---
@@ -101,7 +101,7 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
         const fetchUsers = async () => {
             if (users.length > 0) return // Already loaded
             try {
-                const response = await axios.get('http://localhost:5000/api/users')
+                const response = await api.get('/users')
                 const backendUsers = response.data.map((u: any) => ({
                     id: u._id,
                     name: u.name,
@@ -149,7 +149,7 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
         try {
             if (mode === 'create') {
                 // Send to Backend
-                const response = await axios.post('http://localhost:5000/api/clients', {
+                const response = await api.post('/clients', {
                     ...data,
                     expectedDeadline: data.deadline // Map field
                 })
@@ -189,7 +189,7 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                 // UPDATE / Edit Mode
                 if (!clientId) throw new Error("Client ID missing for update")
 
-                const response = await axios.put(`http://localhost:5000/api/clients/${clientId}`, {
+                const response = await api.put(`/clients/${clientId}`, {
                     ...data,
                     expectedDeadline: data.deadline
                 })

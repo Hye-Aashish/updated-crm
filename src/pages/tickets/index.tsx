@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate } from '@/lib/utils'
 
@@ -59,7 +59,7 @@ export function TicketsPage() {
     // Fetch Tickets
     const fetchTickets = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/tickets')
+            const res = await api.get('/tickets')
             setTickets(res.data)
         } catch (error) {
             console.error("Failed to fetch tickets", error)
@@ -71,7 +71,7 @@ export function TicketsPage() {
         const fetchData = async () => {
             fetchTickets()
             try {
-                const res = await axios.get('http://localhost:5000/api/clients')
+                const res = await api.get('/clients')
                 setClients(res.data)
             } catch (error) {
                 console.error("Failed to fetch clients", error)
@@ -84,7 +84,7 @@ export function TicketsPage() {
     const handleCreateTicket = async () => {
         if (!newTicket.subject) return
         try {
-            await axios.post('http://localhost:5000/api/tickets', newTicket)
+            await api.post('/tickets', newTicket)
             fetchTickets()
             setIsDialogOpen(false)
             setNewTicket({ subject: '', description: '', priority: 'medium', clientName: '', assignedTo: '', screenshot: '' })
@@ -97,7 +97,7 @@ export function TicketsPage() {
     // Update Status
     const handleStatusChange = async (id: string, newStatus: string) => {
         try {
-            await axios.put(`http://localhost:5000/api/tickets/${id}`, { status: newStatus })
+            await api.put(`/tickets/${id}`, { status: newStatus })
             setTickets(tickets.map(t => t._id === id ? { ...t, status: newStatus as any } : t))
             toast({ description: "Status updated" })
         } catch (error) {
@@ -108,7 +108,7 @@ export function TicketsPage() {
     // Delete Ticket
     const handleDeleteTicket = async (id: string) => {
         try {
-            await axios.delete(`http://localhost:5000/api/tickets/${id}`)
+            await api.delete(`/tickets/${id}`)
             setTickets(tickets.filter(t => t._id !== id))
             toast({ description: "Ticket deleted" })
             if (selectedTicket?._id === id) setViewTicketDialogOpen(false)

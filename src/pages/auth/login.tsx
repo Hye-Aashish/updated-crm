@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
 export function LoginPage() {
@@ -21,7 +21,7 @@ export function LoginPage() {
 
     useEffect(() => {
         // Fetch Branding
-        axios.get('http://localhost:5000/api/settings').then(res => {
+        api.get('/settings').then(res => {
             const cp = res.data?.companyProfile
             if (cp) {
                 setBranding({
@@ -41,7 +41,7 @@ export function LoginPage() {
         e.preventDefault()
         setLoading(true)
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/login', { email, password })
+            const res = await api.post('/auth/login', { email, password })
             setCurrentUser(res.data)
             toast({ description: `Welcome back, ${res.data.name}` })
             navigate('/dashboard')

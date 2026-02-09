@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '@/lib/api-client'
 
 function hexToHSL(hex: string) {
     if (!hex) return null;
@@ -66,7 +66,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
     const [permissions, setPermissions] = useState<any>(null)
 
     useEffect(() => {
-        axios.get('http://localhost:5000/api/settings').then(res => {
+        api.get('/settings').then(res => {
             const cp = res.data?.companyProfile
             if (cp) {
                 if (cp.logo) setLogo(cp.logo)

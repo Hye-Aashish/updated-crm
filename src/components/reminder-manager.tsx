@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '@/store'
 import { useToast } from '@/hooks/use-toast'
-import axios from 'axios'
+import api from '@/lib/api-client'
 
 export function ReminderManager() {
     const { leads, setLeads, notifications, addNotification } = useAppStore()
@@ -12,7 +12,7 @@ export function ReminderManager() {
     useEffect(() => {
         const fetchSystemNotifications = async () => {
             try {
-                const res = await axios.get('http://localhost:5000/api/notifications')
+                const res = await api.get('/notifications')
                 if (Array.isArray(res.data)) {
                     // We only add new ones to avoid duplicates/infinite loops
                     res.data.forEach((notif: any) => {
@@ -100,7 +100,7 @@ export function ReminderManager() {
                 } : l))
 
                 // Update backend - sending full reminder to preserve date/tone
-                await axios.put(`http://localhost:5000/api/leads/${leadId}`, {
+                await api.put(`/leads/${leadId}`, {
                     reminder: updatedReminder
                 })
             } catch (error) {

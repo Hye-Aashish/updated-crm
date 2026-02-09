@@ -14,7 +14,7 @@ import {
     CheckCircle2,
     Info
 } from 'lucide-react'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { useAppStore } from '@/store'
@@ -40,7 +40,7 @@ export function AttendancePage() {
 
     const fetchStatus = async () => {
         try {
-            const res = await axios.get(`http://localhost:5000/api/attendance/today/${currentUser?.id || (currentUser as any)._id}`)
+            const res = await api.get(`/attendance/today/${currentUser?.id || (currentUser as any)._id}`)
             setStatus(res.data)
         } catch (error) {
             console.error('Failed to fetch status')
@@ -49,7 +49,7 @@ export function AttendancePage() {
 
     const fetchHistory = async () => {
         try {
-            const res = await axios.get(`http://localhost:5000/api/attendance/history/${currentUser?.id || (currentUser as any)._id}`)
+            const res = await api.get(`/attendance/history/${currentUser?.id || (currentUser as any)._id}`)
             setHistory(res.data)
         } catch (error) {
             console.error('Failed to fetch history')
@@ -58,7 +58,7 @@ export function AttendancePage() {
 
     const fetchUsers = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/users')
+            const res = await api.get('/users')
             setUsers(res.data)
         } catch (error) {
             console.error('Failed to fetch users')
@@ -67,7 +67,7 @@ export function AttendancePage() {
 
     const handleAction = async (endpoint: string, successMsg: string) => {
         try {
-            const res = await axios.post(`http://localhost:5000/api/attendance/${endpoint}`, { userId: currentUser?.id })
+            const res = await api.post(`/attendance/${endpoint}`, { userId: currentUser?.id })
             setStatus(res.data)
             toast({ title: 'Success', description: successMsg })
             fetchHistory()

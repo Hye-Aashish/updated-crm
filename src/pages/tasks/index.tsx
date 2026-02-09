@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { timeEntryService } from '@/lib/timeEntryService'
 
 // Task Status Type
@@ -133,9 +133,9 @@ export function TasksPage() {
             if (storeTasks.length === 0 || users.length === 0 || projects.length === 0) {
                 try {
                     const [tasksRes, usersRes, projectsRes] = await Promise.all([
-                        storeTasks.length === 0 ? axios.get('http://localhost:5000/api/tasks') : Promise.resolve({ data: null }),
-                        users.length === 0 ? axios.get('http://localhost:5000/api/users') : Promise.resolve({ data: null }),
-                        projects.length === 0 ? axios.get('http://localhost:5000/api/projects') : Promise.resolve({ data: null })
+                        storeTasks.length === 0 ? api.get('/tasks') : Promise.resolve({ data: null }),
+                        users.length === 0 ? api.get('/users') : Promise.resolve({ data: null }),
+                        projects.length === 0 ? api.get('/projects') : Promise.resolve({ data: null })
                     ])
 
                     if (tasksRes.data) {
@@ -374,7 +374,7 @@ export function TasksPage() {
 
         // Update Backend
         try {
-            await axios.put(`http://localhost:5000/api/tasks/${draggedTask.id}`, updates)
+            await api.put(`/tasks/${draggedTask.id}`, updates)
         } catch (error) {
             console.error("Failed to update status", error)
         }
@@ -432,7 +432,7 @@ export function TasksPage() {
         setStoreTasks(updatedTasks)
 
         try {
-            await axios.put(`http://localhost:5000/api/tasks/${task.id}`, updates)
+            await api.put(`/tasks/${task.id}`, updates)
             toast({ title: "Sent for Approval", description: "Task moved to Client Approval." })
         } catch (error) {
             console.error("Failed to update status", error)
@@ -496,7 +496,7 @@ export function TasksPage() {
                 estimatedHours: selectedTask.estimatedHours
             }
 
-            await axios.put(`http://localhost:5000/api/tasks/${selectedTask.id}`, taskData)
+            await api.put(`/tasks/${selectedTask.id}`, taskData)
 
             updateStoreTask(selectedTask.id, taskData)
             // useEffect will sync to local tasks if needed, but updateStoreTask should trigger it
@@ -530,7 +530,7 @@ export function TasksPage() {
                 return
             }
 
-            const response = await axios.post('http://localhost:5000/api/tasks', taskData)
+            const response = await api.post('/tasks', taskData)
             const savedTask = response.data
 
             const frontendTask = {
@@ -569,7 +569,7 @@ export function TasksPage() {
     const confirmDeleteTask = async () => {
         if (!taskToDelete) return
         try {
-            await axios.delete(`http://localhost:5000/api/tasks/${taskToDelete}`)
+            await api.delete(`/tasks/${taskToDelete}`)
             const updatedTasks = tasks.filter(t => t.id !== taskToDelete)
             setTasks(updatedTasks)
             setStoreTasks(updatedTasks)

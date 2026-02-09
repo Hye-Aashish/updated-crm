@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+import api from './api-client';
 
 export interface TimeEntry {
     _id: string;
@@ -42,23 +42,14 @@ export const timeEntryService = {
         startDate?: string;
         endDate?: string;
     }): Promise<TimeEntry[]> {
-        const params = new URLSearchParams();
-        if (filters?.userId) params.append('userId', filters.userId);
-        if (filters?.projectId) params.append('projectId', filters.projectId);
-        if (filters?.taskId) params.append('taskId', filters.taskId);
-        if (filters?.startDate) params.append('startDate', filters.startDate);
-        if (filters?.endDate) params.append('endDate', filters.endDate);
-
-        const response = await fetch(`${API_BASE_URL}/time-entries?${params}`);
-        if (!response.ok) throw new Error('Failed to fetch time entries');
-        return response.json();
+        const response = await api.get('/time-entries', { params: filters });
+        return response.data;
     },
 
     // Get a single time entry by ID
     async getById(id: string): Promise<TimeEntry> {
-        const response = await fetch(`${API_BASE_URL}/time-entries/${id}`);
-        if (!response.ok) throw new Error('Failed to fetch time entry');
-        return response.json();
+        const response = await api.get(`/time-entries/${id}`);
+        return response.data;
     },
 
     // Create a new time entry (start timer)
@@ -70,13 +61,8 @@ export const timeEntryService = {
         startTime?: Date;
         isRunning?: boolean;
     }): Promise<TimeEntry> {
-        const response = await fetch(`${API_BASE_URL}/time-entries`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!response.ok) throw new Error('Failed to create time entry');
-        return response.json();
+        const response = await api.post('/time-entries', data);
+        return response.data;
     },
 
     // Update a time entry (stop timer, update note, etc.)
@@ -86,28 +72,19 @@ export const timeEntryService = {
         note?: string;
         isRunning?: boolean;
     }): Promise<TimeEntry> {
-        const response = await fetch(`${API_BASE_URL}/time-entries/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!response.ok) throw new Error('Failed to update time entry');
-        return response.json();
+        const response = await api.put(`/time-entries/${id}`, data);
+        return response.data;
     },
 
     // Delete a time entry
     async delete(id: string): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/time-entries/${id}`, {
-            method: 'DELETE'
-        });
-        if (!response.ok) throw new Error('Failed to delete time entry');
+        await api.delete(`/time-entries/${id}`);
     },
 
     // Get running timer for a user
     async getRunningTimer(userId: string): Promise<TimeEntry | null> {
-        const response = await fetch(`${API_BASE_URL}/time-entries/user/${userId}/running`);
-        if (!response.ok) throw new Error('Failed to fetch running timer');
-        return response.json();
+        const response = await api.get(`/time-entries/user/${userId}/running`);
+        return response.data;
     },
 
     // Get time statistics
@@ -116,14 +93,8 @@ export const timeEntryService = {
         startDate?: string;
         endDate?: string;
     }): Promise<TimeEntryStats> {
-        const params = new URLSearchParams();
-        if (filters?.userId) params.append('userId', filters.userId);
-        if (filters?.startDate) params.append('startDate', filters.startDate);
-        if (filters?.endDate) params.append('endDate', filters.endDate);
-
-        const response = await fetch(`${API_BASE_URL}/time-entries/stats/summary?${params}`);
-        if (!response.ok) throw new Error('Failed to fetch time statistics');
-        return response.json();
+        const response = await api.get('/time-entries/stats/summary', { params: filters });
+        return response.data;
     },
 
     // Start a timer

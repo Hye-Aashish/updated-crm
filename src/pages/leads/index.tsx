@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Plus, Settings, List, LayoutGrid, FileText, Trash2 } from 'lucide-react'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
 import { useLeadsData } from '@/hooks/use-leads-data'
@@ -52,7 +52,7 @@ export function LeadsPage() {
                 source: newLead.source || 'Direct',
                 stage: stages[0]?.id || 'new'
             }
-            const res = await axios.post('http://localhost:5000/api/leads', payload)
+            const res = await api.post('/leads', payload)
             setLeads([...leads, { id: res.data._id, ...payload, activities: [], customFields: {} }])
             setNewLead({ name: '', company: '', value: '', source: '', email: '', phone: '' })
             setIsLeadDialogOpen(false)
@@ -67,7 +67,7 @@ export function LeadsPage() {
         const stageId = newStage.label.toLowerCase().replace(/\s+/g, '-')
         const stagePayload = { id: stageId, label: newStage.label, color: newStage.color, order: stages.length }
         try {
-            await axios.post('http://localhost:5000/api/leads/stages', stagePayload)
+            await api.post('/leads/stages', stagePayload)
             setStages([...stages, stagePayload])
             setNewStage({ label: '', color: 'bg-blue-500' })
             setIsStageDialogOpen(false)
@@ -80,7 +80,7 @@ export function LeadsPage() {
     const handleDeleteStage = async (stageId: string) => {
         if (stages.length <= 1) return
         try {
-            await axios.delete(`http://localhost:5000/api/leads/stages/${stageId}`)
+            await api.delete(`/leads/stages/${stageId}`)
             fetchData()
             toast({ description: "Stage deleted and leads migrated" })
         } catch (error) {

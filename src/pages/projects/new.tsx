@@ -17,7 +17,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { ChevronLeft, Info } from 'lucide-react'
 import type { Project, ProjectStatus, ProjectType, PaymentModel } from '@/types'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import {
     Popover,
     PopoverContent,
@@ -50,7 +50,7 @@ export function NewProjectPage() {
 
         try {
             // Send data to Backend API
-            const response = await axios.post('http://localhost:5000/api/projects', {
+            const response = await api.post('/projects', {
                 ...formData,
                 dueDate: formData.deadline // Map deadline to dueDate for backend
             })

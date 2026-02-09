@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
 export function useAttendance(userId: string | undefined) {
@@ -16,7 +16,7 @@ export function useAttendance(userId: string | undefined) {
 
     useEffect(() => {
         if (!userId) return
-        axios.get(`http://localhost:5000/api/attendance/today/${userId}`)
+        api.get(`/attendance/today/${userId}`)
             .then(res => {
                 const data = res.data
                 if (data.status) {
@@ -51,7 +51,7 @@ export function useAttendance(userId: string | undefined) {
 
     const handleClockIn = async () => {
         try {
-            await axios.post('http://localhost:5000/api/attendance/check-in', { userId })
+            await api.post('/attendance/check-in', { userId })
             setAttendanceStatus('in')
             setClockInTime(new Date())
             toast({ description: "Clocked in successfully" })
@@ -63,11 +63,11 @@ export function useAttendance(userId: string | undefined) {
     const handleBreakToggle = async () => {
         try {
             if (attendanceStatus === 'in') {
-                await axios.post('http://localhost:5000/api/attendance/break-start', { userId })
+                await api.post('/attendance/break-start', { userId })
                 setAttendanceStatus('break')
                 toast({ description: "Break started" })
             } else {
-                await axios.post('http://localhost:5000/api/attendance/break-end', { userId })
+                await api.post('/attendance/break-end', { userId })
                 setAttendanceStatus('in')
                 toast({ description: "Break ended" })
             }
@@ -78,7 +78,7 @@ export function useAttendance(userId: string | undefined) {
 
     const handleClockOut = async () => {
         try {
-            const res = await axios.post('http://localhost:5000/api/attendance/check-out', { userId })
+            const res = await api.post('/attendance/check-out', { userId })
             setAttendanceStatus('checked-out')
             setElapsedTime(0)
             if (res.data.isHalfDay) {

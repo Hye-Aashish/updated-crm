@@ -11,7 +11,7 @@ import { ArrowLeft, Mail, Phone, Briefcase, MapPin, User, FileText, Shield, Edit
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { getInitials, formatDate } from '@/lib/utils'
 
@@ -41,7 +41,7 @@ export function TeamMemberPage() {
                 setLoading(false)
             } else {
                 try {
-                    const res = await axios.get(`http://localhost:5000/api/users/${id}`)
+                    const res = await api.get(`/users/${id}`)
                     const mapped = { ...res.data, id: res.data._id }
                     setUser(mapped)
                     setEditForm(mapped)
@@ -57,7 +57,7 @@ export function TeamMemberPage() {
 
     const handleUpdateUser = async () => {
         try {
-            const res = await axios.put(`http://localhost:5000/api/users/${id}`, editForm)
+            const res = await api.put(`/users/${id}`, editForm)
             const updated = { ...res.data, id: res.data._id }
             setUser(updated)
             setIsEditDialogOpen(false)

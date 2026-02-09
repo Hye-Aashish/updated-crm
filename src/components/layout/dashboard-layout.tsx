@@ -4,7 +4,7 @@ import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
-import axios from 'axios'
+import api from '@/lib/api-client'
 
 export function DashboardLayout() {
     const [collapsed, setCollapsed] = useState(false)
@@ -14,7 +14,7 @@ export function DashboardLayout() {
     // 1. Load Leads if empty (Global Check)
     useEffect(() => {
         if (leads.length === 0) {
-            axios.get('http://localhost:5000/api/leads').then(res => {
+            api.get('/leads').then(res => {
                 const mappedLeads = res.data.map((l: any) => ({
                     id: l._id,
                     name: l.name,
@@ -58,7 +58,7 @@ export function DashboardLayout() {
                         })
 
                         // Update Backend
-                        axios.put(`http://localhost:5000/api/leads/${lead.id}`, {
+                        api.put(`/leads/${lead.id}`, {
                             reminder: { ...lead.reminder, completed: true }
                         }).catch(console.error)
 

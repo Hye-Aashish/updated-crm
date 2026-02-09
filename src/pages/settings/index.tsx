@@ -9,7 +9,7 @@ import {
     Upload, Save, Plus, Trash2, Edit, Eye, EyeOff, Shield, Mail, CheckCircle, AlertCircle, Loader2,
     Layout, GripVertical, Check
 } from 'lucide-react'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -56,7 +56,7 @@ export function SettingsPage() {
 
     const fetchSettings = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/settings')
+            const res = await api.get('/settings')
             setSettings(res.data)
         } catch (error) {
             console.error("Failed to fetch settings", error)
@@ -65,7 +65,7 @@ export function SettingsPage() {
 
     const updateSettings = async (section: string, data: any) => {
         try {
-            const res = await axios.put('http://localhost:5000/api/settings', { [section]: data })
+            const res = await api.put('/settings', { [section]: data })
             setSettings(res.data)
             toast({ description: "Settings updated successfully" })
         } catch (error) {
@@ -350,7 +350,7 @@ function UsersRolesTab() {
 
     const fetchRoles = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/settings')
+            const res = await api.get('/settings')
             if (res.data.roles) setAvailableRoles(res.data.roles)
         } catch (error) {
             console.error("Failed to fetch roles", error)
@@ -359,7 +359,7 @@ function UsersRolesTab() {
 
     const fetchUsers = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/users')
+            const res = await api.get('/users')
             setUsers(res.data)
         } catch (error) {
             console.error("Failed to fetch users", error)
@@ -392,14 +392,14 @@ function UsersRolesTab() {
             }
 
             if (editingUser) {
-                await axios.put(`http://localhost:5000/api/users/${editingUser._id}`, formData)
+                await api.put(`/users/${editingUser._id}`, formData)
                 toast({ description: "User updated successfully" })
             } else {
                 if (!formData.password) {
                     toast({ description: "Password is required for new users", variant: "destructive" })
                     return
                 }
-                await axios.post('http://localhost:5000/api/users', formData)
+                await api.post('/users', formData)
                 toast({ description: "User added successfully" })
             }
             setIsOpen(false)
@@ -413,7 +413,7 @@ function UsersRolesTab() {
     const handleDelete = async (id: string, name: string) => {
         if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
         try {
-            await axios.delete(`http://localhost:5000/api/users/${id}`)
+            await api.delete(`/users/${id}`)
             fetchUsers()
             toast({ description: "User deleted" })
         } catch (error) {
@@ -634,7 +634,7 @@ function EmailSettingsTab({ data, onSave }: any) {
         setTesting(true)
         setTestResult(null)
         try {
-            const res = await axios.post('http://localhost:5000/api/settings/test-smtp', formData)
+            const res = await api.post('/settings/test-smtp', formData)
             setTestResult({ success: true, message: res.data.message })
         } catch (error: any) {
             setTestResult({ success: false, message: error.response?.data?.message || "Failed to connect to SMTP server." })

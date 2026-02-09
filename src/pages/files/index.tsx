@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Plus, Search, FileText, Image, FileIcon, User, HardDrive } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import axios from 'axios'
+import api from '@/lib/api-client'
 
 export function FilesPage() {
     const { files, setFiles, users, projects } = useAppStore()
@@ -14,7 +14,7 @@ export function FilesPage() {
         const fetchFiles = async () => {
             if (files.length === 0) {
                 try {
-                    const res = await axios.get('http://localhost:5000/api/files')
+                    const res = await api.get('/files')
                     setFiles(res.data.map((f: any) => ({
                         id: f._id,
                         name: f.name,

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Bell, Trash2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Lead } from '@/types'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
 interface LeadDetailsDialogProps {
@@ -53,7 +53,7 @@ export function LeadDetailsDialog({ lead, isOpen, onClose, onUpdate, onDelete, o
                     completed: false
                 }
             }
-            await axios.put(`http://localhost:5000/api/leads/${lead.id}`, payload)
+            await api.put(`/leads/${lead.id}`, payload)
             onUpdate({ ...lead, reminder: payload.reminder })
             toast({ description: "Reminder set successfully" })
         } catch (error) {

@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast'
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import type { Invoice } from '@/types'
 import { formatCurrency } from '@/lib/utils'
-import axios from 'axios'
+import api from '@/lib/api-client'
 
 interface InvoiceFormItem {
     id: string
@@ -37,7 +37,7 @@ export function NewInvoicePage() {
         const loadData = async () => {
             if (clients.length === 0) {
                 try {
-                    const res = await axios.get('http://localhost:5000/api/clients')
+                    const res = await api.get('/clients')
                     setClients(res.data.map((c: any) => ({
                         id: c._id,
                         name: c.name,
@@ -56,7 +56,7 @@ export function NewInvoicePage() {
 
             if (projects.length === 0) {
                 try {
-                    const res = await axios.get('http://localhost:5000/api/projects')
+                    const res = await api.get('/projects')
                     // Map backend projects to store format
                     setProjects(res.data.map((p: any) => ({
                         id: p._id,
@@ -179,7 +179,7 @@ export function NewInvoicePage() {
                 frequency: formData.frequency // Add frequency to payload
             }
 
-            const response = await axios.post('http://localhost:5000/api/invoices', payload)
+            const response = await api.post('/invoices', payload)
             const saved = response.data
 
             const newInvoice: Invoice = {

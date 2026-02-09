@@ -28,7 +28,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
 import { AttendanceSheet } from '@/components/attendance/attendance-sheet'
@@ -91,7 +91,7 @@ export function TeamPage() {
         const fetchUsers = async () => {
             if (users.length === 0) {
                 try {
-                    const res = await axios.get('http://localhost:5000/api/users')
+                    const res = await api.get('/users')
                     const mapped = res.data.map((u: any) => ({
                         id: u._id,
                         ...u
@@ -123,7 +123,7 @@ export function TeamPage() {
             return
         }
         try {
-            const res = await axios.post('http://localhost:5000/api/users', newUser)
+            const res = await api.post('/users', newUser)
             const created = { id: res.data._id, ...res.data }
             setUsers([...users, created])
             setIsAddUserOpen(false)
@@ -144,7 +144,7 @@ export function TeamPage() {
     const confirmDeleteUser = async () => {
         if (!userToDelete) return
         try {
-            await axios.delete(`http://localhost:5000/api/users/${userToDelete}`)
+            await api.delete(`/users/${userToDelete}`)
             setUsers(users.filter(u => u.id !== userToDelete))
             toast({ title: "Member Released", description: "User has been removed." })
         } catch (error) {

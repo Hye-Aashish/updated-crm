@@ -24,6 +24,7 @@ import {
 import { Clock, Calendar as CalendarIcon, Timer, TrendingUp, Users as UsersIcon, Play, Loader2, Plus, Square, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { timeEntryService, TimeEntry, TimeEntryStats } from '@/lib/timeEntryService'
+import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
 interface Project {
@@ -91,18 +92,16 @@ export function TimePage() {
     const fetchProjectsAndTasks = async () => {
         try {
             const [projectsRes, tasksRes] = await Promise.all([
-                fetch('http://localhost:5000/api/projects'),
-                fetch('http://localhost:5000/api/tasks')
+                api.get('/projects'),
+                api.get('/tasks')
             ])
 
-            if (projectsRes.ok) {
-                const projectsData = await projectsRes.json()
-                setProjects(projectsData)
+            if (projectsRes.data) {
+                setProjects(projectsRes.data)
             }
 
-            if (tasksRes.ok) {
-                const tasksData = await tasksRes.json()
-                setTasks(tasksData)
+            if (tasksRes.data) {
+                setTasks(tasksRes.data)
             }
         } catch (error) {
             console.error('Error fetching projects/tasks:', error)

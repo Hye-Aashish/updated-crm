@@ -12,7 +12,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Check, Type, Image as ImageIcon, Ban } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import type { Invoice, Client } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 
@@ -49,7 +49,7 @@ export function InvoiceDetailPage() {
         const fetchInvoiceData = async () => {
             if (!id) return;
             try {
-                const invoiceRes = await axios.get(`http://localhost:5000/api/invoices/${id}`)
+                const invoiceRes = await api.get(`/invoices/${id}`)
                 const invData = invoiceRes.data
                 const mappedInvoice: Invoice = {
                     id: invData._id,
@@ -79,7 +79,7 @@ export function InvoiceDetailPage() {
 
                 if (mappedInvoice.clientId) {
                     try {
-                        const clientRes = await axios.get(`http://localhost:5000/api/clients/${mappedInvoice.clientId}`)
+                        const clientRes = await api.get(`/clients/${mappedInvoice.clientId}`)
                         setClient({ ...clientRes.data, id: clientRes.data._id })
                     } catch (e) { }
                 }
@@ -577,7 +577,7 @@ export function InvoiceDetailPage() {
         if (!invoice) return;
         setSending(true)
         try {
-            await axios.post(`http://localhost:5000/api/invoices/${id}/send`)
+            await api.post(`/invoices/${id}/send`)
             toast({ description: "Invoice sent to client successfully!" })
         } catch (error: any) {
             console.error("Failed to send invoice", error)

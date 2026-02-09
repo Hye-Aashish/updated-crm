@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import type { Invoice } from '@/types'
 
 export function InvoicesPage() {
@@ -51,7 +51,7 @@ export function InvoicesPage() {
         if (!selectedInvoice || !recipientEmail) return
         setSending(true)
         try {
-            await axios.post(`http://localhost:5000/api/invoices/${selectedInvoice.id}/send`, {
+            await api.post(`/invoices/${selectedInvoice.id}/send`, {
                 customEmail: recipientEmail
             })
             toast({ title: "Email Sent", description: `Invoice sent to ${recipientEmail}` })
@@ -73,7 +73,7 @@ export function InvoicesPage() {
                 // Fetch Clients if empty
                 if (clients.length === 0) {
                     try {
-                        const clientsRes = await axios.get('http://localhost:5000/api/clients')
+                        const clientsRes = await api.get('/clients')
                         if (clientsRes.data) {
                             const mappedClients = clientsRes.data.map((c: any) => ({
                                 id: c._id,
@@ -94,7 +94,7 @@ export function InvoicesPage() {
                 }
 
                 // Fetch Invoices
-                const response = await axios.get('http://localhost:5000/api/invoices')
+                const response = await api.get('/invoices')
                 if (response.data) {
                     const mappedInvoices = response.data.map((i: any) => ({
                         id: i._id,

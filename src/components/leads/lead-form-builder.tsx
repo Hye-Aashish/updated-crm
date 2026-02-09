@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Copy, Plus, Trash2, ExternalLink, Code, CheckCircle2, Settings } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import type { LeadForm } from '@/types'
 import React from 'react'
 
@@ -76,14 +76,14 @@ export function LeadFormBuilder({ isOpen, onClose, leadForms, setLeadForms }: Le
         try {
             if (formId) {
                 // UPDATE existing form
-                const res = await axios.put(`http://localhost:5000/api/lead-forms/${formId}`, currentForm)
+                const res = await api.put(`/lead-forms/${formId}`, currentForm)
                 if (res.data) {
                     setLeadForms((prev: LeadForm[]) => prev.map((f: LeadForm) => (f as any)._id === formId ? res.data : f))
                     toast({ title: 'Success', description: 'Lead form updated' })
                 }
             } else {
                 // CREATE new form
-                const res = await axios.post('http://localhost:5000/api/lead-forms', currentForm)
+                const res = await api.post('/lead-forms', currentForm)
                 if (res.data) {
                     setLeadForms((prev: LeadForm[]) => [res.data, ...prev])
                     toast({ title: 'Success', description: 'Lead form published' })
@@ -105,7 +105,7 @@ export function LeadFormBuilder({ isOpen, onClose, leadForms, setLeadForms }: Le
     const handleDeleteForm = async (id: string) => {
         if (!confirm('Are you sure you want to delete this form?')) return
         try {
-            await axios.delete(`http://localhost:5000/api/lead-forms/${id}`)
+            await api.delete(`/lead-forms/${id}`)
             setLeadForms(leadForms.filter(f => (f as any)._id !== id))
             toast({ title: 'Success', description: 'Lead form deleted' })
         } catch (err) {

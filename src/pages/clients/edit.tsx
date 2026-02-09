@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { ClientForm } from '@/components/forms/client-form'
 import { useEffect } from 'react'
-import axios from 'axios'
+import api from '@/lib/api-client'
 
 export function EditClientPage() {
     const { id } = useParams()
@@ -16,7 +16,7 @@ export function EditClientPage() {
         if (!client && clients.length === 0) {
             const fetchClients = async () => {
                 try {
-                    const response = await axios.get('http://localhost:5000/api/clients')
+                    const response = await api.get('/clients')
                     const backendClients = response.data.map((c: any) => ({
                         id: c._id,
                         name: c.name,

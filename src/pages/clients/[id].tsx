@@ -11,7 +11,7 @@ import {
     DollarSign, Clock, Edit, Trash2, ExternalLink
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
-import axios from 'axios'
+import api from '@/lib/api-client'
 
 export function ClientDetailPage() {
     const { id } = useParams()
@@ -24,7 +24,7 @@ export function ClientDetailPage() {
         if (!client) return
         if (window.confirm("Are you sure you want to delete this client? This action cannot be undone.")) {
             try {
-                await axios.delete(`http://localhost:5000/api/clients/${client.id}`)
+                await api.delete(`/clients/${client.id}`)
                 deleteClient(client.id)
                 navigate('/clients')
             } catch (error) {
@@ -39,7 +39,7 @@ export function ClientDetailPage() {
         if (!client && clients.length === 0) {
             const fetchClients = async () => {
                 try {
-                    const response = await axios.get('http://localhost:5000/api/clients')
+                    const response = await api.get('/clients')
                     const backendClients = response.data.map((c: any) => ({
                         id: c._id,
                         name: c.name,

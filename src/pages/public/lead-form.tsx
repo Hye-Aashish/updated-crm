@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -29,7 +29,7 @@ export function PublicLeadForm() {
     const fetchFormConfig = async () => {
         try {
             setLoading(true)
-            const res = await axios.get(`http://localhost:5000/api/lead-forms/public/${id}`)
+            const res = await api.get(`/lead-forms/public/${id}`)
             setFormConfig(res.data)
             // Initialize form data
             const initialData = {} as any
@@ -52,7 +52,7 @@ export function PublicLeadForm() {
         e.preventDefault()
         setSubmitting(true)
         try {
-            await axios.post(`http://localhost:5000/api/lead-forms/public/${id}/submit`, formData)
+            await api.post(`/lead-forms/public/${id}/submit`, formData)
             setSubmitted(true)
             toast({ title: 'Success', description: 'Thank you! We will contact you soon.' })
         } catch (err: any) {

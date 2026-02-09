@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import type {
     User,
     Client,
@@ -354,7 +354,7 @@ export const useAppStore = create<AppState>((set) => ({
 
     markNotificationRead: async (id) => {
         try {
-            await axios.put(`http://localhost:5000/api/notifications/${id}/read`)
+            await api.put(`/notifications/${id}/read`)
             set((state) => ({
                 notifications: state.notifications.map((n) =>
                     n.id === id ? { ...n, read: true } : n
@@ -365,7 +365,7 @@ export const useAppStore = create<AppState>((set) => ({
 
     markAllNotificationsRead: async () => {
         try {
-            await axios.put('http://localhost:5000/api/notifications/mark-all-read')
+            await api.put('/notifications/mark-all-read')
             set((state) => ({
                 notifications: state.notifications.map((n) => ({ ...n, read: true })),
             }))

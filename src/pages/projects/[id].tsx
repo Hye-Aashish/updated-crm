@@ -19,7 +19,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import axios from 'axios'
+import api from '@/lib/api-client'
 import { TaskBoard } from '@/components/tasks/task-board'
 
 
@@ -44,7 +44,7 @@ export function ProjectDetailPage() {
         if (!project) return
         if (window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
             try {
-                await axios.delete(`http://localhost:5000/api/projects/${project.id}`)
+                await api.delete(`/projects/${project.id}`)
                 deleteProject(project.id)
                 navigate('/projects')
             } catch (error) {
@@ -63,11 +63,11 @@ export function ProjectDetailPage() {
             if (projects.length === 0 || clients.length === 0 || users.length === 0 || files.length === 0 || invoices.length === 0) {
                 try {
                     const [projectsRes, clientsRes, usersRes, filesRes, invoicesRes] = await Promise.all([
-                        projects.length === 0 ? axios.get('http://localhost:5000/api/projects') : Promise.resolve({ data: null }),
-                        clients.length === 0 ? axios.get('http://localhost:5000/api/clients') : Promise.resolve({ data: null }),
-                        users.length === 0 ? axios.get('http://localhost:5000/api/users') : Promise.resolve({ data: null }),
-                        files.length === 0 ? axios.get('http://localhost:5000/api/files') : Promise.resolve({ data: null }),
-                        invoices.length === 0 ? axios.get('http://localhost:5000/api/invoices') : Promise.resolve({ data: null })
+                        projects.length === 0 ? api.get('/projects') : Promise.resolve({ data: null }),
+                        clients.length === 0 ? api.get('/clients') : Promise.resolve({ data: null }),
+                        users.length === 0 ? api.get('/users') : Promise.resolve({ data: null }),
+                        files.length === 0 ? api.get('/files') : Promise.resolve({ data: null }),
+                        invoices.length === 0 ? api.get('/invoices') : Promise.resolve({ data: null })
                     ])
 
                     if (projectsRes.data) {
