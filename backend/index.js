@@ -69,8 +69,12 @@ app.get('/', (req, res) => res.send('Nexprism CRM API v1.0 - Operational'));
 // Error Middleware
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-    console.log(`\n🚀 Server established on port ${PORT}`);
-    console.log(`📡 Local: http://localhost:${PORT}`);
-    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}\n`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`\n🚀 Server established on port ${PORT}`);
+        console.log(`📡 Local: http://localhost:${PORT}`);
+        console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}\n`);
+    });
+}
+
+module.exports = app;

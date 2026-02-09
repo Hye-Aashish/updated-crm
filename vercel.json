@@ -1,0 +1,14 @@
+{
+    "version": 2,
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/backend/index.js"
+        }
+    ],
+    "functions": {
+        "backend/index.js": {
+            "runtime": "vercel-node@latest"
+        }
+    }
+}
