@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { MoreHorizontal, Trash2, Clock, Video, FileText } from 'lucide-react'
+import { useAppStore } from '@/store'
+import { MoreHorizontal, Trash2, Clock, Video, FileText, Calendar as CalendarIcon } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 interface TaskBoardCardProps {
@@ -21,7 +22,12 @@ interface TaskBoardCardProps {
 }
 
 export function TaskBoardCardV2({ task, users, setSelectedTask, handleDragStart, handleDeleteTask }: TaskBoardCardProps) {
+    const { currentUser, projects } = useAppStore()
     const assignee = users.find(u => u.id === task.assigneeId)
+    const project = projects.find(p => p.id === task.projectId)
+
+    const canDelete = currentUser?.role === 'admin' || currentUser?.role === 'owner' || (project && project.pmId === currentUser?.id)
+
     const [elapsed, setElapsed] = useState(task.totalTimeSpent || 0)
 
     useEffect(() => {
@@ -64,19 +70,21 @@ export function TaskBoardCardV2({ task, users, setSelectedTask, handleDragStart,
             <CardContent className="p-3">
                 <div className="flex justify-between items-start">
                     <div className="font-medium text-sm flex-1">{task.title}</div>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 -mr-2 -mt-2 focus:ring-0 ring-offset-0" onClick={(e) => e.stopPropagation()}>
-                                <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }} className="text-destructive focus:text-destructive cursor-pointer">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {canDelete && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 -mr-2 -mt-2 focus:ring-0 ring-offset-0" onClick={(e) => e.stopPropagation()}>
+                                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }} className="text-destructive focus:text-destructive cursor-pointer">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
 
                 {task.attachments && task.attachments.length > 0 && (
@@ -117,7 +125,7 @@ export function TaskBoardCardV2({ task, users, setSelectedTask, handleDragStart,
                         </span>
                     ) : (
                         <span className="text-muted-foreground flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
+                            <CalendarIcon className="h-3 w-3" />
                             {formatDate(task.dueDate)}
                         </span>
                     )}
@@ -135,27 +143,5 @@ export function TaskBoardCardV2({ task, users, setSelectedTask, handleDragStart,
                 )}
             </CardContent>
         </Card>
-    )
-}
-
-function Calendar(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-            <line x1="16" x2="16" y1="2" y2="6" />
-            <line x1="8" x2="8" y1="2" y2="6" />
-            <line x1="3" x2="21" y1="10" y2="10" />
-        </svg>
     )
 }

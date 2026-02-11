@@ -9,7 +9,7 @@ if (!cached) {
 
 async function connectDB() {
     if (cached.conn) {
-        console.log('>>> Using Cached DB Connection <<<');
+        // console.log('>>> Using Cached DB Connection <<<');
         return cached.conn;
     }
 

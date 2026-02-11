@@ -42,8 +42,15 @@ export function LoginPage() {
         setLoading(true)
         try {
             const res = await api.post('/auth/login', { email, password })
-            setCurrentUser(res.data)
-            toast({ description: `Welcome back, ${res.data.name}` })
+            const userData = res.data
+
+            // Save token for api-client
+            if (userData.token) {
+                localStorage.setItem('token', userData.token)
+            }
+
+            setCurrentUser(userData)
+            toast({ description: `Welcome back, ${userData.name}` })
             navigate('/dashboard')
         } catch (error: any) {
             toast({

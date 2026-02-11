@@ -1,11 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const File = require('../models/File');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // GET all files
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
-        const files = await File.find().sort({ uploadedAt: -1 });
+        let query = {};
+        // If not admin/owner, filter by uploader
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            query.uploadedBy = req.user._id.toString();
+        }
+
+        const files = await File.find(query).sort({ uploadedAt: -1 });
         res.json(files);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -13,10 +20,16 @@ router.get('/', async (req, res) => {
 });
 
 // GET single file
-router.get('/:id', async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         const file = await File.findById(req.params.id);
         if (!file) return res.status(404).json({ message: 'File not found' });
+
+        // Authorization check
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && file.uploadedBy !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
         res.json(file);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -24,9 +37,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // UPLAOD/CREATE a new file record
-// Note: This is just the metadata record. Real file upload usually involves multer or cloud storage.
-// For now, we assume 'url' and metadata are passed in body (e.g. from frontend base64 or pre-signed url logic).
-router.post('/', async (req, res) => {
+router.post('/', protect, async (req, res) => {
     const file = new File({
         name: req.body.name,
         type: req.body.type,
@@ -34,7 +45,7 @@ router.post('/', async (req, res) => {
         url: req.body.url,
         projectId: req.body.projectId,
         clientId: req.body.clientId,
-        uploadedBy: req.body.uploadedBy
+        uploadedBy: req.user._id.toString() // Enforce current user
     });
 
     try {
@@ -46,10 +57,17 @@ router.post('/', async (req, res) => {
 });
 
 // UPDATE a file
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, async (req, res) => {
     try {
+        const file = await File.findById(req.params.id);
+        if (!file) return res.status(404).json({ message: 'File not found' });
+
+        // Authorization check
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && file.uploadedBy !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
         const updatedFile = await File.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedFile) return res.status(404).json({ message: 'File not found' });
         res.json(updatedFile);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -57,10 +75,17 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE a file
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
     try {
-        const deletedFile = await File.findByIdAndDelete(req.params.id);
-        if (!deletedFile) return res.status(404).json({ message: 'File not found' });
+        const file = await File.findById(req.params.id);
+        if (!file) return res.status(404).json({ message: 'File not found' });
+
+        // Authorization check
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && file.uploadedBy !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        await file.deleteOne();
         res.json({ message: 'File deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });

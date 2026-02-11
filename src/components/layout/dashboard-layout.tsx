@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
 import { cn } from '@/lib/utils'
@@ -9,11 +9,37 @@ import api from '@/lib/api-client'
 export function DashboardLayout() {
     const [collapsed, setCollapsed] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
-    const { leads, setLeads, addNotification } = useAppStore()
+    const navigate = useNavigate()
+    const { currentUser, setCurrentUser, leads, setLeads, addNotification } = useAppStore()
+    const [authLoading, setAuthLoading] = useState(true)
+
+    // 0. Auth / Session Check
+    useEffect(() => {
+        const checkAuth = async () => {
+            const token = localStorage.getItem('token')
+            if (!token) {
+                navigate('/login')
+                return
+            }
+
+            if (!currentUser) {
+                try {
+                    const res = await api.get('/auth/me')
+                    setCurrentUser(res.data)
+                } catch (err) {
+                    console.error("Auth failed:", err)
+                    localStorage.removeItem('token')
+                    navigate('/login')
+                }
+            }
+            setAuthLoading(false)
+        }
+        checkAuth()
+    }, [currentUser, navigate, setCurrentUser])
 
     // 1. Load Leads if empty (Global Check)
     useEffect(() => {
-        if (leads.length === 0) {
+        if (!authLoading && currentUser && leads.length === 0) {
             api.get('/leads').then(res => {
                 const mappedLeads = res.data.map((l: any) => ({
                     id: l._id,
@@ -30,7 +56,7 @@ export function DashboardLayout() {
                 setLeads(mappedLeads)
             }).catch(e => console.error("Reminder Sys: Load failed", e))
         }
-    }, [])
+    }, [authLoading, currentUser, leads.length, setLeads])
 
     // 2. Poll for Reminders
     useEffect(() => {
@@ -78,6 +104,15 @@ export function DashboardLayout() {
         return () => clearInterval(interval)
     }, [leads, addNotification, setLeads])
 
+    if (authLoading) {
+        return (
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-background space-y-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+                <p className="text-sm font-medium text-muted-foreground animate-pulse">Authenticating...</p>
+            </div>
+        )
+    }
+
     return (
 
         <div className="flex h-screen bg-background overflow-hidden w-full font-sans">
@@ -96,7 +131,7 @@ export function DashboardLayout() {
                 )}
             >
                 {/* Topbar */}
-                <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border/40 bg-background/80 backdrop-blur-md px-6 shadow-sm shrink-0">
+                <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border/40 bg-background/80 backdrop-blur-md px-4 md:px-6 shadow-sm shrink-0">
                     <div className="flex-1 min-w-0">
                         <Topbar onMenuClick={() => setMobileOpen(true)} />
                     </div>

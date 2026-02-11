@@ -1,15 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const TimeEntry = require('../models/TimeEntry');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Get all time entries with filters
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
         const { userId, projectId, taskId, startDate, endDate } = req.query;
 
         let query = {};
 
-        if (userId) query.userId = userId;
+        // Enforcement: If not admin/owner, force the user's own ID
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            query.userId = req.user._id;
+        } else if (userId) {
+            query.userId = userId;
+        }
+
         if (projectId) query.projectId = projectId;
         if (taskId) query.taskId = taskId;
 
@@ -37,7 +44,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get a single time entry
-router.get('/:id', async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         const timeEntry = await TimeEntry.findById(req.params.id)
             .populate('userId', 'name email')
@@ -48,6 +55,11 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ message: 'Time entry not found' });
         }
 
+        // Authorization check
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && timeEntry.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
         res.json(timeEntry);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -55,10 +67,10 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create a new time entry (start timer)
-router.post('/', async (req, res) => {
+router.post('/', protect, async (req, res) => {
     try {
         const timeEntry = new TimeEntry({
-            userId: req.body.userId,
+            userId: req.user._id, // Enforce current user
             projectId: req.body.projectId,
             taskId: req.body.taskId,
             startTime: req.body.startTime || new Date(),
@@ -80,12 +92,17 @@ router.post('/', async (req, res) => {
 });
 
 // Update a time entry (stop timer, update note, etc.)
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, async (req, res) => {
     try {
         const timeEntry = await TimeEntry.findById(req.params.id);
 
         if (!timeEntry) {
             return res.status(404).json({ message: 'Time entry not found' });
+        }
+
+        // Authorization check
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && timeEntry.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
         }
 
         // Update fields
@@ -115,12 +132,17 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete a time entry
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
     try {
         const timeEntry = await TimeEntry.findById(req.params.id);
 
         if (!timeEntry) {
             return res.status(404).json({ message: 'Time entry not found' });
+        }
+
+        // Authorization check
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && timeEntry.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
         }
 
         await timeEntry.deleteOne();
@@ -130,11 +152,11 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-// Get running timer for a user
-router.get('/user/:userId/running', async (req, res) => {
+// Get running timer for current user
+router.get('/running/me', protect, async (req, res) => {
     try {
         const runningTimer = await TimeEntry.findOne({
-            userId: req.params.userId,
+            userId: req.user._id,
             isRunning: true
         })
             .populate('userId', 'name email')
@@ -147,13 +169,15 @@ router.get('/user/:userId/running', async (req, res) => {
     }
 });
 
-// Get time statistics
-router.get('/stats/summary', async (req, res) => {
+// General summary for user
+router.get('/stats/summary', protect, async (req, res) => {
     try {
-        const { userId, startDate, endDate } = req.query;
+        const { startDate, endDate } = req.query;
 
         let query = {};
-        if (userId) query.userId = userId;
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            query.userId = req.user._id;
+        }
 
         if (startDate || endDate) {
             query.startTime = {};

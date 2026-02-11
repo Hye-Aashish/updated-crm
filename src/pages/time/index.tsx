@@ -272,30 +272,32 @@ export function TimePage() {
                     <h1 className="text-3xl font-bold">Time Tracking</h1>
                     <p className="text-muted-foreground mt-1">Monitor time spent on projects and tasks.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 w-full md:w-auto md:flex-row md:items-center">
                     <div className="flex items-center gap-2 bg-muted/40 p-2 rounded-lg border">
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                         <Input
                             type="date"
-                            className="h-8 w-auto bg-background border-none shadow-none text-sm"
+                            className="h-8 w-auto min-w-[110px] bg-background border-none shadow-none text-sm p-1"
                             value={dateRange.start}
                             onChange={(e) => handleDateChange('start', e.target.value)}
                         />
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-muted-foreground shrink-0">-</span>
                         <Input
                             type="date"
-                            className="h-8 w-auto bg-background border-none shadow-none text-sm"
+                            className="h-8 w-auto min-w-[110px] bg-background border-none shadow-none text-sm p-1"
                             value={dateRange.end}
                             onChange={(e) => handleDateChange('end', e.target.value)}
                         />
                     </div>
-                    <Button onClick={() => setShowStartModal(true)}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Start Timer
-                    </Button>
-                    <Button variant="outline" onClick={() => navigate('/time/reports')}>
-                        Reports
-                    </Button>
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <Button onClick={() => setShowStartModal(true)} className="flex-1 md:flex-none">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Start Timer
+                        </Button>
+                        <Button variant="outline" onClick={() => navigate('/time/reports')} className="flex-1 md:flex-none">
+                            Reports
+                        </Button>
+                    </div>
                 </div>
             </div>
 

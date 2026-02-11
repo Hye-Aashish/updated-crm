@@ -30,7 +30,11 @@ const settingSchema = new mongoose.Schema({
     notifications: {
         emailAlerts: { type: Boolean, default: true },
         projectUpdates: { type: Boolean, default: true },
-        taskAssignments: { type: Boolean, default: true }
+        taskAssignments: { type: Boolean, default: true },
+        taskOverdue: { type: Boolean, default: true },
+        invoiceDue: { type: Boolean, default: true },
+        clientApproval: { type: Boolean, default: true },
+        projectDeadline: { type: Boolean, default: true }
     },
     emailSettings: {
         host: String,

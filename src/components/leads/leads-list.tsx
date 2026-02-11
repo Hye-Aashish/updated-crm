@@ -20,8 +20,8 @@ export function LeadsList({ leads, stages, onLeadClick, onDeleteLead }: LeadsLis
                     <thead className="bg-muted/40 text-[11px] uppercase font-bold tracking-wider text-muted-foreground border-b border-border/40">
                         <tr>
                             <th className="px-6 py-4">Company</th>
-                            <th className="px-6 py-4">Contact</th>
-                            <th className="px-6 py-4">Value</th>
+                            <th className="hidden md:table-cell px-6 py-4">Contact</th>
+                            <th className="hidden sm:table-cell px-6 py-4">Value</th>
                             <th className="px-6 py-4">Stage</th>
                             <th className="px-6 py-4 text-right">Actions</th>
                         </tr>
@@ -35,11 +35,11 @@ export function LeadsList({ leads, stages, onLeadClick, onDeleteLead }: LeadsLis
                                         <div className="font-bold text-foreground group-hover:text-primary transition-colors">{lead.company}</div>
                                         <div className="text-[10px] text-muted-foreground font-medium mt-0.5">{lead.source}</div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="hidden md:table-cell px-6 py-4">
                                         <div className="font-semibold text-foreground">{lead.name}</div>
                                         <div className="text-[10px] text-muted-foreground">{lead.email}</div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="hidden sm:table-cell px-6 py-4">
                                         <div className="font-bold text-foreground">{formatCurrency(lead.value)}</div>
                                     </td>
                                     <td className="px-6 py-4">

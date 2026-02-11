@@ -13,6 +13,7 @@ const projectSchema = new mongoose.Schema({
     budget: { type: Number, default: 0 },
     clientId: { type: String, required: true },
     pmId: { type: String },
+    members: [{ type: String }],
     type: { type: String, default: 'web-development' }, // Added
     paymentModel: { type: String, default: 'milestone' }, // Added
     progress: { type: Number, default: 0 },

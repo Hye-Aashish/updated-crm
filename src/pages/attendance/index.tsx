@@ -135,33 +135,33 @@ export function AttendancePage() {
                     </CardHeader>
                     <CardContent className="space-y-8 py-6">
                         <div className="text-center space-y-2 relative">
-                            <h2 className="text-7xl font-black font-mono tracking-tighter text-primary">
+                            <h2 className="text-5xl md:text-7xl font-black font-mono tracking-tighter text-primary">
                                 {format(currentTime, 'hh:mm:ss')}
-                                <span className="text-2xl ml-2 font-sans font-bold text-muted-foreground">{format(currentTime, 'a')}</span>
+                                <span className="text-xl md:text-2xl ml-2 font-sans font-bold text-muted-foreground">{format(currentTime, 'a')}</span>
                             </h2>
                             <p className="text-sm font-medium text-muted-foreground">Current Session Time</p>
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="bg-muted/40 p-4 rounded-2xl text-center space-y-1">
                                 <LogIn className="h-4 w-4 mx-auto text-green-500 mb-1" />
                                 <p className="text-xs font-bold text-muted-foreground uppercase">Check In</p>
-                                <p className="text-xl font-bold">{formatTime(status?.checkIn)}</p>
+                                <p className="text-lg md:text-xl font-bold">{formatTime(status?.checkIn)}</p>
                             </div>
                             <div className="bg-muted/40 p-4 rounded-2xl text-center space-y-1">
                                 <Coffee className="h-4 w-4 mx-auto text-amber-500 mb-1" />
                                 <p className="text-xs font-bold text-muted-foreground uppercase">Break Time</p>
-                                <p className="text-xl font-bold">{formatDuration(status?.totalBreakTime)}</p>
+                                <p className="text-lg md:text-xl font-bold">{formatDuration(status?.totalBreakTime)}</p>
                             </div>
                             <div className="bg-muted/40 p-4 rounded-2xl text-center space-y-1">
                                 <LogOut className="h-4 w-4 mx-auto text-rose-500 mb-1" />
                                 <p className="text-xs font-bold text-muted-foreground uppercase">Check Out</p>
-                                <p className="text-xl font-bold">{formatTime(status?.checkOut)}</p>
+                                <p className="text-lg md:text-xl font-bold">{formatTime(status?.checkOut)}</p>
                             </div>
                             <div className="bg-muted/40 p-4 rounded-2xl text-center space-y-1">
                                 <History className="h-4 w-4 mx-auto text-blue-500 mb-1" />
                                 <p className="text-xs font-bold text-muted-foreground uppercase">Work Hours</p>
-                                <p className="text-xl font-bold">{formatDuration(status?.totalWorkTime)}</p>
+                                <p className="text-lg md:text-xl font-bold">{formatDuration(status?.totalWorkTime)}</p>
                             </div>
                         </div>
 
@@ -169,7 +169,7 @@ export function AttendancePage() {
                             {!status?.checkIn && (
                                 <Button
                                     size="lg"
-                                    className="h-16 text-lg font-bold gap-3 shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+                                    className="md:col-span-2 h-16 text-lg font-bold gap-3 shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
                                     onClick={() => handleAction('check-in', 'Checked in successfully!')}
                                 >
                                     <Play className="h-6 w-6" /> Check In Now

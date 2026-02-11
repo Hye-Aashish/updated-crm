@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const LeadForm = require('../models/LeadForm');
 const Lead = require('../models/Lead');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Get all forms
-router.get('/', async (req, res) => {
+// Get all forms (All authenticated users for pipeline view)
+router.get('/', protect, async (req, res) => {
     try {
         const forms = await LeadForm.find().sort({ createdAt: -1 });
         res.json(forms);
@@ -13,8 +14,8 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Create form
-router.post('/', async (req, res) => {
+// Create form (Admin only)
+router.post('/', protect, authorize('admin', 'owner'), async (req, res) => {
     const { title, description, fields, isActive } = req.body;
     try {
         const newForm = new LeadForm({ title, description, fields, isActive });
@@ -25,8 +26,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update form
-router.put('/:id', async (req, res) => {
+// Update form (Admin only)
+router.put('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const updateData = { ...req.body };
         delete updateData._id;
@@ -46,8 +47,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete form
-router.delete('/:id', async (req, res) => {
+// Delete form (Admin only)
+router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const form = await LeadForm.findByIdAndDelete(req.params.id);
         if (!form) return res.status(404).json({ message: 'Form not found' });
@@ -79,8 +80,6 @@ router.post('/public/:id/submit', async (req, res) => {
         }
 
         // Map submission to Lead model
-        // Assuming fields correspond to Lead properties or we store them in a way leads can handle
-        // Default Lead fields: name, company, value, source, stage, email, phone
         const submission = req.body;
         const mainFields = ['name', 'company', 'email', 'phone', 'value', 'source', 'stage'];
         const customFields = {};

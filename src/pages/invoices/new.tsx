@@ -12,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import type { Invoice } from '@/types'
@@ -89,7 +90,8 @@ export function NewInvoicePage() {
         projectId: '',
         dueDate: '',
         taxRate: 18,
-        frequency: 'once'
+        frequency: 'once',
+        autoSend: false
     })
 
     const [items, setItems] = useState<InvoiceFormItem[]>([
@@ -176,7 +178,8 @@ export function NewInvoicePage() {
                 subtotal,
                 tax: taxAmount,
                 total,
-                frequency: formData.frequency // Add frequency to payload
+                frequency: formData.frequency,
+                autoSend: formData.autoSend
             }
 
             const response = await api.post('/invoices', payload)
@@ -307,6 +310,19 @@ export function NewInvoicePage() {
                                 <div className="space-y-2">
                                     <Label>Currency</Label>
                                     <Input value="INR (₹)" disabled />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="autoSend">Auto Send Email</Label>
+                                    <div className="flex items-center space-x-2 h-10">
+                                        <Switch
+                                            id="autoSend"
+                                            checked={formData.autoSend}
+                                            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, autoSend: checked }))}
+                                        />
+                                        <Label htmlFor="autoSend" className="text-sm font-normal cursor-pointer">
+                                            Send to Client immediately
+                                        </Label>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>

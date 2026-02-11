@@ -4,11 +4,15 @@ import { Target, Briefcase, CheckSquare, Banknote } from 'lucide-react'
 
 export function useDashboardMetrics(settings: any) {
     const { currentUser, projects, tasks, invoices, timeEntries, leads, expenses } = useAppStore()
-    const userId = currentUser.id || (currentUser as any)._id
+    const userId = currentUser?.id || (currentUser as any)?._id
 
-    const canViewAll = currentUser.role === 'owner' || currentUser.role === 'admin'
-    const relevantProjects = useMemo(() => canViewAll ? projects : projects.filter(p => (p as any).team?.some((m: any) => (m._id || m) === userId)), [canViewAll, projects, userId])
-    const relevantTasks = useMemo(() => canViewAll ? tasks : tasks.filter(t => ((t as any).assignedTo?._id || (t as any).assignedTo) === userId), [canViewAll, tasks, userId])
+    const canViewAll = currentUser?.role === 'owner' || currentUser?.role === 'admin'
+    const relevantProjects = useMemo(() => canViewAll ? projects : projects.filter(p => p.pmId === userId || p.members?.includes(userId)), [canViewAll, projects, userId])
+    const relevantTasks = useMemo(() => {
+        if (canViewAll) return tasks
+        const myProjectIds = relevantProjects.map(p => p.id)
+        return tasks.filter(t => t.assigneeId === userId || myProjectIds.includes(t.projectId))
+    }, [canViewAll, tasks, userId, relevantProjects])
 
     const totalRevenue = useMemo(() => invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total, 0), [invoices])
     const totalExpenses = useMemo(() => expenses.reduce((sum, e) => sum + e.amount, 0), [expenses])

@@ -1,12 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const Expense = require('../models/Expense');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Get all expenses
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
-        // Sort by date descending by default
-        const expenses = await Expense.find().sort({ date: -1 });
+        let filter = {};
+        // If not admin/owner, only show own expenses
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            filter = { paidById: req.user._id.toString() };
+        }
+
+        const expenses = await Expense.find(filter).sort({ date: -1 });
         res.json(expenses);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -14,13 +20,14 @@ router.get('/', async (req, res) => {
 });
 
 // Create expense
-router.post('/', async (req, res) => {
+router.post('/', protect, async (req, res) => {
     const expense = new Expense({
         date: req.body.date,
         amount: req.body.amount,
         category: req.body.category,
         paymentMode: req.body.paymentMode,
         paidBy: req.body.paidBy,
+        paidById: req.user._id.toString(), // Automatically link to current user
         note: req.body.note,
         receipt: req.body.receipt
     });
@@ -34,7 +41,7 @@ router.post('/', async (req, res) => {
 });
 
 // Delete expense
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const deletedExpense = await Expense.findByIdAndDelete(req.params.id);
         if (!deletedExpense) return res.status(404).json({ message: 'Expense not found' });

@@ -1,11 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const Invoice = require('../models/Invoice');
+const Client = require('../models/Client');
+const Project = require('../models/Project');
+const sendEmail = require('../utils/sendEmail');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // GET all invoices
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
-        const invoices = await Invoice.find().sort({ createdAt: -1 });
+        let filter = {};
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            const userId = req.user._id.toString();
+
+            // Invoices for clients assigned to me
+            const myClients = await Client.find({ assignedTo: userId }).select('_id');
+            const myClientIds = myClients.map(c => c._id.toString());
+
+            // Invoices for projects I manage or belong to
+            const myProjects = await Project.find({
+                $or: [{ pmId: userId }, { members: userId }]
+            }).select('_id');
+            const myProjectIds = myProjects.map(p => p._id.toString());
+
+            filter = {
+                $or: [
+                    { clientId: { $in: myClientIds } },
+                    { projectId: { $in: myProjectIds } }
+                ]
+            };
+        }
+        const invoices = await Invoice.find(filter).sort({ createdAt: -1 });
         res.json(invoices);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -13,10 +38,32 @@ router.get('/', async (req, res) => {
 });
 
 // GET single invoice
-router.get('/:id', async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+        // RBAC Check for View Access
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            const userId = req.user._id.toString();
+
+            // Allow if client is assigned to me
+            const client = await Client.findById(invoice.clientId);
+            if (client && client.assignedTo === userId) {
+                return res.json(invoice);
+            }
+
+            // Allow if I'm a member/PM of the project
+            if (invoice.projectId) {
+                const project = await Project.findById(invoice.projectId);
+                if (project && (project.pmId === userId || (project.members && project.members.includes(userId)))) {
+                    return res.json(invoice);
+                }
+            }
+
+            return res.status(403).json({ message: 'Not authorized to view this invoice' });
+        }
+
         res.json(invoice);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -24,7 +71,8 @@ router.get('/:id', async (req, res) => {
 });
 
 // CREATE a new invoice
-router.post('/', async (req, res) => {
+// CREATE a new invoice
+router.post('/', protect, async (req, res) => {
     const invoice = new Invoice({
         invoiceNumber: req.body.invoiceNumber,
         clientId: req.body.clientId,
@@ -37,11 +85,46 @@ router.post('/', async (req, res) => {
         total: req.body.total,
         date: req.body.date,
         dueDate: req.body.dueDate,
-        paidDate: req.body.paidDate
+        paidDate: req.body.paidDate,
+        autoSend: req.body.autoSend,
+        frequency: req.body.frequency
     });
 
     try {
         const newInvoice = await invoice.save();
+
+        if (req.body.autoSend) {
+            try {
+                const client = await Client.findById(newInvoice.clientId);
+                if (client && client.email) {
+                    const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+                    const message = `
+                        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                            <h2 style="color: #0f172a;">Invoice #${newInvoice.invoiceNumber}</h2>
+                            <p>Dear ${client.name},</p>
+                            <p>Please find attached invoice <strong>#${newInvoice.invoiceNumber}</strong> dated <strong>${new Date(newInvoice.date).toLocaleDateString()}</strong>.</p>
+                            
+                            <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                <p style="margin: 5px 0;"><strong>Amount Due:</strong> <span style="font-size: 1.2em; color: #0f172a;">${formatting.format(newInvoice.total)}</span></p>
+                                <p style="margin: 5px 0;"><strong>Due Date:</strong> ${new Date(newInvoice.dueDate).toLocaleDateString()}</p>
+                            </div>
+
+                            <p>Thank you for your business.</p>
+                            <p>Best regards,<br>Nexprism Team</p>
+                        </div>
+                    `;
+
+                    await sendEmail({
+                        to: client.email,
+                        subject: `Invoice #${newInvoice.invoiceNumber} from Nexprism`,
+                        html: message
+                    });
+                }
+            } catch (emailErr) {
+                console.error("Auto-send failed:", emailErr);
+            }
+        }
+
         res.status(201).json(newInvoice);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -49,10 +132,26 @@ router.post('/', async (req, res) => {
 });
 
 // UPDATE an invoice
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, async (req, res) => {
     try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+        // RBAC Check
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            const userId = req.user._id.toString();
+            const client = await Client.findById(invoice.clientId);
+            const project = invoice.projectId ? await Project.findById(invoice.projectId) : null;
+
+            const isClientOwner = client && client.assignedTo === userId;
+            const isPM = project && project.pmId === userId;
+
+            if (!isClientOwner && !isPM) {
+                return res.status(403).json({ message: 'Not authorized to update this invoice' });
+            }
+        }
+
         const updatedInvoice = await Invoice.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedInvoice) return res.status(404).json({ message: 'Invoice not found' });
         res.json(updatedInvoice);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -60,7 +159,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE an invoice
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const deletedInvoice = await Invoice.findByIdAndDelete(req.params.id);
         if (!deletedInvoice) return res.status(404).json({ message: 'Invoice not found' });
@@ -71,7 +170,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // SEND invoice via Email
-router.post('/:id/send', async (req, res) => {
+router.post('/:id/send', protect, async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });

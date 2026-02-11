@@ -27,7 +27,9 @@ const invoiceSchema = new mongoose.Schema({
     dueDate: { type: Date, required: true },
     paidDate: { type: Date },
     createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    updatedAt: { type: Date, default: Date.now },
+    autoSend: { type: Boolean, default: false },
+    frequency: { type: String, default: 'once' }
 });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);

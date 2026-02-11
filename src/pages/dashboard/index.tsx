@@ -24,7 +24,7 @@ export function DashboardPage() {
     const navigate = useNavigate()
     const { currentUser, leads, invoices, setLeads, setExpenses, setProjects, setInvoices, setTasks } = useAppStore()
     const [settings, setSettings] = useState<any>(null)
-    const userId = currentUser.id || (currentUser as any)._id
+    const userId = currentUser?.id || (currentUser as any)?._id
 
     // Hooks for business logic
     const {
@@ -38,6 +38,8 @@ export function DashboardPage() {
         revenueData, leadStatusData, healthMetrics, recentActivities,
         revenueTrend, expenseTrend, currentLayout
     } = useDashboardMetrics(settings)
+
+    if (!currentUser) return null;
 
     // Data Fetching (Initial load only)
     useEffect(() => {
@@ -357,10 +359,10 @@ export function DashboardPage() {
                                             <td className="px-6 py-4 font-semibold text-foreground">
                                                 {lead.company}
                                             </td>
-                                            <td className="px-6 py-4 text-muted-foreground font-medium">
+                                            <td className="hidden md:table-cell px-6 py-4 text-muted-foreground font-medium">
                                                 {lead.name}
                                             </td>
-                                            <td className="px-6 py-4 font-bold text-foreground">
+                                            <td className="hidden sm:table-cell px-6 py-4 font-bold text-foreground">
                                                 {formatCurrency(lead.value)}
                                             </td>
                                             <td className="px-6 py-4">
@@ -387,55 +389,64 @@ export function DashboardPage() {
         <div className="space-y-8 pb-10">
             {/* 1. Header & Attendance */}
             <div className="flex flex-col xl:flex-row gap-6 justify-between items-end">
-                <div className="animate-in fade-in slide-in-from-left-4 duration-700">
+                <div className="animate-in fade-in slide-in-from-left-4 duration-700 w-full xl:w-auto">
                     <div className="flex items-center gap-2">
                         <WelcomeAnimation />
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground font-sans">Dashboard</h1>
+                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground font-sans">Dashboard</h1>
                     </div>
-                    <p className="text-muted-foreground mt-2 text-base font-medium">
+                    <p className="text-muted-foreground mt-2 text-sm md:text-base font-medium">
                         Welcome back, {currentUser.name}. Here's what's happening today.
                     </p>
                 </div>
 
-                <div className="dashboard-card flex items-center gap-4 p-2 pr-4 bg-background/50 border-border/60 animate-in fade-in slide-in-from-right-4 duration-700">
-                    <div className="px-4 border-r border-border/40 text-right">
+                <div className="dashboard-card flex flex-col sm:flex-row items-center gap-4 p-4 bg-background/50 border-border/60 animate-in fade-in slide-in-from-right-4 duration-700 w-full xl:w-auto">
+                    <div className="w-full sm:w-auto flex justify-between sm:block px-0 sm:px-4 border-b sm:border-b-0 sm:border-r border-border/40 pb-2 sm:pb-0 text-left sm:text-right">
                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">System Time</p>
                         <p className="text-xl font-mono font-bold tracking-tight">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
 
-                    {attendanceStatus === 'out' ? (
-                        <Button size="sm" onClick={handleClockIn} className="rounded-lg bg-emerald-600 hover:bg-emerald-700 font-semibold shadow-sm transition-all hover:shadow-md text-white">
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Clock In
-                        </Button>
-                    ) : attendanceStatus === 'checked-out' ? (
-                        <Badge variant="outline" className="h-9 px-4 rounded-lg font-bold border-muted-foreground/30 text-muted-foreground">
-                            <CheckSquare className="h-4 w-4 mr-2" />
-                            Shift Completed
-                        </Badge>
-                    ) : (
-                        <div className="flex items-center gap-2">
-                            <div className="text-right mr-2">
-                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Session</p>
-                                <p className="text-sm font-mono text-primary font-bold tabular-nums">{formatElapsedTime(elapsedTime)}</p>
+                    <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                        {attendanceStatus === 'out' ? (
+                            <Button size="sm" onClick={handleClockIn} className="w-full sm:w-auto rounded-lg bg-emerald-600 hover:bg-emerald-700 font-semibold shadow-sm transition-all hover:shadow-md text-white">
+                                <PlayCircle className="h-4 w-4 mr-2" />
+                                Clock In
+                            </Button>
+                        ) : attendanceStatus === 'checked-out' ? (
+                            <Badge variant="outline" className="w-full sm:w-auto justify-center h-9 px-4 rounded-lg font-bold border-muted-foreground/30 text-muted-foreground">
+                                <CheckSquare className="h-4 w-4 mr-2" />
+                                Shift Completed
+                            </Badge>
+                        ) : (
+                            <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                                <div className="hidden sm:block text-right mr-2">
+                                    <p className="text-[10px] uppercase text-muted-foreground font-bold">Session</p>
+                                    <p className="text-sm font-mono text-primary font-bold tabular-nums">{formatElapsedTime(elapsedTime)}</p>
+                                </div>
+
+                                <div className="flex gap-2 w-full sm:w-auto">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className={`flex-1 sm:flex-none rounded-lg font-semibold transition-colors ${attendanceStatus === 'break' ? 'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
+                                        onClick={handleBreakToggle}
+                                    >
+                                        <Coffee className="h-4 w-4 mr-1" />
+                                        {attendanceStatus === 'break' ? 'End Break' : 'Break'}
+                                    </Button>
+
+                                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none rounded-lg shadow-sm font-semibold text-white transition-transform hover:scale-105" onClick={handleClockOut} disabled={attendanceStatus === 'break'}>
+                                        <StopCircle className="h-4 w-4 mr-2" />
+                                        Clock Out
+                                    </Button>
+                                </div>
+                                {/* Mobile Session Timer */}
+                                <div className="sm:hidden w-full flex justify-between items-center bg-muted/30 p-2 rounded-lg mt-1">
+                                    <span className="text-[10px] uppercase text-muted-foreground font-bold">Current Session</span>
+                                    <span className="text-sm font-mono text-primary font-bold tabular-nums">{formatElapsedTime(elapsedTime)}</span>
+                                </div>
                             </div>
-
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className={`rounded-lg font-semibold transition-colors ${attendanceStatus === 'break' ? 'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
-                                onClick={handleBreakToggle}
-                            >
-                                <Coffee className="h-4 w-4 mr-1" />
-                                {attendanceStatus === 'break' ? 'End Break' : 'Break'}
-                            </Button>
-
-                            <Button size="sm" variant="destructive" className="rounded-lg shadow-sm font-semibold text-white transition-transform hover:scale-105" onClick={handleClockOut} disabled={attendanceStatus === 'break'}>
-                                <StopCircle className="h-4 w-4 mr-2" />
-                                Clock Out
-                            </Button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
 

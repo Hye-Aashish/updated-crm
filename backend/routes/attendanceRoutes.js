@@ -1,10 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const Attendance = require('../models/Attendance');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Get today's attendance for a user
-router.get('/today/:userId', async (req, res) => {
+router.get('/today/:userId', protect, async (req, res) => {
     try {
+        // Enforce same user or admin
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && req.params.userId !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized to view this record' });
+        }
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -20,9 +26,9 @@ router.get('/today/:userId', async (req, res) => {
 });
 
 // Check-in
-router.post('/check-in', async (req, res) => {
+router.post('/check-in', protect, async (req, res) => {
     try {
-        const { userId } = req.body;
+        const userId = req.user._id.toString(); // Use authenticated user ID for security
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -47,9 +53,9 @@ router.post('/check-in', async (req, res) => {
 });
 
 // Break Start
-router.post('/break-start', async (req, res) => {
+router.post('/break-start', protect, async (req, res) => {
     try {
-        const { userId } = req.body;
+        const userId = req.user._id.toString();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -74,9 +80,9 @@ router.post('/break-start', async (req, res) => {
 });
 
 // Break End
-router.post('/break-end', async (req, res) => {
+router.post('/break-end', protect, async (req, res) => {
     try {
-        const { userId } = req.body;
+        const userId = req.user._id.toString();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -101,9 +107,9 @@ router.post('/break-end', async (req, res) => {
 });
 
 // Check-out
-router.post('/check-out', async (req, res) => {
+router.post('/check-out', protect, async (req, res) => {
     try {
-        const { userId } = req.body;
+        const userId = req.user._id.toString();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -141,8 +147,8 @@ router.post('/check-out', async (req, res) => {
     }
 });
 
-// Get monthly attendance for all users
-router.get('/monthly', async (req, res) => {
+// Get monthly attendance for all users (Admin only)
+router.get('/monthly', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const { month, year } = req.query;
         const targetMonth = month ? parseInt(month) : new Date().getMonth();
@@ -162,7 +168,7 @@ router.get('/monthly', async (req, res) => {
 });
 
 // Manual Attendance Management (Admin only)
-router.post('/manual', async (req, res) => {
+router.post('/manual', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const { userId, date, status } = req.body;
         const targetDate = new Date(date);
@@ -193,8 +199,13 @@ router.post('/manual', async (req, res) => {
 });
 
 // Get attendance history for a user
-router.get('/history/:userId', async (req, res) => {
+router.get('/history/:userId', protect, async (req, res) => {
     try {
+        // Enforce same user or admin
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && req.params.userId !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
         const history = await Attendance.find({ userId: req.params.userId })
             .sort({ date: -1 })
             .limit(30);

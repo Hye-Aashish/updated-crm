@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
@@ -8,53 +7,19 @@ import {
     Calendar, PlayCircle, StopCircle, Coffee
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { useAttendance } from '@/hooks/use-attendance'
 
 export function EmployeeDashboardPage() {
     const navigate = useNavigate()
     const { projects, tasks, currentUser } = useAppStore()
+    const userId = currentUser?.id || (currentUser as any)?._id
 
-    // --- Attendance Logic (Reused) ---
-    const [currentTime, setCurrentTime] = useState(new Date())
-    const [attendanceStatus, setAttendanceStatus] = useState<'out' | 'in' | 'break'>('out')
-    const [clockInTime, setClockInTime] = useState<Date | null>(null)
-    const [elapsedTime, setElapsedTime] = useState(0)
+    const {
+        currentTime, attendanceStatus, elapsedTime,
+        handleClockIn, handleBreakToggle, handleClockOut, formatElapsedTime
+    } = useAttendance(userId)
 
-    useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-        return () => clearInterval(timer)
-    }, [])
-
-    useEffect(() => {
-        let interval: any
-        if (attendanceStatus === 'in' && clockInTime) {
-            interval = setInterval(() => {
-                const now = new Date()
-                const seconds = Math.floor((now.getTime() - clockInTime.getTime()) / 1000)
-                setElapsedTime(seconds)
-            }, 1000)
-        } else if (attendanceStatus === 'out') {
-            setElapsedTime(0)
-        }
-        return () => clearInterval(interval)
-    }, [attendanceStatus, clockInTime])
-
-    const formatElapsedTime = (seconds: number) => {
-        const h = Math.floor(seconds / 3600).toString().padStart(2, '0')
-        const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0')
-        const s = (seconds % 60).toString().padStart(2, '0')
-        return `${h}:${m}:${s}`
-    }
-
-    const handleClockIn = () => {
-        setAttendanceStatus('in')
-        setClockInTime(new Date())
-    }
-    const handleClockOut = () => {
-        setAttendanceStatus('out')
-        setClockInTime(null)
-    }
-    const handleBreak = () => { setAttendanceStatus('break') }
-    const handleResume = () => { setAttendanceStatus('in') }
+    if (!currentUser) return null;
 
     // --- Metrics for Employee (Filtered by Current User is harder with mock data, simulating "My" data) ---
     // In a real app, I'd filter like: .filter(t => t.assigneeId === currentUser.id)
@@ -157,12 +122,12 @@ export function EmployeeDashboardPage() {
                             ) : (
                                 <>
                                     {attendanceStatus === 'in' ? (
-                                        <Button variant="outline" className="gap-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50" onClick={handleBreak}>
+                                        <Button variant="outline" className="gap-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50" onClick={handleBreakToggle}>
                                             <Coffee className="h-4 w-4" />
                                             Take Break
                                         </Button>
                                     ) : (
-                                        <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={handleResume}>
+                                        <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={handleBreakToggle}>
                                             <PlayCircle className="h-4 w-4" />
                                             Resume
                                         </Button>

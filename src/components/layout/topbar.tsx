@@ -105,6 +105,9 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     const unreadCount = notifications.filter((n) => !n.read).length
     const initials = currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'
 
+    // Mobile Search State
+    const [showMobileSearch, setShowMobileSearch] = useState(false)
+
     // Quick Add Expense State
     const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
     const [lastCategory, setLastCategory] = useState('salary')
@@ -190,14 +193,70 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     }
 
     return (
-        <div className="flex w-full items-center justify-between gap-4">
+        <div className="flex w-full items-center justify-between gap-4 relative">
+            {/* Mobile Search Overlay */}
+            {showMobileSearch && (
+                <div className="absolute inset-0 z-50 flex items-center bg-background/95 backdrop-blur-xl px-2 gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <Search className="h-4 w-4 text-primary shrink-0 ml-2" />
+                    <Input
+                        autoFocus
+                        placeholder="Search leads, projects..."
+                        className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent h-full text-base"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <Button variant="ghost" size="icon" onClick={() => { setShowMobileSearch(false); setSearchQuery('') }} className="shrink-0">
+                        <X className="h-5 w-5" />
+                    </Button>
+
+                    {/* Mobile Results Dropdown */}
+                    {(searchQuery || searchResults.length > 0) && (
+                        <div className="absolute top-14 left-0 w-full bg-popover/95 backdrop-blur-md border border-border/50 rounded-b-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                            <div className="p-2 border-b border-border/30 bg-muted/20 flex justify-between items-center px-4">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Results</span>
+                                <span className="text-[10px] text-muted-foreground">{searchResults.length} matches</span>
+                            </div>
+                            <div className="max-h-[60vh] overflow-y-auto p-2">
+                                {searchResults.length === 0 && searchQuery && (
+                                    <div className="p-8 text-center">
+                                        <p className="text-sm text-muted-foreground">No results for "{searchQuery}"</p>
+                                    </div>
+                                )}
+                                {searchResults.map((res: any) => (
+                                    <div
+                                        key={`${res.type}-${res.id}`}
+                                        onClick={() => {
+                                            navigate(res.link)
+                                            setShowMobileSearch(false)
+                                            setSearchQuery('')
+                                        }}
+                                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 cursor-pointer border border-transparent hover:border-primary/10 mb-1"
+                                    >
+                                        <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-primary shrink-0">
+                                            <res.icon className="h-5 w-5" />
+                                        </div>
+                                        <div className="flex flex-col flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold truncate">{res.title}</span>
+                                                <Badge variant="outline" className="text-[8px] h-4 uppercase">{res.type}</Badge>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground truncate">{res.subtitle}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Mobile Menu Button */}
             <Button variant="ghost" size="icon" className="lg:hidden shrink-0 text-muted-foreground hover:text-foreground" onClick={onMenuClick}>
                 <Menu className="h-5 w-5" />
             </Button>
 
-            {/* Premium Search Bar */}
-            <div className="hidden md:flex flex-1 max-w-xl relative" ref={searchContainerRef}>
+            {/* Premium Search Bar (Desktop) */}
+            <div className={`hidden md:flex flex-1 max-w-xl relative ${showMobileSearch ? 'opacity-0' : ''}`} ref={searchContainerRef}>
                 <div className="relative w-full group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Search className="h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -223,7 +282,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                     </div>
                 </div>
 
-                {/* Search Results Dropdown */}
+                {/* Search Results Dropdown (Desktop) */}
                 {isSearchFocused && (searchQuery || searchResults.length > 0) && (
                     <div className="absolute top-12 left-0 w-full bg-popover/95 backdrop-blur-md border border-border/50 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="p-2 border-b border-border/30 bg-muted/20 flex justify-between items-center px-4">
@@ -259,7 +318,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                                         <span className="text-xs text-muted-foreground truncate">{res.subtitle}</span>
                                     </div>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Plus className="h-4 w-4 rotate-[135deg]" /> {/* Arrow icon substitute */}
+                                        <Plus className="h-4 w-4 rotate-[135deg]" />
                                     </Button>
                                 </div>
                             ))}
@@ -275,13 +334,17 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                 )}
             </div>
 
-            {/* Mobile Search Icon Only */}
-            <Button variant="ghost" size="icon" className="md:hidden shrink-0 text-muted-foreground">
-                <Search className="h-5 w-5" />
-            </Button>
-
             {/* Right Side Actions */}
             <div className="flex items-center gap-2 md:gap-3">
+                {/* Mobile Search Icon Only */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden shrink-0 text-muted-foreground"
+                    onClick={() => setShowMobileSearch(true)}
+                >
+                    <Search className="h-5 w-5" />
+                </Button>
                 {/* Add Expense - Primary Action */}
                 <Button
                     onClick={() => setIsExpenseDialogOpen(true)}
@@ -354,7 +417,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                             </Avatar>
                             <div className="hidden md:flex flex-col items-start text-xs">
                                 <span className="font-bold text-foreground leading-none mb-0.5">{currentUser?.name?.split(' ')[0]}</span>
-                                <span className="text-muted-foreground font-medium text-[10px]">Admin</span>
+                                <span className="text-muted-foreground font-medium text-[10px] capitalize">{currentUser?.role || 'Guest'}</span>
                             </div>
                         </Button>
                     </DropdownMenuTrigger>
@@ -371,7 +434,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                             <Settings className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg" onClick={() => navigate('/login')}>
+                        <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}>
                             <LogOut className="mr-2 h-4 w-4" /> Log out
                         </DropdownMenuItem>
                     </DropdownMenuContent>

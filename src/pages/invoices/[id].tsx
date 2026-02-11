@@ -597,43 +597,50 @@ export function InvoiceDetailPage() {
 
     return (
         <div className="max-w-5xl mx-auto pb-20 space-y-6">
-            <div className="bg-card p-4 rounded-xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6 no-print sticky top-4 z-50">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/invoices')}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div>
-                        <div className="text-sm font-medium text-muted-foreground">Customization</div>
-                        <div className="flex items-center gap-2 mt-1">
-                            <Select value={template} onValueChange={(v: any) => setTemplate(v)}>
-                                <SelectTrigger className="h-8 w-[140px] text-xs bg-muted/50 border-border">
-                                    <LayoutTemplate className="w-3 h-3 mr-2 text-primary" />
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="nexus">Nexus (New)</SelectItem>
-                                    <SelectItem value="corporate">Corporate</SelectItem>
-                                    <SelectItem value="creative">Creative</SelectItem>
-                                    <SelectItem value="elegant">Elegant</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <div className="h-6 w-px bg-border mx-1" />
-                            <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/30 rounded-full border border-border/50">
-                                {COLOR_PRESETS.map((color) => (
+            <div className="bg-card p-4 rounded-xl shadow-sm border flex flex-col lg:flex-row items-center justify-between gap-4 no-print sticky top-4 z-50 max-h-[80vh] overflow-y-auto lg:overflow-visible">
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+                    <div className="flex items-center justify-between w-full sm:w-auto">
+                        <Button variant="ghost" size="icon" onClick={() => navigate('/invoices')} className="shrink-0">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm font-semibold sm:hidden">Customization</span>
+                        <div className="w-8 sm:hidden" />
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+
+                        {/* Customization Group */}
+                        <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start w-full sm:w-auto gap-2 border bg-muted/20 p-1.5 rounded-lg border-dashed border-border/60">
+                            <div className="flex items-center gap-2">
+                                <Select value={template} onValueChange={(v: any) => setTemplate(v)}>
+                                    <SelectTrigger className="h-8 w-[130px] text-xs bg-background border-border shadow-sm">
+                                        <LayoutTemplate className="w-3 h-3 mr-2 text-primary" />
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="nexus">Nexus (New)</SelectItem>
+                                        <SelectItem value="corporate">Corporate</SelectItem>
+                                        <SelectItem value="creative">Creative</SelectItem>
+                                        <SelectItem value="elegant">Elegant</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-background rounded-md border border-border/50 shadow-sm">
+                                {COLOR_PRESETS.slice(0, 5).map((color) => (
                                     <button
                                         key={color.value}
                                         onClick={() => setThemeColor(color.value)}
-                                        className={`w-5 h-5 rounded-full cursor-pointer transition-all ${themeColor === color.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-110'}`}
+                                        className={`w-4 h-4 rounded-full cursor-pointer transition-all ${themeColor === color.value ? 'ring-2 ring-offset-1 ring-primary scale-110' : 'hover:scale-110'}`}
                                         style={{ backgroundColor: color.value }}
                                         title={color.name}
                                     />
                                 ))}
                                 <div className="relative ml-1">
-                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center cursor-pointer ${!COLOR_PRESETS.some(c => c.value === themeColor) ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer ${!COLOR_PRESETS.some(c => c.value === themeColor) ? 'ring-2 ring-offset-1 ring-primary' : ''}`}
                                         style={{ background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}
                                         onClick={() => setShowColorPicker(!showColorPicker)}
                                     >
-                                        <Palette className="w-2.5 h-2.5 text-white drop-shadow-md" />
+                                        <Palette className="w-2 h-2 text-white drop-shadow-md" />
                                     </div>
                                     {showColorPicker && (
                                         <div className="absolute top-full left-0 mt-2 p-2 bg-card rounded-lg shadow-xl border z-50 translate-x-[-50%] ml-2.5">
@@ -643,13 +650,13 @@ export function InvoiceDetailPage() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="h-6 w-px bg-border mx-2" />
-                    <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-1">Watermark</div>
-                        <div className="flex items-center gap-2">
+
+                        <div className="hidden lg:block h-8 w-px bg-border/60" />
+
+                        {/* Watermark Group */}
+                        <div className="flex items-center justify-center sm:justify-start w-full sm:w-auto gap-2 border bg-muted/20 p-1.5 rounded-lg border-dashed border-border/60">
                             <Select value={watermarkType} onValueChange={(v: any) => setWatermarkType(v)}>
-                                <SelectTrigger className="h-8 w-[110px] text-xs bg-muted/50 border-border">
+                                <SelectTrigger className="h-8 w-[100px] text-xs bg-background border-border shadow-sm">
                                     {watermarkType === 'none' && <Ban className="w-3 h-3 mr-2 text-muted-foreground" />}
                                     {watermarkType === 'logo' && <ImageIcon className="w-3 h-3 mr-2 text-primary" />}
                                     {watermarkType === 'text' && <Type className="w-3 h-3 mr-2 text-primary" />}
@@ -665,21 +672,22 @@ export function InvoiceDetailPage() {
                                 <Input
                                     value={watermarkText}
                                     onChange={(e) => setWatermarkText(e.target.value)}
-                                    className="h-8 w-[100px] text-xs bg-muted/50 border-border"
+                                    className="h-8 w-[80px] text-xs bg-background border-border shadow-sm"
                                     placeholder="Text..."
                                 />
                             )}
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={handlePrint}>
+                <div className="flex items-center gap-2 w-full lg:w-auto">
+                    <Button variant="outline" onClick={handlePrint} className="flex-1 lg:flex-none">
                         <Printer className="mr-2 h-4 w-4" /> Print
                     </Button>
                     <Button
                         style={{ backgroundColor: themeColor }}
                         onClick={handleSendEmail}
                         disabled={sending}
+                        className="flex-1 lg:flex-none"
                     >
                         {sending ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

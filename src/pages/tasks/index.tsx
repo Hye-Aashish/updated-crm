@@ -636,17 +636,17 @@ export function TasksPage() {
     return (
         <div className="space-y-4 h-[calc(100vh-100px)] flex flex-col w-full overflow-hidden">
             {/* Compact Header */}
-            <div className="flex items-center gap-4 flex-shrink-0">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 flex-shrink-0">
                 {/* Title */}
                 <div className="flex-shrink-0 animate-in fade-in slide-in-from-left-4 duration-500">
                     <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
                     <p className="text-sm text-muted-foreground">Manage work with Kanban or List views.</p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 ml-auto justify-end">
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto md:ml-auto justify-start md:justify-end">
                     {/* Filter Type */}
                     <select
-                        className={`h-9 px-3 rounded-md border text-sm w-32 ${filterType !== 'all' ? 'border-primary bg-primary/5 font-bold' : 'border-input bg-background'}`}
+                        className={`h-9 px-3 rounded-md border text-sm flex-1 min-w-[140px] md:flex-none md:w-32 ${filterType !== 'all' ? 'border-primary bg-primary/5 font-bold' : 'border-input bg-background'}`}
                         value={filterType}
                         onChange={(e) => {
                             setFilterType(e.target.value)
@@ -661,7 +661,7 @@ export function TasksPage() {
 
                     {/* Filters */}
                     <select
-                        className="h-9 px-3 rounded-md border border-input bg-background text-sm w-32"
+                        className="h-9 px-3 rounded-md border border-input bg-background text-sm flex-1 min-w-[140px] md:flex-none md:w-32"
                         value={filterPriority}
                         onChange={(e) => {
                             setFilterPriority(e.target.value)
@@ -676,7 +676,7 @@ export function TasksPage() {
                     </select>
 
                     <select
-                        className="h-9 px-3 rounded-md border border-input bg-background text-sm w-36"
+                        className="h-9 px-3 rounded-md border border-input bg-background text-sm flex-1 min-w-[140px] md:flex-none md:w-36"
                         value={filterProject}
                         onChange={(e) => setFilterProject(e.target.value)}
                     >

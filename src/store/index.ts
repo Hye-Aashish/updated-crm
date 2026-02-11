@@ -100,14 +100,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
     // Initial state with data transformations
-    currentUser: {
-        id: 'u1',
-        name: 'Demo Owner',
-        email: 'owner@example.com',
-        role: 'owner',
-        avatar: '',
-        phone: '1234567890'
-    },
+    currentUser: null as any,
     users: [], // Initialize empty
     clients: [],
     projects: [],

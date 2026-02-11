@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const Lead = require('../models/Lead');
 const PipelineStage = require('../models/PipelineStage');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // --- STAGES ROUTES ---
 
 // GET all stages
-router.get('/stages', async (req, res) => {
+router.get('/stages', protect, async (req, res) => {
     try {
         const stages = await PipelineStage.find().sort({ order: 1 });
         // If no stages, seed default
@@ -27,7 +28,7 @@ router.get('/stages', async (req, res) => {
 });
 
 // POST new stage
-router.post('/stages', async (req, res) => {
+router.post('/stages', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const stage = new PipelineStage({
             id: req.body.id,
@@ -43,7 +44,7 @@ router.post('/stages', async (req, res) => {
 });
 
 // DELETE stage
-router.delete('/stages/:id', async (req, res) => {
+router.delete('/stages/:id', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         await PipelineStage.findOneAndDelete({ id: req.params.id });
         res.json({ message: 'Stage deleted' });
@@ -56,9 +57,13 @@ router.delete('/stages/:id', async (req, res) => {
 // --- LEADS ROUTES ---
 
 // GET all leads
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
-        const leads = await Lead.find().sort({ createdAt: -1 });
+        let filter = {};
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            filter = { assignedTo: req.user._id.toString() };
+        }
+        const leads = await Lead.find(filter).sort({ createdAt: -1 });
         res.json(leads);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -66,7 +71,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST new lead
-router.post('/', async (req, res) => {
+router.post('/', protect, async (req, res) => {
     try {
         const lead = new Lead(req.body);
         const newLead = await lead.save();
@@ -89,8 +94,29 @@ router.post('/', async (req, res) => {
 });
 
 // UPDATE lead
-router.put('/:id', async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
+        const lead = await Lead.findById(req.params.id);
+        if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && lead.assignedTo !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+        res.json(lead);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+router.put('/:id', protect, async (req, res) => {
+    try {
+        const lead = await Lead.findById(req.params.id);
+        if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && lead.assignedTo !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
         const updatedLead = await Lead.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json(updatedLead);
     } catch (err) {
@@ -99,7 +125,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE lead
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         await Lead.findByIdAndDelete(req.params.id);
         res.json({ message: 'Lead deleted' });
@@ -109,10 +135,14 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Add Activity
-router.post('/:id/activities', async (req, res) => {
+router.post('/:id/activities', protect, async (req, res) => {
     try {
         const lead = await Lead.findById(req.params.id);
         if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && lead.assignedTo !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
 
         lead.activities.push({
             content: req.body.content,

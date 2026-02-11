@@ -19,6 +19,7 @@ const leadSchema = new mongoose.Schema({
         tone: { type: String, default: 'default' },
         completed: { type: Boolean, default: false }
     },
+    assignedTo: { type: String }, // User ID
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

@@ -118,7 +118,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Attendance': return !!p.users?.view
             case 'Time Tracking': return !!p.tasks?.view
             case 'Invoices': return !!p.finance?.view
-            case 'Sales Pipeline': return !!p.clients?.view
+            case 'Leads': return !!p.clients?.view
             case 'Expenses': return !!p.finance?.view
             case 'Payroll': return true // Everyone can see their own
             case 'Support Tickets': return !!p.tasks?.view
@@ -133,7 +133,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         <>
             {/* Mobile Sidebar */}
             {mobileOpen && (
-                <div className="fixed inset-0 z-50 flex" onClick={() => setMobileOpen(false)}>
+                <div className="fixed inset-0 z-[100] flex" onClick={() => setMobileOpen(false)}>
                     <div className="fixed inset-0 bg-black/50" />
                     <div className="relative flex w-64 flex-col bg-card shadow-xl transition-transform" onClick={e => e.stopPropagation()}>
                         {/* Mobile Logo */}
@@ -289,7 +289,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
                                     <p className="text-sm font-medium truncate">{currentUser?.name}</p>
                                     <p className="text-xs text-muted-foreground truncate capitalize">{currentUser?.role}</p>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => navigate('/login')} title="Logout">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }} title="Logout">
                                     <LogOut className="h-4 w-4" />
                                 </Button>
                             </>
@@ -298,7 +298,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
                                 <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-2 ring-background">
                                     {currentUser?.name?.charAt(0) || 'U'}
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => navigate('/login')} title="Logout">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }} title="Logout">
                                     <LogOut className="h-4 w-4" />
                                 </Button>
                             </div>

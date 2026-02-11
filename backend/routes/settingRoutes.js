@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Setting = require('../models/Setting');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 const defaultRoles = [
     {
@@ -30,7 +31,7 @@ const defaultRoles = [
 ];
 
 // Get Settings (Create if not exists)
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
         let settings = await Setting.findOne({ type: 'general' });
         if (!settings) {
@@ -46,8 +47,8 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Update Settings
-router.put('/', async (req, res) => {
+// Update Settings (Admin Only)
+router.put('/', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         let settings = await Setting.findOne({ type: 'general' });
         if (!settings) settings = new Setting({ type: 'general' });
@@ -83,8 +84,8 @@ router.put('/', async (req, res) => {
     }
 });
 
-// Test SMTP Connection
-router.post('/test-smtp', async (req, res) => {
+// Test SMTP Connection (Admin Only)
+router.post('/test-smtp', protect, authorize('admin', 'owner'), async (req, res) => {
     const nodemailer = require('nodemailer');
     const { host, port, user, pass, secure, fromEmail } = req.body;
 

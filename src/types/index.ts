@@ -95,6 +95,7 @@ export interface Project {
     description: string
     milestones: Milestone[]
     pmId: string
+    members: string[] // Added for multi-user assignment
     priority?: 'low' | 'medium' | 'high' | 'urgent' // Added
     progress?: number // Progress percentage 0-100
     autoInvoice?: boolean // Auto generate invoice on completion
