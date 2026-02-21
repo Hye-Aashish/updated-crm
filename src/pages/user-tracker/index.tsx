@@ -77,7 +77,7 @@ const UserTrackerPage = () => {
 
     useEffect(() => {
         fetchAnalytics();
-        const interval = setInterval(fetchAnalytics, 30000); // Poll every 30s
+        const interval = setInterval(fetchAnalytics, 120000); // Poll every 2m
         return () => clearInterval(interval);
     }, [timeRange]);
 

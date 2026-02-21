@@ -13,6 +13,7 @@ import type {
     Notification,
     Lead,
     Expense,
+    Ticket,
 } from '@/types'
 
 interface AppState {
@@ -32,6 +33,7 @@ interface AppState {
     notifications: Notification[]
     leads: Lead[]
     expenses: Expense[]
+    tickets: Ticket[]
 
 
     // Running timer
@@ -66,6 +68,7 @@ interface AppState {
     deleteTask: (id: string) => void
 
     // Time tracking actions
+    setTimeEntries: (entries: TimeEntry[]) => void // Added
     startTimer: (projectId: string, taskId: string) => void
     stopTimer: (note: string) => void
     addTimeEntry: (entry: TimeEntry) => void
@@ -96,6 +99,10 @@ interface AppState {
     markNotificationRead: (id: string) => Promise<void>
     markAllNotificationsRead: () => Promise<void>
     addNotification: (notification: Notification) => void
+
+    // Ticket actions
+    setTickets: (tickets: Ticket[]) => void
+    addTicket: (ticket: Ticket) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -113,6 +120,7 @@ export const useAppStore = create<AppState>((set) => ({
     notifications: [],
     leads: [],
     expenses: [],
+    tickets: [],
     runningTimer: null,
 
 
@@ -216,6 +224,7 @@ export const useAppStore = create<AppState>((set) => ({
     })),
 
     // Time tracking actions
+    setTimeEntries: (timeEntries) => set({ timeEntries }),
     startTimer: (projectId, taskId) => set((state) => ({
         runningTimer: {
             projectId,
@@ -367,5 +376,11 @@ export const useAppStore = create<AppState>((set) => ({
 
     addNotification: (notification) => set((state) => ({
         notifications: [notification, ...state.notifications],
+    })),
+
+    // Ticket actions
+    setTickets: (tickets) => set({ tickets }),
+    addTicket: (ticket) => set((state) => ({
+        tickets: [...state.tickets, ticket],
     })),
 }))

@@ -17,17 +17,31 @@ import { getInitials, formatCurrency } from '@/lib/utils'
 import type { User } from '@/types'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
+import { useAppStore } from '@/store'
 
 interface AttendanceSheetProps {
     users: User[]
     currentUserId?: string
+    externalDate?: Date
+    onDateChange?: (date: Date) => void
 }
 
 type AttendanceStatus = 'present' | 'absent' | 'late' | 'half-day' | 'leave' | 'holiday' | 'off' | 'checked-out'
 
-export function AttendanceSheet({ users }: AttendanceSheetProps) {
+export function AttendanceSheet({ users, externalDate, onDateChange }: AttendanceSheetProps) {
     const { toast } = useToast()
-    const [currentDate, setCurrentDate] = useState(new Date())
+    const { currentUser } = useAppStore()
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner'
+    const [internalDate, setInternalDate] = useState(new Date())
+
+    const currentDate = externalDate || internalDate
+    const setCurrentDate = (date: Date) => {
+        if (onDateChange) {
+            onDateChange(date)
+        } else {
+            setInternalDate(date)
+        }
+    }
     const [searchTerm, setSearchTerm] = useState('')
     const [attendanceData, setAttendanceData] = useState<any[]>([])
     const [payrollData, setPayrollData] = useState<any[]>([])
@@ -42,15 +56,18 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
         try {
             const month = currentDate.getMonth()
             const year = currentDate.getFullYear()
+            const userId = currentUser?.id || (currentUser as any)?._id
+
+            const payrollEndpoint = isAdmin ? '/payroll/all' : `/payroll/my/${userId}`
 
             const [attRes, payRes, settingsRes] = await Promise.all([
                 api.get(`/attendance/monthly?month=${month}&year=${year}`),
-                api.get(`/payroll/all?month=${month}&year=${year}`),
+                api.get(`${payrollEndpoint}?month=${month}&year=${year}`),
                 api.get('/settings')
             ])
 
             setAttendanceData(attRes.data)
-            setPayrollData(payRes.data)
+            setPayrollData(Array.isArray(payRes.data) ? payRes.data : [payRes.data])
 
             if (settingsRes.data.payroll) {
                 setOffDays(settingsRes.data.payroll.offDays || [0])
@@ -64,10 +81,11 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
     }
 
     useEffect(() => {
-        fetchAllData()
-    }, [currentDate])
+        if (currentUser) {
+            fetchAllData()
+        }
+    }, [currentDate, currentUser])
 
-    // Generate days for the current month
     const daysInMonth = useMemo(() => {
         const year = currentDate.getFullYear()
         const month = currentDate.getMonth()
@@ -96,10 +114,10 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
                     holidays: newHolidays
                 }
             })
-            toast({ title: "Updated", description: "Global calendar settings saved" })
+            toast({ title: "CALENDAR UPDATED", description: "Global schedule settings saved", variant: 'success' })
             fetchAllData()
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to save settings", variant: "destructive" })
+        } catch (error: any) {
+            toast({ title: "SETTINGS ERROR", description: error.response?.data?.message || "Failed to save settings", variant: "destructive" })
         }
     }
 
@@ -112,6 +130,7 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
     }
 
     const toggleHoliday = (dateStr: string) => {
+        if (!isAdmin) return
         const updated = holidays.find(h => h.date === dateStr)
             ? holidays.filter(h => h.date !== dateStr)
             : [...holidays, { date: dateStr, label: 'Public Holiday' }]
@@ -124,12 +143,12 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
             await api.post('/attendance/manual', {
                 userId,
                 date: dateStr,
-                status: status === 'leave' ? 'absent' : status // backend supports present, half-day, absent
+                status: status === 'leave' ? 'absent' : status
             })
-            toast({ title: "Updated", description: "Attendance updated" })
-            fetchAllData() // Refresh to sync salary and icons
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to update", variant: "destructive" })
+            toast({ title: "ATTENDANCE UPDATED", description: "Status changed successfully", variant: 'success' })
+            fetchAllData()
+        } catch (error: any) {
+            toast({ title: "UPDATE FAILED", description: error.response?.data?.message || "Could not update status", variant: "destructive" })
         }
     }
 
@@ -178,7 +197,7 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
         </div>
     )
 
-    if (loading && attendanceData.length === 0) return <div className="p-12 text-center text-muted-foreground">Loading Team Data...</div>
+    if (loading && attendanceData.length === 0) return <div className="p-12 text-center text-muted-foreground">Syncing Data...</div>
 
     return (
         <Card className="shadow-none border-none bg-transparent">
@@ -201,7 +220,7 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
 
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div className="flex items-center gap-3">
-                            <h2 className="text-lg font-bold">Team Sheet {loading && <span className="text-[10px] text-primary animate-pulse ml-2">Syncing...</span>}</h2>
+                            <h2 className="text-lg font-bold">Sheet {loading && <span className="text-[10px] text-primary animate-pulse ml-2">Syncing...</span>}</h2>
                             <div className="flex items-center border rounded-lg bg-background shadow-sm overflow-hidden h-9">
                                 <Button variant="ghost" size="icon" onClick={prevMonth} className="h-full rounded-none"><ChevronLeft className="h-4 w-4" /></Button>
                                 <span className="px-3 font-bold text-xs min-w-[100px] text-center uppercase tracking-wider">
@@ -212,99 +231,87 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
                         </div>
 
                         <div className="flex items-center gap-2 w-full md:w-auto">
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" size="sm" className="h-9 gap-2 shadow-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
-                                        <Calendar className="h-4 w-4" /> Manage Schedule
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80 p-4 shadow-2xl">
-                                    <div className="space-y-4">
-                                        <div>
-                                            <h3 className="font-bold text-sm mb-3">Weekly Off-Days</h3>
-                                            <div className="grid grid-cols-4 gap-2">
-                                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
-                                                    <Button
-                                                        key={day}
-                                                        variant={offDays.includes(idx) ? 'default' : 'outline'}
-                                                        size="sm"
-                                                        className="h-8 text-[10px] px-0"
-                                                        onClick={() => toggleOffDay(idx)}
-                                                    >
-                                                        {day}
-                                                    </Button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="pt-4 border-t">
-                                            <h3 className="font-bold text-sm mb-3">Public Holidays</h3>
-                                            <div className="space-y-2 max-h-[150px] overflow-y-auto mb-3">
-                                                {holidays.length === 0 && <p className="text-[10px] text-muted-foreground italic">No holidays set.</p>}
-                                                {holidays.map((h, i) => (
-                                                    <div key={i} className="flex items-center justify-between bg-muted/50 p-2 rounded text-[10px] group">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-bold">{h.label}</span>
-                                                            <span className="text-muted-foreground">{h.date}</span>
-                                                        </div>
+                            {isAdmin && (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-9 gap-2 shadow-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
+                                            <Calendar className="h-4 w-4" /> Manage Schedule
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-80 p-4 shadow-2xl">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <h3 className="font-bold text-sm mb-3">Weekly Off-Days</h3>
+                                                <div className="grid grid-cols-4 gap-2">
+                                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
                                                         <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-6 w-6 text-rose-500 opacity-0 group-hover:opacity-100"
-                                                            onClick={() => toggleHoliday(h.date)}
+                                                            key={day}
+                                                            variant={offDays.includes(idx) ? 'default' : 'outline'}
+                                                            size="sm"
+                                                            className="h-8 text-[10px] px-0"
+                                                            onClick={() => toggleOffDay(idx)}
                                                         >
-                                                            <X className="h-3 w-3" />
+                                                            {day}
                                                         </Button>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
                                             </div>
 
-                                            <div className="flex flex-col gap-2 pt-3 border-t mt-3">
-                                                <h4 className="text-[11px] font-bold">Add Custom Holiday</h4>
-                                                <div className="flex gap-2">
-                                                    <Input
-                                                        type="date"
-                                                        className="h-7 text-[10px] w-full"
-                                                        id="new-h-date"
-                                                    />
-                                                    <Input
-                                                        placeholder="Name"
-                                                        className="h-7 text-[10px] w-full"
-                                                        id="new-h-label"
-                                                    />
+                                            <div className="pt-4 border-t">
+                                                <h3 className="font-bold text-sm mb-3">Public Holidays</h3>
+                                                <div className="space-y-2 max-h-[150px] overflow-y-auto mb-3">
+                                                    {holidays.length === 0 && <p className="text-[10px] text-muted-foreground italic">No holidays set.</p>}
+                                                    {holidays.map((h, i) => (
+                                                        <div key={i} className="flex items-center justify-between bg-muted/50 p-2 rounded text-[10px] group">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold">{h.label}</span>
+                                                                <span className="text-muted-foreground">{h.date}</span>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-6 w-6 text-rose-500 opacity-0 group-hover:opacity-100"
+                                                                onClick={() => toggleHoliday(h.date)}
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                <Button
-                                                    size="sm"
-                                                    className="h-7 text-[10px] font-bold"
-                                                    onClick={() => {
-                                                        const d = (document.getElementById('new-h-date') as HTMLInputElement).value
-                                                        const l = (document.getElementById('new-h-label') as HTMLInputElement).value
-                                                        if (d && l) {
-                                                            const updated = [...holidays, { date: d, label: l }]
-                                                            setHolidays(updated)
-                                                            saveSettings(offDays, updated)
-                                                                // Clear inputs
-                                                                ; (document.getElementById('new-h-date') as HTMLInputElement).value = ''
-                                                                ; (document.getElementById('new-h-label') as HTMLInputElement).value = ''
-                                                        } else {
-                                                            toast({ title: "Error", description: "Select date & label", variant: "destructive" })
-                                                        }
-                                                    }}
-                                                >
-                                                    Add Holiday
-                                                </Button>
-                                                <p className="text-[10px] text-muted-foreground italic leading-tight mt-1">
-                                                    Tip: Click on date numbers in the header to toggle fast.
-                                                </p>
+
+                                                <div className="flex flex-col gap-2 pt-3 border-t mt-3">
+                                                    <h4 className="text-[11px] font-bold">Add Custom Holiday</h4>
+                                                    <div className="flex gap-2">
+                                                        <Input type="date" className="h-7 text-[10px]" id="new-h-date" />
+                                                        <Input placeholder="Label" className="h-7 text-[10px]" id="new-h-label" />
+                                                    </div>
+                                                    <Button
+                                                        size="sm"
+                                                        className="h-7 text-[10px] font-bold"
+                                                        onClick={() => {
+                                                            const d = (document.getElementById('new-h-date') as HTMLInputElement).value
+                                                            const l = (document.getElementById('new-h-label') as HTMLInputElement).value
+                                                            if (d && l) {
+                                                                const updated = [...holidays, { date: d, label: l }]
+                                                                setHolidays(updated)
+                                                                saveSettings(offDays, updated)
+                                                                    ; (document.getElementById('new-h-date') as HTMLInputElement).value = ''
+                                                                    ; (document.getElementById('new-h-label') as HTMLInputElement).value = ''
+                                                            }
+                                                        }}
+                                                    >
+                                                        Add
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
                             <div className="relative w-full md:w-auto">
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search Employee..."
+                                    placeholder="Search..."
                                     className="pl-9 w-full md:w-64 h-9"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -324,15 +331,16 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
                                     Employee
                                 </th>
                                 <th className="border-b border-r py-4 px-2 min-w-[100px] text-emerald-500 font-bold uppercase tracking-wider bg-emerald-500/5">
-                                    Real-time Salary
+                                    Final Salary
                                 </th>
                                 {daysInMonth.map((d) => (
                                     <th
                                         key={d.date}
                                         onClick={() => toggleHoliday(d.fullDate)}
-                                        title={d.isHoliday ? `Holiday: ${d.holidayLabel}` : 'Click to mark as Holiday'}
+                                        title={isAdmin ? (d.isHoliday ? `Holiday: ${d.holidayLabel}` : 'Click to mark as Holiday') : d.holidayLabel}
                                         className={`
-                                            border-b border-r py-2 min-w-[32px] w-[32px] cursor-pointer hover:bg-amber-500/20 transition-colors
+                                            border-b border-r py-2 min-w-[32px] w-[32px] transition-colors
+                                            ${isAdmin ? 'cursor-pointer hover:bg-amber-500/10' : 'cursor-default'}
                                             ${d.isWeekend ? 'bg-muted/20' : ''}
                                             ${d.isHoliday ? 'bg-amber-500/20' : ''}
                                         `}
@@ -380,28 +388,34 @@ export function AttendanceSheet({ users }: AttendanceSheetProps) {
                                                         ${d.isWeekend ? 'bg-muted/10' : ''}
                                                     `}
                                                 >
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                            <div className="h-full w-full flex items-center justify-center cursor-pointer hover:bg-muted/50">
-                                                                {renderIcon(status)}
-                                                            </div>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-40 p-1 shadow-2xl">
-                                                            <div className="grid gap-1">
-                                                                {(['present', 'half-day', 'absent'] as const).map((s) => (
-                                                                    <Button
-                                                                        key={s}
-                                                                        variant="ghost"
-                                                                        className="justify-start h-8 text-[10px] font-bold gap-2 px-2"
-                                                                        onClick={() => setStatus(user.id || (user as any)._id, d.fullDate, s)}
-                                                                    >
-                                                                        {renderIcon(s)}
-                                                                        <span className="capitalize">{s}</span>
-                                                                    </Button>
-                                                                ))}
-                                                            </div>
-                                                        </PopoverContent>
-                                                    </Popover>
+                                                    {isAdmin ? (
+                                                        <Popover>
+                                                            <PopoverTrigger asChild>
+                                                                <div className="h-full w-full flex items-center justify-center cursor-pointer hover:bg-muted/50">
+                                                                    {renderIcon(status)}
+                                                                </div>
+                                                            </PopoverTrigger>
+                                                            <PopoverContent className="w-40 p-1 shadow-2xl">
+                                                                <div className="grid gap-1">
+                                                                    {(['present', 'half-day', 'absent'] as const).map((s) => (
+                                                                        <Button
+                                                                            key={s}
+                                                                            variant="ghost"
+                                                                            className="justify-start h-8 text-[10px] font-bold gap-2 px-2"
+                                                                            onClick={() => setStatus(user.id || (user as any)._id, d.fullDate, s)}
+                                                                        >
+                                                                            {renderIcon(s)}
+                                                                            <span className="capitalize">{s}</span>
+                                                                        </Button>
+                                                                    ))}
+                                                                </div>
+                                                            </PopoverContent>
+                                                        </Popover>
+                                                    ) : (
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            {renderIcon(status)}
+                                                        </div>
+                                                    )}
                                                 </td>
                                             )
                                         })}

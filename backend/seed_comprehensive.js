@@ -73,19 +73,28 @@ const seedComprehensive = async () => {
         console.log('✅ Pipeline Stages Seeded');
 
         // 4. Seed Users
-        const hashedPassword = bcrypt.hashSync('password123', 10);
+        const rawPassword = 'password';
         const usersData = [
-            { name: 'Rahul PM', email: 'rahul@crm.com', password: hashedPassword, role: 'pm', designation: 'Project Manager' },
-            { name: 'Sneha Dev', email: 'sneha@crm.com', password: hashedPassword, role: 'developer', designation: 'Sr. Backend Developer' },
-            { name: 'Amit Dev', email: 'amit@crm.com', password: hashedPassword, role: 'developer', designation: 'Frontend Developer' }
+            { name: 'Demo Admin', email: 'admin@example.com', password: rawPassword, role: 'admin', designation: 'Technical Administrator' },
+            { name: 'Demo Employee', email: 'employee@example.com', password: rawPassword, role: 'employee', designation: 'Software Engineer' },
+            { name: 'Rahul PM', email: 'rahul@crm.com', password: rawPassword, role: 'pm', designation: 'Project Manager' },
+            { name: 'Sneha Dev', email: 'sneha@crm.com', password: rawPassword, role: 'developer', designation: 'Sr. Backend Developer' },
+            { name: 'Amit Dev', email: 'amit@crm.com', password: rawPassword, role: 'developer', designation: 'Frontend Developer' }
         ];
-        const users = await User.insertMany(usersData);
+
+        // Use create for all to ensure hooks are triggered correctly
+        const users = await User.create(usersData);
+
         let owner = await User.findOne({ email: 'owner@example.com' });
-        if (!owner) {
-            owner = await User.create({ name: 'Aashish Owner', email: 'owner@example.com', password: hashedPassword, role: 'owner', designation: 'Founder' });
+        if (owner) {
+            owner.password = rawPassword;
+            owner.name = 'Demo Owner';
+            await owner.save();
+        } else {
+            owner = await User.create({ name: 'Demo Owner', email: 'owner@example.com', password: rawPassword, role: 'owner', designation: 'Founder' });
         }
         const allUsers = [owner, ...users];
-        console.log('✅ Users Seeded');
+        console.log('✅ Users Seeded (Hooks triggered for hashing)');
 
         // 5. Seed Clients
         const clientsData = [

@@ -133,28 +133,28 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, duration })
             }).catch(() => { });
-        }, 10000);
+        }, 30000); // Pulse every 30s (reduced from 10s)
     };
 
     // --- Event Listeners ---
     const setupEventListeners = () => {
-        // 1. Clicks (Heatmap + Analytics)
+        // 1. Clicks (Heatmap + Analytics) - Filtered to keep DB light
         document.addEventListener('click', (e) => {
-            const target = e.target.closest('a, button, input[type="submit"], div, span, img');
+            const interactive = e.target.closest('a, button, input[type="submit"], input[type="button"]');
+
+            // Only track interactive clicks OR deep heatmap samples (throttled logic could go here)
+            if (!interactive) return;
+
             const clickData = {
                 x: e.pageX,
                 y: e.pageY,
                 viewport_width: window.innerWidth,
                 viewport_height: window.innerHeight,
-                selector: target ? (target.id ? `#${target.id}` : target.className ? `.${target.className.split(' ')[0]}` : target.tagName.toLowerCase()) : 'body'
+                selector: interactive.id ? `#${interactive.id}` : interactive.className ? `.${interactive.className.split(' ')[0]}` : interactive.tagName.toLowerCase(),
+                element_id: interactive.id,
+                element_text: (interactive.innerText || interactive.value || '').trim().slice(0, 50),
+                href: interactive.href
             };
-
-            const interactive = e.target.closest('a, button, input[type="submit"]');
-            if (interactive) {
-                clickData.element_id = interactive.id;
-                clickData.element_text = (interactive.innerText || interactive.value || '').trim().slice(0, 50);
-                clickData.href = interactive.href;
-            }
 
             trackEvent('click', clickData);
         }, true);

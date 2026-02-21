@@ -65,6 +65,18 @@ exports.getConversations = async (req, res) => {
 exports.getMessages = async (req, res) => {
     try {
         const { conversationId } = req.params;
+
+        // Verify ownership
+        const userWidgets = await ChatWidget.find({ user_id: req.user.id }).distinct('_id');
+        const conversation = await ChatConversation.findOne({
+            _id: conversationId,
+            widget_id: { $in: userWidgets }
+        });
+
+        if (!conversation && req.user.role !== 'admin' && req.user.role !== 'owner') {
+            return res.status(403).json({ message: 'Not authorized to view this conversation' });
+        }
+
         const messages = await ChatMessage.find({ conversation_id: conversationId }).sort({ timestamp: 1 });
         res.status(200).json(messages);
     } catch (error) {
@@ -76,6 +88,17 @@ exports.replyMessage = async (req, res) => {
     try {
         const { conversationId } = req.params;
         const { message } = req.body;
+
+        // Verify ownership
+        const userWidgets = await ChatWidget.find({ user_id: req.user.id }).distinct('_id');
+        const conversation = await ChatConversation.findOne({
+            _id: conversationId,
+            widget_id: { $in: userWidgets }
+        });
+
+        if (!conversation && req.user.role !== 'admin' && req.user.role !== 'owner') {
+            return res.status(403).json({ message: 'Not authorized to reply to this conversation' });
+        }
 
         const newMessage = new ChatMessage({
             conversation_id: conversationId,
@@ -91,10 +114,6 @@ exports.replyMessage = async (req, res) => {
             last_message_time: new Date(),
             status: 'open'
         });
-
-        // Socket.io emission will be handled in the socket handler or here if we have access to io instance
-        // For now, we assume the client also emits via socket or polls, but better to emit here if possible.
-        // We will handle real-time via socket connection, this endpoint is for persistence/fallback.
 
         res.status(201).json(newMessage);
     } catch (error) {

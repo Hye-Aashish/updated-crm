@@ -12,7 +12,9 @@ import {
     Pause,
     History,
     CheckCircle2,
-    Info
+    Info,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
@@ -27,16 +29,25 @@ export function AttendancePage() {
     const [history, setHistory] = useState<any[]>([])
     const [users, setUsers] = useState<any[]>([])
     const [currentTime, setCurrentTime] = useState(new Date())
+    const [selectedDate, setSelectedDate] = useState(new Date())
+
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner'
+    const displayUsers = isAdmin ? users : (currentUser ? [currentUser] : [])
 
     useEffect(() => {
-        if (currentUser?.id) {
+        if (currentUser?.id || (currentUser as any)?._id) {
             fetchStatus()
             fetchHistory()
-            fetchUsers()
+            if (isAdmin) {
+                fetchUsers()
+            }
         }
+    }, [currentUser, isAdmin, selectedDate])
+
+    useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
         return () => clearInterval(timer)
-    }, [currentUser])
+    }, [])
 
     const fetchStatus = async () => {
         try {
@@ -49,7 +60,9 @@ export function AttendancePage() {
 
     const fetchHistory = async () => {
         try {
-            const res = await api.get(`/attendance/history/${currentUser?.id || (currentUser as any)._id}`)
+            const month = selectedDate.getMonth()
+            const year = selectedDate.getFullYear()
+            const res = await api.get(`/attendance/history/${currentUser?.id || (currentUser as any)._id}?month=${month}&year=${year}`)
             setHistory(res.data)
         } catch (error) {
             console.error('Failed to fetch history')
@@ -69,12 +82,17 @@ export function AttendancePage() {
         try {
             const res = await api.post(`/attendance/${endpoint}`, { userId: currentUser?.id })
             setStatus(res.data)
-            toast({ title: 'Success', description: successMsg })
+            toast({
+                title: 'SUCCESS',
+                description: successMsg,
+                variant: 'success'
+            })
             fetchHistory()
         } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Action failed';
             toast({
-                title: 'Error',
-                description: error.response?.data?.message || 'Action failed',
+                title: 'ATTENDANCE ERROR',
+                description: errorMsg,
                 variant: 'destructive'
             })
         }
@@ -101,6 +119,9 @@ export function AttendancePage() {
         return h > 0 ? `${h}h ${m}m` : `${m}m`
     }
 
+    const prevMonth = () => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1))
+    const nextMonth = () => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1))
+
     return (
         <div className="p-6 space-y-8 max-w-6xl mx-auto animate-in fade-in duration-700">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -108,13 +129,26 @@ export function AttendancePage() {
                     <h1 className="text-3xl font-bold tracking-tight">Attendance Tracking</h1>
                     <p className="text-muted-foreground mt-1">Manage your daily check-ins, breaks, and shifts.</p>
                 </div>
-                <div className="flex items-center gap-3 bg-card p-3 rounded-xl border shadow-sm">
-                    <div className="bg-primary/10 p-2 rounded-lg">
-                        <Calendar className="h-5 w-5 text-primary" />
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center border rounded-xl bg-card shadow-sm overflow-hidden h-12">
+                        <Button variant="ghost" size="icon" onClick={prevMonth} className="h-full rounded-none hover:bg-primary/5"><ChevronLeft className="h-5 w-5" /></Button>
+                        <div className="px-6 flex flex-col items-center justify-center min-w-[140px]">
+                            <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-none">Viewing Data</span>
+                            <span className="text-sm font-bold mt-1">
+                                {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                            </span>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={nextMonth} className="h-full rounded-none hover:bg-primary/5"><ChevronRight className="h-5 w-5" /></Button>
                     </div>
-                    <div className="text-right">
-                        <p className="text-xs font-bold text-muted-foreground uppercase">{format(currentTime, 'EEEE')}</p>
-                        <p className="text-lg font-bold">{format(currentTime, 'dd MMM yyyy')}</p>
+
+                    <div className="hidden md:flex items-center gap-3 bg-card p-3 rounded-xl border shadow-sm">
+                        <div className="bg-primary/10 p-2 rounded-lg">
+                            <Calendar className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-muted-foreground uppercase">{format(currentTime, 'EEEE')}</p>
+                            <p className="text-lg font-bold">{format(currentTime, 'dd MMM yyyy')}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -222,8 +256,8 @@ export function AttendancePage() {
                 {/* Sidebar Info */}
                 <Card className="shadow-lg">
                     <CardHeader>
-                        <CardTitle className="text-lg">Recent History</CardTitle>
-                        <CardDescription>Your last 30 days activity</CardDescription>
+                        <CardTitle className="text-lg">Attendance History</CardTitle>
+                        <CardDescription>Records for {format(selectedDate, 'MMM yyyy')}</CardDescription>
                     </CardHeader>
                     <CardContent className="px-0">
                         <div className="space-y-1 max-h-[450px] overflow-y-auto px-6">
@@ -294,13 +328,21 @@ export function AttendancePage() {
                 </Card>
             </div>
 
-            {/* Monthly Attendance Sheet (Requested) */}
+            {/* Monthly Attendance Sheet (Everyone) */}
             <div className="space-y-4 pt-8 border-t">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Team Attendance Sheet</h2>
-                    <p className="text-muted-foreground mt-1">Full monthly overview of all team members.</p>
+                    <h2 className="text-2xl font-bold tracking-tight">
+                        {isAdmin ? 'Team Attendance Sheet' : 'My Attendance Sheet'}
+                    </h2>
+                    <p className="text-muted-foreground mt-1">
+                        {isAdmin ? 'Full monthly overview of all team members.' : 'Full overview of your monthly attendance and calculated salary.'}
+                    </p>
                 </div>
-                <AttendanceSheet users={users} />
+                <AttendanceSheet
+                    users={displayUsers}
+                    externalDate={selectedDate}
+                    onDateChange={(d) => setSelectedDate(d)}
+                />
             </div>
         </div>
     )

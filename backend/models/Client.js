@@ -39,4 +39,8 @@ const clientSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+clientSchema.index({ assignedTo: 1 });
+clientSchema.index({ status: 1 });
+clientSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Client', clientSchema);

@@ -11,6 +11,7 @@ export function ReminderManager() {
     // 1. Fetch real-time system notifications
     useEffect(() => {
         const fetchSystemNotifications = async () => {
+            if (!localStorage.getItem('token')) return
             try {
                 const res = await api.get('/notifications')
                 if (Array.isArray(res.data)) {
@@ -34,7 +35,7 @@ export function ReminderManager() {
         }
 
         fetchSystemNotifications()
-        const interval = setInterval(fetchSystemNotifications, 15000) // Poll every 15s
+        const interval = setInterval(fetchSystemNotifications, 60000) // Poll every 60s
         return () => clearInterval(interval)
     }, [addNotification, notifications])
 

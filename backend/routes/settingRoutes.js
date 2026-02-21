@@ -8,11 +8,23 @@ const defaultRoles = [
         name: 'admin', label: 'Administrator',
         permissions: {
             dashboard: { view: true },
+            user_tracker: { view: true },
+            clients: { view: true, create: true, edit: true, delete: true },
+            leads: { view: true, create: true, edit: true, delete: true },
             projects: { view: true, create: true, edit: true, delete: true },
             tasks: { view: true, create: true, edit: true, delete: true },
-            clients: { view: true, create: true, edit: true, delete: true },
-            finance: { view: true, create: true, edit: true, delete: true },
-            users: { view: true, create: true, edit: true, delete: true },
+            team: { view: true, create: true, edit: true, delete: true },
+            attendance: { view: true, manage: true },
+            time_tracking: { view: true, manage: true },
+            invoices: { view: true, create: true, edit: true, delete: true },
+            quotations: { view: true, create: true, edit: true, delete: true },
+            templates: { view: true, create: true, edit: true, delete: true },
+            expenses: { view: true, create: true, edit: true, delete: true },
+            payroll: { view: true, manage: true },
+            tickets: { view: true, create: true, edit: true, delete: true },
+            chat: { view: true, reply: true },
+            reports: { view: true },
+            files: { view: true, upload: true, delete: true },
             settings: { view: true, edit: true }
         }
     },
@@ -20,11 +32,23 @@ const defaultRoles = [
         name: 'employee', label: 'Employee',
         permissions: {
             dashboard: { view: true },
+            user_tracker: { view: false },
+            clients: { view: true, create: false, edit: false, delete: false },
+            leads: { view: false, create: false, edit: false, delete: false },
             projects: { view: true, create: false, edit: false, delete: false },
             tasks: { view: true, create: true, edit: true, delete: false },
-            clients: { view: true, create: false, edit: false, delete: false },
-            finance: { view: false, create: false, edit: false, delete: false },
-            users: { view: false, create: false, edit: false, delete: false },
+            team: { view: false, create: false, edit: false, delete: false },
+            attendance: { view: true, manage: false },
+            time_tracking: { view: true, manage: false },
+            invoices: { view: false, create: false, edit: false, delete: false },
+            quotations: { view: true, create: true, edit: false, delete: false },
+            templates: { view: true, create: false, edit: false, delete: false },
+            expenses: { view: true, create: true, edit: false, delete: false },
+            payroll: { view: true, manage: false },
+            tickets: { view: true, create: true, edit: true, delete: false },
+            chat: { view: true, reply: true },
+            reports: { view: false },
+            files: { view: true, upload: true, delete: false },
             settings: { view: false, edit: false }
         }
     }
@@ -41,7 +65,28 @@ router.get('/', protect, async (req, res) => {
             settings.roles = defaultRoles;
             await settings.save();
         }
-        res.json(settings);
+
+        const userRole = req.user.role;
+        if (userRole === 'admin' || userRole === 'owner') {
+            return res.json(settings);
+        }
+
+        // For non-admin, filter out sensitive data
+        const publicSettings = settings.toObject();
+
+        // Remove sensitive billing data
+        if (publicSettings.billing) {
+            delete publicSettings.billing.razorpaySecret;
+        }
+
+        // Remove sensitive email data
+        if (publicSettings.emailSettings) {
+            delete publicSettings.emailSettings.pass;
+        }
+
+        // Return limited view
+        res.json(publicSettings);
+
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -53,27 +98,33 @@ router.put('/', protect, authorize('admin', 'owner'), async (req, res) => {
         let settings = await Setting.findOne({ type: 'general' });
         if (!settings) settings = new Setting({ type: 'general' });
 
-        // Deep merge or overwrite sections
+        // Deep merge or overwrite sections with safety guards
         if (req.body.companyProfile) {
-            settings.companyProfile = { ...settings.companyProfile.toObject(), ...req.body.companyProfile };
+            const current = settings.companyProfile ? settings.companyProfile.toObject() : {};
+            settings.companyProfile = { ...current, ...req.body.companyProfile };
         }
         if (req.body.billing) {
-            settings.billing = { ...settings.billing.toObject(), ...req.body.billing };
+            const current = settings.billing ? settings.billing.toObject() : {};
+            settings.billing = { ...current, ...req.body.billing };
         }
         if (req.body.notifications) {
-            settings.notifications = { ...settings.notifications.toObject(), ...req.body.notifications };
+            const current = settings.notifications ? settings.notifications.toObject() : {};
+            settings.notifications = { ...current, ...req.body.notifications };
         }
         if (req.body.emailSettings) {
-            settings.emailSettings = { ...settings.emailSettings.toObject(), ...req.body.emailSettings };
+            const current = settings.emailSettings ? settings.emailSettings.toObject() : {};
+            settings.emailSettings = { ...current, ...req.body.emailSettings };
         }
         if (req.body.roles) {
             settings.roles = req.body.roles;
         }
         if (req.body.dashboardLayouts) {
             settings.dashboardLayouts = req.body.dashboardLayouts;
+            settings.markModified('dashboardLayouts');
         }
         if (req.body.payroll) {
-            settings.payroll = { ...settings.payroll.toObject(), ...req.body.payroll };
+            const current = settings.payroll ? settings.payroll.toObject() : {};
+            settings.payroll = { ...current, ...req.body.payroll };
         }
 
         settings.updatedAt = Date.now();

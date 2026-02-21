@@ -83,7 +83,11 @@ export function EmployeeSettingsPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="designation">Designation</Label>
-                                        <Input id="designation" defaultValue="Senior Developer" />
+                                        <Input id="designation" defaultValue={currentUser?.designation || ''} disabled />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="salary">Monthly Salary (INR)</Label>
+                                        <Input id="salary" defaultValue={currentUser?.salary || '0'} disabled className="font-bold text-emerald-600" />
                                     </div>
                                 </div>
 

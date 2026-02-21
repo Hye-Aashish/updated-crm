@@ -10,7 +10,6 @@ import { Textarea } from '@/components/ui/textarea'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate } from '@/lib/utils'
-
 type Ticket = {
     _id: string
     subject: string
@@ -23,7 +22,10 @@ type Ticket = {
     screenshot?: string
 }
 
+import { useAppStore } from '@/store'
+
 export function TicketsPage() {
+    const { users, currentUser } = useAppStore()
     const { toast } = useToast()
     const [tickets, setTickets] = useState<Ticket[]>([])
     const [clients, setClients] = useState<{ _id: string, name: string }[]>([])
@@ -71,10 +73,14 @@ export function TicketsPage() {
         const fetchData = async () => {
             fetchTickets()
             try {
-                const res = await api.get('/clients')
-                setClients(res.data)
+                const [clientsRes, usersRes] = await Promise.all([
+                    api.get('/clients'),
+                    api.get('/users')
+                ])
+                setClients(clientsRes.data)
+                useAppStore.getState().setUsers(usersRes.data)
             } catch (error) {
-                console.error("Failed to fetch clients", error)
+                console.error("Failed to fetch data", error)
             }
         }
         fetchData()
@@ -141,12 +147,26 @@ export function TicketsPage() {
         const matchesSearch = t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (t.clientName || '').toLowerCase().includes(searchQuery.toLowerCase())
         const matchesStatus = statusFilter === 'all' || t.status === statusFilter
-        return matchesSearch && matchesStatus
+
+        // Role based filtering
+        const role = currentUser?.role?.toLowerCase()
+        const isOwner = role === 'owner' || role === 'admin'
+
+        // Robust matching: trim, lowercase, and check both Name and ID
+        const currentName = (currentUser?.name || '').toLowerCase().trim()
+        const currentId = currentUser?.id || (currentUser as any)?._id
+        const assignedVal = (t.assignedTo || '').toLowerCase().trim()
+
+        const matchesAssignment = isOwner ||
+            assignedVal === currentName ||
+            assignedVal === currentId?.toString().toLowerCase()
+
+        return matchesSearch && matchesStatus && matchesAssignment
     })
 
-    const openCount = tickets.filter(t => t.status === 'open').length
-    const resolvedCount = tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length
-    const criticalCount = tickets.filter(t => t.priority === 'critical' || t.priority === 'high').length
+    const openCount = filteredTickets.filter(t => t.status === 'open').length
+    const resolvedCount = filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length
+    const criticalCount = filteredTickets.filter(t => t.priority === 'critical' || t.priority === 'high').length
 
     return (
         <div className="space-y-6">
@@ -202,6 +222,19 @@ export function TicketsPage() {
                                         <option value="critical">Critical</option>
                                     </select>
                                 </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Assign To User</Label>
+                                <select
+                                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    value={newTicket.assignedTo}
+                                    onChange={(e) => setNewTicket({ ...newTicket, assignedTo: e.target.value })}
+                                >
+                                    <option value="">Unassigned</option>
+                                    {users.map(user => (
+                                        <option key={user.id || (user as any)._id} value={user.name}>{user.name}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="space-y-2">
                                 <Label>Description</Label>
@@ -331,7 +364,13 @@ export function TicketsPage() {
                                             {ticket.clientName && (
                                                 <div className="flex items-center text-muted-foreground">
                                                     <User className="h-3 w-3 mr-1" />
-                                                    {ticket.clientName}
+                                                    Client: {ticket.clientName}
+                                                </div>
+                                            )}
+                                            {ticket.assignedTo && (
+                                                <div className="flex items-center text-primary font-bold">
+                                                    <User className="h-3 w-3 mr-1" />
+                                                    Assigned: {ticket.assignedTo}
                                                 </div>
                                             )}
                                         </div>
@@ -413,6 +452,29 @@ export function TicketsPage() {
                                         <option value="in-progress">In Progress</option>
                                         <option value="resolved">Resolved</option>
                                         <option value="closed">Closed</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <p className="text-muted-foreground text-xs">Assigned To</p>
+                                    <select
+                                        className="mt-1 h-8 rounded-md border text-sm px-2 font-medium w-full bg-background"
+                                        value={selectedTicket.assignedTo || ''}
+                                        onChange={async (e) => {
+                                            const newName = e.target.value;
+                                            try {
+                                                await api.put(`/tickets/${selectedTicket._id}`, { assignedTo: newName });
+                                                setTickets(tickets.map(t => t._id === selectedTicket._id ? { ...t, assignedTo: newName } : t));
+                                                setSelectedTicket({ ...selectedTicket, assignedTo: newName });
+                                                toast({ description: "Assignment updated" });
+                                            } catch (err) {
+                                                toast({ title: "Error", description: "Failed to update assignment", variant: "destructive" });
+                                            }
+                                        }}
+                                    >
+                                        <option value="">Unassigned</option>
+                                        {users.map(u => (
+                                            <option key={u.id} value={u.name}>{u.name}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>

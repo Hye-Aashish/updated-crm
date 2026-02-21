@@ -307,4 +307,15 @@ export interface Expense {
     receipt?: string
     createdAt?: Date
 }
-
+export interface Ticket {
+    id: string
+    _id?: string
+    subject: string
+    description: string
+    priority: 'low' | 'medium' | 'high' | 'critical'
+    status: 'open' | 'in-progress' | 'resolved' | 'closed'
+    clientName: string
+    assignedTo: string
+    screenshot?: string
+    createdAt: Date
+}

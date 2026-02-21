@@ -36,12 +36,15 @@ userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) {
         return next();
     }
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    const salt = bcrypt.genSaltSync(10);
+    this.password = bcrypt.hashSync(this.password, salt);
 });
 
 userSchema.methods.matchPassword = async function (enteredPassword) {
-    return await bcrypt.compare(enteredPassword, this.password);
+    console.log(`Matching password... Hash in DB: ${this.password?.substring(0, 10)}...`);
+    const match = bcrypt.compareSync(enteredPassword, this.password);
+    console.log(`Match result: ${match}`);
+    return match;
 };
 
 module.exports = mongoose.model('User', userSchema);

@@ -18,33 +18,20 @@ const parseUserAgent = (ua) => {
 // Get country from IP using GeoIP
 const getLocationFromIP = (ip) => {
     try {
-        console.log('🌍 Original IP:', ip);
-
-        // Clean IP address (remove ::ffff: prefix for IPv4-mapped IPv6)
         const cleanIP = ip.replace(/^::ffff:/, '');
-        console.log('🧹 Cleaned IP:', cleanIP);
-
         if (cleanIP === '127.0.0.1' || cleanIP === 'localhost' || cleanIP.startsWith('::1')) {
             return { country: 'Local', city: 'Development', region: 'Internal' };
         }
-
         const geo = geoip.lookup(cleanIP);
-        console.log('📍 GeoIP Result:', geo);
-
         if (geo) {
-            const location = {
+            return {
                 country: geo.country || 'Unknown',
                 city: geo.city || 'Unknown',
                 region: geo.region || 'Unknown'
             };
-            console.log('✅ Final Location:', location);
-            return location;
         }
-
-        console.log('❌ No GeoIP data found');
         return { country: 'Unknown', city: 'Unknown', region: 'Unknown' };
     } catch (error) {
-        console.error('🚨 GeoIP lookup error:', error);
         return { country: 'Unknown', city: 'Unknown', region: 'Unknown' };
     }
 };
@@ -401,13 +388,15 @@ exports.getAnalyticsSummary = async (req, res) => {
             ]
         })
             .populate('visitor_id', 'location ip_address identified_name identified_email')
-            .sort({ updatedAt: -1 });
+            .sort({ updatedAt: -1 })
+            .lean();
 
         // 3. Recent History (Last 50 sessions)
         const recentHistory = await VisitSession.find({ end_time: { $lt: fiveMinsAgo } })
             .populate('visitor_id', 'location ip_address identified_name identified_email')
             .sort({ end_time: -1 })
-            .limit(50);
+            .limit(50)
+            .lean();
 
         // 4. Total Page Views (In this period)
         const totalPageViews = await TrackingEvent.countDocuments({

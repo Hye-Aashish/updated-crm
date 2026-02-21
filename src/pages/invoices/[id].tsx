@@ -10,11 +10,12 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Check, Type, Image as ImageIcon, Ban } from 'lucide-react'
+import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Check, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import api from '@/lib/api-client'
 import type { Invoice, Client } from '@/types'
 import { useToast } from '@/hooks/use-toast'
+import { useAppStore } from '@/store'
 
 type InvoiceTemplate = 'corporate' | 'creative' | 'elegant' | 'nexus'
 
@@ -35,6 +36,7 @@ export function InvoiceDetailPage() {
     const [loading, setLoading] = useState(true)
     const [invoice, setInvoice] = useState<Invoice | null>(null)
     const [client, setClient] = useState<Client | null>(null)
+    const { currentUser } = useAppStore()
 
 
     // Customization State
@@ -42,6 +44,7 @@ export function InvoiceDetailPage() {
     const [themeColor, setThemeColor] = useState('#0047AB')
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [sending, setSending] = useState(false)
+    const [paying, setPaying] = useState(false)
     const [watermarkType, setWatermarkType] = useState<'none' | 'logo' | 'text'>('logo')
     const [watermarkText, setWatermarkText] = useState('PAID')
 
@@ -77,7 +80,10 @@ export function InvoiceDetailPage() {
                 }
                 setInvoice(mappedInvoice)
 
-                if (mappedInvoice.clientId) {
+                // Use pre-populated client/project if available (e.g. from public view)
+                if (invData.client) {
+                    setClient({ ...invData.client, id: invData.client._id })
+                } else if (mappedInvoice.clientId) {
                     try {
                         const clientRes = await api.get(`/clients/${mappedInvoice.clientId}`)
                         setClient({ ...clientRes.data, id: clientRes.data._id })
@@ -91,6 +97,41 @@ export function InvoiceDetailPage() {
             }
         }
         fetchInvoiceData()
+    }, [id])
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const status = urlParams.get('status');
+        if (status === 'success') {
+            const verifyPayment = async () => {
+                try {
+                    await api.get(`/invoices/${id}/verify-payment`)
+                    // Reload invoice data
+                    const invoiceRes = await api.get(`/invoices/${id}`)
+                    const invData = invoiceRes.data
+                    setInvoice({
+                        ...invData,
+                        id: invData._id,
+                        date: new Date(invData.date),
+                        dueDate: new Date(invData.dueDate),
+                        createdAt: new Date(invData.createdAt),
+                        updatedAt: new Date(invData.updatedAt)
+                    })
+
+                    toast({
+                        title: "Payment Successful!",
+                        description: "Your payment has been verified and updated.",
+                        variant: "success"
+                    })
+                } catch (error) {
+                    console.error("Verification failed", error)
+                } finally {
+                    // Clear URL params
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }
+            verifyPayment();
+        }
     }, [id])
 
     const handlePrint = () => window.print()
@@ -116,9 +157,13 @@ export function InvoiceDetailPage() {
 
             <CardContent className="p-12 pt-28 flex-1 relative z-10">
                 {/* Watermark */}
-                {watermarkType !== 'none' && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none z-0 overflow-hidden">
-                        {watermarkType === 'logo' ? (
+                {(watermarkType !== 'none' || invoice.status === 'paid') && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none z-0 overflow-hidden">
+                        {invoice.status === 'paid' ? (
+                            <span className="text-[180px] font-black rotate-[-35deg] whitespace-nowrap uppercase tracking-widest select-none text-emerald-600 border-[20px] border-emerald-600 px-12 rounded-[40px]">
+                                PAID
+                            </span>
+                        ) : watermarkType === 'logo' ? (
                             <Building2 className="w-[600px] h-[600px]" />
                         ) : (
                             <span className="text-[150px] font-black rotate-[-35deg] whitespace-nowrap uppercase tracking-widest select-none">
@@ -246,11 +291,28 @@ export function InvoiceDetailPage() {
                         </div>
 
                         {/* Total Strip */}
-                        <div className="flex justify-between items-center text-white py-4 px-6 shadow-lg mb-10 rounded-xl relative overflow-hidden transform scale-105"
+                        <div className="flex justify-between items-center text-white py-4 px-6 shadow-lg mb-4 rounded-xl relative overflow-hidden transform scale-105"
                             style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}dd)` }}>
                             <span className="font-bold text-sm uppercase tracking-wider opacity-90">Total Due</span>
                             <span className="font-black text-3xl tracking-tight">{formatCurrency(invoice.total)}</span>
                         </div>
+
+                        {/* Direct Pay Button for Client */}
+                        {invoice.status !== 'paid' && (
+                            <button
+                                onClick={handlePayOnline}
+                                disabled={paying}
+                                className="w-full py-4 px-6 rounded-xl text-white font-black text-lg shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 no-print mb-10"
+                                style={{ backgroundColor: '#059669' }} // Emerald-600 for attention
+                            >
+                                {paying ? (
+                                    <Loader2 className="animate-spin h-5 w-5" />
+                                ) : (
+                                    <CreditCard className="h-6 w-6" />
+                                )}
+                                {paying ? 'INITIALIZING...' : 'PAY NOW'}
+                            </button>
+                        )}
 
                         {/* Stamp */}
                         {invoice.status !== 'paid' && (
@@ -298,9 +360,13 @@ export function InvoiceDetailPage() {
     const CorporateTemplate = () => (
         <Card className="overflow-hidden shadow-none border-0 bg-white relative">
             {/* Watermark */}
-            {watermarkType !== 'none' && (
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none z-0 overflow-hidden">
-                    {watermarkType === 'logo' ? (
+            {(watermarkType !== 'none' || invoice.status === 'paid') && (
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none z-0 overflow-hidden">
+                    {invoice.status === 'paid' ? (
+                        <span className="text-[150px] font-black rotate-[-35deg] whitespace-nowrap uppercase tracking-widest select-none text-emerald-600 border-[15px] border-emerald-600 px-8 rounded-[30px]">
+                            PAID
+                        </span>
+                    ) : watermarkType === 'logo' ? (
                         <Building2 className="w-[500px] h-[500px]" />
                     ) : (
                         <span className="text-[120px] font-black rotate-[-35deg] whitespace-nowrap uppercase tracking-widest select-none">
@@ -388,6 +454,17 @@ export function InvoiceDetailPage() {
                             <span className="font-bold text-slate-700">Total Due</span>
                             <span className="text-2xl font-bold" style={{ color: themeColor }}>{formatCurrency(invoice.total)}</span>
                         </div>
+
+                        {invoice.status !== 'paid' && (
+                            <Button
+                                onClick={handlePayOnline}
+                                disabled={paying}
+                                className="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold no-print"
+                            >
+                                {paying ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                                Pay Online Now
+                            </Button>
+                        )}
                     </div>
                 </div>
                 <div className="mt-16 pt-8 border-t border-slate-100 text-center text-slate-400 text-sm">
@@ -432,9 +509,14 @@ export function InvoiceDetailPage() {
                 </div>
             </div>
             <div className="md:col-span-8 p-10 bg-white relative">
-                {watermarkType !== 'none' && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none z-0 overflow-hidden">
-                        {watermarkType === 'logo' ? (
+                {/* Watermark */}
+                {(watermarkType !== 'none' || invoice.status === 'paid') && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none z-0 overflow-hidden">
+                        {invoice.status === 'paid' ? (
+                            <span className="text-[120px] font-black rotate-[-35deg] whitespace-nowrap uppercase tracking-widest select-none text-emerald-600 border-[12px] border-emerald-600 px-6 rounded-[24px]">
+                                PAID
+                            </span>
+                        ) : watermarkType === 'logo' ? (
                             <Building2 className="w-[400px] h-[400px]" />
                         ) : (
                             <span className="text-[100px] font-black rotate-[-35deg] whitespace-nowrap uppercase tracking-widest select-none text-slate-900">
@@ -476,7 +558,7 @@ export function InvoiceDetailPage() {
                             </tbody>
                         </table>
                     </div>
-                    <div className="flex justify-end border-t border-slate-100 pt-8">
+                    <div className="flex justify-end border-t border-slate-100 pt-8 gap-4">
                         <div className="w-1/2 space-y-3 text-right">
                             <div className="flex justify-between text-slate-500">
                                 <span>Subtotal</span>
@@ -490,6 +572,17 @@ export function InvoiceDetailPage() {
                                 <span>Total</span>
                                 <span style={{ color: themeColor }}>{formatCurrency(invoice.total)}</span>
                             </div>
+
+                            {invoice.status !== 'paid' && (
+                                <Button
+                                    onClick={handlePayOnline}
+                                    disabled={paying}
+                                    className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white font-bold no-print h-12"
+                                >
+                                    {paying ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                                    PAY ONLINE NOW
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -500,9 +593,14 @@ export function InvoiceDetailPage() {
     // 4. ELEGANT
     const ElegantTemplate = () => (
         <Card className="overflow-hidden shadow-none border border-slate-200 bg-white relative">
-            {watermarkType !== 'none' && (
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none z-0 overflow-hidden">
-                    {watermarkType === 'logo' ? (
+            {/* Watermark */}
+            {(watermarkType !== 'none' || invoice.status === 'paid') && (
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.04] pointer-events-none z-0 overflow-hidden">
+                    {invoice.status === 'paid' ? (
+                        <span className="text-[130px] font-black rotate-[-35deg] whitespace-nowrap uppercase tracking-widest select-none text-emerald-600 border-[15px] border-emerald-600 px-10 rounded-[35px]">
+                            PAID
+                        </span>
+                    ) : watermarkType === 'logo' ? (
                         <Building2 className="w-[500px] h-[500px]" />
                     ) : (
                         <span className="text-[100px] font-black rotate-[-35deg] whitespace-nowrap uppercase tracking-widest select-none">
@@ -558,10 +656,22 @@ export function InvoiceDetailPage() {
                         <span>Tax</span>
                         <span>{formatCurrency(invoice.tax)}</span>
                     </div>
-                    <div className="flex justify-between text-xl font-serif font-bold text-slate-900 pt-2">
+                    <div className="flex justify-between text-xl font-serif font-bold text-slate-900 pt-2 pb-6">
                         <span>Total</span>
                         <span>{formatCurrency(invoice.total)}</span>
                     </div>
+
+                    {invoice.status !== 'paid' && (
+                        <Button
+                            onClick={handlePayOnline}
+                            disabled={paying}
+                            variant="outline"
+                            className="w-full border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white font-serif tracking-widest no-print"
+                        >
+                            {paying ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                            PAY ONLINE
+                        </Button>
+                    )}
                 </div>
                 <div className="mt-16">
                     <p className="text-slate-400 text-xs uppercase tracking-widest">Thank you for your business</p>
@@ -578,16 +688,84 @@ export function InvoiceDetailPage() {
         setSending(true)
         try {
             await api.post(`/invoices/${id}/send`)
-            toast({ description: "Invoice sent to client successfully!" })
+            toast({
+                title: "Invoice Sent!",
+                description: "Invoice emailed with PDF attachment.",
+                variant: "success"
+            })
         } catch (error: any) {
             console.error("Failed to send invoice", error)
             toast({
                 title: "Error sending invoice",
-                description: error.response?.data?.message || "Could not send email. Check SMTP settings.",
+                description: error.response?.data?.message || error.message || "Could not send email. Check SMTP settings.",
                 variant: "destructive"
             })
         } finally {
             setSending(false)
+        }
+    }
+
+    const handlePayOnline = async () => {
+        if (!invoice) return;
+        setPaying(true)
+        try {
+            // Get Payment Session
+            const res = await api.post(`/invoices/${id}/payment-session`)
+            const { payment_session_id } = res.data
+
+            // Initialize Cashfree
+            const cashfree = (window as any).Cashfree({
+                mode: "sandbox" // Change to "production" for live
+            })
+
+            // Open Checkout
+            await cashfree.checkout({
+                paymentSessionId: payment_session_id,
+                redirectTarget: "_self"
+            })
+
+        } catch (error: any) {
+            console.error("Payment failed", error)
+            toast({
+                title: "Payment Error",
+                description: error.response?.data?.message || "Could not initialize payment session.",
+                variant: "destructive"
+            })
+        } finally {
+            setPaying(false)
+        }
+    }
+
+    const handleMarkAsPaid = async () => {
+        if (!invoice) return;
+        if (!window.confirm("Are you sure you want to mark this invoice as PAID manually? This will reconcile the balance without an online transaction.")) return;
+
+        try {
+            await api.post(`/invoices/${id}/manual-payment`)
+            // Reload invoice data
+            const invoiceRes = await api.get(`/invoices/${id}`)
+            const invData = invoiceRes.data
+            setInvoice({
+                ...invData,
+                id: invData._id,
+                date: new Date(invData.date),
+                dueDate: new Date(invData.dueDate),
+                createdAt: new Date(invData.createdAt),
+                updatedAt: new Date(invData.updatedAt)
+            })
+
+            toast({
+                title: "Manual Reconciliation Successful",
+                description: "The invoice has been marked as PAID.",
+                variant: "success"
+            })
+        } catch (error) {
+            console.error("Manual payment failed", error)
+            toast({
+                title: "Action Failed",
+                description: "Could not update invoice status.",
+                variant: "destructive"
+            })
         }
     }
 
@@ -683,6 +861,35 @@ export function InvoiceDetailPage() {
                     <Button variant="outline" onClick={handlePrint} className="flex-1 lg:flex-none">
                         <Printer className="mr-2 h-4 w-4" /> Print
                     </Button>
+                    <Button variant="outline" onClick={handlePrint} title="Save as PDF" className="flex-1 lg:flex-none">
+                        <Download className="mr-2 h-4 w-4" /> Download PDF
+                    </Button>
+
+                    {invoice.status !== 'paid' && (
+                        <Button
+                            onClick={handlePayOnline}
+                            disabled={paying}
+                            className="flex-1 lg:flex-none bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                            {paying ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <CreditCard className="mr-2 h-4 w-4" />
+                            )}
+                            {paying ? 'Processing...' : 'Pay Online'}
+                        </Button>
+                    )}
+
+                    {invoice.status !== 'paid' && ['admin', 'owner'].includes(currentUser?.role || '') && (
+                        <Button
+                            variant="secondary"
+                            onClick={handleMarkAsPaid}
+                            className="flex-1 lg:flex-none"
+                        >
+                            <Banknote className="mr-2 h-4 w-4" /> Mark as Paid
+                        </Button>
+                    )}
+
                     <Button
                         style={{ backgroundColor: themeColor }}
                         onClick={handleSendEmail}

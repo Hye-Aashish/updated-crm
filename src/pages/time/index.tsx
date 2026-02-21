@@ -26,21 +26,13 @@ import { formatDate } from '@/lib/utils'
 import { timeEntryService, TimeEntry, TimeEntryStats } from '@/lib/timeEntryService'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
-
-interface Project {
-    _id: string
-    name: string
-}
-
-interface Task {
-    _id: string
-    title: string
-    projectId: string
-}
+import { useAppStore } from '@/store'
 
 export function TimePage() {
     const navigate = useNavigate()
     const { toast } = useToast()
+    const { currentUser, tasks: globalTasks, projects: globalProjects, users: globalUsers } = useAppStore()
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner'
 
     // State
     const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
@@ -66,10 +58,9 @@ export function TimePage() {
 
     // Start Timer Modal
     const [showStartModal, setShowStartModal] = useState(false)
-    const [projects, setProjects] = useState<Project[]>([])
-    const [tasks, setTasks] = useState<Task[]>([])
     const [selectedProject, setSelectedProject] = useState('')
     const [selectedTask, setSelectedTask] = useState('')
+    const [selectedUser, setSelectedUser] = useState('')
     const [timerNote, setTimerNote] = useState('')
 
     // Date Filter Logic
@@ -86,26 +77,6 @@ export function TimePage() {
 
     const handleDateChange = (key: 'start' | 'end', value: string) => {
         setDateRange(prev => ({ ...prev, [key]: value }))
-    }
-
-    // Fetch projects and tasks
-    const fetchProjectsAndTasks = async () => {
-        try {
-            const [projectsRes, tasksRes] = await Promise.all([
-                api.get('/projects'),
-                api.get('/tasks')
-            ])
-
-            if (projectsRes.data) {
-                setProjects(projectsRes.data)
-            }
-
-            if (tasksRes.data) {
-                setTasks(tasksRes.data)
-            }
-        } catch (error) {
-            console.error('Error fetching projects/tasks:', error)
-        }
     }
 
     // Fetch data
@@ -141,7 +112,6 @@ export function TimePage() {
 
     useEffect(() => {
         fetchData()
-        fetchProjectsAndTasks()
         setCurrentPage(1) // Reset to first page when dates change
     }, [dateRange])
 
@@ -159,12 +129,13 @@ export function TimePage() {
         try {
             setStarting(true)
 
-            // For demo purposes, using a hardcoded user ID
-            // In production, get this from auth context
-            const userId = '507f1f77bcf86cd799439011' // Replace with actual user ID
+            const finalUserId = selectedUser || currentUser?.id || (currentUser as any)?._id
+            if (!finalUserId) {
+                throw new Error("User not authenticated")
+            }
 
             await timeEntryService.startTimer(
-                userId,
+                finalUserId,
                 selectedProject,
                 selectedTask || undefined,
                 timerNote || undefined
@@ -213,6 +184,29 @@ export function TimePage() {
         }
     }
 
+    // When task is selected, auto-select the assignee if admin
+    useEffect(() => {
+        if (selectedTask && isAdmin && globalTasks.length > 0) {
+            const task = globalTasks.find(t => (t as any)._id === selectedTask || (t as any).id === selectedTask)
+            if (task?.assigneeId) {
+                // Find user in global users list
+                const user = globalUsers.find(u => u._id === task.assigneeId || u.id === task.assigneeId)
+                if (user) {
+                    setSelectedUser(user._id || (user as any).id)
+                }
+            }
+        }
+    }, [selectedTask, globalTasks, globalUsers, isAdmin])
+
+    // Reset selectedUser when modal opens
+    useEffect(() => {
+        if (showStartModal) {
+            setSelectedUser(currentUser?.id || (currentUser as any)?._id || '')
+        }
+    }, [showStartModal, currentUser])
+
+    const selectedUserName = globalUsers.find(u => u._id === selectedUser || u.id === selectedUser)?.name || 'Me'
+
     // KPI Card Component
     const StatsCard = ({ title, value, icon: Icon, color, bg }: any) => (
         <Card className="border-l-4 shadow-sm" style={{ borderLeftColor: color }}>
@@ -254,7 +248,7 @@ export function TimePage() {
 
     // Filter tasks by selected project
     const filteredTasks = selectedProject
-        ? tasks.filter(t => t.projectId === selectedProject)
+        ? globalTasks.filter(t => t.projectId === selectedProject)
         : []
 
     if (loading) {
@@ -319,6 +313,22 @@ export function TimePage() {
                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                             </div>
                             Running Tasks ({timeEntries.filter(e => e.isRunning).length})
+                            {isAdmin && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="ml-auto text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 font-black uppercase tracking-widest"
+                                    onClick={async () => {
+                                        if (confirm("Stop all running timers?")) {
+                                            const active = timeEntries.filter(e => e.isRunning)
+                                            await Promise.all(active.map(e => timeEntryService.stopTimer(e._id)))
+                                            fetchData()
+                                        }
+                                    }}
+                                >
+                                    Stop All
+                                </Button>
+                            )}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -345,6 +355,12 @@ export function TimePage() {
                                                 </Badge>
                                                 <span>•</span>
                                                 <span className="font-mono text-xs opacity-80">Started at {startTime.toLocaleTimeString()}</span>
+                                                {entry.userId?.name && (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span className="text-xs font-bold text-primary/80">{entry.userId.name}</span>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -519,6 +535,16 @@ export function TimePage() {
                     </DialogHeader>
 
                     <div className="space-y-4 py-4">
+                        {isAdmin && (
+                            <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                                    <span className="font-medium text-muted-foreground whitespace-nowrap">Logging time for:</span>
+                                </div>
+                                <span className="font-bold text-primary truncate max-w-[180px] text-right">{selectedUserName}</span>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             <Label htmlFor="project">Project *</Label>
                             <Select value={selectedProject} onValueChange={setSelectedProject}>
@@ -526,8 +552,8 @@ export function TimePage() {
                                     <SelectValue placeholder="Select a project" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {projects.map(project => (
-                                        <SelectItem key={project._id} value={project._id}>
+                                    {globalProjects.map(project => (
+                                        <SelectItem key={project.id || (project as any)._id} value={project.id || (project as any)._id}>
                                             {project.name}
                                         </SelectItem>
                                     ))}
@@ -547,13 +573,31 @@ export function TimePage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {filteredTasks.map(task => (
-                                        <SelectItem key={task._id} value={task._id}>
+                                        <SelectItem key={(task as any)._id || task.id} value={(task as any)._id || task.id}>
                                             {task.title}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {isAdmin && (
+                            <div className="space-y-2">
+                                <Label htmlFor="user">Log Time For (Manual Override)</Label>
+                                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                                    <SelectTrigger id="user">
+                                        <SelectValue placeholder="Select a user" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {globalUsers.map(user => (
+                                            <SelectItem key={user._id || user.id} value={user._id || user.id}>
+                                                {user.name} ({user.role})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label htmlFor="note">Note (Optional)</Label>

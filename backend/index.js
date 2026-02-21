@@ -11,6 +11,7 @@ const connectDB = require('./config/db');
 const User = require('./models/User');
 const { errorHandler } = require('./middleware/errorMiddleware');
 
+// Initialize app
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -24,16 +25,7 @@ require('./socket/chatSocket')(io);
 
 const PORT = process.env.PORT || 5000;
 
-// Middleware to ensure DB connection
-app.use(async (req, res, next) => {
-    try {
-        await connectDB();
-        next();
-    } catch (error) {
-        console.error('Database connection failed:', error);
-        res.status(500).json({ message: 'Database Connection Error', error: error.message });
-    }
-});
+// Middleware (DB connection is handled in connectDB cache)
 
 // Middleware
 app.use(cors());
@@ -70,6 +62,7 @@ const routes = {
     notifications: require('./routes/notificationRoutes'),
     chat: require('./routes/chatRoutes'),
     tracking: require('./routes/trackingRoutes'),
+    quotations: require('./routes/quotationRoutes'),
     test: require('./routes/testRoutes')
 };
 
@@ -87,6 +80,7 @@ app.get('/', (req, res) => res.send('Nexprism CRM API v1.0 - Operational'));
 // Error Middleware
 app.use(errorHandler);
 
+// Start Server
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     server.listen(PORT, () => {
         console.log(`\n🚀 Server established on port ${PORT}`);
@@ -94,5 +88,10 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
         console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}\n`);
     });
 }
+
+// Connect to DB in background
+connectDB().catch(err => {
+    console.error('Initial DB connection failed:', err.message);
+});
 
 module.exports = app;

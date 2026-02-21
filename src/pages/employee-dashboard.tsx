@@ -1,10 +1,12 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
+import api from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
     Briefcase, CheckSquare, Clock,
-    Calendar, PlayCircle, StopCircle, Coffee
+    Calendar, PlayCircle, StopCircle, Coffee, AlertCircle, ArrowUpRight
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useAttendance } from '@/hooks/use-attendance'
@@ -12,6 +14,7 @@ import { useAttendance } from '@/hooks/use-attendance'
 export function EmployeeDashboardPage() {
     const navigate = useNavigate()
     const { projects, tasks, currentUser } = useAppStore()
+    const [settings, setSettings] = useState<any>(null)
     const userId = currentUser?.id || (currentUser as any)?._id
 
     const {
@@ -19,7 +22,19 @@ export function EmployeeDashboardPage() {
         handleClockIn, handleBreakToggle, handleClockOut, formatElapsedTime
     } = useAttendance(userId)
 
+    useEffect(() => {
+        api.get('/settings').then(res => setSettings(res.data)).catch(() => { })
+    }, [])
+
     if (!currentUser) return null;
+
+    // Get layout for employee
+    const layoutConfig = settings?.dashboardLayouts?.employee || {
+        enabledSections: ['hero', 'session', 'financials', 'operational', 'analytics', 'deadlines', 'tasks'],
+        hiddenSubItems: []
+    }
+    const isDeadlinesEnabled = layoutConfig.enabledSections.includes('deadlines')
+    const isTasksEnabled = layoutConfig.enabledSections.includes('tasks')
 
     // --- Metrics for Employee (Filtered by Current User is harder with mock data, simulating "My" data) ---
     // In a real app, I'd filter like: .filter(t => t.assigneeId === currentUser.id)
@@ -46,6 +61,8 @@ export function EmployeeDashboardPage() {
         { title: 'Assigned Projects', value: myActiveProjects, icon: Briefcase, color: '#8b5cf6', bg: 'bg-purple-50', link: '/employee/projects' },
         { title: 'Logged Hours', value: "24h", icon: Clock, color: '#10b981', bg: 'bg-emerald-50', link: '/employee/time' },
     ]
+
+    const overdueTasks = myTasks.filter(t => t.status !== 'done' && new Date(t.dueDate) < new Date()).slice(0, 3)
 
     return (
         <div className="space-y-6 pb-10">
@@ -141,41 +158,68 @@ export function EmployeeDashboardPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Urgent Tasks Section for Employee */}
+                {isDeadlinesEnabled && overdueTasks.length > 0 && !layoutConfig.hiddenSubItems?.includes('overdue') && (
+                    <div className="flex-shrink-0 w-full xl:w-96 bg-rose-500/5 rounded-[2.5rem] p-8 border border-rose-500/10 self-stretch">
+                        <div className="flex items-center gap-3 mb-6">
+                            <AlertCircle className="h-5 w-5 text-rose-500" />
+                            <h3 className="text-sm font-black uppercase tracking-[0.1em] text-rose-600">Urgent Tasks</h3>
+                        </div>
+                        <div className="space-y-4">
+                            {overdueTasks.map((t: any, i: number) => (
+                                <div
+                                    key={i}
+                                    onClick={() => navigate(`/tasks`)}
+                                    className="bg-card/50 p-4 rounded-2xl border border-rose-500/10 hover:bg-card transition-all cursor-pointer group shadow-sm"
+                                >
+                                    <span className="text-xs font-bold font-sans line-clamp-1 block mb-1 text-foreground">{t.title}</span>
+                                    <div className="flex items-center justify-between">
+                                        <Badge className="bg-rose-500/10 text-rose-600 border-none text-[8px] px-2 py-0 font-black h-4 uppercase tracking-tighter">OVERDUE</Badge>
+                                        <ArrowUpRight className="h-3 w-3 text-rose-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* My Tasks List */}
-            <div className="grid gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">My Priority Tasks</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {myRecentTasks.length > 0 ? (
-                            <div className="space-y-4">
-                                {myRecentTasks.map(task => (
-                                    <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-2 h-2 rounded-full ${task.priority === 'urgent' ? 'bg-red-500' : task.priority === 'high' ? 'bg-orange-500' : 'bg-blue-500'}`} />
-                                            <div>
-                                                <p className="font-medium text-sm">{task.title}</p>
-                                                <p className="text-xs text-muted-foreground">{task.projectId}</p>
+            {isTasksEnabled && (
+                <div className="grid gap-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">My Priority Tasks</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {myRecentTasks.length > 0 ? (
+                                <div className="space-y-4">
+                                    {myRecentTasks.map(task => (
+                                        <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-2 h-2 rounded-full ${task.priority === 'urgent' ? 'bg-red-500' : task.priority === 'high' ? 'bg-orange-500' : 'bg-blue-500'}`} />
+                                                <div>
+                                                    <p className="font-medium text-sm">{task.title}</p>
+                                                    <p className="text-xs text-muted-foreground">{task.projectId}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <Badge variant="outline">{task.status}</Badge>
+                                                <span className="text-xs text-muted-foreground">Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <Badge variant="outline">{task.status}</Badge>
-                                            <span className="text-xs text-muted-foreground">Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                                No pending tasks. Good job!
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    No pending tasks. Good job!
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     )
 }

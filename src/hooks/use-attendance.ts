@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast'
 export function useAttendance(userId: string | undefined) {
     const { toast } = useToast()
     const [currentTime, setCurrentTime] = useState(new Date())
-    const [attendanceStatus, setAttendanceStatus] = useState<'out' | 'in' | 'break' | 'checked-out'>('out')
+    const [attendanceStatus, setAttendanceStatus] = useState<'out' | 'in' | 'break' | 'checked-out' | 'half-day'>('out')
     const [clockInTime, setClockInTime] = useState<Date | null>(null)
     const [elapsedTime, setElapsedTime] = useState(0)
 

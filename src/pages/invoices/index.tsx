@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, FileText, AlertCircle, Banknote, Loader2, Mail, Send } from 'lucide-react'
+import { Plus, Search, Filter, FileText, AlertCircle, Banknote, Loader2, Mail, Send, CreditCard, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,11 +33,15 @@ export function InvoicesPage() {
     const { invoices, clients, setInvoices, setClients } = useAppStore()
     const [loading, setLoading] = useState(true)
 
-    // Send Modal State
     const [sendModalOpen, setSendModalOpen] = useState(false)
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
     const [recipientEmail, setRecipientEmail] = useState('')
     const [sending, setSending] = useState(false)
+
+    // WhatsApp Modal State
+    const [whatsappModalOpen, setWhatsappModalOpen] = useState(false)
+    const [recipientPhone, setRecipientPhone] = useState('')
+    const [sendingWhatsApp, setSendingWhatsApp] = useState(false)
 
     const openSendModal = (e: React.MouseEvent, invoice: Invoice) => {
         e.stopPropagation()
@@ -45,6 +49,14 @@ export function InvoicesPage() {
         const client = clients.find(c => c.id === invoice.clientId)
         setRecipientEmail(client?.email || '')
         setSendModalOpen(true)
+    }
+
+    const openWhatsAppModal = (e: React.MouseEvent, invoice: Invoice) => {
+        e.stopPropagation()
+        setSelectedInvoice(invoice)
+        const client = clients.find(c => c.id === invoice.clientId)
+        setRecipientPhone(client?.phone || '')
+        setWhatsappModalOpen(true)
     }
 
     const handleSendEmail = async () => {
@@ -64,6 +76,30 @@ export function InvoicesPage() {
             })
         } finally {
             setSending(false)
+        }
+    }
+
+    const handleSendWhatsApp = async () => {
+        if (!selectedInvoice || !recipientPhone) return
+        setSendingWhatsApp(true)
+        try {
+            await api.post(`/invoices/${selectedInvoice.id}/send-whatsapp`, {
+                phone: recipientPhone
+            })
+            toast({
+                title: "WhatsApp Message Sent",
+                description: `Invoice notification sent to ${recipientPhone} via official API.`,
+                variant: "success"
+            })
+            setWhatsappModalOpen(false)
+        } catch (error: any) {
+            toast({
+                title: "WhatsApp API Error",
+                description: error.response?.data?.message || "Failed to send WhatsApp message. Check API settings.",
+                variant: "destructive"
+            })
+        } finally {
+            setSendingWhatsApp(false)
         }
     }
 
@@ -232,6 +268,20 @@ export function InvoicesPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
+                                                {invoice.status !== 'paid' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-bold"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            navigate(`/invoices/${invoice.id}`)
+                                                        }}
+                                                    >
+                                                        <CreditCard className="h-4 w-4 mr-1" />
+                                                        Pay
+                                                    </Button>
+                                                )}
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -242,9 +292,18 @@ export function InvoicesPage() {
                                                     <Mail className="h-4 w-4" />
                                                 </Button>
                                                 <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                                                    onClick={(e) => openWhatsAppModal(e, invoice)}
+                                                    title="Send WhatsApp"
+                                                >
+                                                    <MessageSquare className="h-4 w-4" />
+                                                </Button>
+                                                <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-8"
+                                                    className="h-8 font-medium"
                                                     onClick={() => navigate(`/invoices/${invoice.id}`)}
                                                 >
                                                     View
@@ -309,6 +368,63 @@ export function InvoicesPage() {
                                 <>
                                     <Send className="mr-2 h-4 w-4" />
                                     Send Invoice
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* --- WhatsApp Modal --- */}
+            <Dialog open={whatsappModalOpen} onOpenChange={setWhatsappModalOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-green-600" />
+                            Send via WhatsApp (Official API)
+                        </DialogTitle>
+                        <DialogDescription>
+                            Confirm the phone number for Invoice <strong>#{selectedInvoice?.invoiceNumber}</strong>.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium leading-none">
+                                Recipient Phone Number
+                            </label>
+                            <Input
+                                type="text"
+                                placeholder="e.g. 919876543210"
+                                value={recipientPhone}
+                                onChange={(e) => setRecipientPhone(e.target.value)}
+                                className="focus-visible:ring-green-600"
+                            />
+                            <p className="text-[10px] text-muted-foreground italic">Include country code without '+' (e.g., 91 for India).</p>
+                        </div>
+                    </div>
+                    <DialogFooter className="sm:justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setWhatsappModalOpen(false)}
+                            disabled={sendingWhatsApp}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleSendWhatsApp}
+                            disabled={sendingWhatsApp || !recipientPhone}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                            {sendingWhatsApp ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Communicating...
+                                </>
+                            ) : (
+                                <>
+                                    <MessageSquare className="mr-2 h-4 w-4" />
+                                    Send WhatsApp
                                 </>
                             )}
                         </Button>

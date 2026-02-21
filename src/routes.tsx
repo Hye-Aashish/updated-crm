@@ -32,9 +32,14 @@ import { ExpensesPage } from './pages/expenses'
 import { SalaryPage } from './pages/salary'
 import { AttendancePage } from './pages/attendance'
 import { PublicLeadForm } from './pages/public/lead-form'
+import PublicQuotationView from './pages/public/quotation-view'
 import { ChatPage } from './pages/chat'
 import { ChatWidgetsPage } from './pages/chat/widgets'
 import UserTrackerPage from './pages/user-tracker'
+import QuotationsPage from './pages/quotations'
+import QuotationEditor from './pages/quotations/create'
+import QuotationDetailPage from './pages/quotations/[id]'
+import QuotationTemplates from './pages/quotations/templates'
 
 
 export function AppRoutes() {
@@ -44,6 +49,7 @@ export function AppRoutes() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/f/:id" element={<PublicLeadForm />} />
+            <Route path="/q/:id" element={<PublicQuotationView />} />
 
 
             {/* Dashboard Routes */}
@@ -90,6 +96,13 @@ export function AppRoutes() {
 
                 <Route path="files" element={<FilesPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+
+                {/* Quotations */}
+                <Route path="quotations" element={<QuotationsPage />} />
+                <Route path="quotations/templates" element={<QuotationTemplates />} />
+                <Route path="quotations/create" element={<QuotationEditor />} />
+                <Route path="quotations/:id" element={<QuotationDetailPage />} />
+                <Route path="quotations/:id/edit" element={<QuotationEditor />} />
             </Route>
 
             {/* Employee Routes */}

@@ -10,7 +10,7 @@ export function DashboardLayout() {
     const [collapsed, setCollapsed] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
     const navigate = useNavigate()
-    const { currentUser, setCurrentUser, leads, setLeads, addNotification } = useAppStore()
+    const { currentUser, setCurrentUser, leads, setLeads } = useAppStore()
     const [authLoading, setAuthLoading] = useState(true)
 
     // 0. Auth / Session Check
@@ -58,51 +58,7 @@ export function DashboardLayout() {
         }
     }, [authLoading, currentUser, leads.length, setLeads])
 
-    // 2. Poll for Reminders
-    useEffect(() => {
-        const checkReminders = () => {
-            const now = new Date()
-            let hasUpdates = false
-            const updatedLeads = leads.map(lead => {
-                if (lead.reminder?.date && !lead.reminder.completed) {
-                    const reminderTime = new Date(lead.reminder.date)
-                    if (now >= reminderTime) {
-                        console.log(`🔔 Reminder Triggered for ${lead.name}`)
 
-                        // Play Tone
-                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
-                        audio.volume = 0.5
-                        audio.play().catch(e => console.error("Audio denied", e))
-
-                        // Add Notification
-                        addNotification({
-                            id: `rem-${Date.now()}-${lead.id}`,
-                            title: `Reminder: ${lead.name}`,
-                            message: `Follow up due for ${lead.company}`,
-                            read: false,
-                            createdAt: new Date()
-                        })
-
-                        // Update Backend
-                        api.put(`/leads/${lead.id}`, {
-                            reminder: { ...lead.reminder, completed: true }
-                        }).catch(console.error)
-
-                        hasUpdates = true
-                        return { ...lead, reminder: { ...lead.reminder, completed: true } }
-                    }
-                }
-                return lead
-            })
-
-            if (hasUpdates) {
-                setLeads(updatedLeads)
-            }
-        }
-
-        const interval = setInterval(checkReminders, 10000) // Check every 10s
-        return () => clearInterval(interval)
-    }, [leads, addNotification, setLeads])
 
     if (authLoading) {
         return (

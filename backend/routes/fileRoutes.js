@@ -3,13 +3,28 @@ const router = express.Router();
 const File = require('../models/File');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
+const Project = require('../models/Project');
+
 // GET all files
 router.get('/', protect, async (req, res) => {
     try {
         let query = {};
-        // If not admin/owner, filter by uploader
+        // If not admin/owner, filter by uploader OR project association
         if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-            query.uploadedBy = req.user._id.toString();
+            const userId = req.user._id.toString();
+
+            // Find projects I am involved in
+            const myProjects = await Project.find({
+                $or: [{ pmId: userId }, { members: userId }]
+            }).select('_id');
+            const myProjectIds = myProjects.map(p => p._id.toString());
+
+            query = {
+                $or: [
+                    { uploadedBy: userId },
+                    { projectId: { $in: myProjectIds } }
+                ]
+            };
         }
 
         const files = await File.find(query).sort({ uploadedAt: -1 });
@@ -26,8 +41,21 @@ router.get('/:id', protect, async (req, res) => {
         if (!file) return res.status(404).json({ message: 'File not found' });
 
         // Authorization check
-        if (req.user.role !== 'admin' && req.user.role !== 'owner' && file.uploadedBy !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Not authorized' });
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            const userId = req.user._id.toString();
+            const isUploader = file.uploadedBy === userId;
+
+            let hasProjectAccess = false;
+            if (file.projectId) {
+                const project = await Project.findById(file.projectId);
+                if (project && (project.pmId === userId || (project.members && project.members.includes(userId)))) {
+                    hasProjectAccess = true;
+                }
+            }
+
+            if (!isUploader && !hasProjectAccess) {
+                return res.status(403).json({ message: 'Not authorized to view this file' });
+            }
         }
 
         res.json(file);

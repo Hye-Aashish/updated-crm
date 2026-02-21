@@ -3,11 +3,24 @@ const router = express.Router();
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// GET all users (Admin only)
-router.get('/', protect, authorize('admin', 'owner'), async (req, res) => {
+// GET all users
+router.get('/', protect, async (req, res) => {
     try {
-        const users = await User.find().select('-password'); // Exclude password
-        res.json(users);
+        const userRole = req.user.role;
+        let query = User.find();
+
+        if (userRole === 'admin' || userRole === 'owner') {
+            // Full data for admins
+            const users = await query.select('-password');
+            res.json(users);
+        } else if (['pm', 'developer', 'employee'].includes(userRole)) {
+            // Limited data for other staff for assignment purposes
+            const users = await query.select('name email role avatar designation department');
+            res.json(users);
+        } else {
+            // Clients or others shouldn't see user list
+            res.status(403).json({ message: 'Not authorized to view user list' });
+        }
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

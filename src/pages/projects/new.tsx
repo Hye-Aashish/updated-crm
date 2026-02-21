@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { ChevronLeft, Info } from 'lucide-react'
-import type { Project, ProjectStatus, ProjectType, PaymentModel } from '@/types'
+import type { ProjectStatus, ProjectType, PaymentModel } from '@/types'
 import api from '@/lib/api-client'
 import {
     Popover,
@@ -24,13 +24,25 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 
+import { mapProject, mapClient } from '@/lib/mappers'
+
 export function NewProjectPage() {
     const navigate = useNavigate()
     const { toast } = useToast()
     const addProject = useAppStore((state) => state.addProject)
+    const setClients = useAppStore((state) => state.setClients)
     const clients = useAppStore((state) => state.clients)
     const currentUser = useAppStore((state) => state.currentUser)
     const [loading, setLoading] = useState(false)
+
+    // Fetch if missing
+    useEffect(() => {
+        if (clients.length === 0) {
+            api.get('/clients').then(res => {
+                setClients(res.data.map(mapClient))
+            }).catch(console.error)
+        }
+    }, [clients.length, setClients])
 
     const [formData, setFormData] = useState({
         name: '',
@@ -52,32 +64,13 @@ export function NewProjectPage() {
             // Send data to Backend API
             const response = await api.post('/projects', {
                 ...formData,
-                dueDate: formData.deadline // Map deadline to dueDate for backend
+                dueDate: formData.deadline,
+                pmId: currentUser.id // Set current user as PM by default
             })
 
-            const savedProject = response.data
+            const savedProject = mapProject(response.data)
 
-            // Update Local Store (Optional: helps see changes immediately without refresh if strict sync isn't needed)
-            const newProject: Project = {
-                id: savedProject._id, // Map MongoDB _id to frontend id
-                name: savedProject.name,
-                description: savedProject.description,
-                clientId: savedProject.clientId,
-                status: savedProject.status,
-                deadline: new Date(savedProject.dueDate),
-                budget: savedProject.budget,
-                type: savedProject.type,
-                paymentModel: savedProject.paymentModel,
-                createdAt: new Date(savedProject.createdAt),
-                updatedAt: new Date(savedProject.createdAt),
-                milestones: [],
-                startDate: new Date(savedProject.startDate),
-                dueDate: new Date(savedProject.dueDate),
-                pmId: savedProject.pmId || 'u2',
-                progress: savedProject.progress || 0
-            }
-
-            addProject(newProject)
+            addProject(savedProject)
 
             toast({
                 title: "Project created",
@@ -89,7 +82,7 @@ export function NewProjectPage() {
             console.error(error)
             toast({
                 title: "Error",
-                description: "Failed to create project. Database connection might be down.",
+                description: "Failed to create project.",
                 variant: "destructive"
             })
         } finally {
@@ -180,7 +173,7 @@ export function NewProjectPage() {
                         </div>
 
                         <div className="grid gap-4 md:grid-cols-2">
-                            {['owner', 'pm'].includes(currentUser?.role) && (
+                            {['owner', 'admin'].includes(currentUser?.role) && (
                                 <div className="space-y-2">
                                     <Label htmlFor="budget">Budget (₹)</Label>
                                     <Input

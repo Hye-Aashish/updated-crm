@@ -131,18 +131,57 @@
 
   /* Standardized Dashboard Card for Consistency */
   .dashboard-card {
-    @apply bg-card border border-border/60 shadow-sm rounded-xl transition-all duration-300 hover:shadow-md;
+    @apply bg-card border border-border/50 rounded-2xl transition-all duration-300;
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .dashboard-card:hover {
+    @apply border-primary/20;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
   }
 
   .dashboard-card-header {
-    @apply p-6 border-b border-border/30 flex items-center justify-between;
+    @apply p-5 border-b border-border/20 flex items-center justify-between;
   }
 
   .dashboard-card-title {
-    @apply text-base font-bold flex items-center gap-2;
+    @apply text-sm font-bold flex items-center gap-2.5 text-foreground/90 tracking-tight;
   }
 
   .dashboard-card-content {
-    @apply p-6;
+    @apply p-5;
+  }
+
+  /* Premium Utilities */
+  .glass-panel {
+    @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/20 dark:border-white/5;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-primary via-blue-500 to-indigo-600;
+  }
+
+  .brand-gradient {
+    @apply bg-gradient-to-br from-primary via-blue-600 to-indigo-700;
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite linear;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .status-dot {
+    @apply h-2 w-2 rounded-full inline-block mr-2;
   }
 }

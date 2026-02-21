@@ -24,4 +24,8 @@ const leadSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+leadSchema.index({ assignedTo: 1 });
+leadSchema.index({ stage: 1 });
+leadSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Lead', leadSchema);

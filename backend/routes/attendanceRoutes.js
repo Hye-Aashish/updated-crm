@@ -35,6 +35,9 @@ router.post('/check-in', protect, async (req, res) => {
         let attendance = await Attendance.findOne({ userId, date: today });
 
         if (attendance) {
+            if (attendance.status === 'checked-out' || attendance.status === 'half-day') {
+                return res.status(400).json({ message: 'Your shift for today is already complete. See you tomorrow! 👋' });
+            }
             return res.status(400).json({ message: 'Already checked in today' });
         }
 
@@ -44,7 +47,6 @@ router.post('/check-in', protect, async (req, res) => {
             checkIn: new Date(),
             status: 'present'
         });
-
         await attendance.save();
         res.status(201).json(attendance);
     } catch (error) {
@@ -147,20 +149,28 @@ router.post('/check-out', protect, async (req, res) => {
     }
 });
 
-// Get monthly attendance for all users (Admin only)
-router.get('/monthly', protect, authorize('admin', 'owner'), async (req, res) => {
+// Get monthly attendance data
+router.get('/monthly', protect, async (req, res) => {
     try {
-        const { month, year } = req.query;
+        const { month, year, userId } = req.query;
         const targetMonth = month ? parseInt(month) : new Date().getMonth();
         const targetYear = year ? parseInt(year) : new Date().getFullYear();
 
         const startDate = new Date(targetYear, targetMonth, 1);
         const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
 
-        const attendance = await Attendance.find({
+        const filter = {
             date: { $gte: startDate, $lte: endDate }
-        });
+        };
 
+        // RBAC: Non-admins can only see their own records
+        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            filter.userId = req.user._id.toString();
+        } else if (userId) {
+            filter.userId = userId;
+        }
+
+        const attendance = await Attendance.find(filter);
         res.json(attendance);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -206,9 +216,20 @@ router.get('/history/:userId', protect, async (req, res) => {
             return res.status(403).json({ message: 'Not authorized' });
         }
 
-        const history = await Attendance.find({ userId: req.params.userId })
+        const { month, year } = req.query;
+        const filter = { userId: req.params.userId };
+
+        if (month !== undefined && year !== undefined) {
+            const targetMonth = parseInt(month);
+            const targetYear = parseInt(year);
+            const startDate = new Date(targetYear, targetMonth, 1);
+            const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+            filter.date = { $gte: startDate, $lte: endDate };
+        }
+
+        const history = await Attendance.find(filter)
             .sort({ date: -1 })
-            .limit(30);
+            .limit(month !== undefined ? 100 : 30);
         res.json(history);
     } catch (error) {
         res.status(500).json({ message: error.message });

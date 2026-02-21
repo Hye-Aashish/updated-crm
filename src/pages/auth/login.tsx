@@ -55,7 +55,7 @@ export function LoginPage() {
         } catch (error: any) {
             toast({
                 title: "Login Failed",
-                description: error.response?.data?.message || "Invalid credentials",
+                description: error.message || "Something went wrong",
                 variant: 'destructive'
             })
         } finally {

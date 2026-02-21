@@ -100,6 +100,8 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Attendance', href: '/attendance', icon: Clock }, // Updated link
         { name: 'Time Tracking', href: '/time', icon: Clock },
         { name: 'Invoices', href: '/invoices', icon: FileText },
+        { name: 'Quotations', href: '/quotations', icon: FileText },
+        { name: 'Templates', href: '/quotations/templates', icon: LayoutDashboard },
         { name: 'Leads', href: '/leads', icon: Target },
         { name: 'Expenses', href: '/expenses', icon: Wallet },
         { name: 'Payroll', href: '/salary', icon: Wallet },
@@ -115,21 +117,23 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         const p = permissions
         switch (item.name) {
             case 'Dashboard': return !!p.dashboard?.view
-            case 'User Tracker': return true
+            case 'User Tracker': return !!p.user_tracker?.view
             case 'Clients': return !!p.clients?.view
             case 'Projects': return !!p.projects?.view
             case 'Tasks': return !!p.tasks?.view
-            case 'Team': return !!p.users?.view
-            case 'Attendance': return !!p.users?.view
-            case 'Time Tracking': return !!p.tasks?.view
-            case 'Invoices': return !!p.finance?.view
-            case 'Leads': return !!p.clients?.view
-            case 'Expenses': return !!p.finance?.view
-            case 'Payroll': return true // Everyone can see their own
-            case 'Support Tickets': return !!p.tasks?.view
-            case 'Live Chat': return true // Everyone (or restricted)
-            case 'Reports': return !!p.finance?.view
-            case 'Files': return !!p.projects?.view
+            case 'Team': return !!p.team?.view
+            case 'Attendance': return !!p.attendance?.view
+            case 'Time Tracking': return !!p.time_tracking?.view
+            case 'Invoices': return !!p.invoices?.view
+            case 'Quotations': return !!p.quotations?.view
+            case 'Templates': return !!p.templates?.view
+            case 'Leads': return !!p.leads?.view
+            case 'Expenses': return !!p.expenses?.view
+            case 'Payroll': return !!p.payroll?.view
+            case 'Support Tickets': return !!p.tickets?.view
+            case 'Live Chat': return !!p.chat?.view
+            case 'Reports': return !!p.reports?.view
+            case 'Files': return !!p.files?.view
             case 'Settings': return !!p.settings?.view
             default: return true
         }

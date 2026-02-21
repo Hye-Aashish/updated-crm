@@ -23,6 +23,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import { mapProject, mapClient } from '@/lib/mappers'
 
 export function EditProjectPage() {
     const { id } = useParams()
@@ -49,39 +50,26 @@ export function EditProjectPage() {
 
     // Fetch if missing
     useEffect(() => {
-        if (!project && projects.length === 0) {
-            // Fetch logic could be added here, similar to Detail Page
-            // For now redirect or show loading
-            const fetchProjects = async () => {
-                try {
-                    const response = await api.get('/projects')
-                    const backendProjects = response.data.map((p: any) => ({
-                        id: p._id,
-                        name: p.name,
-                        description: p.description,
-                        clientId: p.clientId,
-                        status: p.status,
-                        deadline: new Date(p.dueDate),
-                        budget: p.budget,
-                        type: p.type,
-                        paymentModel: p.paymentModel,
-                        priority: p.priority,
-                        milestones: p.milestones || [],
-                        progress: p.progress || 0,
-                        startDate: new Date(p.startDate),
-                        dueDate: new Date(p.dueDate),
-                        createdAt: new Date(p.createdAt),
-                        updatedAt: new Date(p.createdAt),
-                        pmId: p.pmId || 'u2',
-                    }))
-                    setProjects(backendProjects)
-                } catch (error) {
-                    console.error(error)
+        const loadData = async () => {
+            try {
+                const promises = []
+                if (!project && projects.length === 0) promises.push(api.get('/projects'))
+                if (clients.length === 0) promises.push(api.get('/clients'))
+
+                if (promises.length > 0) {
+                    const results = await Promise.all(promises)
+                    results.forEach(res => {
+                        const url = res.config?.url
+                        if (url?.includes('/projects')) setProjects(res.data.map(mapProject))
+                        if (url?.includes('/clients')) useAppStore.getState().setClients(res.data.map(mapClient))
+                    })
                 }
+            } catch (error) {
+                console.error("Data load error", error)
             }
-            fetchProjects()
         }
-    }, [project, projects.length, setProjects])
+        loadData()
+    }, [project, projects.length, clients.length, setProjects])
 
     // Populate Form
     useEffect(() => {
@@ -91,8 +79,10 @@ export function EditProjectPage() {
                 description: project.description,
                 clientId: project.clientId,
                 status: project.status,
-                deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
-                budget: project.budget.toString(),
+                deadline: (project.deadline && !isNaN(new Date(project.deadline).getTime()))
+                    ? new Date(project.deadline).toISOString().split('T')[0]
+                    : '',
+                budget: (project.budget || 0).toString(),
                 type: project.type,
                 paymentModel: project.paymentModel,
                 priority: project.priority || 'medium',
@@ -115,21 +105,10 @@ export function EditProjectPage() {
                 dueDate: formData.deadline
             })
 
-            const updatedProject = response.data
+            const updatedProject = mapProject(response.data)
 
             // Update Local Store
-            updateProject(project.id, {
-                name: updatedProject.name,
-                description: updatedProject.description,
-                clientId: updatedProject.clientId,
-                status: updatedProject.status,
-                deadline: new Date(updatedProject.dueDate),
-                budget: updatedProject.budget,
-                type: updatedProject.type,
-                paymentModel: updatedProject.paymentModel,
-                priority: updatedProject.priority,
-                // ... other fields
-            })
+            updateProject(project.id, updatedProject)
 
             toast({
                 title: "Project Updated",
@@ -236,7 +215,7 @@ export function EditProjectPage() {
                         </div>
 
                         <div className="grid gap-4 md:grid-cols-2">
-                            {['owner', 'pm'].includes(currentUser?.role) && (
+                            {['owner', 'admin'].includes(currentUser?.role) && (
                                 <div className="space-y-2">
                                     <Label htmlFor="budget">Budget (₹)</Label>
                                     <Input

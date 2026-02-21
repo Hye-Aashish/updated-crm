@@ -62,14 +62,15 @@ router.get('/all', protect, authorize('admin', 'owner'), async (req, res) => {
                 }
             });
 
-            // Add Holidays to paid days
+            // Add Holidays to paid days (but not off-days, unless you want them paid)
             for (let d = 1; d <= daysInMonth; d++) {
                 const date = new Date(targetYear, targetMonth, d);
                 const dateStr = date.toISOString().split('T')[0];
                 const isOff = payrollSettings.offDays.includes(date.getDay());
                 const isHoliday = payrollSettings.holidays.some(h => h.date === dateStr);
 
-                if (isHoliday || isOff) {
+                // For 26-day rule, we typically only add holidays that fall on working days
+                if (isHoliday && !isOff) {
                     const hasAttendance = attendance.some(a => new Date(a.date).getDate() === d);
                     if (!hasAttendance) {
                         stats.paidDays += 1;
@@ -78,7 +79,8 @@ router.get('/all', protect, authorize('admin', 'owner'), async (req, res) => {
             }
 
             const baseSalary = parseFloat(user.salary) || 0;
-            const currentSalary = (baseSalary / daysInMonth) * stats.paidDays;
+            // Use customWorkingDays (default 26) as divisor
+            const currentSalary = (baseSalary / customWorkingDays) * stats.paidDays;
 
             payrollData.push({
                 userId: user.id || user._id,
@@ -153,7 +155,7 @@ router.get('/my/:userId', protect, async (req, res) => {
             const isOff = payrollSettings.offDays.includes(date.getDay());
             const isHoliday = payrollSettings.holidays.some(h => h.date === dateStr);
 
-            if (isHoliday || isOff) {
+            if (isHoliday && !isOff) {
                 const hasAttendance = attendance.some(a => new Date(a.date).getDate() === d);
                 if (!hasAttendance) {
                     stats.paidDays += 1;
@@ -162,7 +164,7 @@ router.get('/my/:userId', protect, async (req, res) => {
         }
 
         const baseSalary = parseFloat(user.salary) || 0;
-        const currentSalary = (baseSalary / daysInMonth) * stats.paidDays;
+        const currentSalary = (baseSalary / 26) * stats.paidDays; // Use 26 as standard for personal view too
 
         res.json({
             userId,
@@ -173,7 +175,7 @@ router.get('/my/:userId', protect, async (req, res) => {
             month: targetMonth,
             year: targetYear,
             daysInMonth,
-            workingDays: daysInMonth
+            workingDays: 26
         });
     } catch (error) {
         res.status(500).json({ message: error.message });

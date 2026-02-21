@@ -6,7 +6,7 @@ const taskSchema = new mongoose.Schema({
     projectId: { type: String, required: true },
     status: {
         type: String,
-        enum: ['todo', 'in-progress', 'in-review', 'done', 'completed'],
+        enum: ['todo', 'in-progress', 'review', 'client-approval', 'done', 'completed'],
         default: 'todo'
     },
     priority: {
@@ -35,5 +35,10 @@ const taskSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
+
+taskSchema.index({ projectId: 1 });
+taskSchema.index({ assigneeId: 1 });
+taskSchema.index({ status: 1 });
+taskSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Task', taskSchema);

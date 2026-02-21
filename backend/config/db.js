@@ -18,7 +18,11 @@ async function connectDB() {
         console.log('Target URI:', process.env.MONGO_URI ? 'PROTECTED_URI' : 'UNDEFINED');
 
         const opts = {
-            bufferCommands: false,
+            bufferCommands: true,
+            maxPoolSize: 10, // Maintain up to 10 socket connections
+            serverSelectionTimeoutMS: 5000, // 5 seconds instead of 30
+            socketTimeoutMS: 45000,
+            family: 4 // Use IPv4, skip trying IPv6 first
         };
 
         cached.promise = mongoose.connect(process.env.MONGO_URI, opts).then((mongoose) => {

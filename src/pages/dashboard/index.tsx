@@ -5,13 +5,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import {
-    Users, Briefcase, CheckSquare, Clock,
-    Banknote, TrendingUp, TrendingDown, AlertCircle, PlayCircle, StopCircle, Target, Activity, Layers, Filter,
-    Wallet, CreditCard, Coffee
+    CheckSquare, Clock, Briefcase,
+    Banknote, TrendingUp, TrendingDown, AlertCircle, PlayCircle, StopCircle, Target, Layers,
+    Wallet, CreditCard, Coffee, ArrowUpRight, Zap, LayoutDashboard, CheckCircle, MessageSquare
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Cell, PieChart, Pie
@@ -22,7 +21,7 @@ import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
 
 export function DashboardPage() {
     const navigate = useNavigate()
-    const { currentUser, leads, invoices, setLeads, setExpenses, setProjects, setInvoices, setTasks } = useAppStore()
+    const { currentUser, leads, setLeads, setExpenses, setProjects, setInvoices, setTasks, invoices, setTickets } = useAppStore()
     const [settings, setSettings] = useState<any>(null)
     const userId = currentUser?.id || (currentUser as any)?._id
 
@@ -34,49 +33,42 @@ export function DashboardPage() {
 
     const {
         totalRevenue, totalExpenses, netProfit, outstandingInvoices,
-        relevantProjects, relevantTasks, winRate, totalBillableHours,
+        relevantTasks, winRate,
         revenueData, leadStatusData, healthMetrics, recentActivities,
-        revenueTrend, expenseTrend, currentLayout
+        revenueTrend, expenseTrend,
+        completedProjects, inProgressProjects, onHoldProjects, planningProjects,
+        todoTasks, inProgressTasks, reviewTasks, doneTasks,
+        totalProjectCost,
+        currentLayout, sectionOrder, customLabels, hiddenSubItems,
+        myPerformanceScore,
+        openTickets, resolvedTickets, criticalTickets
     } = useDashboardMetrics(settings)
 
-    if (!currentUser) return null;
+    // Loading state guard
+    if (!currentUser) {
+        return (
+            <div className="h-[80vh] w-full flex flex-col items-center justify-center space-y-4 animate-pulse">
+                <div className="h-16 w-16 rounded-2xl bg-muted" />
+                <div className="h-4 w-48 bg-muted rounded-full" />
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Syncing Enterprise Data...</p>
+            </div>
+        )
+    }
 
-    // Data Fetching (Initial load only)
+    // Data Fetching
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                console.log('Fetching dashboard data...')
                 const [settingsRes] = await Promise.all([
                     api.get('/settings').catch(() => ({ data: null })),
-                    api.get('/leads').then(res => {
-                        console.log('Leads fetched:', res.data.length)
-                        setLeads(res.data.map(mapLead))
-                    }).catch(err => console.error('Leads fetch fail:', err)),
-                    api.get('/expenses').then(res => {
-                        setExpenses(res.data.map(mapExpense))
-                    }).catch(err => console.error('Expenses fetch fail:', err)),
-                    api.get('/projects').then(res => {
-                        console.log('Projects fetched:', res.data.length)
-                        setProjects(res.data.map(mapProject))
-                    }).catch(err => console.error('Projects fetch fail:', err)),
-                    api.get('/invoices').then(res => {
-                        console.log('Invoices fetched:', res.data.length)
-                        setInvoices(res.data.map(mapInvoice))
-                    }).catch(err => console.error('Invoices fetch fail:', err)),
-                    api.get('/tasks').then(res => {
-                        setTasks(res.data.map(mapTask))
-                    }).catch(err => console.error('Tasks fetch fail:', err)),
-                    api.get('/notifications').then(res => {
-                        if (Array.isArray(res.data)) {
-                            useAppStore.getState().setNotifications(res.data.map((n: any) => ({
-                                id: n._id,
-                                title: n.title,
-                                message: n.message,
-                                read: n.read,
-                                createdAt: new Date(n.createdAt)
-                            })))
-                        }
-                    }).catch(err => console.error('Notifications fetch fail:', err))
+                    api.get('/leads').then(res => { if (Array.isArray(res.data)) setLeads(res.data.map(mapLead)) }).catch(err => console.error(err)),
+                    api.get('/expenses').then(res => { if (Array.isArray(res.data)) setExpenses(res.data.map(mapExpense)) }).catch(err => console.error(err)),
+                    api.get('/projects').then(res => { if (Array.isArray(res.data)) setProjects(res.data.map(mapProject)) }).catch(err => console.error(err)),
+                    api.get('/invoices').then(res => { if (Array.isArray(res.data)) setInvoices(res.data.map(mapInvoice)) }).catch(err => console.error(err)),
+                    api.get('/tasks').then(res => { if (Array.isArray(res.data)) setTasks(res.data.map(mapTask)) }).catch(err => console.error(err)),
+                    api.get('/users').then(res => { if (Array.isArray(res.data)) useAppStore.getState().setUsers(res.data) }).catch(err => console.error(err)),
+                    api.get('/time-entries').then(res => { if (Array.isArray(res.data)) useAppStore.getState().setTimeEntries(res.data) }).catch(err => console.error(err)),
+                    api.get('/tickets').then(res => { if (Array.isArray(res.data)) setTickets(res.data) }).catch(err => console.error(err))
                 ])
                 if (settingsRes?.data) setSettings(settingsRes.data)
             } catch (error) {
@@ -86,388 +78,476 @@ export function DashboardPage() {
         loadInitialData()
     }, [setLeads, setExpenses, setProjects, setInvoices, setTasks])
 
-    const renderSection = (key: string) => {
-        const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#64748b']
-
-        switch (key) {
-            case 'financials':
-                return (
-                    <div key="financials" className="space-y-3">
-                        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider pl-1 font-sans">Financial Overview</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {[
-                                { label: 'Total Revenue', value: formatCurrency(totalRevenue), trend: revenueTrend, icon: Banknote, color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
-                                { label: 'Total Expenses', value: formatCurrency(totalExpenses), trend: expenseTrend, icon: Wallet, color: 'text-red-600', bg: 'bg-red-500/10' },
-                                { label: 'Net Profit', value: formatCurrency(netProfit), trend: revenueTrend, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-500/10' },
-                                { label: 'Outstanding Invoices', value: formatCurrency(outstandingInvoices), trend: `${invoices.filter(i => i.status === 'pending').length} Pending`, icon: CreditCard, color: 'text-amber-600', bg: 'bg-amber-500/10' },
-                            ].map((stat, i) => (
-                                <div key={i} className="dashboard-card hover:-translate-y-1">
-                                    <div className="dashboard-card-content flex flex-col justify-between h-full p-5">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className={`p-2.5 rounded-xl ${stat.bg} ${stat.color} transition-colors`}>
-                                                <stat.icon className="h-5 w-5" />
-                                            </div>
-                                            <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-background border border-border/40 ${stat.trend.includes('-') || stat.label === 'Total Expenses' ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                                {stat.trend.includes('-') || stat.label === 'Total Expenses' ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-                                                {stat.trend}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">{stat.label}</p>
-                                            <h3 className="text-2xl font-bold mt-1 tracking-tight text-foreground">{stat.value}</h3>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+    const StatCard = ({ label, value, trend, icon: Icon, color, bg, onClick }: any) => {
+        return (
+            <div
+                className="group relative bg-card/60 backdrop-blur-sm border border-border/40 hover:border-primary/40 p-6 rounded-[2rem] transition-all duration-500 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] active:scale-[0.98] cursor-pointer overflow-hidden"
+                onClick={onClick}
+            >
+                <div className="flex justify-between items-start mb-4">
+                    <div className={`p-3 rounded-2xl ${bg} ${color} shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500`}>
+                        <Icon className="h-6 w-6" />
                     </div>
-                )
-            case 'operational':
-                return (
-                    <div key="operational" className="space-y-3">
-                        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider pl-1 font-sans">Operational Efficiency</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {[
-                                { label: 'Active Projects', value: relevantProjects.filter(p => p.status === 'in-progress').length, sub: 'Projects in flight', icon: Briefcase, color: 'text-indigo-600', bg: 'bg-indigo-500/10', onClick: () => navigate('/projects') },
-                                { label: 'Pending Tasks', value: relevantTasks.filter(t => t.status !== 'done').length, sub: 'Due this week', icon: CheckSquare, color: 'text-cyan-600', bg: 'bg-cyan-500/10', onClick: () => navigate('/tasks?filter=active') },
-                                { label: 'Win Rate', value: `${winRate}%`, sub: 'Lead Conversion', icon: Target, color: 'text-purple-600', bg: 'bg-purple-500/10' },
-                                { label: 'Billable Hours', value: `${totalBillableHours}h`, sub: 'Tracked time', icon: Clock, color: 'text-orange-600', bg: 'bg-orange-500/10' },
-                            ].map((stat, i) => (
-                                <div key={i} className={`dashboard-card hover:-translate-y-1 ${stat.onClick ? 'cursor-pointer active:scale-95' : ''}`} onClick={stat.onClick}>
-                                    <div className="dashboard-card-content flex flex-col justify-between h-full p-5">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className={`p-2.5 rounded-xl ${stat.bg} ${stat.color} transition-colors`}>
-                                                <stat.icon className="h-5 w-5" />
-                                            </div>
-                                            <Activity className="h-4 w-4 text-muted-foreground/30" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">{stat.label}</p>
-                                            <div className="flex items-baseline gap-2 mt-1">
-                                                <h3 className="text-2xl font-bold tracking-tight text-foreground">{stat.value}</h3>
-                                                <span className="text-[10px] text-muted-foreground font-medium">{stat.sub}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                    {trend && (
+                        <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg border ${!trend.includes('-') ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>
+                            {!trend.includes('-') ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {trend}
                         </div>
+                    )}
+                </div>
+                <div>
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] mb-1">{label}</p>
+                    <div className="flex items-end justify-between">
+                        <h3 className="text-3xl font-black tracking-tighter text-foreground leading-none">{value}</h3>
+                        <ArrowUpRight className="h-4 w-4 text-muted-foreground/30 mb-0.5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                     </div>
-                )
-            case 'analytics':
-                return (
-                    <div key="analytics" className="dashboard-card lg:col-span-2">
-                        <div className="dashboard-card-header">
-                            <div>
-                                <h3 className="dashboard-card-title">
-                                    <Activity className="h-4 w-4 text-primary" />
-                                    Financial Performance
-                                </h3>
-                                <p className="text-sm text-muted-foreground mt-1">Revenue trends over time</p>
-                            </div>
-                            <Select defaultValue="6m">
-                                <SelectTrigger className="h-9 w-[120px]">
-                                    <SelectValue placeholder="Period" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="6m">Last 6 Months</SelectItem>
-                                    <SelectItem value="ytd">Year to Date</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="dashboard-card-content h-[350px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.15} />
-                                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))', fontWeight: 500 }} dy={10} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))', fontWeight: 500 }} />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        itemStyle={{ fontSize: '13px', fontWeight: 'bold', color: 'hsl(var(--foreground))' }}
-                                        labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '0.25rem' }}
-                                    />
-                                    <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-                                    <Area type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" fillOpacity={0} />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                )
-            case 'funnel':
-                return (
-                    <div key="funnel" className="dashboard-card flex flex-col">
-                        <div className="dashboard-card-header">
-                            <h3 className="dashboard-card-title">
-                                <Target className="h-4 w-4 text-primary" />
-                                Conversion Funnel
-                            </h3>
-                        </div>
-                        <div className="dashboard-card-content flex-1 flex flex-col justify-center items-center">
-                            <div className="w-full h-[200px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={leadStatusData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={65}
-                                            outerRadius={85}
-                                            paddingAngle={5}
-                                            dataKey="value"
-                                            stroke="hsl(var(--card))"
-                                            strokeWidth={4}
-                                        >
-                                            {leadStatusData.map((_entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 w-full mt-6">
-                                {leadStatusData.map((item, i) => (
-                                    <div key={i} className="flex items-center gap-3">
-                                        <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                                        <div className="flex flex-col">
-                                            <span className="text-[11px] uppercase font-bold text-muted-foreground leading-tight">{item.name}</span>
-                                            <span className="text-sm font-bold text-foreground">{item.name === 'No Data' ? '-' : `${item.value} Leads`}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )
-            case 'deadlines':
-                return (
-                    <div key="deadlines" className="dashboard-card">
-                        <div className="dashboard-card-header">
-                            <h3 className="dashboard-card-title text-red-600">
-                                <AlertCircle className="h-4 w-4" />
-                                Critical Deadlines
-                            </h3>
-                            <Badge variant="outline" className="border-red-200 text-red-600 bg-red-50 font-bold">HIGH PRIORITY</Badge>
-                        </div>
-                        <div className="divide-y divide-border/50">
-                            {relevantTasks.filter(t => t.status !== 'done').slice(0, 4).map((task, i) => (
-                                <div key={i} className="p-4 hover:bg-muted/30 transition-colors group cursor-pointer">
-                                    <div className="flex justify-between items-start mb-1.5">
-                                        <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors pr-4">{task.title}</p>
-                                        <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full whitespace-nowrap">Due Soon</span>
-                                    </div>
-                                    <div className="flex items-center justify-between mt-2">
-                                        <Badge variant="secondary" className="text-[10px] h-5 font-medium bg-muted text-muted-foreground rounded-md">Project Task</Badge>
-                                        <div className="flex -space-x-2">
-                                            <div className="h-6 w-6 rounded-full border-2 border-card bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">U</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )
-            case 'health':
-                return (
-                    <div key="health" className="dashboard-card">
-                        <div className="dashboard-card-header">
-                            <h3 className="dashboard-card-title">
-                                <Layers className="h-4 w-4 text-primary" />
-                                Operational Health
-                            </h3>
-                        </div>
-                        <div className="dashboard-card-content space-y-6">
-                            {healthMetrics.map((metric, i) => (
-                                <div key={i} className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="font-medium text-foreground">{metric.label}</span>
-                                        <span className="font-bold text-foreground">{metric.value}%</span>
-                                    </div>
-                                    <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden">
-                                        <div
-                                            className={`h-full ${metric.color} rounded-full transition-all duration-1000`}
-                                            style={{ width: `${metric.value}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )
-            case 'activity':
-                return (
-                    <div key="activity" className="dashboard-card">
-                        <div className="dashboard-card-header">
-                            <h3 className="dashboard-card-title">
-                                <Clock className="h-4 w-4 text-primary" />
-                                Recent Activity
-                            </h3>
-                        </div>
-                        <div className="divide-y divide-border/50">
-                            {recentActivities.map((log, i) => (
-                                <div key={i} className="p-4 flex gap-4 hover:bg-muted/30 transition-colors cursor-default">
-                                    <div className={`h-9 w-9 rounded-xl ${log.bg} ${log.color} shrink-0 flex items-center justify-center`}>
-                                        <log.icon className="h-4.5 w-4.5" />
-                                    </div>
-                                    <div className="flex flex-col justify-center">
-                                        <span className="text-sm font-semibold text-foreground">{log.action}</span>
-                                        <span className="text-xs text-muted-foreground font-medium">{log.user} • {log.time}</span>
-                                    </div>
-                                </div>
-                            ))}
-                            {recentActivities.length === 0 && (
-                                <div className="p-8 text-center text-muted-foreground text-sm font-medium italic">No recent activity detected.</div>
-                            )}
-                        </div>
-                        <div className="p-4 border-t border-border/50 text-center">
-                            <Button variant="ghost" size="sm" className="text-xs font-semibold hover:text-primary">View Full Audit Log</Button>
-                        </div>
-                    </div>
-                )
-            case 'leads':
-                return (
-                    <div key="leads" className="dashboard-card overflow-hidden">
-                        <div className="dashboard-card-header">
-                            <div>
-                                <h3 className="dashboard-card-title">
-                                    <Users className="h-4 w-4 text-primary" />
-                                    Business Opportunities
-                                </h3>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={() => navigate('/leads')} className="font-semibold text-xs transition-transform hover:scale-105">View All Leads</Button>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-muted/40 text-[11px] uppercase font-bold tracking-wider text-muted-foreground border-b border-border/50">
-                                    <tr>
-                                        <th className="px-6 py-4">Company</th>
-                                        <th className="px-6 py-4">Contact</th>
-                                        <th className="px-6 py-4">Value</th>
-                                        <th className="px-6 py-4">Stage</th>
-                                        <th className="px-6 py-4 text-right">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border/40 text-sm">
-                                    {leads.slice(0, 5).map((lead) => (
-                                        <tr key={lead.id} className="hover:bg-muted/20 transition-colors">
-                                            <td className="px-6 py-4 font-semibold text-foreground">
-                                                {lead.company}
-                                            </td>
-                                            <td className="hidden md:table-cell px-6 py-4 text-muted-foreground font-medium">
-                                                {lead.name}
-                                            </td>
-                                            <td className="hidden sm:table-cell px-6 py-4 font-bold text-foreground">
-                                                {formatCurrency(lead.value)}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <Badge variant="secondary" className="rounded-md font-bold text-[10px] uppercase tracking-wide">{lead.stage}</Badge>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                                    <Filter className="h-4 w-4" />
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )
-            default:
-                return null
-        }
+                </div>
+            </div>
+        )
     }
 
+    const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
+
     return (
-        <div className="space-y-8 pb-10">
-            {/* 1. Header & Attendance */}
-            <div className="flex flex-col xl:flex-row gap-6 justify-between items-end">
-                <div className="animate-in fade-in slide-in-from-left-4 duration-700 w-full xl:w-auto">
-                    <div className="flex items-center gap-2">
-                        <WelcomeAnimation />
-                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground font-sans">Dashboard</h1>
-                    </div>
-                    <p className="text-muted-foreground mt-2 text-sm md:text-base font-medium">
-                        Welcome back, {currentUser.name}. Here's what's happening today.
-                    </p>
-                </div>
+        <div className="max-w-[1700px] mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
 
-                <div className="dashboard-card flex flex-col sm:flex-row items-center gap-4 p-4 bg-background/50 border-border/60 animate-in fade-in slide-in-from-right-4 duration-700 w-full xl:w-auto">
-                    <div className="w-full sm:w-auto flex justify-between sm:block px-0 sm:px-4 border-b sm:border-b-0 sm:border-r border-border/40 pb-2 sm:pb-0 text-left sm:text-right">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">System Time</p>
-                        <p className="text-xl font-mono font-bold tracking-tight">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                    </div>
+            {/* 1. Header & Command Hub */}
+            {(currentLayout.includes('hero') || currentLayout.includes('session')) && (
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
+                    {/* Brand Hero */}
+                    {currentLayout.includes('hero') && (
+                        <div className={`${currentLayout.includes('session') ? 'xl:col-span-8' : 'xl:col-span-12'} bg-slate-950 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl group border border-white/5`}>
+                            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full -mr-48 -mt-48 blur-[120px] animate-pulse" />
+                            <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-600/10 rounded-full -ml-20 -mb-20 blur-[100px]" />
 
-                    <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-                        {attendanceStatus === 'out' ? (
-                            <Button size="sm" onClick={handleClockIn} className="w-full sm:w-auto rounded-lg bg-emerald-600 hover:bg-emerald-700 font-semibold shadow-sm transition-all hover:shadow-md text-white">
-                                <PlayCircle className="h-4 w-4 mr-2" />
-                                Clock In
-                            </Button>
-                        ) : attendanceStatus === 'checked-out' ? (
-                            <Badge variant="outline" className="w-full sm:w-auto justify-center h-9 px-4 rounded-lg font-bold border-muted-foreground/30 text-muted-foreground">
-                                <CheckSquare className="h-4 w-4 mr-2" />
-                                Shift Completed
-                            </Badge>
-                        ) : (
-                            <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                                <div className="hidden sm:block text-right mr-2">
-                                    <p className="text-[10px] uppercase text-muted-foreground font-bold">Session</p>
-                                    <p className="text-sm font-mono text-primary font-bold tabular-nums">{formatElapsedTime(elapsedTime)}</p>
+                            <div className="relative z-10 h-full flex flex-col justify-between">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                    <div className="flex items-center gap-5">
+                                        <div className="h-16 w-16 rounded-2xl bg-white/5 backdrop-blur-xl flex items-center justify-center border border-white/10 shadow-inner group-hover:rotate-12 transition-transform duration-700">
+                                            <WelcomeAnimation />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-3">
+                                                <h1 className="text-4xl font-black tracking-tight tracking-[-0.04em]">{customLabels.hero || 'Dashboard'}</h1>
+                                                <Badge className="bg-primary hover:bg-primary border-none text-[9px] h-5 px-2 font-black tracking-widest uppercase">System Active</Badge>
+                                            </div>
+                                            {!hiddenSubItems.includes('welcome_msg') && (
+                                                <p className="text-slate-400 font-medium mt-1 text-sm">Welcome back, <span className="text-white font-bold">{currentUser.name}</span>. Here's your workspace today.</p>
+                                            )}
+                                        </div>
+                                    </div>
+
                                 </div>
 
-                                <div className="flex gap-2 w-full sm:w-auto">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className={`flex-1 sm:flex-none rounded-lg font-semibold transition-colors ${attendanceStatus === 'break' ? 'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
-                                        onClick={handleBreakToggle}
-                                    >
-                                        <Coffee className="h-4 w-4 mr-1" />
-                                        {attendanceStatus === 'break' ? 'End Break' : 'Break'}
-                                    </Button>
+                                {!hiddenSubItems.includes('mini_stats') && (
+                                    <div className="mt-6 pt-6 border-t border-white/5">
+                                        {['owner', 'admin'].includes(currentUser.role) ? (
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                                {[
+                                                    { label: 'Revenue Net', value: formatCurrency(netProfit), color: 'from-emerald-400 to-teal-500' },
+                                                    { label: 'Project Success', value: `${winRate}%`, color: 'from-blue-400 to-indigo-500' },
+                                                    { label: 'Active Projects', value: inProgressProjects, color: 'from-indigo-400 to-purple-500' },
+                                                    { label: 'Project Portfolio', value: formatCurrency(totalProjectCost || 0), color: 'from-rose-400 to-orange-500' },
+                                                ].map((item, i) => (
+                                                    <div key={i} className="group/item relative p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1 block">{item.label}</span>
+                                                        <p className="text-xl font-black tracking-tighter text-white">{item.value}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {/* Full-width Compact Performance HUD */}
+                                                <div className="bg-white/5 border border-white/10 rounded-[1.5rem] p-4 relative overflow-hidden group/hud">
+                                                    <div className="flex items-center justify-between mb-4 relative z-10">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-8 w-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary border border-primary/20">
+                                                                <Zap className="h-4 w-4 fill-primary/20 animate-pulse" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/80">Performance HUD</p>
+                                                                <h4 className="text-lg font-black text-white leading-none mt-0.5">Efficiency Score</h4>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className="text-3xl font-black text-white tabular-nums tracking-tighter">{myPerformanceScore ?? 0}<span className="text-xs text-slate-500 ml-1">/100</span></span>
+                                                        </div>
+                                                    </div>
 
-                                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none rounded-lg shadow-sm font-semibold text-white transition-transform hover:scale-105" onClick={handleClockOut} disabled={attendanceStatus === 'break'}>
-                                        <StopCircle className="h-4 w-4 mr-2" />
-                                        Clock Out
-                                    </Button>
+                                                    <div className="space-y-2 relative z-10">
+                                                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
+                                                            <div
+                                                                className="h-full bg-gradient-to-r from-indigo-500 via-primary to-emerald-400 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(var(--primary),0.5)]"
+                                                                style={{ width: `${Math.max(2, myPerformanceScore ?? 0)}%` }}
+                                                            />
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-slate-500 px-1">
+                                                            <span className="flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" /> Live</span>
+                                                            <span className="text-primary/70">Stable Engine</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Session Hub */}
+                    {currentLayout.includes('session') && (
+                        <div className={`${currentLayout.includes('hero') ? 'xl:col-span-4' : 'xl:col-span-12'} bg-card border border-border/40 rounded-[3rem] p-10 flex flex-col justify-between shadow-xl relative overflow-hidden group/session`}>
+                            <div className="flex justify-between items-start relative z-10">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">{customLabels.session || 'Live Session'}</p>
+                                    <h2 className="text-4xl font-black tabular-nums tracking-tighter">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
                                 </div>
-                                {/* Mobile Session Timer */}
-                                <div className="sm:hidden w-full flex justify-between items-center bg-muted/30 p-2 rounded-lg mt-1">
-                                    <span className="text-[10px] uppercase text-muted-foreground font-bold">Current Session</span>
-                                    <span className="text-sm font-mono text-primary font-bold tabular-nums">{formatElapsedTime(elapsedTime)}</span>
+                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${(attendanceStatus === 'out' || attendanceStatus === 'checked-out')
+                                    ? 'bg-slate-500/10 text-slate-600 border-slate-500/20'
+                                    : attendanceStatus === 'break'
+                                        ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                        : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                    }`}>
+                                    <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${(attendanceStatus === 'out' || attendanceStatus === 'checked-out')
+                                        ? 'bg-slate-400'
+                                        : attendanceStatus === 'break'
+                                            ? 'bg-amber-500'
+                                            : 'bg-emerald-500'
+                                        }`} />
+                                    {(attendanceStatus === 'out' || attendanceStatus === 'checked-out') ? 'Offline' : attendanceStatus === 'break' ? 'On Break' : 'Online'}
                                 </div>
                             </div>
-                        )}
+
+                            {!hiddenSubItems.includes('timer') && (
+                                <div className="mt-8 space-y-4 relative z-10">
+                                    <div className="flex items-center justify-between text-[11px] font-black text-muted-foreground uppercase tracking-widest">
+                                        <div className="flex items-center gap-2"><Clock className="h-3 w-3" /> Duration</div>
+                                        <span className="text-foreground font-black tabular-nums">{formatElapsedTime(elapsedTime)}</span>
+                                    </div>
+                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                        <div className="h-full brand-gradient shimmer rounded-full transition-all duration-1000" style={{ width: (attendanceStatus === 'out' || attendanceStatus === 'checked-out') ? '0%' : '75%' }} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {!hiddenSubItems.includes('clock_actions') && (
+                                <div className="mt-8 grid grid-cols-1 gap-3 relative z-10">
+                                    {attendanceStatus === 'out' ? (
+                                        <Button onClick={handleClockIn} className="w-full h-16 rounded-[1.5rem] brand-gradient text-white font-black text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_30px_-10px_rgba(37,99,235,0.4)]">
+                                            <PlayCircle className="h-5 w-5 mr-3" />
+                                            CLOCK IN START SESSION
+                                        </Button>
+                                    ) : (attendanceStatus === 'checked-out' || attendanceStatus === 'half-day') ? (
+                                        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-[1.5rem] p-6 text-center animate-in zoom-in-95 duration-500">
+                                            <div className="h-12 w-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                <CheckCircle className="h-6 w-6 text-emerald-600" />
+                                            </div>
+                                            <h4 className="text-emerald-900 font-black text-sm uppercase tracking-tight">Shift Completed</h4>
+                                            <p className="text-emerald-600/60 text-[10px] font-bold mt-1 uppercase tracking-widest">Great work today, {currentUser.name.split(' ')[0]}!</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <Button variant="outline" onClick={handleBreakToggle} className={`h-16 rounded-[1.5rem] font-black text-xs border-2 shadow-sm ${attendanceStatus === 'break' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'hover:border-primary/40'}`}>
+                                                <Coffee className="h-4 w-4 mr-2" />
+                                                {attendanceStatus === 'break' ? 'RESUME' : 'BREAK'}
+                                            </Button>
+                                            <Button variant="destructive" onClick={handleClockOut} className="h-16 rounded-[1.5rem] font-black text-xs shadow-[0_15px_30px_-10px_rgba(244,63,94,0.3)]" disabled={attendanceStatus === 'break'}>
+                                                <StopCircle className="h-4 w-4 mr-2" />
+                                                CLOCK OUT
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* 2. Top Stats - Financials */}
+            {currentLayout.includes('financials') && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                    <div className="flex items-center justify-between px-2">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{customLabels.financials || 'Financial Overview'}</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {!hiddenSubItems.includes('revenue') && <StatCard label="Total Revenue" value={formatCurrency(totalRevenue)} trend={revenueTrend} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" />}
+                        {!hiddenSubItems.includes('expenses') && <StatCard label="Total Expenses" value={formatCurrency(totalExpenses)} trend={expenseTrend} icon={Wallet} color="text-rose-600" bg="bg-rose-100" />}
+                        {!hiddenSubItems.includes('profit') && <StatCard label="Net Profit" value={formatCurrency(netProfit)} trend={revenueTrend} icon={TrendingUp} color="text-blue-600" bg="bg-blue-100" />}
+                        {!hiddenSubItems.includes('outstanding') && <StatCard label="Outstanding" value={formatCurrency(outstandingInvoices)} trend={`${invoices?.filter ? invoices.filter(i => i.status === 'pending').length : 0} Invoices`} icon={CreditCard} color="text-amber-600" bg="bg-amber-100" />}
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Layout Rendering */}
-            <div className="grid grid-cols-1 gap-8">
-                {currentLayout.includes('financials') && renderSection('financials')}
-                {currentLayout.includes('operational') && renderSection('operational')}
+            {/* 3. Operational Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-                <div className="grid lg:grid-cols-3 gap-8">
-                    {currentLayout.includes('analytics') && renderSection('analytics')}
-                    {currentLayout.includes('funnel') && renderSection('funnel')}
+                {/* Primary Intelligence Area */}
+                <div className="lg:col-span-8 space-y-8">
+                    {sectionOrder.map((sectionId: string) => {
+                        if (!currentLayout.includes(sectionId)) return null;
+
+                        // Render Main Sections
+                        if (sectionId === 'tasks') {
+                            return (
+                                <div key={sectionId} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                    <div className="flex items-center justify-between mb-8 px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                                                <CheckSquare className="h-5 w-5 text-primary" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl font-black tracking-tight">{customLabels.tasks || 'Task Center'}</h3>
+                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mt-0.5">Distribution across status</p>
+                                            </div>
+                                        </div>
+                                        <Badge className="bg-primary/10 text-primary border-none text-[10px] px-3 font-black underline decoration-primary/20 underline-offset-4">LIVE ENGINE</Badge>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        {!hiddenSubItems.includes('todo') && (
+                                            <StatCard label="To Do" value={todoTasks} icon={Layers} color="text-slate-600" bg="bg-slate-100" onClick={() => navigate('/tasks?status=todo')} />
+                                        )}
+                                        {!hiddenSubItems.includes('in_progress') && (
+                                            <StatCard label="Progress" value={inProgressTasks} icon={PlayCircle} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/tasks?status=in-progress')} />
+                                        )}
+                                        {!hiddenSubItems.includes('review') && (
+                                            <StatCard label="Review" value={reviewTasks} icon={Target} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/tasks?status=review')} />
+                                        )}
+                                        {!hiddenSubItems.includes('done') && (
+                                            <StatCard label="Done" value={doneTasks} icon={CheckSquare} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/tasks?status=done')} />
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'projects_overview') {
+                            return (
+                                <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-[2.5rem] p-6 bg-indigo-50/10">
+                                    <div className="flex items-center justify-between mb-8 px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
+                                                <Briefcase className="h-6 w-6 text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-2xl font-black tracking-tight text-indigo-900">{customLabels.projects_overview || 'Projects Assigned to Me'}</h3>
+                                                <p className="text-xs font-black uppercase text-indigo-500 tracking-widest mt-0.5">Project status overview</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <StatCard label="Planning" value={planningProjects} icon={Layers} color="text-slate-600" bg="bg-slate-100" onClick={() => navigate('/projects?status=planning')} />
+                                        <StatCard label="Active" value={inProgressProjects} icon={PlayCircle} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/projects?status=in-progress')} />
+                                        <StatCard label="On Hold" value={onHoldProjects} icon={StopCircle} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/projects?status=on-hold')} />
+                                        <StatCard label="Completed" value={completedProjects} icon={CheckCircle} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/projects?status=completed')} />
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'analytics') {
+                            return (
+                                <div key={sectionId} className="bg-card border border-border/40 rounded-[2.5rem] p-8 shadow-sm animate-in fade-in slide-in-from-left-4 duration-500">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                                <LayoutDashboard className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-black tracking-tight">{customLabels.analytics || 'Financial Velocity'}</h3>
+                                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">Performance tracking across current cycle</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="h-[380px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={revenueData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                                                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="6 6" vertical={false} stroke="hsl(var(--border))" />
+                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} dy={15} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} />
+                                                <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', background: 'hsl(var(--card))', fontSize: '12px', fontWeight: 'bold' }} />
+                                                {!hiddenSubItems.includes('revenue_trend') && <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={5} fill="url(#velocityGrad)" />}
+                                                {!hiddenSubItems.includes('expense_trend') && <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={3} strokeDasharray="10 10" fillOpacity={0} />}
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'support_tickets') {
+                            return (
+                                <div key={sectionId} className="mb-12 border-2 border-rose-500/20 rounded-[2.5rem] p-6 bg-rose-50/10">
+                                    <div className="flex items-center justify-between mb-8 px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-12 w-12 rounded-2xl bg-rose-500/20 flex items-center justify-center">
+                                                <MessageSquare className="h-6 w-6 text-rose-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-2xl font-black tracking-tight text-rose-900">{customLabels.support_tickets || 'Support Tickets'}</h3>
+                                                <p className="text-xs font-black uppercase text-rose-500 tracking-widest mt-0.5">Customer issues snapshot</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {!hiddenSubItems.includes('open') && (
+                                            <StatCard label="Open Tickets" value={openTickets} icon={AlertCircle} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/tickets?status=open')} />
+                                        )}
+                                        {!hiddenSubItems.includes('critical') && (
+                                            <StatCard label="Critical/High" value={criticalTickets} icon={Clock} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/tickets?priority=critical')} />
+                                        )}
+                                        {!hiddenSubItems.includes('resolved') && (
+                                            <StatCard label="Resolved" value={resolvedTickets} icon={CheckCircle} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/tickets?status=resolved')} />
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        }
+
+
+
+                        return null;
+                    })}
                 </div>
 
-                <div className="grid lg:grid-cols-3 gap-8">
-                    {currentLayout.includes('deadlines') && renderSection('deadlines')}
-                    {currentLayout.includes('health') && renderSection('health')}
-                    {currentLayout.includes('activity') && renderSection('activity')}
-                </div>
+                {/* Secondary Sidebar Area */}
+                <div className="lg:col-span-4 space-y-8">
+                    {sectionOrder.map((sectionId: string) => {
+                        if (!currentLayout.includes(sectionId)) return null;
 
-                {currentLayout.includes('leads') && renderSection('leads')}
+                        // Render Sidebar Sections
+                        if (sectionId === 'funnel') {
+                            return (
+                                <div key={sectionId} className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-[80px]" />
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-8 pr-12 leading-relaxed">
+                                        <Target className="h-4 w-4 text-primary" />
+                                        {customLabels.funnel || 'Business Conversion Pipeline'}
+                                    </h3>
+                                    <div className="h-[220px] relative">
+                                        {!hiddenSubItems.includes('conversion') && (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie data={leadStatusData} dataKey="value" innerRadius={65} outerRadius={85} paddingAngle={8} stroke="none">
+                                                        {leadStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                                    </Pie>
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        )}
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                            <span className="text-3xl font-black">{leads.length}</span>
+                                            <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50">Opportunities</span>
+                                        </div>
+                                    </div>
+                                    {!hiddenSubItems.includes('velocity') && (
+                                        <div className="mt-8 space-y-3">
+                                            {leadStatusData.slice(0, 4).map((item, i) => (
+                                                <div key={i} className="flex justify-between items-center text-[11px] font-bold group/item">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                                        <span className="opacity-60 group-hover/item:opacity-100 transition-opacity uppercase tracking-widest">{item.name}</span>
+                                                    </div>
+                                                    <span className="font-black">{item.value}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'health') {
+                            return (
+                                <div key={sectionId} className="bg-card border border-border/40 rounded-[2.5rem] p-8 shadow-sm">
+                                    <div className="flex items-center gap-3 mb-8">
+                                        <Zap className="h-5 w-5 text-primary" />
+                                        <h3 className="text-sm font-black uppercase tracking-[0.1em]">{customLabels.health || 'Metric Pulse'}</h3>
+                                    </div>
+                                    <div className="space-y-8">
+                                        {healthMetrics.map((m, i) => {
+                                            const itemKey = m.label.toLowerCase().includes('success') ? 'success_rate' : 'throughput'
+                                            if (hiddenSubItems.includes(itemKey)) return null
+                                            return (
+                                                <div key={i} className="space-y-3">
+                                                    <div className="flex justify-between items-end">
+                                                        <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{m.label}</span>
+                                                        <span className="text-sm font-black text-primary">{m.value}%</span>
+                                                    </div>
+                                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                                        <div className={`h-full ${m.color} rounded-full shimmer transition-all duration-1000`} style={{ width: `${m.value}%` }} />
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'deadlines') {
+                            return (
+                                <div key={sectionId} className="bg-rose-500/5 rounded-[2.5rem] p-8 border border-rose-500/10">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <AlertCircle className="h-5 w-5 text-rose-500" />
+                                        <h3 className="text-sm font-black uppercase tracking-[0.1em] text-rose-600">{customLabels.deadlines || 'Urgent Tasks'}</h3>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {!hiddenSubItems.includes('overdue') && relevantTasks.filter(t => t.status !== 'done').slice(0, 3).map((t, i) => (
+                                            <div
+                                                key={i}
+                                                onClick={() => navigate('/tasks')}
+                                                className="bg-card/50 p-4 rounded-2xl border border-rose-500/10 hover:bg-card transition-all cursor-pointer group shadow-sm"
+                                            >
+                                                <span className="text-xs font-bold font-sans line-clamp-1 block mb-1">{t.title}</span>
+                                                <div className="flex items-center justify-between">
+                                                    <Badge className="bg-rose-500/10 text-rose-600 border-none text-[8px] px-2 py-0 font-black h-4">OVERDUE</Badge>
+                                                    <ArrowUpRight className="h-3 w-3 text-rose-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {relevantTasks.filter(t => t.status !== 'done').length === 0 && (
+                                            <div className="py-6 text-center text-[10px] font-black text-muted-foreground uppercase opacity-50">Zero incidents reported</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'activity') {
+                            return (
+                                <div key={sectionId} className="px-4">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-6">{customLabels.activity || 'Network Stream'}</h3>
+                                    <div className="space-y-6">
+                                        {!hiddenSubItems.includes('system_logs') && recentActivities.slice(0, 4).map((log, i) => (
+                                            <div key={i} className="flex gap-4 items-center group">
+                                                <div className={`h-11 w-11 rounded-2xl ${log.bg} ${log.color} flex items-center justify-center shrink-0 shadow-sm group-hover:scale-95 transition-transform`}>
+                                                    <log.icon className="h-5 w-5" />
+                                                </div>
+                                                <div className="flex flex-col min-w-0 flex-1">
+                                                    <span className="text-xs font-bold text-foreground truncate tracking-tight">{log.action}</span>
+                                                    <span className="text-[10px] font-black text-muted-foreground uppercase mt-0.5 opacity-60">{log.user} • {log.time}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        return null;
+                    })}
+                </div>
             </div>
+
+
+
         </div>
     )
 }

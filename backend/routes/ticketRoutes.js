@@ -8,8 +8,14 @@ router.get('/', protect, async (req, res) => {
     try {
         let filter = {};
         if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-            // Employees see tickets assigned to them
-            filter = { assignedTo: req.user._id.toString() };
+            // Employees see tickets assigned to them (by ID or Name)
+            filter = {
+                $or: [
+                    { assignedTo: req.user._id.toString() },
+                    { assignedTo: req.user.name },
+                    { assignedTo: { $regex: new RegExp('^' + req.user.name + '$', 'i') } }
+                ]
+            };
         }
         const tickets = await Ticket.find(filter).sort({ createdAt: -1 });
         res.json(tickets);
@@ -42,7 +48,11 @@ router.get('/:id', protect, async (req, res) => {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
-        if (req.user.role !== 'admin' && req.user.role !== 'owner' && ticket.assignedTo !== req.user._id.toString()) {
+        const isAssigned = ticket.assignedTo === req.user._id.toString() ||
+            ticket.assignedTo === req.user.name ||
+            (ticket.assignedTo && ticket.assignedTo.toLowerCase() === req.user.name.toLowerCase());
+
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned) {
             return res.status(403).json({ message: 'Not authorized' });
         }
         res.json(ticket);
@@ -57,7 +67,11 @@ router.put('/:id', protect, async (req, res) => {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
-        if (req.user.role !== 'admin' && req.user.role !== 'owner' && ticket.assignedTo !== req.user._id.toString()) {
+        const isAssigned = ticket.assignedTo === req.user._id.toString() ||
+            ticket.assignedTo === req.user.name ||
+            (ticket.assignedTo && ticket.assignedTo.toLowerCase() === req.user.name.toLowerCase());
+
+        if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned) {
             return res.status(403).json({ message: 'Not authorized' });
         }
 

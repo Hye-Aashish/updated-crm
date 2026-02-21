@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 import {
-    Building2, Users, CreditCard, FolderKanban, Bell,
+    Building2, Users, CreditCard, FolderKanban, Bell, MessageSquare,
     Upload, Save, Plus, Trash2, Edit, Eye, EyeOff, Shield, Mail, CheckCircle, AlertCircle, Loader2,
-    Layout, GripVertical, Check
+    Layout, GripVertical, ChevronUp, ChevronDown
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -43,7 +44,7 @@ function hexToHSL(hex: string) {
     return `${(h * 360).toFixed(1)} ${(s * 100).toFixed(1)}% ${(l * 100).toFixed(1)}%`;
 }
 
-type SettingsTab = 'company' | 'users' | 'roles' | 'billing' | 'templates' | 'project-settings' | 'notifications' | 'email' | 'dashboard-builder'
+type SettingsTab = 'company' | 'users' | 'roles' | 'billing' | 'templates' | 'project-settings' | 'notifications' | 'email' | 'whatsapp' | 'dashboard-builder'
 
 export function SettingsPage() {
     const [activeTab, setActiveTab] = useState<SettingsTab>('company')
@@ -63,14 +64,29 @@ export function SettingsPage() {
         }
     }
 
+    const [saving, setSaving] = useState(false)
+
     const updateSettings = async (section: string, data: any) => {
+        if (saving) return
+        setSaving(true)
         try {
             const res = await api.put('/settings', { [section]: data })
             setSettings(res.data)
-            toast({ description: "Settings updated successfully" })
-        } catch (error) {
+            toast({
+                title: 'SETTINGS UPDATED',
+                description: "Configuration saved successfully.",
+                variant: 'success'
+            })
+        } catch (error: any) {
             console.error("Failed to update settings", error)
-            toast({ title: "Error", description: "Failed to save settings", variant: "destructive" })
+            const msg = error.response?.data?.message || error.message || "Failed to save settings";
+            toast({
+                title: 'SETTINGS ERROR',
+                description: msg,
+                variant: "destructive"
+            })
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -82,6 +98,7 @@ export function SettingsPage() {
         { id: 'dashboard-builder' as SettingsTab, label: 'Dashboard Builder', icon: Layout },
         { id: 'notifications' as SettingsTab, label: 'Notifications', icon: Bell },
         { id: 'email' as SettingsTab, label: 'SMTP Settings', icon: Mail },
+        { id: 'whatsapp' as SettingsTab, label: 'WhatsApp API', icon: MessageSquare },
     ]
 
     return (
@@ -114,6 +131,7 @@ export function SettingsPage() {
                                             {tab.id === 'dashboard-builder' && <Layout className="h-4 w-4" />}
                                             {tab.id === 'notifications' && <Bell className="h-4 w-4" />}
                                             {tab.id === 'email' && <Mail className="h-4 w-4" />}
+                                            {tab.id === 'whatsapp' && <MessageSquare className="h-4 w-4" />}
                                             {tab.label}
                                         </button>
                                     )
@@ -129,13 +147,14 @@ export function SettingsPage() {
                         <div className="flex h-full items-center justify-center text-muted-foreground animate-pulse">Loading settings...</div>
                     ) : (
                         <>
-                            {activeTab === 'company' && <CompanyProfileTab data={settings?.companyProfile} onSave={(d: any) => updateSettings('companyProfile', d)} />}
+                            {activeTab === 'company' && <CompanyProfileTab data={settings?.companyProfile} onSave={(d: any) => updateSettings('companyProfile', d)} saving={saving} />}
                             {activeTab === 'users' && <UsersRolesTab />}
-                            {activeTab === 'roles' && <RolesPermissionsTab data={settings?.roles} onSave={(d: any) => updateSettings('roles', d)} />}
-                            {activeTab === 'billing' && <BillingTab data={settings?.billing} onSave={(d: any) => updateSettings('billing', d)} />}
-                            {activeTab === 'dashboard-builder' && <DashboardBuilderTab data={settings?.dashboardLayouts} onSave={(d: any) => updateSettings('dashboardLayouts', d)} />}
-                            {activeTab === 'notifications' && <NotificationsTab data={settings?.notifications} onSave={(d: any) => updateSettings('notifications', d)} />}
-                            {activeTab === 'email' && <EmailSettingsTab data={settings?.emailSettings} onSave={(d: any) => updateSettings('emailSettings', d)} />}
+                            {activeTab === 'roles' && <RolesPermissionsTab data={settings?.roles} onSave={(d: any) => updateSettings('roles', d)} saving={saving} />}
+                            {activeTab === 'billing' && <BillingTab data={settings?.billing} onSave={(d: any) => updateSettings('billing', d)} saving={saving} />}
+                            {activeTab === 'dashboard-builder' && <DashboardBuilderTab data={settings?.dashboardLayouts} onSave={(d: any) => updateSettings('dashboardLayouts', d)} saving={saving} />}
+                            {activeTab === 'notifications' && <NotificationsTab data={settings?.notifications} onSave={(d: any) => updateSettings('notifications', d)} saving={saving} />}
+                            {activeTab === 'email' && <EmailSettingsTab data={settings?.emailSettings} onSave={(d: any) => updateSettings('emailSettings', d)} saving={saving} />}
+                            {activeTab === 'whatsapp' && <WhatsAppSettingsTab data={settings?.whatsappSettings} onSave={(d: any) => updateSettings('whatsappSettings', d)} saving={saving} />}
                         </>
                     )}
                 </div>
@@ -144,7 +163,7 @@ export function SettingsPage() {
     )
 }
 
-function CompanyProfileTab({ data, onSave }: any) {
+function CompanyProfileTab({ data, onSave, saving }: any) {
     const [formData, setFormData] = useState(data || {})
     const fileInputRef = useRef<HTMLInputElement>(null)
     const iconInputRef = useRef<HTMLInputElement>(null)
@@ -324,9 +343,9 @@ function CompanyProfileTab({ data, onSave }: any) {
                     </div>
                 </div>
 
-                <Button className="w-full" onClick={() => onSave(formData)}>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Company Profile
+                <Button className="w-full" onClick={() => onSave(formData)} disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {saving ? 'Saving...' : 'Save Company Profile'}
                 </Button>
             </CardContent>
         </Card>
@@ -339,7 +358,7 @@ function UsersRolesTab() {
     const [editingUser, setEditingUser] = useState<any>(null)
     const [availableRoles, setAvailableRoles] = useState<any[]>([])
     const [formData, setFormData] = useState({
-        name: '', email: '', password: '', role: 'employee', designation: ''
+        name: '', email: '', password: '', role: 'employee', designation: '', salary: ''
     })
     const { toast } = useToast()
 
@@ -368,7 +387,7 @@ function UsersRolesTab() {
 
     const openAdd = () => {
         setEditingUser(null)
-        setFormData({ name: '', email: '', password: '', role: 'employee', designation: '' })
+        setFormData({ name: '', email: '', password: '', role: 'employee', designation: '', salary: '' })
         setIsOpen(true)
     }
 
@@ -379,7 +398,8 @@ function UsersRolesTab() {
             email: user.email,
             password: '',
             role: user.role || 'employee',
-            designation: user.designation || ''
+            designation: user.designation || '',
+            salary: user.salary || ''
         })
         setIsOpen(true)
     }
@@ -443,7 +463,10 @@ function UsersRolesTab() {
                                 </div>
                                 <div>
                                     <div className="font-medium">{user.name}</div>
-                                    <div className="text-sm text-muted-foreground">{user.email} • <span className="capitalize">{user.role}</span></div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {user.email} • <span className="capitalize">{user.role}</span>
+                                        {user.salary && <span className="ml-2 text-emerald-600 font-bold">• ₹{user.salary}</span>}
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -485,6 +508,10 @@ function UsersRolesTab() {
                                 <Input value={formData.designation} onChange={(e) => setFormData({ ...formData, designation: e.target.value })} placeholder="e.g. Senior Developer" />
                             </div>
                             <div className="space-y-2">
+                                <Label>Monthly Salary (INR)</Label>
+                                <Input type="number" value={formData.salary} onChange={(e) => setFormData({ ...formData, salary: e.target.value })} placeholder="e.g. 25000" />
+                            </div>
+                            <div className="space-y-2">
                                 <Label>Role</Label>
                                 <Select value={formData.role} onValueChange={(val) => setFormData({ ...formData, role: val })}>
                                     <SelectTrigger>
@@ -516,7 +543,7 @@ function UsersRolesTab() {
     )
 }
 
-function BillingTab({ data, onSave }: any) {
+function BillingTab({ data, onSave, saving }: any) {
     const [formData, setFormData] = useState(data || {})
     const [showKey, setShowKey] = useState(false)
 
@@ -551,6 +578,37 @@ function BillingTab({ data, onSave }: any) {
                 </div>
 
                 <div className="border-t pt-6 space-y-4">
+                    <h3 className="font-semibold text-emerald-600 flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" /> Cashfree Integration
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="cashfreeClientId">App ID (Client ID)</Label>
+                            <Input id="cashfreeClientId" value={formData.cashfreeClientId || ''} onChange={handleChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="cashfreeMode">Environment</Label>
+                            <Select
+                                value={formData.cashfreeMode || 'sandbox'}
+                                onValueChange={(val) => setFormData({ ...formData, cashfreeMode: val })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
+                                    <SelectItem value="production">Production (Live)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="cashfreeClientSecret">Secret Key</Label>
+                        <Input id="cashfreeClientSecret" value={formData.cashfreeClientSecret || ''} onChange={handleChange} type="password" />
+                    </div>
+                </div>
+
+                <div className="border-t pt-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="invoiceFormat">Invoice Prefix</Label>
@@ -563,16 +621,16 @@ function BillingTab({ data, onSave }: any) {
                     </div>
                 </div>
 
-                <Button className="w-full" onClick={() => onSave(formData)}>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Billing Settings
+                <Button className="w-full" onClick={() => onSave(formData)} disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {saving ? 'Saving...' : 'Save Billing Settings'}
                 </Button>
             </CardContent>
         </Card>
     )
 }
 
-function NotificationsTab({ data, onSave }: any) {
+function NotificationsTab({ data, onSave, saving }: any) {
     const [prefs, setPrefs] = useState(data || {})
 
     useEffect(() => { setPrefs(data || {}) }, [data])
@@ -588,37 +646,38 @@ function NotificationsTab({ data, onSave }: any) {
                 <CardTitle>Notifications & Alerts</CardTitle>
                 <CardDescription>Manage notification preferences</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                {[
-                    { key: 'taskOverdue', label: 'Task Overdue Alert', desc: 'Notify when tasks pass their due date' },
-                    { key: 'invoiceDue', label: 'Invoice Due Reminder', desc: 'Send reminders for pending invoices' },
-                    { key: 'clientApproval', label: 'Client Approval', desc: 'Alert when client approval is requested' },
-                    { key: 'projectDeadline', label: 'Project Deadlines', desc: 'Notify before project milestones' },
-                ].map((item) => (
-                    <div key={item.key} className="flex items-center justify-between p-4 rounded-lg border">
-                        <div>
-                            <div className="font-medium">{item.label}</div>
-                            <div className="text-sm text-muted-foreground">{item.desc}</div>
-                        </div>
-                        <button
-                            onClick={() => toggle(item.key)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${prefs[item.key] ? 'bg-primary' : 'bg-muted'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${prefs[item.key] ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
+            <CardContent className="space-y-6">
+                <div className="space-y-4">
+                    <h3 className="font-semibold flex items-center gap-2">
+                        <Bell className="h-4 w-4" /> System Alerts
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                        {[
+                            { key: 'taskOverdue', label: 'Overdue Alerts' },
+                            { key: 'invoiceDue', label: 'Invoice Reminders' },
+                            { key: 'clientApproval', label: 'Client Approvals' },
+                            { key: 'projectDeadline', label: 'Project Deadlines' },
+                        ].map((item) => (
+                            <div key={item.key} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+                                <span className="text-xs font-medium">{item.label}</span>
+                                <Switch checked={prefs[item.key]} onCheckedChange={() => toggle(item.key)} scale-75 />
+                            </div>
+                        ))}
                     </div>
-                ))}
+                </div>
 
-                <Button className="w-full mt-6" onClick={() => onSave(prefs)}>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Preferences
-                </Button>
+                <div className="flex gap-4 pt-8 mt-4 border-t">
+                    <Button className="w-full h-12 rounded-xl" onClick={() => onSave(prefs)} disabled={saving}>
+                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {saving ? 'Saving...' : 'Save Notification Preferences'}
+                    </Button>
+                </div>
             </CardContent>
-        </Card>
+        </Card >
     )
 }
 
-function EmailSettingsTab({ data, onSave }: any) {
+function EmailSettingsTab({ data, onSave, saving }: any) {
     const [formData, setFormData] = useState(data || { host: '', port: 587, user: '', pass: '', secure: false, fromEmail: '', fromName: '' })
     const [testing, setTesting] = useState(false)
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -627,8 +686,10 @@ function EmailSettingsTab({ data, onSave }: any) {
     useEffect(() => { if (data) setFormData(data) }, [data])
 
     const handleChange = (e: any) => {
-        setFormData({ ...formData, [e.target.id]: e.target.value })
+        const val = e.target.id === 'port' ? (parseInt(e.target.value) || 587) : e.target.value
+        setFormData({ ...formData, [e.target.id]: val })
     }
+
 
     const handleTest = async () => {
         setTesting(true)
@@ -711,9 +772,9 @@ function EmailSettingsTab({ data, onSave }: any) {
                         {testing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                         Test Connection
                     </Button>
-                    <Button className="w-full" onClick={() => onSave(formData)}>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Settings
+                    <Button className="w-full" onClick={() => onSave(formData)} disabled={saving}>
+                        {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        {saving ? 'Saving...' : 'Save Settings'}
                     </Button>
                 </div>
             </CardContent>
@@ -721,7 +782,7 @@ function EmailSettingsTab({ data, onSave }: any) {
     )
 }
 
-function RolesPermissionsTab({ data, onSave }: any) {
+function RolesPermissionsTab({ data, onSave, saving }: any) {
     const [roles, setRoles] = useState<any[]>(data || [])
     const [selectedRoleIndex, setSelectedRoleIndex] = useState(0)
 
@@ -746,7 +807,12 @@ function RolesPermissionsTab({ data, onSave }: any) {
         setRoles(newRoles)
     }
 
-    const modules = ['dashboard', 'projects', 'tasks', 'clients', 'finance', 'users', 'settings']
+    const modules = [
+        'dashboard', 'user_tracker', 'clients', 'leads', 'projects',
+        'tasks', 'team', 'attendance', 'time_tracking', 'invoices',
+        'quotations', 'templates', 'expenses', 'payroll', 'tickets',
+        'chat', 'reports', 'files', 'settings'
+    ]
     const actions = ['view', 'create', 'edit', 'delete']
 
     return (
@@ -788,31 +854,41 @@ function RolesPermissionsTab({ data, onSave }: any) {
                             <div className="border rounded-lg overflow-hidden">
                                 <div className="grid grid-cols-5 gap-4 bg-muted p-3 font-medium text-sm">
                                     <div className="col-span-1">Module</div>
-                                    <div className="text-center">View</div>
-                                    <div className="text-center">Create</div>
-                                    <div className="text-center">Edit</div>
-                                    <div className="text-center">Delete</div>
+                                    <div className="col-span-4 text-center">Permissions & Actions</div>
                                 </div>
-                                {modules.map(module => (
-                                    <div key={module} className="grid grid-cols-5 gap-4 items-center border-t p-3 hover:bg-muted/5">
-                                        <div className="capitalize font-medium text-sm">{module}</div>
-                                        {actions.map(action => {
-                                            if (module === 'dashboard' && action !== 'view') return <div key={action} />
-                                            if (module === 'settings' && (action === 'create' || action === 'delete')) return <div key={action} />
+                                {modules.map(module => {
+                                    const customActions = {
+                                        chat: ['view', 'reply'],
+                                        files: ['view', 'upload', 'delete'],
+                                        attendance: ['view', 'manage'],
+                                        time_tracking: ['view', 'manage'],
+                                        payroll: ['view', 'manage'],
+                                        dashboard: ['view'],
+                                        settings: ['view', 'edit'],
+                                        reports: ['view']
+                                    } as any
 
-                                            return (
-                                                <div key={action} className="flex justify-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={roles[selectedRoleIndex]?.permissions?.[module]?.[action] || false}
-                                                        onChange={(e) => handlePermissionChange(module, action, e.target.checked)}
-                                                        className="h-4 w-4 accent-primary cursor-pointer"
-                                                    />
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                ))}
+                                    const currentActions = customActions[module] || actions
+
+                                    return (
+                                        <div key={module} className="grid grid-cols-5 gap-4 items-center border-t p-3 hover:bg-muted/5">
+                                            <div className="capitalize font-medium text-sm">{module.replace('_', ' ')}</div>
+                                            <div className="col-span-4 grid grid-cols-4 gap-4">
+                                                {currentActions.map((action: string) => (
+                                                    <div key={action} className="flex flex-col items-center gap-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={roles[selectedRoleIndex]?.permissions?.[module]?.[action] || false}
+                                                            onChange={(e) => handlePermissionChange(module, action, e.target.checked)}
+                                                            className="h-4 w-4 accent-primary cursor-pointer"
+                                                        />
+                                                        <span className="text-[10px] capitalize text-muted-foreground">{action}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
                             </div>
 
                             <div className="mt-8 border-t pt-6">
@@ -865,24 +941,25 @@ function RolesPermissionsTab({ data, onSave }: any) {
                                         <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                                             <Shield className="h-4 w-4" /> Data Access Scope
                                         </h4>
-                                        <label className="flex items-center gap-2 text-sm cursor-pointer border p-3 rounded hover:bg-muted/50 w-full sm:w-auto inline-flex">
-                                            <input
-                                                type="checkbox"
-                                                checked={roles[selectedRoleIndex]?.permissions?.dashboard?.scope?.view_all || false}
-                                                onChange={(e) => handleNestedChange('dashboard', 'scope', 'view_all', e.target.checked)}
-                                                className="h-4 w-4 accent-primary"
-                                            />
-                                            <div className="flex-1">
-                                                <div className="font-medium">View All Data (Global Admin)</div>
-                                                <div className="text-xs text-muted-foreground">If unchecked, user only sees their own assigned items.</div>
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-sm">View All System Data (Overall Overview)</div>
+                                                    <div className="text-xs text-muted-foreground">If ON, user sees company-wide stats. If OFF, they only see their assigned data.</div>
+                                                </div>
+                                                <Switch
+                                                    checked={roles[selectedRoleIndex]?.permissions?.dashboard?.scope?.view_all || false}
+                                                    onCheckedChange={(checked) => handleNestedChange('dashboard', 'scope', 'view_all', checked)}
+                                                />
                                             </div>
-                                        </label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <Button className="mt-6" onClick={() => onSave(roles)}>
-                                <Save className="mr-2 h-4 w-4" /> Save Roles & Permissions
+                            <Button className="mt-6" onClick={() => onSave(roles)} disabled={saving}>
+                                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                {saving ? 'Saving...' : 'Save Roles & Permissions'}
                             </Button>
                         </>
                     )}
@@ -892,106 +969,334 @@ function RolesPermissionsTab({ data, onSave }: any) {
     )
 }
 
-function DashboardBuilderTab({ data, onSave }: any) {
+function DashboardBuilderTab({ data, onSave, saving }: any) {
     const [layouts, setLayouts] = useState<any>(data || {})
     const [selectedRole, setSelectedRole] = useState('owner')
 
     useEffect(() => { if (data) setLayouts(data) }, [data])
 
-    const sections = [
-        { id: 'financials', label: 'Financial Overview', desc: 'Revenue, Expenses, Profit metrics' },
-        { id: 'operational', label: 'Operational Efficiency', desc: 'Active projects, Win rate, Hours' },
-        { id: 'analytics', label: 'Financial Analytics', desc: 'Revenue vs Expense chart' },
-        { id: 'funnel', label: 'Lead Funnel', desc: 'Lead status distribution chart' },
-        { id: 'deadlines', label: 'Critical Deadlines', desc: 'Tasks approaching due dates' },
-        { id: 'health', label: 'Operational Health', desc: 'Completion rates and utilization' },
-        { id: 'activity', label: 'Recent Activity', desc: 'Log of latest system actions' },
-        { id: 'leads', label: 'Opportunity Table', desc: 'List of latest business leads' },
+    const defaultSections = [
+        { id: 'hero', label: 'Brand Hero', desc: 'Welcome banner and top-level summary', subItems: ['welcome_msg', 'mini_stats'] },
+        { id: 'session', label: 'Attendance Hub', desc: 'Clock in/out and session timer', subItems: ['timer', 'clock_actions'] },
+        { id: 'financials', label: 'Financial Overview', desc: 'Revenue, Expenses, Profit metrics', subItems: ['revenue', 'expenses', 'profit', 'outstanding'] },
+        { id: 'analytics', label: 'Financial Analytics', desc: 'Revenue vs Expense chart', subItems: ['revenue_trend', 'expense_trend'] },
+        { id: 'funnel', label: 'Lead Funnel', desc: 'Lead status distribution chart', subItems: ['conversion', 'velocity'] },
+        { id: 'deadlines', label: 'Urgent Tasks', desc: 'Tasks approaching due dates', subItems: ['overdue', 'upcoming'] },
+        { id: 'health', label: 'Operational Health', desc: 'Completion rates and utilization', subItems: ['success_rate', 'throughput'] },
+        { id: 'activity', label: 'Recent Activity', desc: 'Log of latest system actions', subItems: ['system_logs', 'user_actions'] },
+        { id: 'tasks', label: 'Task Center', desc: 'Summary of task statuses and distribution', subItems: ['todo', 'in_progress', 'review', 'done'] },
+        { id: 'projects_overview', label: 'Projects Overview', desc: 'Quick stats of projects assigned to the user', subItems: ['planning', 'active', 'on_hold', 'completed'] },
+        { id: 'support_tickets', label: 'Support Tickets', desc: 'Overview of client support requests', subItems: ['open', 'resolved', 'critical'] },
     ]
 
-    const toggleSection = (sectionId: string) => {
-        const currentLayout = layouts[selectedRole] || []
-        let newLayout = []
-        if (currentLayout.includes(sectionId)) {
-            newLayout = currentLayout.filter((id: string) => id !== sectionId)
-        } else {
-            newLayout = [...currentLayout, sectionId]
-        }
+    const roleLayout = layouts[selectedRole] || {
+        enabledSections: ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
+        customLabels: {},
+        sectionOrder: ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
+        hiddenSubItems: []
+    }
 
-        const newLayouts = { ...layouts, [selectedRole]: newLayout }
+    const updateRoleLayout = (updates: any) => {
+        const newLayouts = {
+            ...layouts,
+            [selectedRole]: { ...roleLayout, ...updates }
+        }
         setLayouts(newLayouts)
     }
 
-    const roles = ['owner', 'admin', 'pm', 'employee']
+    const toggleSection = (id: string) => {
+        const enabled = roleLayout.enabledSections || []
+        const newEnabled = enabled.includes(id)
+            ? enabled.filter((i: string) => i !== id)
+            : [...enabled, id]
+        updateRoleLayout({ enabledSections: newEnabled })
+    }
+
+    const moveSection = (id: string, direction: 'up' | 'down') => {
+        const existingOrder = roleLayout.sectionOrder || []
+        const defaultIds = defaultSections.map(s => s.id)
+        const missingSections = defaultIds.filter(mid => !existingOrder.includes(mid))
+        const order = [...existingOrder, ...missingSections]
+
+        const idx = order.indexOf(id)
+        if (idx === -1) return
+        if (direction === 'up' && idx > 0) {
+            [order[idx], order[idx - 1]] = [order[idx - 1], order[idx]]
+        } else if (direction === 'down' && idx < order.length - 1) {
+            [order[idx], order[idx + 1]] = [order[idx + 1], order[idx]]
+        }
+        updateRoleLayout({ sectionOrder: order })
+    }
+
+    const setCustomLabel = (id: string, label: string) => {
+        const labels = { ...(roleLayout.customLabels || {}), [id]: label }
+        updateRoleLayout({ customLabels: labels })
+    }
+
+    const toggleSubItem = (itemId: string) => {
+        const hidden = roleLayout.hiddenSubItems || []
+        const newHidden = hidden.includes(itemId)
+            ? hidden.filter((i: string) => i !== itemId)
+            : [...hidden, itemId]
+        updateRoleLayout({ hiddenSubItems: newHidden })
+    }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Layout className="h-5 w-5" />
-                    Role-Based Dashboard Builder
+        <Card className="border-none shadow-none bg-transparent">
+            <CardHeader className="px-0 pt-0">
+                <CardTitle className="text-2xl font-black flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                        <Layout className="h-6 w-6" />
+                    </div>
+                    Dashboard Master Control
                 </CardTitle>
-                <CardDescription>
-                    Configure which sections are visible for each user role on their primary dashboard.
+                <CardDescription className="text-sm font-medium">
+                    Detailed management of widget visibility, labels, and hierarchy for each user tier.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-8">
-                <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit">
-                    {roles.map(role => (
-                        <button
-                            key={role}
-                            onClick={() => setSelectedRole(role)}
-                            className={`px-4 py-2 rounded-md text-sm font-semibold capitalize transition-all ${selectedRole === role ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                        >
-                            {role}
-                        </button>
-                    ))}
-                </div>
 
-                <div className="grid gap-3">
-                    {sections.map(section => {
-                        const isVisible = (layouts[selectedRole] || []).includes(section.id)
-                        return (
-                            <div
-                                key={section.id}
-                                onClick={() => toggleSection(section.id)}
-                                className={`flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer group ${isVisible ? 'bg-primary/5 border-primary/20 shadow-sm' : 'hover:border-border/80 bg-card'
-                                    }`}
+            <CardContent className="px-0 space-y-8">
+                {/* Role Selector & Data Scope */}
+                <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+                    <div className="flex gap-2 p-1.5 bg-muted/50 backdrop-blur-sm border rounded-2xl w-fit">
+                        {['owner', 'admin', 'pm', 'employee'].map(role => (
+                            <button
+                                key={role}
+                                onClick={() => setSelectedRole(role)}
+                                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${selectedRole === role ? 'bg-background text-primary shadow-lg scale-105' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-2 rounded-lg transition-colors ${isVisible ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                                        <GripVertical className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                        <div className={`font-semibold transition-colors ${isVisible ? 'text-primary' : 'text-foreground'}`}>{section.label}</div>
-                                        <div className="text-sm text-muted-foreground">{section.desc}</div>
-                                    </div>
-                                </div>
-                                <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${isVisible ? 'bg-primary border-primary text-white' : 'border-muted-foreground/30'
-                                    }`}>
-                                    {isVisible && <Check className="h-3.5 w-3.5" />}
-                                </div>
-                            </div>
-                        )
-                    })}
+                                {role}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-4 bg-muted/30 p-3 rounded-2xl border border-dashed">
+                        <div className="text-right">
+                            <p className="text-[10px] font-black uppercase tracking-widest leading-none">Data Visibility Scale</p>
+                            <p className="text-[9px] text-muted-foreground mt-1">{roleLayout.view_all ? 'OVERALL COMPANY VIEW' : 'PERSONAL ASSIGNED VIEW'}</p>
+                        </div>
+                        <Switch
+                            checked={roleLayout.view_all || false}
+                            onCheckedChange={(checked) => updateRoleLayout({ view_all: checked })}
+                        />
+                    </div>
                 </div>
 
-                <div className="border-t pt-6 bg-muted/30 -mx-6 px-6 pb-6 rounded-b-xl">
-                    <div className="flex justify-between items-center bg-background p-4 rounded-xl border shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-500/10 rounded-lg">
-                                <Save className="h-5 w-5 text-emerald-600" />
+                {/* Detailed Builder */}
+                <div className="space-y-4">
+                    {(() => {
+                        const existingOrder = roleLayout.sectionOrder || []
+                        const defaultIds = defaultSections.map(s => s.id)
+                        // All sections from default that are NOT in existingOrder
+                        const missingSections = defaultIds.filter(id => !existingOrder.includes(id))
+                        const combinedOrder = [...existingOrder, ...missingSections]
+
+                        return combinedOrder.map((sectionId: string) => {
+                            const section = defaultSections.find(s => s.id === sectionId)
+                            if (!section) return null
+                            const isEnabled = (roleLayout.enabledSections || []).includes(sectionId)
+
+                            return (
+                                <div key={sectionId} className={`group bg-card border rounded-[2rem] overflow-hidden transition-all duration-500 ${isEnabled ? 'ring-2 ring-primary/20 shadow-xl' : 'opacity-60 grayscale-[0.5]'}`}>
+                                    <div className="p-6 flex items-center justify-between gap-6">
+                                        <div className="flex items-center gap-5 flex-1">
+                                            <div className="flex flex-col gap-1">
+                                                <button onClick={() => moveSection(sectionId, 'up')} className="p-1 hover:text-primary transition-colors"><ChevronUp className="h-4 w-4" /></button>
+                                                <button onClick={() => moveSection(sectionId, 'down')} className="p-1 hover:text-primary transition-colors"><ChevronDown className="h-4 w-4" /></button>
+                                            </div>
+
+                                            <div className={`p-4 rounded-2xl transition-all duration-500 ${isEnabled ? 'bg-primary/10 text-primary scale-110 rotate-3' : 'bg-muted text-muted-foreground'}`}>
+                                                <GripVertical className="h-5 w-5" />
+                                            </div>
+
+                                            <div className="space-y-1.5 flex-1">
+                                                <div className="flex items-center gap-3">
+                                                    <Input
+                                                        value={roleLayout.customLabels?.[sectionId] || section.label}
+                                                        onChange={(e) => setCustomLabel(sectionId, e.target.value)}
+                                                        className="h-8 font-black text-sm bg-transparent border-none p-0 focus-visible:ring-0 w-fit min-w-[200px]"
+                                                        placeholder="Edit label..."
+                                                    />
+                                                    {!isEnabled && <Badge variant="outline" className="text-[9px] font-black uppercase opacity-60">Disabled</Badge>}
+                                                </div>
+                                                <p className="text-xs font-medium text-muted-foreground">{section.desc}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-4">
+                                            <div onClick={() => toggleSection(sectionId)} className={`w-14 h-8 rounded-full p-1 cursor-pointer transition-all duration-500 ${isEnabled ? 'bg-primary' : 'bg-muted'}`}>
+                                                <div className={`w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-500 ${isEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {isEnabled && (
+                                        <div className="px-10 pb-8 pt-2 border-t border-dashed bg-muted/20">
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Metric Visibility Control</h4>
+                                            <div className="flex flex-wrap gap-3">
+                                                {section.subItems.map(item => {
+                                                    const isHidden = (roleLayout.hiddenSubItems || []).includes(item)
+                                                    return (
+                                                        <button
+                                                            key={item}
+                                                            onClick={() => toggleSubItem(item)}
+                                                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-300 ${!isHidden ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-background border-border text-muted-foreground hover:border-primary/20'}`}
+                                                        >
+                                                            {item === 'efficiency' ? 'Completed Tasks' : item === 'utilization' ? 'Hours Logged' : item === 'performance_index' ? 'Performance Index' : item.replace('_', ' ')}
+                                                            {!isHidden ? ' (Shown)' : ' (Hidden)'}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })
+                    })()}
+                </div>
+
+                {/* Save Hub */}
+                <div className="sticky bottom-6 z-50">
+                    <div className="bg-slate-950 text-white p-6 rounded-[2.5rem] shadow-2xl border border-white/10 flex items-center justify-between group">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-white/10 rounded-2xl group-hover:scale-110 transition-transform duration-500">
+                                <Save className="h-6 w-6 text-emerald-400" />
                             </div>
                             <div>
-                                <div className="font-bold">Save Configuration</div>
-                                <div className="text-xs text-muted-foreground">Apply these layout changes for the {selectedRole} role.</div>
+                                <h4 className="font-bold text-lg leading-none">Commit Configuration</h4>
+                                <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-widest">Apply unique layout to {selectedRole} experience</p>
                             </div>
                         </div>
-                        <Button onClick={() => onSave(layouts)} className="font-bold">
-                            Update Global Settings
+                        <Button
+                            onClick={() => onSave(layouts)}
+                            disabled={saving}
+                            className={`h-14 px-10 rounded-2xl brand-gradient text-white font-black hover:scale-[1.05] active:scale-95 transition-all shadow-[0_15px_30px_-10px_rgba(37,99,235,0.4)] border-none ${saving ? 'animate-pulse opacity-80' : ''}`}
+                        >
+                            {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                            {saving ? 'SAVING CONFIGURATION...' : 'UPDATE PRODUCTION ENGINE'}
                         </Button>
                     </div>
                 </div>
+            </CardContent>
+        </Card>
+    )
+}
+
+function WhatsAppSettingsTab({ data, onSave, saving }: any) {
+    const [formData, setFormData] = useState(data || {
+        phoneNumberId: '',
+        accessToken: '',
+        businessAccountId: '',
+        templateName: 'invoice_notification',
+        enabled: false
+    })
+    const [showToken, setShowToken] = useState(false)
+
+    useEffect(() => { if (data) setFormData(data) }, [data])
+
+    const handleChange = (e: any) => {
+        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+        setFormData({ ...formData, [e.target.id]: value })
+    }
+
+    return (
+        <Card className="border-none shadow-none bg-transparent">
+            <CardHeader className="px-0 pt-0">
+                <CardTitle className="text-2xl font-black flex items-center gap-3">
+                    <div className="p-2 bg-green-500/10 rounded-xl text-green-600">
+                        <MessageSquare className="h-6 w-6" />
+                    </div>
+                    WhatsApp Cloud API
+                </CardTitle>
+                <CardDescription className="text-sm font-medium">
+                    Configure official Meta WhatsApp Cloud API to send invoices directly to client phones.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="px-0 space-y-6">
+                <div className="flex items-center justify-between p-4 rounded-2xl border bg-muted/20">
+                    <div className="space-y-0.5">
+                        <Label className="text-sm font-black uppercase tracking-wider">Enable WhatsApp Invoicing</Label>
+                        <p className="text-xs text-muted-foreground">Toggle this to show "Send via WhatsApp" on invoices.</p>
+                    </div>
+                    <Switch
+                        id="enabled"
+                        checked={formData.enabled}
+                        onCheckedChange={(checked) => setFormData({ ...formData, enabled: checked })}
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="phoneNumberId" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Phone Number ID</Label>
+                        <Input
+                            id="phoneNumberId"
+                            value={formData.phoneNumberId || ''}
+                            onChange={handleChange}
+                            placeholder="e.g. 106342888888888"
+                            className="h-12 rounded-xl border-muted-foreground/20"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="businessAccountId" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Business Account ID</Label>
+                        <Input
+                            id="businessAccountId"
+                            value={formData.businessAccountId || ''}
+                            onChange={handleChange}
+                            placeholder="e.g. 104555555555555"
+                            className="h-12 rounded-xl border-muted-foreground/20"
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="accessToken" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Permanent Access Token</Label>
+                    <div className="flex gap-2">
+                        <Input
+                            id="accessToken"
+                            type={showToken ? "text" : "password"}
+                            value={formData.accessToken || ''}
+                            onChange={handleChange}
+                            placeholder="EAAG..."
+                            className="h-12 rounded-xl border-muted-foreground/20"
+                        />
+                        <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl shrink-0" onClick={() => setShowToken(!showToken)}>
+                            {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground italic">Generate this from the Meta for Developers portal under WhatsApp {'->'} Getting Started.</p>
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="templateName" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Default Template Name</Label>
+                    <Input
+                        id="templateName"
+                        value={formData.templateName || ''}
+                        onChange={handleChange}
+                        placeholder="invoice_notification"
+                        className="h-12 rounded-xl border-muted-foreground/20"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Ensure this template exists and is approved in your Meta Business Manager.</p>
+                </div>
+
+                <div className="pt-6">
+                    <Button
+                        className="h-14 w-full rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl border-none"
+                        onClick={() => onSave(formData)}
+                        disabled={saving}
+                    >
+                        {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+                        {saving ? 'UPDATING API CONFIG...' : 'CONSERVE WHATSAPP SETTINGS'}
+                    </Button>
+                </div>
+
+                <Alert className="bg-blue-50/50 border-blue-200">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-xs font-bold text-blue-800 uppercase tracking-widest">Official API Note</AlertTitle>
+                    <AlertDescription className="text-xs text-blue-700 font-medium">
+                        This integration uses the official WhatsApp Cloud API. Messages will be sent from your registered business number. Make sure your Meta App is in 'Live' mode for production use.
+                    </AlertDescription>
+                </Alert>
             </CardContent>
         </Card>
     )

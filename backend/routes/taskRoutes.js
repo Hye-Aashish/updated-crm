@@ -119,15 +119,20 @@ router.put('/:id', protect, async (req, res) => {
             const userId = req.user._id.toString();
             const project = await Project.findById(task.projectId);
 
-            const isAssignee = task.assigneeId === userId;
-            const isPM = project && project.pmId === userId;
+            const isAssignee = task.assigneeId?.toString() === userId;
+            const isPM = project && project.pmId?.toString() === userId;
+            const isMember = project && project.members && project.members.includes(userId);
 
-            if (!isAssignee && !isPM) {
+            if (!isAssignee && !isPM && !isMember) {
+                console.warn(`Unauthorized task update attempt by user ${userId} on task ${req.params.id}. Roles: ${req.user.role}`);
                 return res.status(403).json({ message: 'Not authorized to update this task' });
             }
         }
 
-        const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true
+        });
         // Recalculate progress for the project
         await updateProjectProgress(updatedTask.projectId);
         res.json(updatedTask);

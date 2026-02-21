@@ -69,8 +69,14 @@ router.get('/:id', protect, async (req, res) => {
 // Create a new time entry (start timer)
 router.post('/', protect, async (req, res) => {
     try {
+        // Allow admin/owner to specify userId, otherwise use requester's ID
+        let userId = req.user._id;
+        if ((req.user.role === 'admin' || req.user.role === 'owner') && req.body.userId) {
+            userId = req.body.userId;
+        }
+
         const timeEntry = new TimeEntry({
-            userId: req.user._id, // Enforce current user
+            userId,
             projectId: req.body.projectId,
             taskId: req.body.taskId,
             startTime: req.body.startTime || new Date(),

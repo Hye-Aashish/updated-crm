@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import {
     DollarSign, Briefcase, CheckSquare, UserCheck, Target,
-    TrendingUp, TrendingDown, Users, Activity, ArrowUpRight, ArrowDownRight
+    TrendingUp, TrendingDown, Users, Activity, ArrowUpRight, ArrowDownRight, Clock, Zap
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import api from '@/lib/api-client'
@@ -15,7 +15,7 @@ import {
 
 import { useNavigate } from 'react-router-dom'
 
-type ReportTab = 'finance' | 'projects' | 'tasks' | 'clients' | 'sales'
+type ReportTab = 'finance' | 'projects' | 'tasks' | 'clients' | 'sales' | 'team'
 
 export function ReportsPage() {
     const navigate = useNavigate()
@@ -28,20 +28,22 @@ export function ReportsPage() {
         tasks: [],
         users: [],
         invoices: [],
+        timeEntries: [],
         loading: true
     })
 
     useEffect(() => {
         const fetchAllData = async () => {
             try {
-                const [expRes, leadsRes, projRes, ticketsRes, tasksRes, usersRes, invRes] = await Promise.all([
+                const [expRes, leadsRes, projRes, ticketsRes, tasksRes, usersRes, invRes, timeRes] = await Promise.all([
                     api.get('/expenses'),
                     api.get('/leads'),
                     api.get('/projects'),
                     api.get('/tickets'),
                     api.get('/tasks').catch(() => ({ data: [] })),
                     api.get('/users').catch(() => ({ data: [] })),
-                    api.get('/invoices').catch(() => ({ data: [] }))
+                    api.get('/invoices').catch(() => ({ data: [] })),
+                    api.get('/time-entries').catch(() => ({ data: [] }))
                 ])
 
                 setData({
@@ -52,6 +54,7 @@ export function ReportsPage() {
                     tasks: tasksRes.data,
                     users: usersRes.data || [],
                     invoices: invRes.data || [],
+                    timeEntries: timeRes.data || [],
                     loading: false
                 })
             } catch (error) {
@@ -67,6 +70,7 @@ export function ReportsPage() {
         { id: 'sales' as ReportTab, label: 'Sales/Leads', icon: Target, color: 'text-blue-500' },
         { id: 'projects' as ReportTab, label: 'Projects', icon: Briefcase, color: 'text-purple-500' },
         { id: 'tasks' as ReportTab, label: 'Performance', icon: CheckSquare, color: 'text-amber-500' },
+        { id: 'team' as ReportTab, label: 'Team Intel', icon: Users, color: 'text-indigo-500' },
         { id: 'clients' as ReportTab, label: 'Support', icon: UserCheck, color: 'text-rose-500' },
     ]
 
@@ -125,6 +129,7 @@ export function ReportsPage() {
                 {activeTab === 'sales' && <SalesSection data={data} />}
                 {activeTab === 'projects' && <ProjectSection data={data} />}
                 {activeTab === 'tasks' && <TaskSection data={data} navigate={navigate} />}
+                {activeTab === 'team' && <TeamSection data={data} />}
                 {activeTab === 'clients' && <SupportSection data={data} />}
             </div>
         </div>
@@ -322,6 +327,27 @@ function ProjectSection({ data }: { data: any }) {
         { name: 'Planning', value: data.projects.filter((p: any) => p.status === 'planning').length, fill: '#f59e0b' },
     ]
 
+    const projectFinancials = useMemo(() => {
+        return data.projects.map((p: any) => {
+            const pid = p._id || p.id
+            const projectInvoices = data.invoices.filter((i: any) => i.projectId === pid)
+            const received = projectInvoices
+                .filter((i: any) => i.status === 'paid')
+                .reduce((sum: number, i: any) => sum + (Number(i.total) || 0), 0)
+            const budget = Number(p.budget) || 0
+            const balance = budget - received
+            const progress = budget > 0 ? (received / budget) * 100 : 0
+
+            return {
+                ...p,
+                received,
+                budget,
+                balance,
+                paymentProgress: progress
+            }
+        })
+    }, [data.projects, data.invoices])
+
     return (
         <div className="space-y-6">
             <div className="grid lg:grid-cols-2 gap-6">
@@ -352,19 +378,38 @@ function ProjectSection({ data }: { data: any }) {
 
                 <Card className="border-none shadow-sm">
                     <CardHeader>
-                        <CardTitle>Delivery Timeline</CardTitle>
+                        <CardTitle>Project Financial Overview</CardTitle>
+                        <CardDescription>Aggregate payments received vs project budgets</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6 pt-4">
-                        {data.projects.slice(0, 4).map((p: any, i: number) => (
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                                <p className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">Total Received</p>
+                                <p className="text-2xl font-black text-emerald-700">
+                                    {formatCurrency(projectFinancials.reduce((sum: number, p: any) => sum + p.received, 0))}
+                                </p>
+                            </div>
+                            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                                <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest">Total Budgeted</p>
+                                <p className="text-2xl font-black text-blue-700">
+                                    {formatCurrency(projectFinancials.reduce((sum: number, p: any) => sum + p.budget, 0))}
+                                </p>
+                            </div>
+                        </div>
+
+                        {projectFinancials.slice(0, 4).map((p: any, i: number) => (
                             <div key={i}>
                                 <div className="flex justify-between items-center mb-1.5">
-                                    <span className="text-sm font-bold tracking-tight">{p.title || p.name}</span>
-                                    <span className="text-xs font-medium text-muted-foreground">{i * 25 + 15}% Complete</span>
+                                    <span className="text-sm font-bold tracking-tight">{p.name || p.title}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-emerald-600">{formatCurrency(p.received)}</span>
+                                        <span className="text-[10px] text-muted-foreground">/ {formatCurrency(p.budget)}</span>
+                                    </div>
                                 </div>
                                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner">
                                     <div
-                                        className="h-full bg-primary transition-all duration-1000"
-                                        style={{ width: `${i * 25 + 15}%` }}
+                                        className="h-full bg-emerald-500 transition-all duration-1000"
+                                        style={{ width: `${Math.min(100, p.paymentProgress)}%` }}
                                     />
                                 </div>
                             </div>
@@ -372,6 +417,56 @@ function ProjectSection({ data }: { data: any }) {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card className="border-none shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-950 text-white p-8">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle className="text-2xl font-black">Project Payment Tracking</CardTitle>
+                            <CardDescription className="text-slate-400">Detailed financial ledger for all projects</CardDescription>
+                        </div>
+                        <Badge variant="outline" className="border-white/20 text-white font-black">
+                            {data.projects.length} PROJECTS
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b text-center">
+                                <tr>
+                                    <th className="px-8 py-5 text-left">Project Name</th>
+                                    <th className="px-6 py-5">Budget</th>
+                                    <th className="px-6 py-5">Received</th>
+                                    <th className="px-6 py-5">Balance</th>
+                                    <th className="px-8 py-5">Payment Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/30">
+                                {projectFinancials.map((p: any, i: number) => (
+                                    <tr key={i} className="hover:bg-muted/10 transition-colors">
+                                        <td className="px-8 py-6 font-bold">{p.name || p.title}</td>
+                                        <td className="px-6 py-6 text-center tabular-nums font-bold">{formatCurrency(p.budget)}</td>
+                                        <td className="px-6 py-6 text-center tabular-nums font-bold text-emerald-600">{formatCurrency(p.received)}</td>
+                                        <td className="px-6 py-6 text-center tabular-nums font-bold text-rose-500">{formatCurrency(p.balance)}</td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full ${p.paymentProgress >= 100 ? 'bg-emerald-500' : 'bg-primary'}`}
+                                                        style={{ width: `${Math.min(100, p.paymentProgress)}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-[10px] font-black w-8">{Math.round(p.paymentProgress)}%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     )
 }
@@ -684,6 +779,259 @@ function SupportSection({ data }: { data: any }) {
                         </div>
                     ))}
                 </CardContent>
+            </Card>
+        </div>
+    )
+}
+
+// --- 6. TEAM INTELLIGENCE SECTION ---
+function TeamSection({ data }: { data: any }) {
+    const { users = [], tasks = [], projects = [], timeEntries = [] } = data
+
+    const teamReport = useMemo(() => {
+        return users.map((user: any) => {
+            const userId = user._id || user.id
+            const userTasks = tasks.filter((t: any) => t.assigneeId === userId)
+            const completedCount = userTasks.filter((t: any) => t.status === 'done').length
+
+            // Total time worked by this user (in hours)
+            const totalMinutes = timeEntries
+                .filter((te: any) => te.userId === userId)
+                .reduce((sum: number, te: any) => sum + (te.duration || 0), 0)
+            const totalHours = totalMinutes / 60
+
+            // Estimated cost of this employee based on salary and time (26 days * 8h = 208h/month)
+            const hourlyRate = (Number(user.salary) || 0) / 208
+            const calculatedCost = totalHours * hourlyRate
+
+            // Projects this user worked on
+            const userProjectIds = [...new Set(userTasks.map((t: any) => t.projectId))]
+            const projectDetails = userProjectIds.map(pid => {
+                const proj = projects.find((p: any) => p._id === pid || p.id === pid)
+                if (!proj) return null
+
+                const projTasks = userTasks.filter((t: any) => t.projectId === pid)
+                const projMinutes = timeEntries
+                    .filter((te: any) => te.userId === userId && te.projectId === pid)
+                    .reduce((sum: number, te: any) => sum + (te.duration || 0), 0)
+
+                return {
+                    name: proj.name || proj.title,
+                    tasks: projTasks.length,
+                    completed: projTasks.filter((t: any) => t.status === 'done').length,
+                    hours: (projMinutes / 60).toFixed(1),
+                    cost: ((projMinutes / 60) * hourlyRate).toFixed(2)
+                }
+            }).filter(Boolean)
+
+            // Performance Score Formula: (Completion Rate * 70%) + (Hours Consistency * 30%)
+            const totalTasksCount = userTasks.length || 1
+            const taskScore = (completedCount / totalTasksCount) * 70
+            const hourScore = Math.min(30, (totalHours / 160) * 30) // Basis: 160 hours per month
+            const performanceScore = Math.min(100, Math.round(taskScore + hourScore))
+
+            return {
+                ...user,
+                completedCount,
+                totalTasks: userTasks.length,
+                totalHours: totalHours.toFixed(1),
+                calculatedCost: calculatedCost.toFixed(0),
+                performanceScore,
+                projects: projectDetails
+            }
+        }).sort((a: any, b: any) => Number(b.performanceScore) - Number(a.performanceScore))
+    }, [users, tasks, projects, timeEntries])
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="border-none shadow-sm bg-indigo-600 text-white p-6 rounded-[2rem] overflow-hidden relative">
+                    <div className="z-10 relative">
+                        <Users className="h-8 w-8 mb-4 opacity-50" />
+                        <h4 className="text-sm font-black uppercase tracking-widest opacity-80">Active Workforce</h4>
+                        <div className="text-4xl font-black mt-2">{users.length} Employees</div>
+                        <p className="text-xs mt-4 opacity-70">Tracking performance across {projects.length} live projects</p>
+                    </div>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-card p-6 rounded-[2rem] border-2 border-primary/10">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                            <Clock className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-black text-muted-foreground uppercase tracking-widest tracking-tight">Total Time Logged</p>
+                            <h3 className="text-3xl font-black mt-1">
+                                {(timeEntries.reduce((s: number, t: any) => s + (t.duration || 0), 0) / 60).toFixed(0)}h
+                            </h3>
+                        </div>
+                    </div>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-card p-6 rounded-[2rem] border-2 border-emerald-500/10">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                            <TrendingUp className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-black text-muted-foreground uppercase tracking-widest tracking-tight">Work Efficiency</p>
+                            <h3 className="text-3xl font-black mt-1">
+                                {tasks.length > 0 ? Math.round((tasks.filter((t: any) => t.status === 'done').length / tasks.length) * 100) : 0}%
+                            </h3>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+
+            <Card className="border-none shadow-sm overflow-hidden rounded-[2rem]">
+                <CardHeader className="bg-slate-900 text-white p-8">
+                    <CardTitle className="text-2xl font-black">Employee Analysis</CardTitle>
+                    <CardDescription className="text-slate-400">Deep dive into time allocation, task output, and operational cost.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b">
+                                <tr>
+                                    <th className="px-8 py-5">Employee</th>
+                                    <th className="px-6 py-5">Tasks</th>
+                                    <th className="px-6 py-5">Hours Logged</th>
+                                    <th className="px-6 py-5">Perf Score</th>
+                                    <th className="px-6 py-5">Operational Cost</th>
+                                    <th className="px-8 py-5">Project Breakdown</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/30">
+                                {teamReport.map((emp: any, i: number) => (
+                                    <tr key={i} className="hover:bg-muted/10 transition-colors align-top">
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center font-black text-slate-600 border">
+                                                    {emp.name?.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-base">{emp.name}</div>
+                                                    <div className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{emp.designation || emp.role}</div>
+                                                    <div className="text-[10px] font-bold text-emerald-600">₹{emp.salary || 0}/mo</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-6">
+                                            <div className="space-y-1">
+                                                <div className="text-sm font-black">{emp.completedCount} / {emp.totalTasks} Done</div>
+                                                <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-primary"
+                                                        style={{ width: `${emp.totalTasks > 0 ? (emp.completedCount / emp.totalTasks) * 100 : 0}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-6">
+                                            <div className="flex flex-col">
+                                                <span className="text-xl font-black tabular-nums">{emp.totalHours}h</span>
+                                                <span className="text-[10px] uppercase font-bold text-muted-foreground">Logged Total</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-6">
+                                            <div className="flex flex-col items-start gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-2xl font-black tabular-nums ${emp.performanceScore > 80 ? 'text-emerald-500' : emp.performanceScore > 50 ? 'text-blue-500' : 'text-amber-500'}`}>
+                                                        {emp.performanceScore}
+                                                    </span>
+                                                    <Zap className={`h-3 w-3 ${emp.performanceScore > 80 ? 'text-yellow-400 fill-yellow-400 animate-pulse' : 'text-slate-300'}`} />
+                                                </div>
+                                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full transition-all duration-1000 ${emp.performanceScore > 80 ? 'bg-emerald-500' : emp.performanceScore > 50 ? 'bg-blue-500' : 'bg-amber-500'}`}
+                                                        style={{ width: `${emp.performanceScore}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-6">
+                                            <div className="flex flex-col">
+                                                <span className="text-xl font-black tabular-nums text-rose-600">₹{emp.calculatedCost}</span>
+                                                <span className="text-[10px] uppercase font-bold text-muted-foreground">Cost Contribution</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="space-y-3">
+                                                {emp.projects.map((p: any, j: number) => (
+                                                    <div key={j} className="bg-muted/30 p-3 rounded-xl border border-border/40">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <span className="text-xs font-bold leading-none">{p.name}</span>
+                                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-primary/10 text-primary rounded-full">{p.hours}h</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                                                            <span>{p.completed}/{p.tasks} Tasks</span>
+                                                            <span className="font-bold text-rose-500">₹{p.cost} cost</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {emp.projects.length === 0 && <span className="text-[10px] text-muted-foreground italic">No project data available</span>}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm bg-slate-950 p-8 rounded-[2rem] text-white">
+                <div className="flex items-center gap-4 mb-8">
+                    <Briefcase className="h-6 w-6 text-indigo-400" />
+                    <div>
+                        <h3 className="text-xl font-black">Project Profitability Index</h3>
+                        <p className="text-slate-400 text-sm">Calculated gain vs operational overhead (employee costs).</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {projects.slice(0, 6).map((prog: any, k: number) => {
+                        const pid = prog._id || prog.id
+                        const projMinutes = timeEntries
+                            .filter((te: any) => te.projectId === pid)
+                            .reduce((sum: number, te: any) => {
+                                const user = users.find((u: any) => (u._id || u.id) === te.userId)
+                                const hourlyRate = (Number(user?.salary) || 0) / 208
+                                return sum + ((te.duration || 0) / 60) * hourlyRate
+                            }, 0)
+
+                        const cost = Math.round(projMinutes)
+                        const budget = Number(prog.budget) || 0
+                        const profit = budget - cost
+                        const isProfitable = profit >= 0
+
+                        return (
+                            <div key={k} className="bg-white/5 rounded-2xl p-6 border border-white/10 hover:border-white/20 transition-all">
+                                <div className="flex justify-between items-start mb-6">
+                                    <h4 className="font-bold text-lg leading-tight truncate">{prog.name || prog.title}</h4>
+                                    <Badge variant={isProfitable ? 'default' : 'destructive'} className="text-[9px] font-black uppercase tracking-tighter">
+                                        {isProfitable ? 'Healthy' : 'Risk'}
+                                    </Badge>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400 uppercase font-bold tracking-widest">Budget</span>
+                                        <span className="font-black">₹{budget.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400 uppercase font-bold tracking-widest">Est. Cost</span>
+                                        <span className="font-black text-rose-400">₹{cost.toLocaleString()}</span>
+                                    </div>
+                                    <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                                        <span className="text-xs uppercase font-black text-slate-500">Net Return</span>
+                                        <span className={`text-xl font-black ${isProfitable ? 'text-emerald-400' : 'text-rose-500'}`}>
+                                            {isProfitable ? '+' : ''}₹{profit.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
             </Card>
         </div>
     )

@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
     ChevronLeft, Calendar, DollarSign, Clock, CheckSquare,
     MoreHorizontal, Edit, Trash2, Plus, FileText, Paperclip,
-    Download, ExternalLink, Users, AlertCircle
+    Download, ExternalLink, Users, AlertCircle, TrendingUp
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
 import {
@@ -23,9 +23,17 @@ import api from '@/lib/api-client'
 import { TaskBoard } from '@/components/tasks/task-board'
 
 
+import { ProjectTeamDialog } from '@/components/projects/project-team-dialog'
+import { ProjectFileDialog } from '@/components/projects/project-file-dialog'
+import { useState } from 'react'
+
+import { mapProject, mapClient, mapUser, mapInvoice } from '@/lib/mappers'
+
 export function ProjectDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const [teamDialogOpen, setTeamDialogOpen] = useState(false)
+    const [fileDialogOpen, setFileDialogOpen] = useState(false)
     const {
         projects, setProjects,
         tasks,
@@ -57,9 +65,7 @@ export function ProjectDetailPage() {
     // Fetch Data on Reload
     useEffect(() => {
         const fetchData = async () => {
-            // Only fetch if data is missing. 
-            // Ideally we should always fetch "fresh" data for a detail page, 
-            // but checking length is a simple optimization for now.
+            // Only fetch if data is missing. Fresh data is better but length check is simple.
             if (projects.length === 0 || clients.length === 0 || users.length === 0 || files.length === 0 || invoices.length === 0) {
                 try {
                     const [projectsRes, clientsRes, usersRes, filesRes, invoicesRes] = await Promise.all([
@@ -71,60 +77,13 @@ export function ProjectDetailPage() {
                     ])
 
                     if (projectsRes.data) {
-                        setProjects(projectsRes.data.map((p: any) => ({
-                            id: p._id,
-                            name: p.name,
-                            description: p.description,
-                            clientId: p.clientId,
-                            status: p.status,
-                            deadline: new Date(p.dueDate),
-                            budget: p.budget,
-                            type: p.type,
-                            paymentModel: p.paymentModel,
-                            progress: p.progress || 0,
-                            priority: p.priority,
-                            startDate: new Date(p.startDate),
-                            dueDate: new Date(p.dueDate),
-                            createdAt: new Date(p.createdAt),
-                            updatedAt: new Date(p.createdAt),
-                            milestones: p.milestones || [],
-                            pmId: p.pmId || 'u2',
-                        })))
+                        setProjects(projectsRes.data.map(mapProject))
                     }
                     if (clientsRes.data) {
-                        setClients(clientsRes.data.map((c: any) => ({
-                            id: c._id,
-                            name: c.name,
-                            company: c.company,
-                            email: c.email,
-                            phone: c.phone,
-                            address: c.address,
-                            type: c.type,
-                            status: c.status,
-                            industry: c.industry,
-                            city: c.city,
-                            website: c.website,
-                            gstNumber: c.gstNumber,
-                            leadSource: c.leadSource,
-                            notes: c.notes,
-                            services: c.services || [],
-                            budget: c.budget,
-                            paymentModel: c.paymentModel,
-                            deadline: c.expectedDeadline ? new Date(c.expectedDeadline) : undefined,
-                            assignedTo: c.assignedTo,
-                            followUpDate: c.followUpDate ? new Date(c.followUpDate) : undefined,
-                            createdAt: new Date(c.createdAt),
-                            updatedAt: new Date(c.updatedAt)
-                        })))
+                        setClients(clientsRes.data.map(mapClient))
                     }
                     if (usersRes?.data) {
-                        setUsers(usersRes.data.map((u: any) => ({
-                            id: u._id,
-                            name: u.name,
-                            email: u.email,
-                            role: u.role,
-                            phone: u.phone,
-                        })))
+                        setUsers(usersRes.data.map(mapUser))
                     }
                     if (filesRes?.data) {
                         setFiles(filesRes.data.map((f: any) => ({
@@ -140,23 +99,7 @@ export function ProjectDetailPage() {
                         })))
                     }
                     if (invoicesRes?.data) {
-                        setInvoices(invoicesRes.data.map((i: any) => ({
-                            id: i._id,
-                            invoiceNumber: i.invoiceNumber,
-                            clientId: i.clientId,
-                            projectId: i.projectId,
-                            type: i.type,
-                            status: i.status,
-                            lineItems: i.lineItems,
-                            subtotal: i.subtotal,
-                            tax: i.tax,
-                            total: i.total,
-                            date: new Date(i.date),
-                            dueDate: new Date(i.dueDate),
-                            paidDate: i.paidDate ? new Date(i.paidDate) : undefined,
-                            createdAt: new Date(i.createdAt),
-                            updatedAt: new Date(i.updatedAt),
-                        })))
+                        setInvoices(invoicesRes.data.map(mapInvoice))
                     }
                 } catch (error) {
                     console.error("Error fetching detail data", error)
@@ -188,11 +131,14 @@ export function ProjectDetailPage() {
     const projectInvoices = invoices.filter(i => i.projectId === project.id)
 
     // Team Members (Dynamic)
+    const projectMembers = project.members || []
     const assigneeIds = Array.from(new Set(projectTasks.map(t => t.assigneeId).filter(Boolean)))
-    // Add PM to team if not already
-    if (project.pmId && !assigneeIds.includes(project.pmId)) assigneeIds.push(project.pmId)
+    const combinedMemberIds = Array.from(new Set([...projectMembers, ...assigneeIds]))
 
-    const teamMembers = users.filter(u => assigneeIds.includes(u.id))
+    // Add PM to team if not already
+    if (project.pmId && !combinedMemberIds.includes(project.pmId)) combinedMemberIds.push(project.pmId)
+
+    const teamMembers = users.filter(u => combinedMemberIds.includes(u.id))
     const displayTeam = teamMembers.length > 0 ? teamMembers : []
     const pm = users.find(u => u.id === project.pmId)
     const client = clients.find(c => c.id === project.clientId)
@@ -261,27 +207,48 @@ export function ProjectDetailPage() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {['owner', 'pm'].includes(currentUser?.role) && (
-                    <Card>
-                        <CardContent className="p-6">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Budget</p>
-                                    <h3 className="text-2xl font-bold mt-2">{formatCurrency(project.budget)}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {['owner', 'admin'].includes(currentUser?.role) && (
+                    <>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Budget</p>
+                                        <h3 className="text-2xl font-bold mt-2">{formatCurrency(project.budget)}</h3>
+                                    </div>
+                                    <div className="p-2 bg-slate-100 dark:bg-slate-900/20 rounded-lg">
+                                        <DollarSign className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                                    </div>
                                 </div>
-                                <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                                    <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Received</p>
+                                        <h3 className="text-2xl font-bold mt-2 text-emerald-600">
+                                            {formatCurrency(projectInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                                        </h3>
+                                        <p className="text-[10px] text-muted-foreground mt-1">
+                                            {projectInvoices.filter(i => i.status === 'paid').length} Paid Invoices
+                                        </p>
+                                    </div>
+                                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg">
+                                        <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                                    </div>
                                 </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    </>
                 )}
                 <Card>
                     <CardContent className="p-6">
                         <div className="flex justify-between items-start">
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground">Hours Logged</p>
+                                <h3 className="text-2xl font-bold mt-2">--</h3>
                                 {['owner', 'pm'].includes(currentUser?.role) && (
                                     <p className="text-xs text-muted-foreground mt-1">Billable: --</p>
                                 )}
@@ -329,7 +296,7 @@ export function ProjectDetailPage() {
                     <TabsTrigger value="tasks">Tasks ({projectTasks.length})</TabsTrigger>
                     <TabsTrigger value="team">Team ({displayTeam.length})</TabsTrigger>
                     <TabsTrigger value="files">Files ({projectFiles.length})</TabsTrigger>
-                    {['owner', 'pm'].includes(currentUser?.role) && <TabsTrigger value="invoices">Invoices ({projectInvoices.length})</TabsTrigger>}
+                    {['owner', 'admin'].includes(currentUser?.role) && <TabsTrigger value="invoices">Invoices ({projectInvoices.length})</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-4">
@@ -465,47 +432,79 @@ export function ProjectDetailPage() {
                                 </CardContent>
                             </Card>
                         ))}
-                        <Card className="border-dashed hover:bg-muted/50 cursor-pointer flex items-center justify-center min-h-[80px]">
-                            <div className="flex flex-col items-center text-muted-foreground">
-                                <Plus className="h-6 w-6 mb-1" />
-                                <span className="text-sm">Add Member</span>
-                            </div>
-                        </Card>
+                        {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
+                            <Card
+                                className="border-dashed hover:bg-muted/50 cursor-pointer flex items-center justify-center min-h-[80px]"
+                                onClick={() => setTeamDialogOpen(true)}
+                            >
+                                <div className="flex flex-col items-center text-muted-foreground">
+                                    <Plus className="h-6 w-6 mb-1" />
+                                    <span className="text-sm">Manage Team</span>
+                                </div>
+                            </Card>
+                        )}
                     </div>
                 </TabsContent>
+
+                <ProjectTeamDialog
+                    project={project}
+                    open={teamDialogOpen}
+                    onOpenChange={setTeamDialogOpen}
+                />
+                <ProjectFileDialog
+                    project={project}
+                    open={fileDialogOpen}
+                    onOpenChange={setFileDialogOpen}
+                />
 
                 <TabsContent value="files">
                     <Card>
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <CardTitle>Files & Documents</CardTitle>
-                                <Button size="sm" variant="outline"><Paperclip className="mr-2 h-4 w-4" /> Upload</Button>
+                                {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
+                                    <Button size="sm" variant="outline" onClick={() => setFileDialogOpen(true)}>
+                                        <Paperclip className="mr-2 h-4 w-4" /> Add Important File
+                                    </Button>
+                                )}
                             </div>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                {[1, 2].map((_, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded">
-                                                <FileText className="h-4 w-4 text-blue-600" />
+                                {projectFiles.length === 0 ? (
+                                    <div className="text-center py-8 text-muted-foreground border-dashed border-2 rounded-xl">
+                                        No files uploaded yet.
+                                    </div>
+                                ) : (
+                                    projectFiles.map((file) => (
+                                        <div key={file.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded">
+                                                    <FileText className="h-4 w-4 text-blue-600" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium">{file.name}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {(file.size / 1024 / 1024).toFixed(2)} MB • Uploaded {new Date(file.uploadedAt).toLocaleDateString()}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-medium">Project_Requirements_v{i + 1}.pdf</p>
-                                                <p className="text-xs text-muted-foreground">2.4 MB • Uploaded by John Doe</p>
+                                            <div className="flex gap-2">
+                                                <Button variant="ghost" size="sm" asChild>
+                                                    <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                                        <Download className="h-4 w-4" />
+                                                    </a>
+                                                </Button>
                                             </div>
                                         </div>
-                                        <Button variant="ghost" size="sm">
-                                            <Download className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
 
-                {['owner', 'pm'].includes(currentUser?.role) && (
+                {['owner', 'admin'].includes(currentUser?.role) && (
                     <TabsContent value="invoices">
                         <Card>
                             <CardHeader>

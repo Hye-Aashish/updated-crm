@@ -272,15 +272,16 @@ export function TasksPage() {
                 timeEntryId = timeEntry._id
 
                 toast({
-                    title: 'Timer Started',
-                    description: `Time tracking started for "${draggedTask.title}"`
+                    title: 'TIMER STARTED',
+                    description: `Time tracking started for "${draggedTask.title}"`,
+                    variant: 'success'
                 })
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Failed to start timer:', error)
                 toast({
-                    variant: 'destructive',
-                    title: 'Timer Error',
-                    description: 'Failed to start time tracking'
+                    title: 'TASK ERROR',
+                    description: error.response?.data?.message || error.message || "Failed to start timer",
+                    variant: 'destructive'
                 })
             }
         } else if (targetStatus === 'done') {
@@ -298,15 +299,16 @@ export function TasksPage() {
                     updates.lastStartTime = null
 
                     toast({
-                        title: 'Timer Stopped',
-                        description: `Time entry saved for "${draggedTask.title}"`
+                        title: 'TIMER STOPPED',
+                        description: `Time entry saved for "${draggedTask.title}"`,
+                        variant: 'success'
                     })
-                } catch (error) {
+                } catch (error: any) {
                     console.error('Failed to stop timer:', error)
                     toast({
-                        variant: 'destructive',
-                        title: 'Timer Error',
-                        description: 'Failed to stop time tracking'
+                        title: 'TASK ERROR',
+                        description: error.response?.data?.message || error.message || "Failed to stop timer",
+                        variant: 'destructive'
                     })
                 }
             }
@@ -325,8 +327,9 @@ export function TasksPage() {
                     updates.lastStartTime = null
 
                     toast({
-                        title: 'Timer Paused',
-                        description: `Time tracking paused for "${draggedTask.title}"`
+                        title: 'TIMER PAUSED',
+                        description: `Time tracking paused for "${draggedTask.title}"`,
+                        variant: 'success'
                     })
                 } catch (error) {
                     console.error('Failed to pause timer:', error)
@@ -350,20 +353,24 @@ export function TasksPage() {
                 updates.timeEntryId = timeEntry._id
 
                 toast({
-                    title: 'Timer Resumed',
-                    description: `Time tracking resumed for "${draggedTask.title}"`
+                    title: 'TIMER RESUMED',
+                    description: `Time tracking resumed for "${draggedTask.title}"`,
+                    variant: 'success'
                 })
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Failed to resume timer:', error)
                 toast({
-                    variant: 'destructive',
-                    title: 'Timer Error',
-                    description: 'Failed to resume time tracking'
+                    title: 'TASK ERROR',
+                    description: error.response?.data?.message || error.message || "Failed to resume timer",
+                    variant: 'destructive'
                 })
             }
         }
 
-        // Update Local immediately
+        // Capture original state for reversal
+        const originalTasks = [...tasks];
+
+        // Update Local immediately (Optimistic)
         const updatedTasks = tasks.map(task =>
             task.id === draggedTask.id
                 ? { ...task, ...updates }
@@ -375,8 +382,22 @@ export function TasksPage() {
         // Update Backend
         try {
             await api.put(`/tasks/${draggedTask.id}`, updates)
-        } catch (error) {
+            toast({
+                title: 'UPDATE SUCCESS',
+                description: 'Task status updated successfully.',
+                variant: 'success'
+            })
+        } catch (error: any) {
             console.error("Failed to update status", error)
+            toast({
+                variant: 'destructive',
+                title: 'UPDATE FAILED',
+                description: error.response?.data?.message || error.message || "Failed to update task"
+            })
+
+            // Revert local state on failure
+            setTasks(originalTasks)
+            setStoreTasks(originalTasks)
         }
 
         setDraggedTask(null)
@@ -433,10 +454,18 @@ export function TasksPage() {
 
         try {
             await api.put(`/tasks/${task.id}`, updates)
-            toast({ title: "Sent for Approval", description: "Task moved to Client Approval." })
-        } catch (error) {
+            toast({
+                title: "APPROVAL SENT",
+                description: "Task moved to Client Approval.",
+                variant: 'success'
+            })
+        } catch (error: any) {
             console.error("Failed to update status", error)
-            toast({ variant: "destructive", title: "Error", description: "Failed to update task." })
+            toast({
+                variant: "destructive",
+                title: "APPROVAL FAILED",
+                description: error.response?.data?.message || error.message || "Failed to update task."
+            })
         }
 
         // Reset
@@ -501,11 +530,19 @@ export function TasksPage() {
             updateStoreTask(selectedTask.id, taskData)
             // useEffect will sync to local tasks if needed, but updateStoreTask should trigger it
 
-            toast({ title: "Task updated", description: "All changes have been saved." })
+            toast({
+                title: 'UPDATE SUCCESS',
+                description: 'Task updated successfully',
+                variant: 'success'
+            })
             setSelectedTask(null)
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to update task", error)
-            toast({ variant: "destructive", title: "Failed to update task", description: "Please check your connection." })
+            toast({
+                variant: 'destructive',
+                title: 'UPDATE FAILED',
+                description: error.response?.data?.message || error.message || 'Failed to save changes'
+            })
         }
     }
 
@@ -553,11 +590,18 @@ export function TasksPage() {
             addStoreTask(frontendTask)
             setNewTask({ title: '', description: '', priority: 'medium', dueDate: '', assigneeId: '', projectId: '', attachments: [] })
             setIsTaskDialogOpen(false)
-            toast({ title: "Task created", description: "Successfully added to the list." })
+            toast({
+                title: 'CREATION SUCCESS',
+                description: 'Task created successfully',
+                variant: 'success'
+            })
         } catch (error: any) {
             console.error("Failed to create task", error)
-            const errorMessage = error.response?.data?.message || "Check attachment size or connection";
-            toast({ variant: "destructive", title: "Failed to create task", description: errorMessage })
+            toast({
+                variant: 'destructive',
+                title: 'CREATION FAILED',
+                description: error.response?.data?.message || error.message || 'Check your fields'
+            })
         }
     }
 

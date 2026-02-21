@@ -47,7 +47,7 @@ export function SalaryPage() {
     const [payroll, setPayroll] = useState<PayrollRecord[]>([])
     const [myPayroll, setMyPayroll] = useState<PayrollRecord | null>(null)
     const [loading, setLoading] = useState(true)
-    const [workingDays, setWorkingDays] = useState('30')
+    const [workingDays, setWorkingDays] = useState('26')
 
     // Manual Management State
     const [isManageDialogOpen, setIsManageDialogOpen] = useState(false)
@@ -184,7 +184,7 @@ export function SalaryPage() {
                                     </div>
                                     <div className="space-y-1 text-right">
                                         <p className="text-[10px] text-muted-foreground uppercase font-bold">Remaining</p>
-                                        <p className="font-bold text-sm text-foreground">{(record.workingDays || 30) - record.stats.paidDays} Days</p>
+                                        <p className="font-bold text-sm text-foreground">{(Number(record.workingDays) || 26) - record.stats.paidDays} Days</p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -238,7 +238,7 @@ export function SalaryPage() {
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <p className="text-purple-100 text-xs font-bold uppercase tracking-widest">Attendance Status</p>
-                                        <h3 className="text-3xl font-black mt-1">{myPayroll.stats.paidDays} / {myPayroll.workingDays || 30}</h3>
+                                        <h3 className="text-3xl font-black mt-1">{myPayroll.stats.paidDays} / {myPayroll.workingDays || 26}</h3>
                                         <p className="text-xs text-purple-100/80 mt-2 font-medium">Paid Days so far</p>
                                     </div>
                                     <div className="p-3 bg-white/20 rounded-xl backdrop-blur-md">

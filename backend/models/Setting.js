@@ -22,6 +22,9 @@ const settingSchema = new mongoose.Schema({
     billing: {
         razorpayKey: String,
         razorpaySecret: String,
+        cashfreeClientId: String,
+        cashfreeClientSecret: String,
+        cashfreeMode: { type: String, enum: ['sandbox', 'production'], default: 'sandbox' },
         invoiceFormat: { type: String, default: 'INV-2026-001' },
         taxRate: { type: Number, default: 18 },
         paymentTerms: { type: String, default: '15' },
@@ -51,14 +54,8 @@ const settingSchema = new mongoose.Schema({
         permissions: { type: Object, default: {} }
     }],
     dashboardLayouts: {
-        type: Map,
-        of: [String],
-        default: {
-            'owner': ['financials', 'operational', 'analytics', 'funnel', 'deadlines', 'activity', 'leads'],
-            'admin': ['financials', 'operational', 'analytics', 'funnel', 'deadlines', 'activity', 'leads'],
-            'pm': ['operational', 'deadlines', 'activity'],
-            'employee': ['operational', 'deadlines']
-        }
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
     },
     payroll: {
         offDays: { type: [Number], default: [0] }, // 0 for Sunday
