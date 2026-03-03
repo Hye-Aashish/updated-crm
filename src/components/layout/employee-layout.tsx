@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { EmployeeSidebar } from './employee-sidebar'
 import { Topbar } from './topbar'
+import { BottomNav } from './bottom-nav'
 import { cn } from '@/lib/utils'
 import { Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -46,7 +47,7 @@ export function EmployeeLayout() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50/90 dark:bg-zinc-900">
+        <div className="h-[100dvh] bg-gray-50/90 dark:bg-zinc-900 overflow-hidden flex flex-col">
             {/* Employee Sidebar */}
             <EmployeeSidebar
                 collapsed={collapsed}
@@ -58,7 +59,7 @@ export function EmployeeLayout() {
             {/* Main Content Wrapper */}
             <div
                 className={cn(
-                    "flex flex-col min-h-screen transition-all duration-300 ease-in-out",
+                    "flex-1 flex flex-col transition-all duration-300 ease-in-out h-full overflow-hidden",
                     collapsed ? "lg:ml-20" : "lg:ml-64"
                 )}
             >
@@ -75,9 +76,12 @@ export function EmployeeLayout() {
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 p-6 overflow-x-hidden">
+                <main className="flex-1 p-6 overflow-x-hidden pb-24 md:pb-6">
                     <Outlet />
                 </main>
+
+                {/* Mobile Bottom Navigation */}
+                <BottomNav onMenuClick={() => setMobileOpen(true)} />
             </div>
         </div>
     )

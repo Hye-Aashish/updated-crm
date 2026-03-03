@@ -44,6 +44,7 @@ import QuotationDetailPage from './pages/quotations/[id]'
 import QuotationTemplates from './pages/quotations/templates'
 import AmcPage from './pages/amc'
 import DomainsPage from './pages/domains'
+import HostingPage from './pages/hosting'
 
 export function AppRoutes() {
     return (
@@ -91,6 +92,7 @@ export function AppRoutes() {
                 <Route path="salary" element={<SalaryPage />} />
                 <Route path="amc" element={<AmcPage />} />
                 <Route path="domains" element={<DomainsPage />} />
+                <Route path="hosting" element={<HostingPage />} />
 
                 {/* Support & Analysis */}
                 <Route path="tickets" element={<TicketsPage />} />

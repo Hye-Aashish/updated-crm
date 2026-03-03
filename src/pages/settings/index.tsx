@@ -839,6 +839,7 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
     const modules = [
         'dashboard', 'user_tracker', 'clients', 'leads', 'projects',
         'tasks', 'team', 'attendance', 'time_tracking', 'invoices',
+        'amc', 'domains', 'hosting',
         'quotations', 'templates', 'expenses', 'payroll', 'tickets',
         'chat', 'project_chat', 'reports', 'files', 'settings'
     ]
@@ -1009,6 +1010,7 @@ function DashboardBuilderTab({ data, availableRoles, onSave, saving }: any) {
         { id: 'hero', label: 'Brand Hero', desc: 'Welcome banner and top-level summary', subItems: ['welcome_msg', 'mini_stats'] },
         { id: 'session', label: 'Attendance Hub', desc: 'Clock in/out and session timer', subItems: ['timer', 'clock_actions'] },
         { id: 'financials', label: 'Financial Overview', desc: 'Revenue, Expenses, Profit metrics', subItems: ['revenue', 'expenses', 'profit', 'outstanding'] },
+        { id: 'subscriptions', label: 'AMC & Domains', desc: 'Track expiring AMCs and domain renewals', subItems: ['amc_expiring', 'domain_renewals', 'hosting_expiry'] },
         { id: 'analytics', label: 'Financial Analytics', desc: 'Revenue vs Expense chart', subItems: ['revenue_trend', 'expense_trend'] },
         { id: 'funnel', label: 'Lead Funnel', desc: 'Lead status distribution chart', subItems: ['conversion', 'velocity'] },
         { id: 'deadlines', label: 'Urgent Tasks', desc: 'Tasks approaching due dates', subItems: ['overdue', 'upcoming'] },
@@ -1017,6 +1019,7 @@ function DashboardBuilderTab({ data, availableRoles, onSave, saving }: any) {
         { id: 'tasks', label: 'Task Center', desc: 'Summary of task statuses and distribution', subItems: ['todo', 'in_progress', 'review', 'done'] },
         { id: 'projects_overview', label: 'Projects Overview', desc: 'Quick stats of projects assigned to the user', subItems: ['planning', 'active', 'on_hold', 'completed'] },
         { id: 'support_tickets', label: 'Support Tickets', desc: 'Overview of client support requests', subItems: ['open', 'resolved', 'critical'] },
+        { id: 'chat_hub', label: 'Communication Hub', desc: 'Recent messages from Project and Live Chat', subItems: ['project_messages', 'live_messages'] },
     ]
 
     const getInitialLayout = (role: string) => {

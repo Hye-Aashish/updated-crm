@@ -104,6 +104,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Invoices', href: '/invoices', icon: FileText },
         { name: 'AMC', href: '/amc', icon: Shield },
         { name: 'Domains', href: '/domains', icon: Globe },
+        { name: 'Hosting', href: '/hosting', icon: LayoutDashboard },
         { name: 'Quotations', href: '/quotations', icon: FileText },
         { name: 'Templates', href: '/quotations/templates', icon: LayoutDashboard },
         { name: 'Leads', href: '/leads', icon: Target },
@@ -146,8 +147,9 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Attendance': return !!p.attendance?.view
             case 'Time Tracking': return !!p.time_tracking?.view
             case 'Invoices': return !!p.invoices?.view
-            case 'AMC': return currentUser.role === 'admin' || currentUser.role === 'pm'
-            case 'Domains': return currentUser.role === 'admin' || currentUser.role === 'pm'
+            case 'AMC': return !!p.amc?.view
+            case 'Domains': return !!p.domains?.view
+            case 'Hosting': return !!p.hosting?.view
             case 'Quotations': return !!p.quotations?.view
             case 'Templates': return !!p.templates?.view
             case 'Leads': return !!p.leads?.view

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
+import { BottomNav } from './bottom-nav'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
@@ -71,7 +72,7 @@ export function DashboardLayout() {
 
     return (
 
-        <div className="flex h-screen bg-background overflow-hidden w-full font-sans">
+        <div className="flex h-[100dvh] bg-background overflow-hidden w-full font-sans">
             {/* Sidebar with shared state */}
             <Sidebar
                 collapsed={collapsed}
@@ -95,10 +96,13 @@ export function DashboardLayout() {
 
                 {/* Page Content */}
                 <main className="flex-1 overflow-y-auto p-4 md:p-8 w-full scroll-smooth">
-                    <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+                    <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 md:pb-20">
                         <Outlet />
                     </div>
                 </main>
+
+                {/* Mobile Bottom Navigation */}
+                <BottomNav onMenuClick={() => setMobileOpen(true)} />
             </div>
         </div>
     )

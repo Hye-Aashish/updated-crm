@@ -79,31 +79,31 @@ export function ProjectsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-                    <p className="text-muted-foreground mt-1">Manage and track all ongoing projects.</p>
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Projects</h1>
+                    <p className="text-sm text-muted-foreground mt-1">Manage and track all ongoing projects.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 bg-muted/40 p-2 rounded-lg border">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="flex items-center gap-2 bg-muted/40 p-2 rounded-lg border overflow-x-auto whitespace-nowrap">
+                        <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                         <Input
                             type="date"
-                            className="h-8 w-auto bg-background border-none shadow-none text-sm"
+                            className="h-8 w-[130px] bg-background border-none shadow-none text-xs md:text-sm p-1"
                             value={dateRange.start}
                             onChange={(e) => handleDateChange('start', e.target.value)}
                         />
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-muted-foreground text-xs">-</span>
                         <Input
                             type="date"
-                            className="h-8 w-auto bg-background border-none shadow-none text-sm"
+                            className="h-8 w-[130px] bg-background border-none shadow-none text-xs md:text-sm p-1"
                             value={dateRange.end}
                             onChange={(e) => handleDateChange('end', e.target.value)}
                         />
                     </div>
                     {['owner', 'admin', 'pm'].includes(currentUser?.role || '') && (
-                        <Button onClick={() => navigate('/projects/new')}>
-                            <Plus className="mr-2 h-4 w-4" /> New
+                        <Button onClick={() => navigate('/projects/new')} className="h-10">
+                            <Plus className="mr-1 h-4 w-4" /> New Project
                         </Button>
                     )}
                 </div>
