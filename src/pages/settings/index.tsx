@@ -151,7 +151,7 @@ export function SettingsPage() {
                             {activeTab === 'users' && <UsersRolesTab />}
                             {activeTab === 'roles' && <RolesPermissionsTab data={settings?.roles} onSave={(d: any) => updateSettings('roles', d)} saving={saving} />}
                             {activeTab === 'billing' && <BillingTab data={settings?.billing} onSave={(d: any) => updateSettings('billing', d)} saving={saving} />}
-                            {activeTab === 'dashboard-builder' && <DashboardBuilderTab data={settings?.dashboardLayouts} onSave={(d: any) => updateSettings('dashboardLayouts', d)} saving={saving} />}
+                            {activeTab === 'dashboard-builder' && <DashboardBuilderTab data={settings?.dashboardLayouts} availableRoles={settings?.roles} onSave={(d: any) => updateSettings('dashboardLayouts', d)} saving={saving} />}
                             {activeTab === 'notifications' && <NotificationsTab data={settings?.notifications} onSave={(d: any) => updateSettings('notifications', d)} saving={saving} />}
                             {activeTab === 'email' && <EmailSettingsTab data={settings?.emailSettings} onSave={(d: any) => updateSettings('emailSettings', d)} saving={saving} />}
                             {activeTab === 'whatsapp' && <WhatsAppSettingsTab data={settings?.whatsappSettings} onSave={(d: any) => updateSettings('whatsappSettings', d)} saving={saving} />}
@@ -357,15 +357,26 @@ function UsersRolesTab() {
     const [isOpen, setIsOpen] = useState(false)
     const [editingUser, setEditingUser] = useState<any>(null)
     const [availableRoles, setAvailableRoles] = useState<any[]>([])
+    const [clients, setClients] = useState<any[]>([])
     const [formData, setFormData] = useState({
-        name: '', email: '', password: '', role: 'employee', designation: '', salary: ''
+        name: '', email: '', password: '', role: 'employee', designation: '', salary: '', clientId: ''
     })
     const { toast } = useToast()
 
     useEffect(() => {
         fetchUsers()
         fetchRoles()
+        fetchClients()
     }, [])
+
+    const fetchClients = async () => {
+        try {
+            const res = await api.get('/clients')
+            setClients(res.data)
+        } catch (error) {
+            console.error("Failed to fetch clients", error)
+        }
+    }
 
     const fetchRoles = async () => {
         try {
@@ -387,7 +398,7 @@ function UsersRolesTab() {
 
     const openAdd = () => {
         setEditingUser(null)
-        setFormData({ name: '', email: '', password: '', role: 'employee', designation: '', salary: '' })
+        setFormData({ name: '', email: '', password: '', role: 'employee', designation: '', salary: '', clientId: '' })
         setIsOpen(true)
     }
 
@@ -399,7 +410,8 @@ function UsersRolesTab() {
             password: '',
             role: user.role || 'employee',
             designation: user.designation || '',
-            salary: user.salary || ''
+            salary: user.salary || '',
+            clientId: user.clientId || ''
         })
         setIsOpen(true)
     }
@@ -531,6 +543,23 @@ function UsersRolesTab() {
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            {formData.role === 'client' && (
+                                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                    <Label className="text-primary font-bold">Link to Client Project/Account</Label>
+                                    <Select value={formData.clientId} onValueChange={(val) => setFormData({ ...formData, clientId: val })}>
+                                        <SelectTrigger className="border-primary/50">
+                                            <SelectValue placeholder="Select which client this login belongs to" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {clients.map((c: any) => (
+                                                <SelectItem key={c._id} value={c._id}>{c.name} ({c.company || 'Individual'})</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[10px] text-muted-foreground">This user will only see data (projects, invoices, tasks) associated with this client.</p>
+                                </div>
+                            )}
                         </div>
                         <DialogFooter>
                             <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
@@ -811,7 +840,7 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
         'dashboard', 'user_tracker', 'clients', 'leads', 'projects',
         'tasks', 'team', 'attendance', 'time_tracking', 'invoices',
         'quotations', 'templates', 'expenses', 'payroll', 'tickets',
-        'chat', 'reports', 'files', 'settings'
+        'chat', 'project_chat', 'reports', 'files', 'settings'
     ]
     const actions = ['view', 'create', 'edit', 'delete']
 
@@ -859,6 +888,7 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
                                 {modules.map(module => {
                                     const customActions = {
                                         chat: ['view', 'reply'],
+                                        project_chat: ['view', 'message'],
                                         files: ['view', 'upload', 'delete'],
                                         attendance: ['view', 'manage'],
                                         time_tracking: ['view', 'manage'],
@@ -920,7 +950,7 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
                                             <FolderKanban className="h-4 w-4" /> Project Fields
                                         </h4>
                                         <div className="grid grid-cols-2 gap-3">
-                                            {['Budget', 'Invoices', 'Team', 'Client'].map(item => {
+                                            {['Budget', 'Invoices', 'Team', 'Client', 'Chat'].map(item => {
                                                 const key = item.toLowerCase()
                                                 return (
                                                     <label key={key} className="flex items-center gap-2 text-sm cursor-pointer border p-2 rounded hover:bg-muted/50">
@@ -969,7 +999,7 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
     )
 }
 
-function DashboardBuilderTab({ data, onSave, saving }: any) {
+function DashboardBuilderTab({ data, availableRoles, onSave, saving }: any) {
     const [layouts, setLayouts] = useState<any>(data || {})
     const [selectedRole, setSelectedRole] = useState('owner')
 
@@ -989,12 +1019,32 @@ function DashboardBuilderTab({ data, onSave, saving }: any) {
         { id: 'support_tickets', label: 'Support Tickets', desc: 'Overview of client support requests', subItems: ['open', 'resolved', 'critical'] },
     ]
 
-    const roleLayout = layouts[selectedRole] || {
-        enabledSections: ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
-        customLabels: {},
-        sectionOrder: ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
-        hiddenSubItems: []
+    const getInitialLayout = (role: string) => {
+        if (role === 'client') {
+            return {
+                enabledSections: ['hero', 'projects_overview', 'tasks', 'support_tickets', 'financials'],
+                customLabels: { financials: 'Payment Summary', tasks: 'Project Tasks', projects_overview: 'My Active Projects' },
+                sectionOrder: ['hero', 'projects_overview', 'tasks', 'support_tickets', 'financials'],
+                hiddenSubItems: ['revenue', 'expenses', 'profit', 'timer', 'clock_actions', 'system_logs', 'attendance']
+            }
+        }
+        if (role === 'employee') {
+            return {
+                enabledSections: ['hero', 'session', 'tasks', 'deadlines', 'projects_overview'],
+                customLabels: {},
+                sectionOrder: ['hero', 'session', 'tasks', 'deadlines', 'projects_overview'],
+                hiddenSubItems: ['financials', 'analytics', 'revenue', 'expenses', 'profit']
+            }
+        }
+        return {
+            enabledSections: ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
+            customLabels: {},
+            sectionOrder: ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
+            hiddenSubItems: []
+        }
     }
+
+    const roleLayout = layouts[selectedRole] || getInitialLayout(selectedRole)
 
     const updateRoleLayout = (updates: any) => {
         const newLayouts = {
@@ -1058,14 +1108,19 @@ function DashboardBuilderTab({ data, onSave, saving }: any) {
             <CardContent className="px-0 space-y-8">
                 {/* Role Selector & Data Scope */}
                 <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-                    <div className="flex gap-2 p-1.5 bg-muted/50 backdrop-blur-sm border rounded-2xl w-fit">
-                        {['owner', 'admin', 'pm', 'employee'].map(role => (
+                    <div className="flex flex-wrap gap-2 p-1.5 bg-muted/50 backdrop-blur-sm border rounded-2xl w-fit max-w-full">
+                        {(availableRoles && availableRoles.length > 0 ? availableRoles : [
+                            { name: 'owner', label: 'Owner' },
+                            { name: 'admin', label: 'Admin' },
+                            { name: 'pm', label: 'PM' },
+                            { name: 'employee', label: 'Employee' }
+                        ]).map((role: any) => (
                             <button
-                                key={role}
-                                onClick={() => setSelectedRole(role)}
-                                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${selectedRole === role ? 'bg-background text-primary shadow-lg scale-105' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+                                key={role.name}
+                                onClick={() => setSelectedRole(role.name)}
+                                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${selectedRole === role.name ? 'bg-background text-primary shadow-lg scale-105' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                             >
-                                {role}
+                                {role.label || role.name}
                             </button>
                         ))}
                     </div>

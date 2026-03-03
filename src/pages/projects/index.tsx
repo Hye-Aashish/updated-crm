@@ -16,7 +16,7 @@ export function ProjectsPage() {
     const navigate = useNavigate()
     const [view, setView] = useState<'grid' | 'list'>('grid')
     const [loading, setLoading] = useState(true)
-    const { projects, clients, currentUser, setProjects, setClients } = useAppStore()
+    const { projects, clients, invoices, currentUser, setProjects, setClients } = useAppStore()
 
     // Fetch Projects & Clients from API
     useEffect(() => {
@@ -101,9 +101,11 @@ export function ProjectsPage() {
                             onChange={(e) => handleDateChange('end', e.target.value)}
                         />
                     </div>
-                    <Button onClick={() => navigate('/projects/new')}>
-                        <Plus className="mr-2 h-4 w-4" /> New
-                    </Button>
+                    {['owner', 'admin', 'pm'].includes(currentUser?.role || '') && (
+                        <Button onClick={() => navigate('/projects/new')}>
+                            <Plus className="mr-2 h-4 w-4" /> New
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -167,15 +169,17 @@ export function ProjectsPage() {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 text-sm">
-                                        {['owner', 'pm'].includes(currentUser?.role) ? (
+                                        {['owner', 'pm', 'client'].includes(currentUser?.role) ? (
                                             <>
                                                 <div>
-                                                    <p className="text-muted-foreground text-xs">Deadline</p>
-                                                    <p className="font-medium">{formatDate(project.dueDate)}</p>
-                                                </div>
-                                                <div className="text-right">
                                                     <p className="text-muted-foreground text-xs">Budget</p>
                                                     <p className="font-medium">{formatCurrency(project.budget)}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-muted-foreground text-xs">Paid</p>
+                                                    <p className="font-medium text-emerald-600">
+                                                        {formatCurrency((invoices || []).filter(i => i.projectId === project.id && i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0))}
+                                                    </p>
                                                 </div>
                                             </>
                                         ) : (

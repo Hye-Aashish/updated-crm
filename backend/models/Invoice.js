@@ -6,7 +6,7 @@ const invoiceSchema = new mongoose.Schema({
     projectId: { type: String, required: true },
     type: {
         type: String,
-        enum: ['advance', 'milestone', 'final', 'amc'],
+        enum: ['advance', 'milestone', 'final', 'amc', 'domain'],
         default: 'milestone'
     },
     status: {

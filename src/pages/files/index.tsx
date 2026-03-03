@@ -8,7 +8,7 @@ import { formatDate } from '@/lib/utils'
 import api from '@/lib/api-client'
 
 export function FilesPage() {
-    const { files, setFiles, users, projects } = useAppStore()
+    const { files, setFiles, users, projects, currentUser } = useAppStore()
 
     useEffect(() => {
         const fetchFiles = async () => {
@@ -76,36 +76,42 @@ export function FilesPage() {
                 </div>
             ) : (
                 <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-                    {files.map((file) => {
-                        const Icon = getFileIcon(file.type)
-                        const uploader = users.find(u => u.id === file.uploadedBy)
-                        const project = projects.find(p => p.id === file.projectId)
+                    {files
+                        .filter(file => {
+                            if (['owner', 'admin'].includes(currentUser?.role || '')) return true;
+                            if (currentUser?.role === 'client') return file.clientId === currentUser.clientId;
+                            return true; // Other roles
+                        })
+                        .map((file) => {
+                            const Icon = getFileIcon(file.type)
+                            const uploader = users.find(u => u.id === file.uploadedBy)
+                            const project = projects.find(p => p.id === file.projectId)
 
-                        return (
-                            <Card key={file.id} className="cursor-pointer hover:shadow-md transition-all group">
-                                <CardContent className="p-4 space-y-3">
-                                    <div className="aspect-square bg-muted/30 rounded-lg flex items-center justify-center relative overflow-hidden">
-                                        <Icon className="h-12 w-12 text-muted-foreground group-hover:scale-110 transition-transform" />
-                                    </div>
+                            return (
+                                <Card key={file.id} className="cursor-pointer hover:shadow-md transition-all group">
+                                    <CardContent className="p-4 space-y-3">
+                                        <div className="aspect-square bg-muted/30 rounded-lg flex items-center justify-center relative overflow-hidden">
+                                            <Icon className="h-12 w-12 text-muted-foreground group-hover:scale-110 transition-transform" />
+                                        </div>
 
-                                    <div>
-                                        <h4 className="font-semibold truncate" title={file.name}>{file.name}</h4>
-                                        <p className="text-xs text-muted-foreground truncate">{project?.name}</p>
-                                    </div>
+                                        <div>
+                                            <h4 className="font-semibold truncate" title={file.name}>{file.name}</h4>
+                                            <p className="text-xs text-muted-foreground truncate">{project?.name}</p>
+                                        </div>
 
-                                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                                        <span>{formatSize(file.size)}</span>
-                                        <span>{formatDate(file.uploadedAt)}</span>
-                                    </div>
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                                            <span>{formatSize(file.size)}</span>
+                                            <span>{formatDate(file.uploadedAt)}</span>
+                                        </div>
 
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <User className="h-3 w-3" />
-                                        <span>{uploader?.name}</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <User className="h-3 w-3" />
+                                            <span>{uploader?.name}</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
                 </div>
             )}
         </div>

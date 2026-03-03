@@ -12,6 +12,7 @@ import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
 import { timeEntryService } from '@/lib/timeEntryService'
+import { mapTask, mapUser, mapProject } from '@/lib/mappers'
 
 // Task Status Type
 type TaskStatus = {
@@ -52,7 +53,7 @@ export function TasksPage() {
     const initialPriority = searchParams.get('priority') || 'all'
     const initialFilter = searchParams.get('filter') || 'all'
 
-    const { tasks: storeTasks, users, projects, setTasks: setStoreTasks, setUsers, setProjects, addTask: addStoreTask, updateTask: updateStoreTask } = useAppStore()
+    const { currentUser, tasks: storeTasks, users, projects, setTasks: setStoreTasks, setUsers, setProjects, addTask: addStoreTask, updateTask: updateStoreTask } = useAppStore()
 
     const [tasks, setTasks] = useState(storeTasks)
     const [statuses, setStatuses] = useState<TaskStatus[]>(INITIAL_STATUSES)
@@ -133,62 +134,19 @@ export function TasksPage() {
             if (storeTasks.length === 0 || users.length === 0 || projects.length === 0) {
                 try {
                     const [tasksRes, usersRes, projectsRes] = await Promise.all([
-                        storeTasks.length === 0 ? api.get('/tasks') : Promise.resolve({ data: null }),
-                        users.length === 0 ? api.get('/users') : Promise.resolve({ data: null }),
-                        projects.length === 0 ? api.get('/projects') : Promise.resolve({ data: null })
+                        storeTasks.length === 0 ? api.get('/tasks').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        users.length === 0 ? api.get('/users').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        projects.length === 0 ? api.get('/projects').catch(() => ({ data: null })) : Promise.resolve({ data: null })
                     ])
 
                     if (tasksRes.data) {
-                        const backendTasks = tasksRes.data.map((t: any) => ({
-                            id: t._id,
-                            title: t.title,
-                            description: t.description,
-                            projectId: t.projectId,
-                            status: t.status,
-                            priority: t.priority,
-                            assigneeId: t.assigneeId,
-                            dueDate: new Date(t.dueDate),
-                            estimatedHours: t.estimatedHours || 0,
-                            labels: t.labels || [],
-                            checklist: t.checklist || [],
-                            createdAt: new Date(t.createdAt),
-                            updatedAt: new Date(t.updatedAt),
-                            attachments: t.attachments || [],
-                            // Timer attributes
-                            isTimerRunning: t.isTimerRunning,
-                            lastStartTime: t.lastStartTime,
-                            totalTimeSpent: t.totalTimeSpent,
-                            timeEntryId: t.timeEntryId
-                        }))
-                        setStoreTasks(backendTasks)
+                        setStoreTasks(tasksRes.data.map(mapTask))
                     }
-
                     if (usersRes?.data) {
-                        setUsers(usersRes.data.map((u: any) => ({
-                            id: u._id,
-                            name: u.name,
-                            email: u.email,
-                            role: u.role,
-                            phone: u.phone,
-                        })))
+                        setUsers(usersRes.data.map(mapUser))
                     }
-
                     if (projectsRes?.data) {
-                        setProjects(projectsRes.data.map((p: any) => ({
-                            id: p._id,
-                            name: p.name,
-                            description: p.description,
-                            status: p.status,
-                            dueDate: new Date(p.dueDate),
-                            budget: p.budget,
-                            clientId: p.clientId,
-                            createdAt: new Date(p.createdAt),
-                            updatedAt: new Date(p.createdAt),
-                            milestones: [],
-                            pmId: p.pmId || 'u2',
-                            type: p.type || 'web-development',
-                            paymentModel: p.paymentModel || 'milestone'
-                        })))
+                        setProjects(projectsRes.data.map(mapProject))
                     }
                 } catch (error) {
                     console.error("Failed to fetch task data", error)
@@ -768,7 +726,7 @@ export function TasksPage() {
                     </div>
 
                     {/* Manage Statuses Button */}
-                    {view === 'kanban' && (
+                    {view === 'kanban' && ['owner', 'admin'].includes(currentUser?.role || '') && (
                         <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-9">
@@ -837,135 +795,136 @@ export function TasksPage() {
                         </Dialog>
                     )}
 
-                    {/* Add Task Button */}
-                    <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm" className="h-9">
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Task
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-xl">
-                            <DialogHeader>
-                                <DialogTitle>Add New Task</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="title">Task Title *</Label>
-                                    <Input
-                                        id="title"
-                                        value={newTask.title}
-                                        onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                                        placeholder="Complete homepage design"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
-                                    <Input
-                                        id="description"
-                                        value={newTask.description}
-                                        onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                                        placeholder="Task details..."
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="priority">Priority</Label>
-                                        <select
-                                            id="priority"
-                                            value={newTask.priority}
-                                            onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                                        >
-                                            <option value="low">Low</option>
-                                            <option value="medium">Medium</option>
-                                            <option value="high">High</option>
-                                            <option value="urgent">Urgent</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="dueDate">Due Date</Label>
-                                        <Input
-                                            id="dueDate"
-                                            type="date"
-                                            value={newTask.dueDate}
-                                            onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="project">Project</Label>
-                                        <select
-                                            id="project"
-                                            value={newTask.projectId}
-                                            onChange={(e) => setNewTask({ ...newTask, projectId: e.target.value })}
-                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                                        >
-                                            {projects.map(p => (
-                                                <option key={p.id} value={p.id}>{p.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="assignee">Assignee</Label>
-                                        <select
-                                            id="assignee"
-                                            value={newTask.assigneeId}
-                                            onChange={(e) => setNewTask({ ...newTask, assigneeId: e.target.value })}
-                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                                        >
-                                            {users.map(u => (
-                                                <option key={u.id} value={u.id}>{u.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* Attachments Section */}
-                                <div className="space-y-2">
-                                    <Label>Attachments (Screenshots/Files)</Label>
-                                    <div className="flex flex-col gap-3">
-                                        <Input
-                                            type="file"
-                                            onChange={handleFileChange}
-                                            className="cursor-pointer"
-                                        />
-
-                                        {/* Attachment Preview */}
-                                        {newTask.attachments && newTask.attachments.length > 0 && (
-                                            < div className="grid grid-cols-2 gap-2">
-                                                {newTask.attachments.map((att: any, idx: number) => (
-                                                    <div key={idx} className="flex items-center justify-between p-2 rounded-md border bg-muted/40 text-sm">
-                                                        <div className="flex items-center gap-2 overflow-hidden">
-                                                            <div className="w-8 h-8 rounded bg-background flex items-center justify-center flex-shrink-0">
-                                                                {att.fileType === 'image' ? (
-                                                                    <img src={att.data} alt="preview" className="w-full h-full object-cover rounded" />
-                                                                ) : (
-                                                                    <FileText className="h-4 w-4" />
-                                                                )}
-                                                            </div>
-                                                            <span className="truncate max-w-[120px]" title={att.name}>{att.name}</span>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-6 w-6 text-destructive hover:bg-destructive/10"
-                                                            onClick={() => handleRemoveAttachment(idx)}
-                                                        >
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <Button onClick={handleAddTask} className="w-full">
+                    {['owner', 'admin', 'pm'].includes(currentUser?.role || '') && (
+                        <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="h-9">
+                                    <Plus className="h-4 w-4 mr-2" />
                                     Add Task
                                 </Button>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-xl">
+                                <DialogHeader>
+                                    <DialogTitle>Add New Task</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="title">Task Title *</Label>
+                                        <Input
+                                            id="title"
+                                            value={newTask.title}
+                                            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                                            placeholder="Complete homepage design"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="description">Description</Label>
+                                        <Input
+                                            id="description"
+                                            value={newTask.description}
+                                            onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                                            placeholder="Task details..."
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="priority">Priority</Label>
+                                            <select
+                                                id="priority"
+                                                value={newTask.priority}
+                                                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                                                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                            >
+                                                <option value="low">Low</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="high">High</option>
+                                                <option value="urgent">Urgent</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="dueDate">Due Date</Label>
+                                            <Input
+                                                id="dueDate"
+                                                type="date"
+                                                value={newTask.dueDate}
+                                                onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="project">Project</Label>
+                                            <select
+                                                id="project"
+                                                value={newTask.projectId}
+                                                onChange={(e) => setNewTask({ ...newTask, projectId: e.target.value })}
+                                                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                            >
+                                                {projects.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="assignee">Assignee</Label>
+                                            <select
+                                                id="assignee"
+                                                value={newTask.assigneeId}
+                                                onChange={(e) => setNewTask({ ...newTask, assigneeId: e.target.value })}
+                                                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                            >
+                                                {users.map(u => (
+                                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Attachments Section */}
+                                    <div className="space-y-2">
+                                        <Label>Attachments (Screenshots/Files)</Label>
+                                        <div className="flex flex-col gap-3">
+                                            <Input
+                                                type="file"
+                                                onChange={handleFileChange}
+                                                className="cursor-pointer"
+                                            />
+
+                                            {/* Attachment Preview */}
+                                            {newTask.attachments && newTask.attachments.length > 0 && (
+                                                < div className="grid grid-cols-2 gap-2">
+                                                    {newTask.attachments.map((att: any, idx: number) => (
+                                                        <div key={idx} className="flex items-center justify-between p-2 rounded-md border bg-muted/40 text-sm">
+                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                                <div className="w-8 h-8 rounded bg-background flex items-center justify-center flex-shrink-0">
+                                                                    {att.fileType === 'image' ? (
+                                                                        <img src={att.data} alt="preview" className="w-full h-full object-cover rounded" />
+                                                                    ) : (
+                                                                        <FileText className="h-4 w-4" />
+                                                                    )}
+                                                                </div>
+                                                                <span className="truncate max-w-[120px]" title={att.name}>{att.name}</span>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-6 w-6 text-destructive hover:bg-destructive/10"
+                                                                onClick={() => handleRemoveAttachment(idx)}
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <Button onClick={handleAddTask} className="w-full">
+                                        Add Task
+                                    </Button>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                    )}
                 </div>
             </div>
 
@@ -998,9 +957,10 @@ export function TasksPage() {
                                             <Briefcase className="h-4 w-4" /> Project
                                         </Label>
                                         <select
-                                            className="w-full h-9 rounded-md border border-input bg-background px-3"
+                                            className="w-full h-9 rounded-md border border-input bg-background px-3 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.projectId}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, projectId: e.target.value })}
+                                            disabled={currentUser?.role === 'client'}
                                         >
                                             {projects.map(p => (
                                                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -1012,9 +972,10 @@ export function TasksPage() {
                                             <UserIcon className="h-4 w-4" /> Assignee
                                         </Label>
                                         <select
-                                            className="w-full h-9 rounded-md border border-input bg-background px-3"
+                                            className="w-full h-9 rounded-md border border-input bg-background px-3 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.assigneeId}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, assigneeId: e.target.value })}
+                                            disabled={currentUser?.role === 'client'}
                                         >
                                             {users.map(u => (
                                                 <option key={u.id} value={u.id}>{u.name}</option>
@@ -1027,9 +988,10 @@ export function TasksPage() {
                                         </Label>
                                         <Input
                                             type="date"
-                                            className="h-9"
+                                            className="h-9 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.dueDate instanceof Date ? selectedTask.dueDate.toISOString().split('T')[0] : selectedTask.dueDate?.split('T')[0]}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, dueDate: e.target.value })}
+                                            disabled={currentUser?.role === 'client'}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -1037,9 +999,10 @@ export function TasksPage() {
                                             <CheckCircle2 className="h-4 w-4" /> Status
                                         </Label>
                                         <select
-                                            className="w-full h-9 rounded-md border border-input bg-background px-3 capitalize"
+                                            className="w-full h-9 rounded-md border border-input bg-background px-3 capitalize disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.status}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, status: e.target.value })}
+                                            disabled={currentUser?.role === 'client'}
                                         >
                                             {statuses.map(s => (
                                                 <option key={s.id} value={s.id}>{s.label}</option>
@@ -1051,10 +1014,11 @@ export function TasksPage() {
                                 <div className="space-y-2">
                                     <Label className="font-semibold flex items-center gap-2">Description</Label>
                                     <textarea
-                                        className="w-full min-h-[120px] rounded-md border border-input bg-gray-50/50 p-3 text-sm focus-visible:ring-1 focus-visible:ring-primary outline-none"
+                                        className="w-full min-h-[120px] rounded-md border border-input bg-gray-50/50 p-3 text-sm focus-visible:ring-1 focus-visible:ring-primary outline-none disabled:opacity-70 disabled:cursor-not-allowed"
                                         value={selectedTask.description || ''}
                                         onChange={(e) => setSelectedTask({ ...selectedTask, description: e.target.value })}
                                         placeholder="Add more details about this task..."
+                                        disabled={currentUser?.role === 'client'}
                                     />
                                 </div>
 
@@ -1086,8 +1050,10 @@ export function TasksPage() {
                                 )}
                             </div>
                             <DialogFooter className="border-t pt-4">
-                                <Button variant="outline" onClick={() => setSelectedTask(null)}>Cancel</Button>
-                                <Button onClick={handleUpdateTask}>Save Changes</Button>
+                                <Button variant="outline" onClick={() => setSelectedTask(null)}>Close</Button>
+                                {['owner', 'admin', 'pm'].includes(currentUser?.role || '') && (
+                                    <Button onClick={handleUpdateTask}>Save Changes</Button>
+                                )}
                             </DialogFooter>
                         </>
                     )}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +30,14 @@ interface Message {
 }
 
 export const ChatPage = () => {
-    const { currentUser } = useAppStore(); // Get user for ID
+    const { currentUser } = useAppStore();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (currentUser?.role === 'client') {
+            navigate('/project-chat');
+        }
+    }, [currentUser, navigate]);
     const [socket, setSocket] = useState<Socket | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);

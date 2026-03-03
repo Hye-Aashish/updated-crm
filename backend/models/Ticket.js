@@ -5,8 +5,10 @@ const ticketSchema = new mongoose.Schema({
     description: { type: String },
     priority: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
     status: { type: String, enum: ['open', 'in-progress', 'resolved', 'closed'], default: 'open' },
-    clientName: { type: String }, // Can be linked to Client model later
-    assignedTo: { type: String }, // Can be linked to User model later
+    clientName: { type: String },
+    clientId: { type: String }, // Linked to Client model
+    projectId: { type: String }, // Linked to Project model
+    assignedTo: { type: String },
     screenshot: { type: String }, // Base64 or URL
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

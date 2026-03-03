@@ -39,9 +39,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        const message = error.response?.data?.message || 'Something went wrong';
-        // You could trigger a toast here if you have access to a global toast state
-        return Promise.reject(new Error(message));
+        // Re-throw the original error to preserve error.response.data
+        return Promise.reject(error);
     }
 );
 

@@ -1,20 +1,23 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api-client'
-import { mapLead, mapProject, mapInvoice, mapExpense, mapTask } from '@/lib/mappers'
+import { mapLead, mapProject, mapInvoice, mapExpense, mapTask, mapUser } from '@/lib/mappers'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import {
-    CheckSquare, Clock, Briefcase,
-    Banknote, TrendingUp, TrendingDown, AlertCircle, PlayCircle, StopCircle, Target, Layers,
-    Wallet, CreditCard, Coffee, ArrowUpRight, Zap, LayoutDashboard, CheckCircle, MessageSquare
+    CheckSquare, Clock, Briefcase, Banknote, TrendingUp, TrendingDown, AlertCircle, PlayCircle,
+    StopCircle, Target, Layers, Wallet, CreditCard, Coffee, ArrowUpRight, Zap, LayoutDashboard,
+    CheckCircle, MessageSquare, Rocket, FileText
 } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { formatCurrency } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Cell, PieChart, Pie
 } from 'recharts'
+import { Card } from '@/components/ui/card'
 import { WelcomeAnimation } from '@/components/welcome-animation'
 import { useAttendance } from '@/hooks/use-attendance'
 import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
@@ -41,7 +44,9 @@ export function DashboardPage() {
         totalProjectCost,
         currentLayout, sectionOrder, customLabels, hiddenSubItems,
         myPerformanceScore,
-        openTickets, resolvedTickets, criticalTickets
+        openTickets, resolvedTickets, criticalTickets,
+        relevantProjects,
+        relevantInvoices
     } = useDashboardMetrics(settings)
 
     // Loading state guard
@@ -66,7 +71,7 @@ export function DashboardPage() {
                     api.get('/projects').then(res => { if (Array.isArray(res.data)) setProjects(res.data.map(mapProject)) }).catch(err => console.error(err)),
                     api.get('/invoices').then(res => { if (Array.isArray(res.data)) setInvoices(res.data.map(mapInvoice)) }).catch(err => console.error(err)),
                     api.get('/tasks').then(res => { if (Array.isArray(res.data)) setTasks(res.data.map(mapTask)) }).catch(err => console.error(err)),
-                    api.get('/users').then(res => { if (Array.isArray(res.data)) useAppStore.getState().setUsers(res.data) }).catch(err => console.error(err)),
+                    api.get('/users').then(res => { if (Array.isArray(res.data)) useAppStore.getState().setUsers(res.data.map(mapUser)) }).catch(err => console.error(err)),
                     api.get('/time-entries').then(res => { if (Array.isArray(res.data)) useAppStore.getState().setTimeEntries(res.data) }).catch(err => console.error(err)),
                     api.get('/tickets').then(res => { if (Array.isArray(res.data)) setTickets(res.data) }).catch(err => console.error(err))
                 ])
@@ -78,10 +83,10 @@ export function DashboardPage() {
         loadInitialData()
     }, [setLeads, setExpenses, setProjects, setInvoices, setTasks])
 
-    const StatCard = ({ label, value, trend, icon: Icon, color, bg, onClick }: any) => {
+    const StatCard = ({ label, value, trend, icon: Icon, color, bg, onClick, className }: any) => {
         return (
             <div
-                className="group relative bg-card/60 backdrop-blur-sm border border-border/40 hover:border-primary/40 p-6 rounded-[2rem] transition-all duration-500 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] active:scale-[0.98] cursor-pointer overflow-hidden"
+                className={`group relative bg-card/60 backdrop-blur-sm border border-border/40 hover:border-primary/40 p-5 rounded-[1.5rem] transition-all duration-500 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] active:scale-[0.98] cursor-pointer overflow-hidden ${className || ''}`}
                 onClick={onClick}
             >
                 <div className="flex justify-between items-start mb-4">
@@ -109,7 +114,7 @@ export function DashboardPage() {
     const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
 
     return (
-        <div className="max-w-[1700px] mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
+        <div className="max-w-[1700px] mx-auto space-y-4 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
 
             {/* 1. Header & Command Hub */}
             {(currentLayout.includes('hero') || currentLayout.includes('session')) && (
@@ -155,7 +160,7 @@ export function DashboardPage() {
                                                     </div>
                                                 ))}
                                             </div>
-                                        ) : (
+                                        ) : currentUser.role !== 'client' ? (
                                             <div className="grid grid-cols-1 gap-4">
                                                 {/* Full-width Compact Performance HUD */}
                                                 <div className="bg-white/5 border border-white/10 rounded-[1.5rem] p-4 relative overflow-hidden group/hud">
@@ -188,7 +193,7 @@ export function DashboardPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                        )}
+                                        ) : null}
                                     </div>
                                 )}
                             </div>
@@ -196,7 +201,7 @@ export function DashboardPage() {
                     )}
 
                     {/* Session Hub */}
-                    {currentLayout.includes('session') && (
+                    {currentLayout.includes('session') && currentUser?.role !== 'client' && (
                         <div className={`${currentLayout.includes('hero') ? 'xl:col-span-4' : 'xl:col-span-12'} bg-card border border-border/40 rounded-[3rem] p-10 flex flex-col justify-between shadow-xl relative overflow-hidden group/session`}>
                             <div className="flex justify-between items-start relative z-10">
                                 <div className="space-y-1">
@@ -267,25 +272,25 @@ export function DashboardPage() {
 
             {/* 2. Top Stats - Financials */}
             {currentLayout.includes('financials') && (
-                <div className="space-y-6 animate-in fade-in duration-500">
+                <div className="space-y-3 animate-in fade-in duration-500">
                     <div className="flex items-center justify-between px-2">
                         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{customLabels.financials || 'Financial Overview'}</h3>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {!hiddenSubItems.includes('revenue') && <StatCard label="Total Revenue" value={formatCurrency(totalRevenue)} trend={revenueTrend} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" />}
-                        {!hiddenSubItems.includes('expenses') && <StatCard label="Total Expenses" value={formatCurrency(totalExpenses)} trend={expenseTrend} icon={Wallet} color="text-rose-600" bg="bg-rose-100" />}
-                        {!hiddenSubItems.includes('profit') && <StatCard label="Net Profit" value={formatCurrency(netProfit)} trend={revenueTrend} icon={TrendingUp} color="text-blue-600" bg="bg-blue-100" />}
-                        {!hiddenSubItems.includes('outstanding') && <StatCard label="Outstanding" value={formatCurrency(outstandingInvoices)} trend={`${invoices?.filter ? invoices.filter(i => i.status === 'pending').length : 0} Invoices`} icon={CreditCard} color="text-amber-600" bg="bg-amber-100" />}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {!hiddenSubItems.includes('revenue') && <StatCard label={currentUser.role === 'client' ? 'Total Paid' : 'Total Revenue'} value={formatCurrency(totalRevenue)} trend={revenueTrend} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" />}
+                        {!hiddenSubItems.includes('expenses') && currentUser.role !== 'client' && <StatCard label="Total Expenses" value={formatCurrency(totalExpenses)} trend={expenseTrend} icon={Wallet} color="text-rose-600" bg="bg-rose-100" />}
+                        {!hiddenSubItems.includes('profit') && currentUser.role !== 'client' && <StatCard label="Net Profit" value={formatCurrency(netProfit)} trend={revenueTrend} icon={TrendingUp} color="text-blue-600" bg="bg-blue-100" />}
+                        {!hiddenSubItems.includes('outstanding') && <StatCard label={currentUser.role === 'client' ? 'Pending Payment' : 'Outstanding'} value={formatCurrency(outstandingInvoices)} trend={`${(invoices || []).filter((i: any) => i.status === 'pending').length} Invoices`} icon={CreditCard} color="text-amber-600" bg="bg-amber-100" />}
                     </div>
                 </div>
             )}
 
             {/* 3. Operational Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
                 {/* Primary Intelligence Area */}
                 <div className="lg:col-span-8 space-y-8">
-                    {sectionOrder.map((sectionId: string) => {
+                    {(sectionOrder || []).map((sectionId: string) => {
                         if (!currentLayout.includes(sectionId)) return null;
 
                         // Render Main Sections
@@ -323,6 +328,88 @@ export function DashboardPage() {
                         }
 
                         if (sectionId === 'projects_overview') {
+                            if (currentUser.role === 'client') {
+                                return (
+                                    <div key={sectionId} className="space-y-4">
+                                        <div className="flex items-center justify-between px-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                                                    <Rocket className="h-5 w-5 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-black tracking-tight">Active Project Tracking</h3>
+                                                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mt-0.5">Real-time delivery progress</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {relevantProjects.filter(p => p.status !== 'completed').map((project: any) => (
+                                                <Card key={project.id || project._id} className="relative overflow-hidden border-2 border-primary/5 bg-card/40 backdrop-blur-xl group hover:border-primary/20 transition-all duration-500 rounded-[2.5rem] p-6 shadow-sm">
+                                                    <div className="flex items-start justify-between mb-6">
+                                                        <div className="space-y-1">
+                                                            <h4 className="font-black text-lg text-foreground tracking-tight group-hover:text-primary transition-colors">{project.name}</h4>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest bg-primary/5 text-primary border-primary/20">{project.type || 'Standard'}</Badge>
+                                                                <span className="text-[10px] font-bold text-muted-foreground">• Due {new Date(project.dueDate).toLocaleDateString()}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:rotate-12 transition-transform">
+                                                            <Briefcase className="h-5 w-5" />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-4">
+                                                        <div className="grid grid-cols-2 gap-4 pb-2">
+                                                            <div>
+                                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Project Budget</p>
+                                                                <p className="text-sm font-black">{formatCurrency(project.budget || 0)}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Paid Status</p>
+                                                                <p className="text-sm font-black text-emerald-600">
+                                                                    {formatCurrency((invoices || []).filter(i => i.projectId === (project.id || project._id) && i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0))}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="space-y-2">
+                                                            <div className="flex justify-between items-end">
+                                                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Delivery Milestone</span>
+                                                                <span className="text-sm font-black text-primary">{project.progress || 0}%</span>
+                                                            </div>
+                                                            <Progress value={project.progress || 0} className="h-2.5 bg-muted rounded-full" />
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-muted/50">
+                                                            <div className="flex items-center gap-3">
+                                                                <Avatar className="h-8 w-8 border-2 border-primary/10 shadow-sm">
+                                                                    <AvatarImage src="/avatars/pm.png" />
+                                                                    <AvatarFallback className="bg-primary/5 text-primary text-[10px] font-black">PM</AvatarFallback>
+                                                                </Avatar>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Project Manager</p>
+                                                                    <p className="text-[10px] font-bold truncate">Nexprism Team</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex justify-end items-center">
+                                                                <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase tracking-widest hover:bg-primary/5 group/btn" onClick={() => navigate(`/projects/${project.id || project._id}`)}>
+                                                                    Project Docs <ArrowUpRight className="ml-2 h-3 w-3 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Card>
+                                            ))}
+                                            {relevantProjects.filter(p => p.status !== 'completed').length === 0 && (
+                                                <div className="md:col-span-2 py-12 text-center border-2 border-dashed border-muted rounded-[2.5rem] bg-muted/5">
+                                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground opacity-40">No active projects currently being tracked</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            }
                             return (
                                 <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-[2.5rem] p-6 bg-indigo-50/10">
                                     <div className="flex items-center justify-between mb-8 px-2">
@@ -331,7 +418,7 @@ export function DashboardPage() {
                                                 <Briefcase className="h-6 w-6 text-indigo-600" />
                                             </div>
                                             <div>
-                                                <h3 className="text-2xl font-black tracking-tight text-indigo-900">{customLabels.projects_overview || 'Projects Assigned to Me'}</h3>
+                                                <h3 className="text-2xl font-black tracking-tight text-indigo-900">{customLabels.projects_overview || (['owner', 'admin'].includes(currentUser.role) ? 'Projects Portfolio' : 'Projects Assigned to Me')}</h3>
                                                 <p className="text-xs font-black uppercase text-indigo-500 tracking-widest mt-0.5">Project status overview</p>
                                             </div>
                                         </div>
@@ -347,6 +434,7 @@ export function DashboardPage() {
                         }
 
                         if (sectionId === 'analytics') {
+                            if (currentUser.role === 'client') return null;
                             return (
                                 <div key={sectionId} className="bg-card border border-border/40 rounded-[2.5rem] p-8 shadow-sm animate-in fade-in slide-in-from-left-4 duration-500">
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
@@ -419,11 +507,71 @@ export function DashboardPage() {
 
                 {/* Secondary Sidebar Area */}
                 <div className="lg:col-span-4 space-y-8">
-                    {sectionOrder.map((sectionId: string) => {
+                    {currentUser.role === 'client' && (
+                        <div className="bg-primary/5 border border-primary/10 rounded-[2.5rem] p-8 shadow-sm group">
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-8 text-primary">
+                                <Zap className="h-4 w-4 fill-primary/20 animate-pulse" />
+                                Client Quick Control
+                            </h3>
+                            <div className="space-y-3">
+                                <Button className="w-full h-14 rounded-2xl brand-gradient text-white font-black text-xs hover:scale-[1.02] shadow-lg shadow-primary/20" onClick={() => navigate('/invoices')}>
+                                    <Banknote className="mr-2 h-4 w-4" /> PAY LATEST INVOICE
+                                </Button>
+                                <Button variant="outline" className="w-full h-14 rounded-2xl font-black text-xs hover:bg-card border-2" onClick={() => navigate('/tickets')}>
+                                    <MessageSquare className="mr-2 h-4 w-4 text-primary" /> RAISE SUPPORT TICKET
+                                </Button>
+                                <Button variant="outline" className="w-full h-14 rounded-2xl font-black text-xs hover:bg-card border-2" onClick={() => navigate('/chat')}>
+                                    <Coffee className="mr-2 h-4 w-4 text-emerald-500" /> START COLLABORATION
+                                </Button>
+                            </div>
+                            <div className="mt-8 pt-6 border-t border-primary/10">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-10 w-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+                                        <Target className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Managed by</p>
+                                        <p className="text-xs font-black">Senior Account Lead</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {currentUser.role === 'client' && (
+                        <Card className="bg-card border-border/40 rounded-[2.5rem] p-8 shadow-sm">
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-6 text-muted-foreground">
+                                <FileText className="h-4 w-4" />
+                                Pending Actions
+                            </h3>
+                            <div className="space-y-4">
+                                {(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').slice(0, 3).map((inv: any) => (
+                                    <div key={inv.id || inv._id} className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border/50 hover:border-primary/30 transition-all group/inv cursor-pointer" onClick={() => navigate(`/invoices/${inv.id || inv._id}`)}>
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-black text-muted-foreground uppercase truncate">Invoice #{inv.invoiceNumber}</p>
+                                            <p className="font-black text-sm">{formatCurrency(inv.total)}</p>
+                                        </div>
+                                        <Badge className={`${inv.status === 'overdue' ? 'bg-rose-500/10 text-rose-600' : 'bg-amber-500/10 text-amber-600'} border-none text-[8px] font-black uppercase`}>
+                                            {inv.status}
+                                        </Badge>
+                                    </div>
+                                ))}
+                                {(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').length === 0 && (
+                                    <div className="py-8 text-center bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                                        <CheckCircle className="h-8 w-8 text-emerald-500 mx-auto mb-2 opacity-20" />
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/60">No Pending Payments</p>
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    )}
+
+                    {(sectionOrder || []).map((sectionId: string) => {
                         if (!currentLayout.includes(sectionId)) return null;
 
                         // Render Sidebar Sections
                         if (sectionId === 'funnel') {
+                            if (currentUser.role === 'client') return null;
                             return (
                                 <div key={sectionId} className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-[80px]" />
@@ -464,6 +612,7 @@ export function DashboardPage() {
                         }
 
                         if (sectionId === 'health') {
+                            if (currentUser.role === 'client') return null;
                             return (
                                 <div key={sectionId} className="bg-card border border-border/40 rounded-[2.5rem] p-8 shadow-sm">
                                     <div className="flex items-center gap-3 mb-8">

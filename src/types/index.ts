@@ -8,6 +8,7 @@ export interface User {
     role: UserRole
     avatar?: string
     phone?: string
+    clientId?: string
 
     // Extended Profile
     employeeId?: string
@@ -303,6 +304,8 @@ export interface Expense {
     category: string
     paymentMode: string
     paidBy: string
+    paidById?: string
+    projectId?: string
     note?: string
     receipt?: string
     createdAt?: Date
@@ -315,6 +318,8 @@ export interface Ticket {
     priority: 'low' | 'medium' | 'high' | 'critical'
     status: 'open' | 'in-progress' | 'resolved' | 'closed'
     clientName: string
+    clientId?: string
+    projectId?: string
     assignedTo: string
     screenshot?: string
     createdAt: Date

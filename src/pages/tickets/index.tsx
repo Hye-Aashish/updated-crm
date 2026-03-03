@@ -90,7 +90,11 @@ export function TicketsPage() {
     const handleCreateTicket = async () => {
         if (!newTicket.subject) return
         try {
-            await api.post('/tickets', newTicket)
+            const ticketData = {
+                ...newTicket,
+                clientName: currentUser?.role === 'client' ? currentUser.name : newTicket.clientName
+            }
+            await api.post('/tickets', ticketData)
             fetchTickets()
             setIsDialogOpen(false)
             setNewTicket({ subject: '', description: '', priority: 'medium', clientName: '', assignedTo: '', screenshot: '' })
@@ -196,19 +200,21 @@ export function TicketsPage() {
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Client Name</Label>
-                                    <select
-                                        className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        value={newTicket.clientName}
-                                        onChange={(e) => setNewTicket({ ...newTicket, clientName: e.target.value })}
-                                    >
-                                        <option value="">Select Client</option>
-                                        {clients.map(client => (
-                                            <option key={client._id} value={client.name}>{client.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {currentUser?.role !== 'client' && (
+                                    <div className="space-y-2">
+                                        <Label>Client Name</Label>
+                                        <select
+                                            className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                            value={newTicket.clientName}
+                                            onChange={(e) => setNewTicket({ ...newTicket, clientName: e.target.value })}
+                                        >
+                                            <option value="">Select Client</option>
+                                            {clients.map(client => (
+                                                <option key={client._id} value={client.name}>{client.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 <div className="space-y-2">
                                     <Label>Priority</Label>
                                     <select
@@ -223,19 +229,21 @@ export function TicketsPage() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Assign To User</Label>
-                                <select
-                                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                    value={newTicket.assignedTo}
-                                    onChange={(e) => setNewTicket({ ...newTicket, assignedTo: e.target.value })}
-                                >
-                                    <option value="">Unassigned</option>
-                                    {users.map(user => (
-                                        <option key={user.id || (user as any)._id} value={user.name}>{user.name}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            {currentUser?.role !== 'client' && (
+                                <div className="space-y-2">
+                                    <Label>Assign To User</Label>
+                                    <select
+                                        className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        value={newTicket.assignedTo}
+                                        onChange={(e) => setNewTicket({ ...newTicket, assignedTo: e.target.value })}
+                                    >
+                                        <option value="">Unassigned</option>
+                                        {users.map(user => (
+                                            <option key={user.id || (user as any)._id} value={user.name}>{user.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <Label>Description</Label>
                                 <Textarea
@@ -378,13 +386,14 @@ export function TicketsPage() {
 
                                     <div className="flex items-center gap-4">
                                         <select
-                                            className={`h-8 rounded-md border text-sm px-2 font-medium ${getStatusColor(ticket.status)}`}
+                                            className={`h-8 rounded-md border text-sm px-2 font-medium ${getStatusColor(ticket.status)} disabled:opacity-70 disabled:cursor-not-allowed`}
                                             value={ticket.status}
                                             onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => {
                                                 e.stopPropagation(); // prevent card click
                                                 handleStatusChange(ticket._id, e.target.value);
                                             }}
+                                            disabled={currentUser?.role === 'client'}
                                         >
                                             <option value="open">Open</option>
                                             <option value="in-progress">In Progress</option>
@@ -392,17 +401,19 @@ export function TicketsPage() {
                                             <option value="closed">Closed</option>
                                         </select>
 
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="text-muted-foreground hover:text-destructive opacity-50 group-hover:opacity-100 transition-opacity"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleDeleteTicket(ticket._id)
-                                            }}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        {currentUser?.role !== 'client' && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-muted-foreground hover:text-destructive opacity-50 group-hover:opacity-100 transition-opacity"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleDeleteTicket(ticket._id)
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             </CardContent>
@@ -509,13 +520,15 @@ export function TicketsPage() {
 
                             <div className="flex justify-end pt-4 border-t gap-2">
                                 <Button variant="outline" onClick={() => setViewTicketDialogOpen(false)}>Close</Button>
-                                <Button
-                                    variant="destructive"
-                                    onClick={() => handleDeleteTicket(selectedTicket._id)}
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Ticket
-                                </Button>
+                                {currentUser?.role !== 'client' && (
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => handleDeleteTicket(selectedTicket._id)}
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete Ticket
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     )}

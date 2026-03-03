@@ -9,7 +9,6 @@ import {
     Monitor,
     Smartphone,
     Tablet,
-    MapPin,
     Calendar,
     BarChart3,
     Globe

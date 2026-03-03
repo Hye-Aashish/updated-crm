@@ -12,7 +12,9 @@ const crypto = require('crypto');
 router.get('/', protect, async (req, res) => {
     try {
         let filter = {};
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user.role === 'client') {
+            filter = { clientId: req.user.clientId };
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
 
             // Invoices for clients assigned to me
@@ -137,7 +139,11 @@ router.put('/:id', protect, async (req, res) => {
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
         // RBAC Check
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user.role === 'client') {
+            if (invoice.clientId !== req.user.clientId) {
+                return res.status(403).json({ message: 'Not authorized' });
+            }
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             const client = await Client.findById(invoice.clientId);
             const project = invoice.projectId ? await Project.findById(invoice.projectId) : null;

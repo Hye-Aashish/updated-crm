@@ -7,16 +7,18 @@ import {
     FileText,
     Settings,
     FolderOpen,
-
     LifeBuoy,
     BarChart,
     Wallet,
     Target,
     ChevronLeft,
     ChevronRight,
-    LogOut,
+    MessageCircle,
     MessageSquare,
-    Activity
+    LogOut,
+    Activity,
+    Shield,
+    Globe
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -100,19 +102,38 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Attendance', href: '/attendance', icon: Clock }, // Updated link
         { name: 'Time Tracking', href: '/time', icon: Clock },
         { name: 'Invoices', href: '/invoices', icon: FileText },
+        { name: 'AMC', href: '/amc', icon: Shield },
+        { name: 'Domains', href: '/domains', icon: Globe },
         { name: 'Quotations', href: '/quotations', icon: FileText },
         { name: 'Templates', href: '/quotations/templates', icon: LayoutDashboard },
         { name: 'Leads', href: '/leads', icon: Target },
         { name: 'Expenses', href: '/expenses', icon: Wallet },
         { name: 'Payroll', href: '/salary', icon: Wallet },
         { name: 'Support Tickets', href: '/tickets', icon: LifeBuoy },
+        { name: 'Project Chat', href: '/project-chat', icon: MessageCircle },
         { name: 'Live Chat', href: '/chat', icon: MessageSquare },
         { name: 'Reports', href: '/reports', icon: BarChart },
         { name: 'Files', href: '/files', icon: FolderOpen },
         { name: 'Settings', href: '/settings', icon: Settings },
     ]
     const filteredItems = navItems.filter(item => {
-        if (!permissions || currentUser?.role === 'owner') return true
+        if (currentUser?.role === 'owner') return true
+
+        // Hardcoded restrictions for client role to ensure security
+        if (currentUser?.role === 'client') {
+            const allowedForClient = [
+                'Dashboard',
+                'Projects',
+                'Tasks',
+                'Invoices',
+                'Support Tickets',
+                'Project Chat',
+                'Files'
+            ]
+            return allowedForClient.includes(item.name)
+        }
+
+        if (!permissions) return true
 
         const p = permissions
         switch (item.name) {
@@ -125,13 +146,16 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Attendance': return !!p.attendance?.view
             case 'Time Tracking': return !!p.time_tracking?.view
             case 'Invoices': return !!p.invoices?.view
+            case 'AMC': return currentUser.role === 'admin' || currentUser.role === 'pm'
+            case 'Domains': return currentUser.role === 'admin' || currentUser.role === 'pm'
             case 'Quotations': return !!p.quotations?.view
             case 'Templates': return !!p.templates?.view
             case 'Leads': return !!p.leads?.view
             case 'Expenses': return !!p.expenses?.view
             case 'Payroll': return !!p.payroll?.view
             case 'Support Tickets': return !!p.tickets?.view
-            case 'Live Chat': return !!p.chat?.view
+            case 'Project Chat': return !!p.project_chat?.view
+            case 'Live Chat': return !!p.chat?.view && currentUser.role === 'admin'
             case 'Reports': return !!p.reports?.view
             case 'Files': return !!p.files?.view
             case 'Settings': return !!p.settings?.view

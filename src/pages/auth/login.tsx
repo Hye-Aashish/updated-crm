@@ -132,18 +132,19 @@ export function LoginPage() {
                                 <span className="bg-background px-2 text-muted-foreground font-semibold">Quick Demo Login</span>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
                             {[
-                                { role: 'Owner', email: 'owner@example.com', icon: '👑' },
-                                { role: 'Admin', email: 'admin@example.com', icon: '🛡️' },
-                                { role: 'Employee', email: 'employee@example.com', icon: '👨‍💻' }
+                                { role: 'Owner', email: 'owner@example.com', icon: '👑', pass: 'password' },
+                                { role: 'Admin', email: 'admin@example.com', icon: '🛡️', pass: 'password' },
+                                { role: 'Employee', email: 'employee@example.com', icon: '👨‍💻', pass: 'password' },
+                                { role: 'Client', email: 'john@smithco.com', icon: '💼', pass: 'client123' }
                             ].map((demo) => (
                                 <button
                                     key={demo.role}
                                     type="button"
                                     onClick={() => {
                                         setEmail(demo.email);
-                                        setPassword('password');
+                                        setPassword(demo.pass);
                                         // Trigger login after a short delay to show the fields being filled
                                         setTimeout(() => {
                                             const form = document.querySelector('form');
@@ -153,13 +154,14 @@ export function LoginPage() {
                                     className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-muted bg-card hover:border-primary hover:bg-primary/5 transition-all group"
                                 >
                                     <span className="text-xl mb-1 group-hover:scale-110 transition-transform">{demo.icon}</span>
-                                    <span className="font-bold text-xs text-foreground">{demo.role}</span>
-                                    <span className="text-[10px] text-muted-foreground truncate w-full">{demo.email}</span>
+                                    <span className="font-bold text-[10px] sm:text-xs text-foreground">{demo.role}</span>
+                                    <span className="text-[8px] sm:text-[10px] text-muted-foreground truncate w-full px-1">{demo.email}</span>
                                 </button>
                             ))}
                         </div>
                         <p className="text-[10px] text-center text-muted-foreground">
-                            Password for all accounts is <code className="bg-muted px-1 rounded">password</code>
+                            Password for Owner/Admin/Employee is <code className="bg-muted px-1 rounded">password</code>.
+                            Client is <code className="bg-muted px-1 rounded">client123</code>
                         </p>
                     </CardFooter>
                 </Card>

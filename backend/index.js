@@ -22,6 +22,7 @@ const io = new Server(server, {
 });
 
 require('./socket/chatSocket')(io);
+require('./socket/projectChatSocket')(io);
 
 const PORT = process.env.PORT || 5000;
 
@@ -61,8 +62,11 @@ const routes = {
     payroll: require('./routes/payrollRoutes'),
     notifications: require('./routes/notificationRoutes'),
     chat: require('./routes/chatRoutes'),
+    'project-chat': require('./routes/projectChatRoutes'),
     tracking: require('./routes/trackingRoutes'),
     quotations: require('./routes/quotationRoutes'),
+    amc: require('./routes/amcRoutes'),
+    domains: require('./routes/domainRoutes'),
     test: require('./routes/testRoutes')
 };
 

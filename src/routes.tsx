@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { LoginPage } from './pages/auth/login'
 import { ForgotPasswordPage } from './pages/auth/forgot-password'
 import { DashboardLayout } from './components/layout/dashboard-layout'
+import { ClientLayout } from './components/layout/client-layout'
 import { EmployeeLayout } from './components/layout/employee-layout'
 import { DashboardPage } from './pages/dashboard'
 import { EmployeeDashboardPage } from './pages/employee-dashboard'
@@ -35,12 +36,14 @@ import { PublicLeadForm } from './pages/public/lead-form'
 import PublicQuotationView from './pages/public/quotation-view'
 import { ChatPage } from './pages/chat'
 import { ChatWidgetsPage } from './pages/chat/widgets'
+import { ProjectChatPage } from './pages/chat/project-chat'
 import UserTrackerPage from './pages/user-tracker'
 import QuotationsPage from './pages/quotations'
 import QuotationEditor from './pages/quotations/create'
 import QuotationDetailPage from './pages/quotations/[id]'
 import QuotationTemplates from './pages/quotations/templates'
-
+import AmcPage from './pages/amc'
+import DomainsPage from './pages/domains'
 
 export function AppRoutes() {
     return (
@@ -86,10 +89,13 @@ export function AppRoutes() {
                 <Route path="invoices/:id" element={<InvoiceDetailPage />} />
                 <Route path="expenses" element={<ExpensesPage />} />
                 <Route path="salary" element={<SalaryPage />} />
+                <Route path="amc" element={<AmcPage />} />
+                <Route path="domains" element={<DomainsPage />} />
 
                 {/* Support & Analysis */}
                 <Route path="tickets" element={<TicketsPage />} />
                 <Route path="chat" element={<ChatPage />} />
+                <Route path="project-chat" element={<ProjectChatPage />} />
                 <Route path="chat/widgets" element={<ChatWidgetsPage />} />
                 <Route path="user-tracker" element={<UserTrackerPage />} />
                 <Route path="reports" element={<ReportsPage />} />
@@ -117,9 +123,25 @@ export function AppRoutes() {
                 <Route path="tasks/:id" element={<TaskDetailPage />} />
 
                 <Route path="time" element={<TimePage />} />
+                <Route path="project-chat" element={<ProjectChatPage />} />
                 <Route path="files" element={<FilesPage />} />
                 <Route path="tickets" element={<TicketsPage />} />
                 <Route path="attendance" element={<AttendancePage />} />
+                <Route path="settings" element={<EmployeeSettingsPage />} />
+            </Route>
+
+            {/* Client Routes */}
+            <Route path="/client" element={<ClientLayout />}>
+                <Route index element={<Navigate to="/client/dashboard" replace />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="projects/:id" element={<ProjectDetailPage />} />
+                <Route path="tasks" element={<TasksPage />} />
+                <Route path="tasks/:id" element={<TaskDetailPage />} />
+                <Route path="invoices" element={<InvoicesPage />} />
+                <Route path="invoices/:id" element={<InvoiceDetailPage />} />
+                <Route path="project-chat" element={<ProjectChatPage />} />
+                <Route path="tickets" element={<TicketsPage />} />
                 <Route path="settings" element={<EmployeeSettingsPage />} />
             </Route>
 

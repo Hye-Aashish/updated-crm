@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const Project = require('../models/Project');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // GET all users
@@ -17,8 +18,19 @@ router.get('/', protect, async (req, res) => {
             // Limited data for other staff for assignment purposes
             const users = await query.select('name email role avatar designation department');
             res.json(users);
+        } else if (userRole === 'client') {
+            // Clients can see users who are part of their projects
+            const myProjects = await Project.find({ clientId: req.user.clientId }).select('pmId members');
+            const pmIds = myProjects.map(p => p.pmId).filter(Boolean);
+            const memberIds = myProjects.flatMap(p => p.members || []);
+            const relevantUserIds = Array.from(new Set([...pmIds, ...memberIds]));
+
+            const users = await User.find({
+                _id: { $in: relevantUserIds }
+            }).select('name email role avatar designation department');
+            res.json(users);
         } else {
-            // Clients or others shouldn't see user list
+            // Others shouldn't see user list
             res.status(403).json({ message: 'Not authorized to view user list' });
         }
     } catch (err) {

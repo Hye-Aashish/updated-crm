@@ -27,6 +27,8 @@ interface TaskBoardProps {
 const columns: { id: TaskStatus; title: string }[] = [
     { id: 'todo', title: 'To Do' },
     { id: 'in-progress', title: 'In Progress' },
+    { id: 'review', title: 'Review' },
+    { id: 'client-approval', title: 'Client Approval' },
     { id: 'done', title: 'Done' },
 ]
 
@@ -138,9 +140,9 @@ export function TaskBoard({ tasks }: TaskBoardProps) {
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
         >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full items-start">
+            <div className="flex gap-6 h-full items-start overflow-x-auto pb-4">
                 {columns.map((col) => (
-                    <div key={col.id} className="bg-muted/30 rounded-lg p-4 min-h-[500px]">
+                    <div key={col.id} className="bg-muted/30 rounded-lg p-4 min-h-[500px] w-80 shrink-0">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
                                 {col.title}

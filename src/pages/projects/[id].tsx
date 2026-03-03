@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
     ChevronLeft, Calendar, DollarSign, Clock, CheckSquare,
     MoreHorizontal, Edit, Trash2, Plus, FileText, Paperclip,
-    Download, ExternalLink, Users, AlertCircle, TrendingUp
+    Download, ExternalLink, Users, AlertCircle, TrendingUp,
+    MessageCircle, MessageSquare
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
 import {
@@ -25,18 +26,21 @@ import { TaskBoard } from '@/components/tasks/task-board'
 
 import { ProjectTeamDialog } from '@/components/projects/project-team-dialog'
 import { ProjectFileDialog } from '@/components/projects/project-file-dialog'
+import { ProjectTaskDialog } from '@/components/projects/project-task-dialog'
 import { useState } from 'react'
 
-import { mapProject, mapClient, mapUser, mapInvoice } from '@/lib/mappers'
+import { mapProject, mapClient, mapUser, mapInvoice, mapTask } from '@/lib/mappers'
 
 export function ProjectDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
     const [teamDialogOpen, setTeamDialogOpen] = useState(false)
     const [fileDialogOpen, setFileDialogOpen] = useState(false)
+    const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+    const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<any>(null)
     const {
         projects, setProjects,
-        tasks,
+        tasks, setTasks,
         users, setUsers,
         files, setFiles,
         invoices, setInvoices,
@@ -45,6 +49,23 @@ export function ProjectDetailPage() {
         activities,
         deleteProject // Destructure
     } = useAppStore()
+
+    const [permissions, setPermissions] = useState<any>(null)
+
+    useEffect(() => {
+        api.get('/settings').then(res => {
+            if (currentUser?.role && currentUser.role !== 'owner' && res.data.roles) {
+                const role = res.data.roles.find((r: any) => r.name === currentUser.role)
+                if (role) setPermissions(role.permissions)
+            }
+        })
+    }, [currentUser])
+
+    const isVisible = (field: string) => {
+        if (!currentUser || currentUser.role === 'owner') return true
+        if (!permissions) return true // Default to visible while loading
+        return permissions.projects?.fields?.[field] !== false
+    }
 
     const project = projects.find((p) => p.id === id)
 
@@ -66,14 +87,15 @@ export function ProjectDetailPage() {
     useEffect(() => {
         const fetchData = async () => {
             // Only fetch if data is missing. Fresh data is better but length check is simple.
-            if (projects.length === 0 || clients.length === 0 || users.length === 0 || files.length === 0 || invoices.length === 0) {
+            if (projects.length === 0 || clients.length === 0 || users.length === 0 || files.length === 0 || invoices.length === 0 || tasks.length === 0) {
                 try {
-                    const [projectsRes, clientsRes, usersRes, filesRes, invoicesRes] = await Promise.all([
-                        projects.length === 0 ? api.get('/projects') : Promise.resolve({ data: null }),
-                        clients.length === 0 ? api.get('/clients') : Promise.resolve({ data: null }),
-                        users.length === 0 ? api.get('/users') : Promise.resolve({ data: null }),
-                        files.length === 0 ? api.get('/files') : Promise.resolve({ data: null }),
-                        invoices.length === 0 ? api.get('/invoices') : Promise.resolve({ data: null })
+                    const [projectsRes, clientsRes, usersRes, filesRes, invoicesRes, tasksRes] = await Promise.all([
+                        projects.length === 0 ? api.get('/projects').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        clients.length === 0 ? api.get('/clients').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        users.length === 0 ? api.get('/users').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        files.length === 0 ? api.get('/files').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        invoices.length === 0 ? api.get('/invoices').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        tasks.length === 0 ? api.get('/tasks').catch(() => ({ data: null })) : Promise.resolve({ data: null })
                     ])
 
                     if (projectsRes.data) {
@@ -101,13 +123,16 @@ export function ProjectDetailPage() {
                     if (invoicesRes?.data) {
                         setInvoices(invoicesRes.data.map(mapInvoice))
                     }
+                    if (tasksRes?.data) {
+                        setTasks(tasksRes.data.map(mapTask))
+                    }
                 } catch (error) {
                     console.error("Error fetching detail data", error)
                 }
             }
         }
         fetchData()
-    }, [id, projects.length, clients.length, users.length, files.length, invoices.length, setProjects, setClients, setUsers, setFiles, setInvoices])
+    }, [id, projects.length, clients.length, users.length, files.length, invoices.length, tasks.length, setProjects, setClients, setUsers, setFiles, setInvoices, setTasks])
 
 
     if (!project && projects.length > 0) {
@@ -187,61 +212,65 @@ export function ProjectDetailPage() {
                     </div>
 
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${project.id}/edit`)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit Project
-                        </Button>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="text-red-600" onClick={handleDelete}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete Project
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
+                            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${project.id}/edit`)}>
+                                <Edit className="mr-2 h-4 w-4" /> Edit Project
+                            </Button>
+                        )}
+                        {['owner', 'admin'].includes(currentUser?.role) && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem className="text-red-600" onClick={handleDelete}>
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Project
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
                 </div>
             </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {['owner', 'admin'].includes(currentUser?.role) && (
-                    <>
-                        <Card>
-                            <CardContent className="p-6">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Budget</p>
-                                        <h3 className="text-2xl font-bold mt-2">{formatCurrency(project.budget)}</h3>
-                                    </div>
-                                    <div className="p-2 bg-slate-100 dark:bg-slate-900/20 rounded-lg">
-                                        <DollarSign className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-                                    </div>
+                {['owner', 'admin', 'client'].includes(currentUser?.role) && isVisible('budget') && (
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Budget</p>
+                                    <h3 className="text-2xl font-bold mt-2">{formatCurrency(project.budget)}</h3>
                                 </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-6">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Received</p>
-                                        <h3 className="text-2xl font-bold mt-2 text-emerald-600">
-                                            {formatCurrency(projectInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
-                                        </h3>
-                                        <p className="text-[10px] text-muted-foreground mt-1">
-                                            {projectInvoices.filter(i => i.status === 'paid').length} Paid Invoices
-                                        </p>
-                                    </div>
-                                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg">
-                                        <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                                    </div>
+                                <div className="p-2 bg-slate-100 dark:bg-slate-900/20 rounded-lg">
+                                    <DollarSign className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+                {['owner', 'admin', 'client'].includes(currentUser?.role) && isVisible('invoices') && (
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">{currentUser.role === 'client' ? 'Total Paid' : 'Received'}</p>
+                                    <h3 className="text-2xl font-bold mt-2 text-emerald-600">
+                                        {formatCurrency(projectInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                                    </h3>
+                                    <p className="text-[10px] text-muted-foreground mt-1">
+                                        {projectInvoices.filter(i => i.status === 'paid').length} Paid Invoices
+                                    </p>
+                                </div>
+                                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg">
+                                    <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
                 <Card>
                     <CardContent className="p-6">
@@ -294,9 +323,10 @@ export function ProjectDetailPage() {
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="tasks">Tasks ({projectTasks.length})</TabsTrigger>
-                    <TabsTrigger value="team">Team ({displayTeam.length})</TabsTrigger>
+                    {isVisible('team') && <TabsTrigger value="team">Team ({displayTeam.length})</TabsTrigger>}
                     <TabsTrigger value="files">Files ({projectFiles.length})</TabsTrigger>
-                    {['owner', 'admin'].includes(currentUser?.role) && <TabsTrigger value="invoices">Invoices ({projectInvoices.length})</TabsTrigger>}
+                    {['owner', 'admin', 'client'].includes(currentUser?.role) && isVisible('invoices') && <TabsTrigger value="invoices">Invoices ({projectInvoices.length})</TabsTrigger>}
+                    {isVisible('chat') && <TabsTrigger value="chat">Chat</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-4">
@@ -402,7 +432,14 @@ export function ProjectDetailPage() {
                 <TabsContent value="tasks" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold">Tasks</h3>
-                        <Button size="sm"><Plus className="mr-2 h-4 w-4" /> Add Task</Button>
+                        {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
+                            <Button size="sm" onClick={() => {
+                                setSelectedTaskForEdit(null)
+                                setTaskDialogOpen(true)
+                            }}>
+                                <Plus className="mr-2 h-4 w-4" /> Add Task
+                            </Button>
+                        )}
                     </div>
                     {projectTasks.length === 0 ? (
                         <div className="p-8 text-center text-muted-foreground bg-muted/30 rounded-lg border border-dashed">
@@ -456,6 +493,12 @@ export function ProjectDetailPage() {
                     open={fileDialogOpen}
                     onOpenChange={setFileDialogOpen}
                 />
+                <ProjectTaskDialog
+                    projectId={project.id}
+                    open={taskDialogOpen}
+                    onOpenChange={setTaskDialogOpen}
+                    task={selectedTaskForEdit}
+                />
 
                 <TabsContent value="files">
                     <Card>
@@ -504,13 +547,15 @@ export function ProjectDetailPage() {
                     </Card>
                 </TabsContent>
 
-                {['owner', 'admin'].includes(currentUser?.role) && (
+                {['owner', 'admin', 'client'].includes(currentUser?.role) && (
                     <TabsContent value="invoices">
                         <Card>
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <CardTitle>Invoices</CardTitle>
-                                    <Button size="sm" variant="outline"><Plus className="mr-2 h-4 w-4" /> Create Invoice</Button>
+                                    {['owner', 'admin'].includes(currentUser?.role) && (
+                                        <Button size="sm" variant="outline"><Plus className="mr-2 h-4 w-4" /> Create Invoice</Button>
+                                    )}
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -537,6 +582,34 @@ export function ProjectDetailPage() {
                         </Card>
                     </TabsContent>
                 )}
+
+                <TabsContent value="chat">
+                    <Card className="min-h-[500px] flex flex-col backdrop-blur-sm border-2 animate-in fade-in duration-700">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <MessageCircle className="h-5 w-5 text-blue-600" />
+                                Project Collaboration Hub
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 flex flex-col justify-center items-center text-center p-12">
+                            <div className="h-24 w-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl shadow-xl shadow-blue-200 flex items-center justify-center mb-8 rotate-3 hover:rotate-0 transition-transform duration-500">
+                                <MessageSquare className="h-12 w-12 text-white" />
+                            </div>
+                            <h3 className="text-2xl font-black mb-3">Instant Team Synchronization</h3>
+                            <p className="text-muted-foreground text-sm max-w-[420px] mb-10 leading-relaxed">
+                                Experience seamless collaboration. Our dedicated project chat room connects all stakeholders—clients, project managers, and developers—in one unified space for real-time clarity.
+                            </p>
+                            <Button
+                                onClick={() => navigate('/project-chat')}
+                                size="lg"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-10 h-14 rounded-2xl shadow-lg shadow-blue-200 font-bold text-lg group"
+                            >
+                                Enter Discussion Room
+                                <ChevronLeft className="ml-2 h-5 w-5 rotate-180 group-hover:translate-x-1 transition-transform" />
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
             </Tabs>
         </div>
     )

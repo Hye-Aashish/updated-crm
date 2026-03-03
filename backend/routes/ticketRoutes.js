@@ -7,7 +7,9 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 router.get('/', protect, async (req, res) => {
     try {
         let filter = {};
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user.role === 'client') {
+            filter = { clientId: req.user.clientId };
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             // Employees see tickets assigned to them (by ID or Name)
             filter = {
                 $or: [
@@ -30,7 +32,9 @@ router.post('/', protect, async (req, res) => {
         subject: req.body.subject,
         description: req.body.description,
         priority: req.body.priority,
-        clientName: req.body.clientName,
+        clientName: req.user.role === 'client' ? req.user.name : req.body.clientName,
+        clientId: req.user.role === 'client' ? req.user.clientId : req.body.clientId,
+        projectId: req.body.projectId,
         assignedTo: req.body.assignedTo,
         screenshot: req.body.screenshot
     });
@@ -52,7 +56,11 @@ router.get('/:id', protect, async (req, res) => {
             ticket.assignedTo === req.user.name ||
             (ticket.assignedTo && ticket.assignedTo.toLowerCase() === req.user.name.toLowerCase());
 
-        if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned) {
+        if (req.user.role === 'client') {
+            if (ticket.clientId !== req.user.clientId) {
+                return res.status(403).json({ message: 'Not authorized' });
+            }
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned) {
             return res.status(403).json({ message: 'Not authorized' });
         }
         res.json(ticket);
@@ -71,7 +79,11 @@ router.put('/:id', protect, async (req, res) => {
             ticket.assignedTo === req.user.name ||
             (ticket.assignedTo && ticket.assignedTo.toLowerCase() === req.user.name.toLowerCase());
 
-        if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned) {
+        if (req.user.role === 'client') {
+            if (ticket.clientId !== req.user.clientId) {
+                return res.status(403).json({ message: 'Not authorized' });
+            }
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned) {
             return res.status(403).json({ message: 'Not authorized' });
         }
 

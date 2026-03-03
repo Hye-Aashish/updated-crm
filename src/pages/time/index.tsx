@@ -24,7 +24,7 @@ import {
 import { Clock, Calendar as CalendarIcon, Timer, TrendingUp, Users as UsersIcon, Play, Loader2, Plus, Square, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { timeEntryService, TimeEntry, TimeEntryStats } from '@/lib/timeEntryService'
-import api from '@/lib/api-client'
+
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
 

@@ -30,6 +30,14 @@ router.get('/', protect, async (req, res) => {
 
         // RBAC Logic
         const user = req.user;
+        if (user.role === 'client') {
+            const myProjects = await Project.find({ clientId: user.clientId }).select('_id');
+            const myProjectIds = myProjects.map(p => p._id.toString());
+            const filterWithClient = { ...filter, projectId: { $in: myProjectIds } };
+            const tasks = await Task.find(filterWithClient).sort({ createdAt: -1 });
+            return res.json(tasks);
+        }
+
         if (user.role !== 'admin' && user.role !== 'owner') {
             const userId = user._id.toString();
 
@@ -65,7 +73,12 @@ router.get('/:id', protect, async (req, res) => {
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
         // RBAC Check
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user.role === 'client') {
+            const project = await Project.findById(task.projectId);
+            if (!project || project.clientId !== req.user.clientId) {
+                return res.status(403).json({ message: 'Not authorized' });
+            }
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             const project = await Project.findById(task.projectId);
 
@@ -115,7 +128,12 @@ router.put('/:id', protect, async (req, res) => {
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
         // RBAC Check
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user.role === 'client') {
+            const project = await Project.findById(task.projectId);
+            if (!project || project.clientId !== req.user.clientId) {
+                return res.status(403).json({ message: 'Not authorized' });
+            }
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             const project = await Project.findById(task.projectId);
 
@@ -148,7 +166,9 @@ router.delete('/:id', protect, async (req, res) => {
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
         // RBAC Check (Only Admin/Owner/PM can delete)
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients cannot delete tasks' });
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             const project = await Project.findById(task.projectId);
             const isPM = project && project.pmId === userId;

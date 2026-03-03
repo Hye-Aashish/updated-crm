@@ -52,6 +52,7 @@ exports.initSession = async (req, res) => {
 
         // --- PRODUCTION PROTECTION ---
         // Skip tracking for local/internal IPs to prevent dev traffic from polluting DB
+        /*
         const cleanIP = ip.replace(/^::ffff:/, '');
         const isLocal = cleanIP === '127.0.0.1' || cleanIP === 'localhost' || cleanIP.startsWith('192.168.') || cleanIP.startsWith('10.') || cleanIP.startsWith('::1');
 
@@ -63,6 +64,7 @@ exports.initSession = async (req, res) => {
                 visitor_unique_id: 'dev_visitor'
             });
         }
+        */
         // -----------------------------
 
         // 1. Find or Create Visitor

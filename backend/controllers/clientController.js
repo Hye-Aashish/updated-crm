@@ -4,7 +4,9 @@ const Project = require('../models/Project');
 exports.getClients = async (req, res, next) => {
     try {
         let filter = {};
-        if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user && req.user.role === 'client') {
+            filter = { _id: req.user.clientId };
+        } else if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
 
             // Clients assigned to me
@@ -33,7 +35,11 @@ exports.getClientById = async (req, res, next) => {
         const client = await Client.findById(req.params.id);
         if (!client) return res.status(404).json({ message: 'Client not found' });
 
-        if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user && req.user.role === 'client') {
+            if (client._id.toString() !== req.user.clientId) {
+                return res.status(403).json({ message: 'Not authorized to view this client' });
+            }
+        } else if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             if (client.assignedTo !== userId) {
                 // Secondary check: Are they working on any of this client's projects?

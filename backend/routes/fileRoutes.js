@@ -13,18 +13,32 @@ router.get('/', protect, async (req, res) => {
         if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
 
-            // Find projects I am involved in
-            const myProjects = await Project.find({
-                $or: [{ pmId: userId }, { members: userId }]
-            }).select('_id');
-            const myProjectIds = myProjects.map(p => p._id.toString());
+            if (req.user.role === 'client') {
+                // Clients see files linked to their clientId
+                // OR files linked to their projects
+                const myProjects = await Project.find({ clientId: req.user.clientId }).select('_id');
+                const myProjectIds = myProjects.map(p => p._id.toString());
 
-            query = {
-                $or: [
-                    { uploadedBy: userId },
-                    { projectId: { $in: myProjectIds } }
-                ]
-            };
+                query = {
+                    $or: [
+                        { clientId: req.user.clientId },
+                        { projectId: { $in: myProjectIds } }
+                    ]
+                };
+            } else {
+                // Staff see files they uploaded OR files linked to projects they are involved in
+                const myProjects = await Project.find({
+                    $or: [{ pmId: userId }, { members: userId }]
+                }).select('_id');
+                const myProjectIds = myProjects.map(p => p._id.toString());
+
+                query = {
+                    $or: [
+                        { uploadedBy: userId },
+                        { projectId: { $in: myProjectIds } }
+                    ]
+                };
+            }
         }
 
         const files = await File.find(query).sort({ uploadedAt: -1 });
@@ -42,19 +56,24 @@ router.get('/:id', protect, async (req, res) => {
 
         // Authorization check
         if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-            const userId = req.user._id.toString();
-            const isUploader = file.uploadedBy === userId;
-
-            let hasProjectAccess = false;
-            if (file.projectId) {
-                const project = await Project.findById(file.projectId);
-                if (project && (project.pmId === userId || (project.members && project.members.includes(userId)))) {
-                    hasProjectAccess = true;
+            if (req.user.role === 'client') {
+                const project = file.projectId ? await Project.findById(file.projectId) : null;
+                if (file.clientId !== req.user.clientId && (!project || project.clientId !== req.user.clientId)) {
+                    return res.status(403).json({ message: 'Not authorized to view this file' });
                 }
-            }
+            } else {
+                const isUploader = file.uploadedBy === userId;
+                let hasProjectAccess = false;
+                if (file.projectId) {
+                    const project = await Project.findById(file.projectId);
+                    if (project && (project.pmId === userId || (project.members && project.members.includes(userId)))) {
+                        hasProjectAccess = true;
+                    }
+                }
 
-            if (!isUploader && !hasProjectAccess) {
-                return res.status(403).json({ message: 'Not authorized to view this file' });
+                if (!isUploader && !hasProjectAccess) {
+                    return res.status(403).json({ message: 'Not authorized to view this file' });
+                }
             }
         }
 
@@ -64,7 +83,29 @@ router.get('/:id', protect, async (req, res) => {
     }
 });
 
-// UPLAOD/CREATE a new file record
+const upload = require('../utils/multerConfig');
+
+// UPLOAD a physical file
+router.post('/upload', protect, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const fileUrl = `${req.protocol}://${req.get('host')}/public/uploads/${req.file.filename}`;
+
+        res.status(200).json({
+            name: req.file.originalname,
+            url: fileUrl,
+            type: req.file.mimetype.split('/')[1] || 'unknown',
+            size: req.file.size
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// UPLAOD/CREATE a new file record (metadata)
 router.post('/', protect, async (req, res) => {
     const file = new File({
         name: req.body.name,

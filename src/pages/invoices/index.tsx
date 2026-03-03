@@ -30,7 +30,7 @@ import type { Invoice } from '@/types'
 export function InvoicesPage() {
     const navigate = useNavigate()
     const { toast } = useToast()
-    const { invoices, clients, setInvoices, setClients } = useAppStore()
+    const { invoices, clients, currentUser, setInvoices, setClients } = useAppStore()
     const [loading, setLoading] = useState(true)
 
     const [sendModalOpen, setSendModalOpen] = useState(false)
@@ -203,9 +203,11 @@ export function InvoicesPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
                     <p className="text-muted-foreground mt-1">Manage billing and payments.</p>
                 </div>
-                <Button onClick={() => navigate('/invoices/new')}>
-                    <Plus className="mr-2 h-4 w-4" /> Create Invoice
-                </Button>
+                {['owner', 'admin'].includes(currentUser?.role || '') && (
+                    <Button onClick={() => navigate('/invoices/new')}>
+                        <Plus className="mr-2 h-4 w-4" /> Create Invoice
+                    </Button>
+                )}
             </div>
 
             {/* --- Module Specific KPIs --- */}
@@ -282,24 +284,28 @@ export function InvoicesPage() {
                                                         Pay
                                                     </Button>
                                                 )}
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-8 w-8 p-0"
-                                                    onClick={(e) => openSendModal(e, invoice)}
-                                                    title="Send Email"
-                                                >
-                                                    <Mail className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
-                                                    onClick={(e) => openWhatsAppModal(e, invoice)}
-                                                    title="Send WhatsApp"
-                                                >
-                                                    <MessageSquare className="h-4 w-4" />
-                                                </Button>
+                                                {['owner', 'admin'].includes(currentUser?.role || '') && (
+                                                    <>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 w-8 p-0"
+                                                            onClick={(e) => openSendModal(e, invoice)}
+                                                            title="Send Email"
+                                                        >
+                                                            <Mail className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                                                            onClick={(e) => openWhatsAppModal(e, invoice)}
+                                                            title="Send WhatsApp"
+                                                        >
+                                                            <MessageSquare className="h-4 w-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"

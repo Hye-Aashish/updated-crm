@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: 'employee'
     },
+    clientId: { type: String }, // Linked to Client model if role is 'client'
     employeeId: { type: String },
     salutation: { type: String },
     avatar: { type: String },
@@ -32,9 +33,9 @@ const userSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
     if (!this.isModified('password')) {
-        return next();
+        return;
     }
     const salt = bcrypt.genSaltSync(10);
     this.password = bcrypt.hashSync(this.password, salt);

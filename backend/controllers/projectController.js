@@ -4,8 +4,10 @@ const { generateAutoInvoice } = require('../services/invoiceService');
 exports.getProjects = async (req, res, next) => {
     try {
         let query = {};
-        // If user is not admin/owner, they can only see projects they prevent or are a member of
-        if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
+        // If user is not admin/owner, they can only see projects they manage, belong to, or own (if client)
+        if (req.user && req.user.role === 'client') {
+            query = { clientId: req.user.clientId };
+        } else if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             query = {
                 $or: [
@@ -28,7 +30,11 @@ exports.getProjectById = async (req, res, next) => {
         if (!project) return res.status(404).json({ message: 'Project not found' });
 
         // RBAC Check for View Access
-        if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (req.user && req.user.role === 'client') {
+            if (project.clientId !== req.user.clientId) {
+                return res.status(403).json({ message: 'Not authorized to view this project' });
+            }
+        } else if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             const isPM = project.pmId === userId;
             const isMember = project.members && project.members.includes(userId);
@@ -51,6 +57,21 @@ exports.createProject = async (req, res, next) => {
             dueDate: req.body.deadline || req.body.dueDate
         });
         const newProject = await project.save();
+
+        // Initialize Project Chat Group with a welcome message
+        try {
+            const ProjectMessage = require('../models/ProjectMessage');
+            await ProjectMessage.create({
+                projectId: newProject._id,
+                senderId: req.user._id,
+                senderName: 'System',
+                senderRole: 'system',
+                message: `Project Collaboration group for "${newProject.name}" has been created. Team and Client can now discuss project details here.`
+            });
+        } catch (chatError) {
+            console.error("Failed to initialize project chat:", chatError);
+        }
+
         res.status(201).json(newProject);
     } catch (err) {
         next(err);

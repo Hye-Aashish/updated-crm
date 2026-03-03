@@ -37,7 +37,7 @@ export function TeamPage() {
     const navigate = useNavigate()
     const location = useLocation()
     const { toast } = useToast()
-    const { users, setUsers, tasks } = useAppStore()
+    const { users, setUsers, tasks, clients, setClients } = useAppStore()
 
     // UI State
     const [activeTab, setActiveTab] = useState<'members' | 'attendance'>('members')
@@ -69,7 +69,8 @@ export function TeamPage() {
         documentAadhar: '',
         documentPan: '',
         documentOfferLetter: '',
-        salary: ''
+        salary: '',
+        clientId: ''
     })
 
     // Attendance Settings State - Removed as part of redesign
@@ -86,24 +87,31 @@ export function TeamPage() {
         }
     }, [location.search])
 
-    // Fetch Users
+    // Fetch Users & Clients
     useEffect(() => {
         const fetchUsers = async () => {
             if (users.length === 0) {
                 try {
                     const res = await api.get('/users')
-                    const mapped = res.data.map((u: any) => ({
-                        id: u._id,
-                        ...u
-                    }))
-                    setUsers(mapped)
+                    setUsers(res.data.map((u: any) => ({ id: u._id, ...u })))
                 } catch (error) {
                     console.error("Failed to fetch users", error)
                 }
             }
         }
+        const fetchClients = async () => {
+            if (clients.length === 0) {
+                try {
+                    const res = await api.get('/clients')
+                    setClients(res.data.map((c: any) => ({ id: c._id, ...c })))
+                } catch (error) {
+                    console.error("Failed to fetch clients", error)
+                }
+            }
+        }
         fetchUsers()
-    }, [users.length, setUsers])
+        fetchClients()
+    }, [users.length, clients.length, setUsers, setClients])
 
     // File Upload Handler
     const handleFileChange = (field: 'avatar' | 'documentAadhar' | 'documentPan' | 'documentOfferLetter', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,7 +139,7 @@ export function TeamPage() {
                 employeeId: '', salutation: 'Mr.', name: '', email: '', password: 'password123', role: 'employee',
                 avatar: '', designation: '', department: '', country: 'India', phone: '', gender: 'Male',
                 dateOfBirth: '', joiningDate: '', reportingTo: '', language: 'English', address: '', about: '',
-                aadharNumber: '', panNumber: '', documentAadhar: '', documentPan: '', documentOfferLetter: '', salary: ''
+                aadharNumber: '', panNumber: '', documentAadhar: '', documentPan: '', documentOfferLetter: '', salary: '', clientId: ''
             })
             toast({ title: "Account Created", description: `${created.name} added successfully.` })
         } catch (error: any) {
@@ -184,7 +192,7 @@ export function TeamPage() {
     }
 
     const roleColors: Record<string, 'default' | 'secondary' | 'outline'> = {
-        'owner': 'default', 'admin': 'default', 'pm': 'secondary', 'developer': 'outline', 'employee': 'outline'
+        'owner': 'default', 'admin': 'default', 'pm': 'secondary', 'developer': 'outline', 'employee': 'outline', 'client': 'outline'
     }
 
     return (
@@ -332,8 +340,25 @@ export function TeamPage() {
                                                         <option value="developer">Developer</option>
                                                         <option value="pm">Project Manager</option>
                                                         <option value="admin">Admin</option>
+                                                        <option value="client">Client</option>
                                                     </select>
                                                 </div>
+                                                {newUser.role === 'client' && (
+                                                    <div className="space-y-2">
+                                                        <Label>Assign to Client *</Label>
+                                                        <select
+                                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                            value={newUser.clientId}
+                                                            onChange={e => setNewUser({ ...newUser, clientId: e.target.value })}
+                                                            required
+                                                        >
+                                                            <option value="">Select Client</option>
+                                                            {clients.map(c => (
+                                                                <option key={c.id} value={c.id}>{c.company} ({c.name})</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Address & About */}

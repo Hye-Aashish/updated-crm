@@ -24,11 +24,14 @@ const seedData = async () => {
 
         // 2. Seed Users
         const hashedPassword = bcrypt.hashSync('password123', 10);
-        const owner = await User.findOneAndUpdate(
-            { email: 'owner@example.com' },
-            { name: 'Aashish Owner', password: hashedPassword, role: 'owner', designation: 'Founder' },
+        const admin = await User.findOneAndUpdate(
+            { email: 'admin@example.com' },
+            { name: 'Admin User', password: hashedPassword, role: 'admin', designation: 'Manager' },
             { upsert: true, new: true }
         );
+
+        // Fetch client1 after it's defined below or move user seeding after client seeding
+        // For now, I'll just add the logic to create a client user after client creation.
 
         // 3. Seed Pipeline Stages
         const stages = [
@@ -71,6 +74,19 @@ const seedData = async () => {
             { upsert: true, new: true }
         );
         console.log('✅ Clients Ready');
+
+        // 4.5 Seed Client User
+        const clientUser = await User.findOneAndUpdate(
+            { email: 'client@example.com' },
+            {
+                name: 'Client User',
+                password: hashedPassword,
+                role: 'client',
+                clientId: client1._id.toString()
+            },
+            { upsert: true, new: true }
+        );
+        console.log('✅ Client User Ready');
 
         // 5. Seed Leads
         const leads = [
