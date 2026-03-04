@@ -62,6 +62,7 @@ router.get('/:id', protect, async (req, res) => {
                     return res.status(403).json({ message: 'Not authorized to view this file' });
                 }
             } else {
+                const userId = req.user._id.toString();
                 const isUploader = file.uploadedBy === userId;
                 let hasProjectAccess = false;
                 if (file.projectId) {

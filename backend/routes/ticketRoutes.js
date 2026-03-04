@@ -3,6 +3,9 @@ const router = express.Router();
 const Ticket = require('../models/Ticket');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
+// Helper to escape special regex characters
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Get all tickets
 router.get('/', protect, async (req, res) => {
     try {
@@ -15,7 +18,7 @@ router.get('/', protect, async (req, res) => {
                 $or: [
                     { assignedTo: req.user._id.toString() },
                     { assignedTo: req.user.name },
-                    { assignedTo: { $regex: new RegExp('^' + req.user.name + '$', 'i') } }
+                    { assignedTo: { $regex: new RegExp('^' + escapeRegex(req.user.name) + '$', 'i') } }
                 ]
             };
         }

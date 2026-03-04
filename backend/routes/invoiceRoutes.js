@@ -41,8 +41,8 @@ router.get('/', protect, async (req, res) => {
     }
 });
 
-// GET single invoice (Publically accessible for clients)
-router.get('/:id', async (req, res) => {
+// GET single invoice (Authenticated)
+router.get('/:id', protect, async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });

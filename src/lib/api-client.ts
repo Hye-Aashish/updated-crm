@@ -19,11 +19,10 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    timeout: 30000, // 30 second timeout
 });
 
-console.log('📡 API Client Initialized with URL:', api.defaults.baseURL);
-
-// Request interceptor for auth token (if needed in future)
+// Request interceptor for auth token
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
@@ -39,6 +38,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        // Handle 401 — token expired or invalid
+        if (error.response?.status === 401) {
+            const currentPath = window.location.pathname;
+            // Don't redirect if already on login page or it's the login request itself
+            if (currentPath !== '/login' && !error.config?.url?.includes('/auth/login')) {
+                console.warn('🔒 Session expired — redirecting to login');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+                return new Promise(() => { }); // Prevent further error handling
+            }
+        }
+
         // Re-throw the original error to preserve error.response.data
         return Promise.reject(error);
     }

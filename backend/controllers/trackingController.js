@@ -150,13 +150,21 @@ exports.trackEvent = async (req, res) => {
         const session = await VisitSession.findById(session_id);
         if (!session) return res.status(404).json({ message: 'Session not found' });
 
+        // Whitelist allowed fields from data to prevent injection
+        const allowedFields = {};
+        if (data) {
+            const safeKeys = ['event_name', 'element_text', 'selector', 'x', 'y', 'viewport_width', 'viewport_height', 'scroll_depth', 'form_id'];
+            safeKeys.forEach(key => {
+                if (data[key] !== undefined) allowedFields[key] = data[key];
+            });
+        }
+
         const event = new TrackingEvent({
             session_id,
             visitor_id: session.visitor_id,
             type,
             url,
-            // Map generic 'data' to specific fields based on type
-            ...data
+            ...allowedFields
         });
 
         await event.save();

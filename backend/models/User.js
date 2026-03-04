@@ -2,12 +2,13 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    password: { type: String, required: true, minlength: 6 },
     role: {
         type: String,
-        default: 'employee'
+        default: 'employee',
+        enum: ['admin', 'owner', 'pm', 'employee', 'client', 'developer'] // Restrict valid roles
     },
     clientId: { type: String }, // Linked to Client model if role is 'client'
     employeeId: { type: String },
@@ -37,15 +38,12 @@ userSchema.pre('save', async function () {
     if (!this.isModified('password')) {
         return;
     }
-    const salt = bcrypt.genSaltSync(10);
+    const salt = bcrypt.genSaltSync(12); // Increased from 10 to 12 rounds
     this.password = bcrypt.hashSync(this.password, salt);
 });
 
 userSchema.methods.matchPassword = async function (enteredPassword) {
-    console.log(`Matching password... Hash in DB: ${this.password?.substring(0, 10)}...`);
-    const match = bcrypt.compareSync(enteredPassword, this.password);
-    console.log(`Match result: ${match}`);
-    return match;
+    return bcrypt.compareSync(enteredPassword, this.password);
 };
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+const JWT_SECRET = process.env.JWT_SECRET;
+
 const protect = async (req, res, next) => {
     let token;
 
@@ -16,7 +18,7 @@ const protect = async (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+        const decoded = jwt.verify(token, JWT_SECRET);
         req.user = await User.findById(decoded.id).select('-password');
 
         if (!req.user) {
@@ -25,7 +27,12 @@ const protect = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('Auth middleware error:', error.message);
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired, please login again' });
+        }
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token' });
+        }
         return res.status(401).json({ message: 'Not authorized, token failed' });
     }
 };
@@ -37,7 +44,7 @@ const authorize = (...roles) => {
         }
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({
-                message: `Access denied. Role '${req.user.role}' is not allowed.`
+                message: 'Access denied. Insufficient permissions.'
             });
         }
         next();

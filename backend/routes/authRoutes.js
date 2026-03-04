@@ -9,39 +9,49 @@ router.get('/me', protect, async (req, res) => {
         const user = await User.findById(req.user._id).select('-password');
         res.json(user);
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
-    console.log(`LOGIN ATTEMPT: Email=${email}, PassLen=${password?.length}`);
+
+    // Input validation
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    // Basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: 'Invalid email format' });
+    }
+
     try {
-        console.log(`Finding user ${email}...`);
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
         if (!user) {
-            console.log(`LOGIN FAILED: User not found (${email})`);
-            return res.status(404).json({ message: 'User not found' });
+            // Use generic message to prevent email enumeration
+            return res.status(401).json({ message: 'Invalid email or password' });
         }
 
         const isMatch = await user.matchPassword(password);
-        console.log(`LOGIN Match Result: ${isMatch}`);
         if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid credentials' });
+            return res.status(401).json({ message: 'Invalid email or password' });
         }
 
-        console.log('Generating JWT...');
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
-        console.log('JWT Generated.');
+        const token = jwt.sign(
+            { id: user._id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }  // Reduced from 30d to 7d for security
+        );
 
         const userObj = user.toObject();
         delete userObj.password;
 
-        console.log('Sending response...');
         res.json({ ...userObj, token });
     } catch (err) {
-        console.error('LOGIN ERROR:', err);
-        res.status(500).json({ message: err.message });
+        console.error('Login error:', err.message);
+        res.status(500).json({ message: 'Server error during login' });
     }
 });
 
