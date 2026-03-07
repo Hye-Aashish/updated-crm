@@ -102,6 +102,16 @@ exports.createQuotation = async (req, res) => {
         if (data.expiryDate === "") delete data.expiryDate;
         if (data.parentQuotation === "") delete data.parentQuotation;
 
+        if (data.clientId) {
+            const client = await Client.findById(data.clientId);
+            if (client) {
+                data.clientName = client.company || client.name;
+                data.clientEmail = client.email;
+                data.clientPhone = client.phone;
+                data.clientAddress = client.address;
+            }
+        }
+
         // Auto-load modules if projectType is specified and no modules provided
         if (data.projectType && (!data.modules || data.modules.length === 0)) {
             data.modules = PROJECT_TYPE_MODULES[data.projectType] || [];
@@ -137,6 +147,24 @@ exports.updateQuotation = async (req, res) => {
         const data = { ...req.body };
         if (data.expiryDate === "") delete data.expiryDate;
         if (data.parentQuotation === "") delete data.parentQuotation;
+
+        if (data.clientId && data.clientId !== existing.clientId?.toString()) {
+            const client = await Client.findById(data.clientId);
+            if (client) {
+                data.clientName = client.company || client.name;
+                data.clientEmail = client.email;
+                data.clientPhone = client.phone;
+                data.clientAddress = client.address;
+            }
+        } else if (!data.clientName && existing.clientId) {
+            const client = await Client.findById(existing.clientId);
+            if (client) {
+                data.clientName = client.company || client.name;
+                data.clientEmail = client.email;
+                data.clientPhone = client.phone;
+                data.clientAddress = client.address;
+            }
+        }
 
         // If status is 'sent', 'revision', create a new version instead of simple update
         if (['sent', 'revision'].includes(existing.status)) {
@@ -232,9 +260,12 @@ exports.generatePDF = async (req, res) => {
             doc.fillColor('#FFFFFF').fontSize(40).font('Helvetica-Bold').text(branding.coverPageTitle || 'Project Proposal', 50, 300);
             doc.fontSize(15).font('Helvetica').fillColor(PRIMARY_COLOR).text(branding.coverPageSubtitle || 'Custom Solutions', 50, 350);
 
+            const clientTitle = (quotation.clientName || quotation.clientId?.company || quotation.clientId?.name || 'CLIENT').toUpperCase();
+            const clientNameOg = quotation.clientName || quotation.clientId?.company || quotation.clientId?.name || 'Client';
+
             doc.moveDown(10);
             doc.fillColor('#FFFFFF').fontSize(12).font('Helvetica-Bold').text('PREPARED FOR:');
-            doc.fontSize(20).text(quotation.clientName.toUpperCase());
+            doc.fontSize(20).text(clientTitle);
             doc.fontSize(10).font('Helvetica').fillColor('#94A3B8').text(quotation.projectTitle);
 
             doc.moveDown(4);
@@ -259,7 +290,7 @@ exports.generatePDF = async (req, res) => {
         doc.moveDown(4);
         doc.fillColor(PRIMARY_COLOR).fontSize(10).font('Helvetica-Bold').text('PROPOSAL PREPARED FOR:', 50);
         doc.moveDown(0.5);
-        doc.fillColor(SECONDARY_COLOR).fontSize(14).font('Helvetica-Bold').text(quotation.clientName);
+        doc.fillColor(SECONDARY_COLOR).fontSize(14).font('Helvetica-Bold').text(clientNameOg);
         doc.fontSize(10).font('Helvetica').fillColor('#475569').text(quotation.projectTitle);
 
         // --- SECTIONS ---

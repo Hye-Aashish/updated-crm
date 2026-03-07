@@ -148,7 +148,7 @@ export default function QuotationDetailPage() {
                                 <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600"><User className="w-6 h-6" /></div>
                                 <div>
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Client</p>
-                                    <p className="text-sm font-bold text-gray-900 truncate">{quotation.clientName}</p>
+                                    <p className="text-sm font-bold text-gray-900 truncate">{quotation.clientName || quotation.clientId?.company || quotation.clientId?.name || 'Unknown Client'}</p>
                                 </div>
                             </div>
                             <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">

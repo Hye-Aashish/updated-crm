@@ -148,10 +148,22 @@ export default function QuotationBuilder() {
             alert('Please select a client and project title');
             return;
         }
+
+        // Validate milestones total percentage
+        const totalMilestonePct = formData.milestones?.reduce((acc: number, m: any) => acc + (Number(m.percentage) || 0), 0) || 0;
+        if (formData.milestones?.length > 0 && totalMilestonePct !== 100) {
+            alert(`Payment milestones must equal strictly 100%. Currently it is ${totalMilestonePct}%`);
+            return;
+        }
+
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const data = { ...formData, totalAmount, gstAmount, grandTotal };
+            const calculatedMilestones = formData.milestones.map((m: any) => ({
+                ...m,
+                amount: (grandTotal * (Number(m.percentage) || 0)) / 100
+            }));
+            const data = { ...formData, totalAmount, gstAmount, grandTotal, milestones: calculatedMilestones };
             if (statusOverride) data.status = statusOverride;
 
             const url = id ? `http://localhost:5000/api/quotations/${id}` : 'http://localhost:5000/api/quotations';
@@ -452,6 +464,100 @@ export default function QuotationBuilder() {
                                             <FileText className="w-10 h-10 text-gray-200" />
                                         </div>
                                         <p className="text-sm font-bold text-gray-400">Project list is empty. Add modules manually or use presets.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Payment Milestones */}
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-gray-900">Payment Milestones</h3>
+                                <div className="flex gap-2">
+                                    <select
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '50-50') {
+                                                setFormData({ ...formData, milestones: [{ name: 'Advance Payment', percentage: 50 }, { name: 'On Completion', percentage: 50 }] });
+                                            } else if (val === '30-30-40') {
+                                                setFormData({ ...formData, milestones: [{ name: 'Pre Development', percentage: 30 }, { name: 'On Development', percentage: 30 }, { name: 'Post Development', percentage: 40 }] });
+                                            } else if (val === '100') {
+                                                setFormData({ ...formData, milestones: [{ name: '100% Upfront', percentage: 100 }] });
+                                            }
+                                            e.target.value = '';
+                                        }}
+                                        className="px-3 py-2 bg-white text-gray-600 border border-gray-100 rounded-xl text-xs font-bold shadow-sm"
+                                    >
+                                        <option value="">Apply Preset...</option>
+                                        <option value="50-50">50% - 50%</option>
+                                        <option value="30-30-40">30% - 30% - 40%</option>
+                                        <option value="100">100% Upfront</option>
+                                    </select>
+                                    <button
+                                        onClick={() => setFormData({ ...formData, milestones: [...(formData.milestones || []), { name: 'New Milestone', percentage: 20 }] })}
+                                        className="px-4 py-2 bg-white text-blue-600 border border-blue-50 rounded-xl text-xs font-black shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+                                    >
+                                        <Plus className="w-3 h-3" /> Add Milestone
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 p-6">
+                                {(!formData.milestones || formData.milestones.length === 0) ? (
+                                    <div className="text-center py-6 text-sm text-gray-400 font-bold">
+                                        No milestones set. Default 30-30-40 will be applied automatically if left blank.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {formData.milestones.map((ms: any, idx: number) => (
+                                            <div key={idx} className="flex gap-4 items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-50">
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Milestone Name</label>
+                                                    <input
+                                                        type="text"
+                                                        value={ms.name}
+                                                        onChange={e => {
+                                                            const nMs = [...formData.milestones];
+                                                            nMs[idx].name = e.target.value;
+                                                            setFormData({ ...formData, milestones: nMs });
+                                                        }}
+                                                        className="w-full bg-white border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <div className="w-32">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Percentage %</label>
+                                                    <input
+                                                        type="number"
+                                                        value={ms.percentage}
+                                                        onChange={e => {
+                                                            const nMs = [...formData.milestones];
+                                                            nMs[idx].percentage = Number(e.target.value);
+                                                            setFormData({ ...formData, milestones: nMs });
+                                                        }}
+                                                        className="w-full bg-white border-none rounded-xl text-sm font-black text-blue-600 focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <div className="w-32">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Cost (Auto)</label>
+                                                    <div className="h-10 bg-gray-100/50 rounded-xl flex items-center px-4 font-bold text-gray-700 text-sm">
+                                                        ₹{((grandTotal * (Number(ms.percentage) || 0)) / 100).toLocaleString()}
+                                                    </div>
+                                                </div>
+                                                <div className="pt-5">
+                                                    <button onClick={() => {
+                                                        const nMs = formData.milestones.filter((_: any, i: number) => i !== idx);
+                                                        setFormData({ ...formData, milestones: nMs });
+                                                    }} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                                                        <Trash2 className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="text-right pt-2 px-4">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total Assigned: </span>
+                                            <span className={`text-sm font-black ${formData.milestones.reduce((acc: number, m: any) => acc + (Number(m.percentage) || 0), 0) === 100 ? 'text-green-500' : 'text-orange-500'}`}>
+                                                {formData.milestones.reduce((acc: number, m: any) => acc + (Number(m.percentage) || 0), 0)}%
+                                            </span>
+                                        </div>
                                     </div>
                                 )}
                             </div>
