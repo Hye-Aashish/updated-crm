@@ -75,6 +75,7 @@ export function InvoiceDetailPage() {
                     subtotal: invData.subtotal,
                     tax: invData.tax,
                     total: invData.total,
+                    termsAndConditions: invData.termsAndConditions,
                     createdAt: new Date(invData.createdAt),
                     updatedAt: new Date(invData.updatedAt),
                 }

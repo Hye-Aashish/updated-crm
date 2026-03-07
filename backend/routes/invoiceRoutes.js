@@ -97,7 +97,7 @@ router.post('/', protect, async (req, res) => {
                     let pdfBuffer = null;
                     try {
                         const generateInvoicePDF = require('../utils/generateInvoicePDF');
-                        pdfBuffer = await generateInvoicePDF(newInvoice, client, companyProfile);
+                        pdfBuffer = await generateInvoicePDF(newInvoice, client, companyProfile, settings);
                     } catch (pdfErr) {
                         console.error('PDF generation failed:', pdfErr.message);
                     }
@@ -132,6 +132,10 @@ router.post('/', protect, async (req, res) => {
                                 </div>
                                 <div style="text-align: center; margin-bottom: 24px;">
                                     <a href="${invoicePageUrl}" style="display: inline-block; background: #0047AB; color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 16px;">View &amp; Pay Invoice &rarr;</a>
+                                </div>
+                                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: left; border: 1px solid #e2e8f0;">
+                                    <p style="color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 0 0 8px;">Terms & Conditions</p>
+                                    <p style="color: #475569; font-size: 13px; margin: 0; line-height: 1.5; white-space: pre-wrap;">${newInvoice.termsAndConditions || settings?.billing?.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
                                 </div>
                                 <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">Or visit: <a href="${invoicePageUrl}" style="color: #0047AB;">${invoicePageUrl}</a></p>
                             </div>
@@ -233,7 +237,7 @@ router.post('/:id/send', protect, async (req, res) => {
         try {
             const generateInvoicePDF = require('../utils/generateInvoicePDF');
             console.log(`[SEND] Calling generateInvoicePDF...`);
-            pdfBuffer = await generateInvoicePDF(invoice, client, companyProfile);
+            pdfBuffer = await generateInvoicePDF(invoice, client, companyProfile, settings);
             console.log(`[SEND] PDF generated, size: ${pdfBuffer ? pdfBuffer.length : 'NULL'}`);
         } catch (pdfErr) {
             console.error('PDF generation failed:', pdfErr.message);
@@ -269,6 +273,10 @@ router.post('/:id/send', protect, async (req, res) => {
                     </div>
                     <div style="text-align: center; margin-bottom: 24px;">
                         <a href="${invoicePageUrl}" style="display: inline-block; background: #0047AB; color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 16px;">View &amp; Pay Invoice &rarr;</a>
+                    </div>
+                    <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: left; border: 1px solid #e2e8f0;">
+                        <p style="color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 0 0 8px;">Terms & Conditions</p>
+                        <p style="color: #475569; font-size: 13px; margin: 0; line-height: 1.5; white-space: pre-wrap;">${invoice.termsAndConditions || settings?.billing?.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
                     </div>
                     <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">Or visit: <a href="${invoicePageUrl}" style="color: #0047AB;">${invoicePageUrl}</a></p>
                 </div>

@@ -1,6 +1,6 @@
 const PDFDocument = require('pdfkit');
 
-const generateInvoicePDF = (invoice, client, companyProfile) => {
+const generateInvoicePDF = (invoice, client, companyProfile, settings = {}) => {
     return new Promise((resolve, reject) => {
         try {
             const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -148,7 +148,8 @@ const generateInvoicePDF = (invoice, client, companyProfile) => {
             doc.text(formatting.format(invoice.total || 0), 450, y, { width: 90, align: 'right' });
 
             // Terms & Conditions
-            const termsStr = invoice.termsAndConditions || 'Thank you for your business. Payment is expected within the due date.';
+            const fallbackTerms = settings?.billing?.termsAndConditions || 'Thank you for your business. Payment is expected within the due date.';
+            const termsStr = invoice.termsAndConditions || fallbackTerms;
             doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Terms & Conditions', 50, y);
             doc.fontSize(9).font('Helvetica').fillColor('#666').text(termsStr, 50, y + 15, { width: 300, align: 'left' });
 
