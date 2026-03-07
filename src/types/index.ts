@@ -181,6 +181,7 @@ export interface Invoice {
     date: Date // Invoice date
     dueDate: Date
     paidDate?: Date
+    termsAndConditions?: string
     createdAt: Date
     updatedAt: Date
 }

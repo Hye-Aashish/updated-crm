@@ -28,6 +28,7 @@ const settingSchema = new mongoose.Schema({
         invoiceFormat: { type: String, default: 'INV-2026-001' },
         taxRate: { type: Number, default: 18 },
         paymentTerms: { type: String, default: '15' },
+        termsAndConditions: { type: String, default: 'Thank you for your business. Payment is expected within due date. Late payments may incur fees.' },
         lateFee: Number
     },
     notifications: {

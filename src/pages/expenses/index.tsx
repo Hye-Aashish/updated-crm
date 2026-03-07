@@ -215,7 +215,7 @@ export function ExpensesPage() {
 
     // Filter Expenses
     const filteredExpenses = expenses.filter(expense => {
-        const matchesSearch = expense.note.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesSearch = (expense.note || '').toLowerCase().includes(searchQuery.toLowerCase())
         const matchesCategory = !filterCategory || expense.category === filterCategory
         const matchesPayment = !filterPaymentMode || expense.paymentMode === filterPaymentMode
         const expenseDate = new Date(expense.date)

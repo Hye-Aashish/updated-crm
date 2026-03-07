@@ -36,7 +36,7 @@ router.get('/all', protect, authorize('admin', 'owner'), async (req, res) => {
         const startDate = new Date(targetYear, targetMonth, 1);
         const endDate = new Date(targetYear, targetMonth, daysInMonth, 23, 59, 59);
 
-        const users = await User.find({ role: { $ne: 'owner' } });
+        const users = await User.find({ role: { $nin: ['owner', 'client'] } });
         const payrollData = [];
 
         for (const user of users) {

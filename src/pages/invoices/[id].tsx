@@ -225,7 +225,7 @@ export function InvoiceDetailPage() {
                 <div className="flex justify-between items-end">
                     <div className="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl max-w-sm">
                         <p className="font-bold text-slate-700 mb-1">Notes / Terms</p>
-                        <p>Thank you for choosing Agency Pro. Payment is required within due date. Please quote invoice number on all correspondence.</p>
+                        <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
                     </div>
                     <div className="w-72 space-y-4">
                         <div className="flex justify-between text-slate-600 font-medium">
@@ -315,10 +315,9 @@ export function InvoiceDetailPage() {
                 </div>
 
                 <div className="flex justify-between items-end">
-                    <div className="text-xs text-gray-500 uppercase tracking-wider max-w-[200px]">
+                    <div className="text-xs text-gray-500 uppercase tracking-wider max-w-[300px]">
                         <p className="font-bold text-black mb-2">Terms</p>
-                        <p>Due upon receipt.</p>
-                        <p className="mt-2">Due code: {formatDate(invoice.dueDate)}</p>
+                        <p className="whitespace-pre-wrap lowercase first-letter:uppercase normal-case">{invoice.termsAndConditions || 'Due upon receipt.'}</p>
                     </div>
                     <div className="text-right w-64 text-sm uppercase tracking-wider">
                         <div className="flex justify-between mb-2">
@@ -420,7 +419,11 @@ export function InvoiceDetailPage() {
                     </tbody>
                 </table>
 
-                <div className="flex justify-end">
+                <div className="flex justify-between">
+                    <div className="w-1/2 pr-8 text-xs text-gray-500 mt-4">
+                        <p className="font-bold uppercase tracking-widest mb-2">Terms & Conditions</p>
+                        <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Due upon receipt.'}</p>
+                    </div>
                     <div className="w-1/3 min-w-[280px] space-y-3">
                         <div className="flex justify-between text-gray-600">
                             <span>Subtotal</span>
@@ -559,8 +562,9 @@ export function InvoiceDetailPage() {
                         )}
                     </div>
                 </div>
-                <div className="mt-16 pt-8 border-t border-slate-100 text-center text-slate-400 text-sm">
-                    <p>Thank you for doing business with us.</p>
+                <div className="mt-16 pt-8 border-t border-slate-100 text-slate-500 text-xs">
+                    <p className="font-semibold uppercase tracking-wider mb-2 text-slate-400">Terms & Conditions</p>
+                    <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for doing business with us.'}</p>
                 </div>
             </CardContent>
         </Card>
@@ -650,7 +654,11 @@ export function InvoiceDetailPage() {
                             </tbody>
                         </table>
                     </div>
-                    <div className="flex justify-end border-t border-slate-100 pt-8 gap-4">
+                    <div className="flex justify-between border-t border-slate-100 pt-8 gap-4">
+                        <div className="w-1/2 pr-8 text-xs text-slate-500 mt-2">
+                            <p className="font-bold uppercase tracking-widest mb-2 font-mono">Terms</p>
+                            <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Due upon receipt.'}</p>
+                        </div>
                         <div className="w-1/2 space-y-3 text-right">
                             <div className="flex justify-between text-slate-500">
                                 <span>Subtotal</span>
@@ -765,8 +773,9 @@ export function InvoiceDetailPage() {
                         </Button>
                     )}
                 </div>
-                <div className="mt-16">
-                    <p className="text-slate-400 text-xs uppercase tracking-widest">Thank you for your business</p>
+                <div className="mt-16 text-left">
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1 border-b border-slate-100 pb-1">Terms & Conditions</p>
+                    <p className="text-slate-500 text-xs whitespace-pre-wrap font-serif italic">{invoice.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
                 </div>
             </CardContent>
             <div className="h-2 w-full" style={{ backgroundColor: themeColor }}></div>

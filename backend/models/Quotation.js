@@ -34,7 +34,8 @@ const changeRequestSchema = new mongoose.Schema({
 });
 
 const quotationSchema = new mongoose.Schema({
-    quotationNumber: { type: String, unique: true },
+    quotationNumber: { type: String },
+    tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant' },
     version: { type: Number, default: 1 },
     parentQuotation: { type: mongoose.Schema.Types.ObjectId, ref: 'Quotation' },
 

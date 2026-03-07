@@ -200,6 +200,9 @@ router.post('/test-smtp', protect, authorize('admin', 'owner'), async (req, res)
             auth: {
                 user,
                 pass
+            },
+            tls: {
+                rejectUnauthorized: false // Allow self-signed certs (common on shared hosting)
             }
         });
 

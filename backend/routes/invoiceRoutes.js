@@ -78,7 +78,8 @@ router.post('/', protect, async (req, res) => {
         dueDate: req.body.dueDate,
         paidDate: req.body.paidDate,
         autoSend: req.body.autoSend,
-        frequency: req.body.frequency
+        frequency: req.body.frequency,
+        termsAndConditions: req.body.termsAndConditions
     });
 
     try {
@@ -88,37 +89,70 @@ router.post('/', protect, async (req, res) => {
             try {
                 const client = await Client.findById(newInvoice.clientId);
                 if (client && client.email) {
+                    const Setting = require('../models/Setting');
+                    const settings = await Setting.findOne({ type: 'general' });
+                    const companyProfile = settings?.companyProfile || {};
                     const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+
+                    let pdfBuffer = null;
+                    try {
+                        const generateInvoicePDF = require('../utils/generateInvoicePDF');
+                        pdfBuffer = await generateInvoicePDF(newInvoice, client, companyProfile);
+                    } catch (pdfErr) {
+                        console.error('PDF generation failed:', pdfErr.message);
+                    }
+
+                    const invoicePageUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/invoices/${newInvoice._id}`;
+
                     const message = `
-                        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                            <h2 style="color: #0f172a;">Invoice #${newInvoice.invoiceNumber}</h2>
-                            <p>Dear ${client.name},</p>
-                            <p>Please find attached invoice <strong>#${newInvoice.invoiceNumber}</strong> dated <strong>${new Date(newInvoice.date).toLocaleDateString()}</strong>.</p>
-                            
-                            <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                                <p style="margin: 5px 0;"><strong>Amount Due:</strong> <span style="font-size: 1.2em; color: #0f172a;">${formatting.format(newInvoice.total)}</span></p>
-                                <p style="margin: 5px 0;"><strong>Due Date:</strong> ${new Date(newInvoice.dueDate).toLocaleDateString()}</p>
+                        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+                            <div style="background: #0047AB; padding: 32px 40px; text-align: center;">
+                                <h1 style="color: white; margin: 0; font-size: 26px; font-weight: 800;">${companyProfile.name || 'NEXPRISM'}</h1>
+                                <p style="color: rgba(255,255,255,0.7); margin: 6px 0 0; font-size: 13px;">Invoice #${newInvoice.invoiceNumber}</p>
                             </div>
-
-                            <p>Thank you for your business.</p>
-                            
-                            ${process.env.FRONTEND_URL ? `
-                            <div style="margin-top: 30px;">
-                                <a href="${process.env.FRONTEND_URL}/invoices/${newInvoice._id}" 
-                                   style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                                    View & Pay Invoice
-                                </a>
+                            <div style="padding: 36px 40px;">
+                                <p style="color: #0f172a; font-size: 16px; margin: 0 0 16px;">Dear <strong>${client.name}</strong>,</p>
+                                <p style="color: #475569; line-height: 1.6; margin: 0 0 28px;">Please find your invoice <strong>#${newInvoice.invoiceNumber}</strong> attached to this email as a PDF. You can also view and pay online using the button below.</p>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; margin-bottom: 28px;">
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 6px 0; color: #64748b; font-size: 14px;">Invoice Date</td>
+                                            <td style="padding: 6px 0; text-align: right; color: #0f172a; font-weight: 600;">${new Date(newInvoice.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 0; color: #64748b; font-size: 14px;">Due Date</td>
+                                            <td style="padding: 6px 0; text-align: right; color: #dc2626; font-weight: 600;">${new Date(newInvoice.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                        </tr>
+                                        <tr><td colspan="2" style="border-top: 1px solid #e2e8f0; padding-top: 10px;"></td></tr>
+                                        <tr>
+                                            <td style="color: #0f172a; font-size: 18px; font-weight: 800;">Total Due</td>
+                                            <td style="text-align: right; color: #0047AB; font-size: 22px; font-weight: 800;">${formatting.format(newInvoice.total)}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <a href="${invoicePageUrl}" style="display: inline-block; background: #0047AB; color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 16px;">View &amp; Pay Invoice &rarr;</a>
+                                </div>
+                                <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">Or visit: <a href="${invoicePageUrl}" style="color: #0047AB;">${invoicePageUrl}</a></p>
                             </div>
-                            ` : ''}
-
-                            <p>Best regards,<br>Nexprism Team</p>
+                            <div style="background: #0f172a; padding: 20px 40px; text-align: center;">
+                                <p style="color: #64748b; font-size: 12px; margin: 0;">Thank you for your business!</p>
+                                ${companyProfile.email ? `<p style="color: #475569; font-size: 12px; margin: 6px 0 0;">${companyProfile.email}</p>` : ''}
+                            </div>
                         </div>
                     `;
 
                     await sendEmail({
                         to: client.email,
-                        subject: `Invoice #${newInvoice.invoiceNumber} from Nexprism`,
-                        html: message
+                        subject: `Invoice #${newInvoice.invoiceNumber} from Nexprism - ${formatting.format(newInvoice.total)}`,
+                        html: message,
+                        ...(pdfBuffer && {
+                            attachments: [{
+                                filename: `Invoice-${newInvoice.invoiceNumber}.pdf`,
+                                content: pdfBuffer,
+                                contentType: 'application/pdf'
+                            }]
+                        })
                     });
                 }
             } catch (emailErr) {

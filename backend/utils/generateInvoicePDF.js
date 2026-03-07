@@ -12,47 +12,87 @@ const generateInvoicePDF = (invoice, client, companyProfile) => {
 
             const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
 
-            // Header
-            doc.fontSize(22).font('Helvetica-Bold').text(companyProfile.name || 'NEXPRISM', 50, 50);
-            if (companyProfile.address) {
-                doc.fontSize(9).font('Helvetica').fillColor('#666').text(companyProfile.address, 50, 75);
+            // --------- HEADER SECTION ---------
+            const startY = 50;
+
+            // Left Side: BILL FROM
+            // We use a dummy logo placement or just large text for the company name for now
+            doc.fontSize(24).font('Helvetica-Bold').fillColor('#0047AB').text(companyProfile.name || 'NEXPRISM', 50, startY);
+
+            let currentLeftY = startY + 35;
+            doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text('BILL FROM:', 50, currentLeftY);
+            currentLeftY += 15;
+            doc.fontSize(11).font('Helvetica-Bold').fillColor('#000').text(companyProfile.name || 'NEXPRISM', 50, currentLeftY);
+            currentLeftY += 15;
+
+            doc.fontSize(9).font('Helvetica-Bold').text('Address: ', 50, currentLeftY, { continued: true })
+                .font('Helvetica').fillColor('#333').text(companyProfile.address || 'Company Address', { width: 220, align: 'left' });
+
+            currentLeftY = doc.y + 5;
+            if (companyProfile.phone) {
+                doc.font('Helvetica').text(`Phone: ${companyProfile.phone}`, 50, currentLeftY);
+                currentLeftY += 12;
             }
             if (companyProfile.email) {
-                doc.text(companyProfile.email);
-            }
-            if (companyProfile.phone) {
-                doc.text(companyProfile.phone);
+                doc.font('Helvetica').text(`Email: ${companyProfile.email}`, 50, currentLeftY);
+                currentLeftY += 12;
             }
             if (companyProfile.gst) {
-                doc.text(`GST: ${companyProfile.gst}`);
+                currentLeftY += 5;
+                doc.font('Helvetica-Bold').fillColor('#000').text(`GSTIN: ${companyProfile.gst}`, 50, currentLeftY);
+                currentLeftY += 15;
             }
 
-            // Invoice Title
-            doc.fillColor('#0047AB').fontSize(28).font('Helvetica-Bold').text('INVOICE', 400, 50, { align: 'right' });
-            doc.fillColor('#333').fontSize(10).font('Helvetica');
-            doc.text(`#${invoice.invoiceNumber}`, 400, 82, { align: 'right' });
-            doc.text(`Date: ${new Date(invoice.date).toLocaleDateString('en-IN')}`, 400, 96, { align: 'right' });
-            doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString('en-IN')}`, 400, 110, { align: 'right' });
+            // Right Side: INVOICE and BILL TO
+            doc.fillColor('#333').fontSize(36).font('Helvetica-Bold').text('INVOICE', 350, startY, { align: 'right', characterSpacing: 2 });
+
+            let currentRightY = startY + 45;
+            doc.fontSize(10).font('Helvetica').fillColor('#666');
+
+            // Format date example: 06 feb 2026
+            const invDate = new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase();
+            const dueDate = new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase();
+
+            doc.text('Invoice No:', 350, currentRightY, { width: 100, align: 'left' });
+            doc.fillColor('#333').text(`#${invoice.invoiceNumber}`, 450, currentRightY, { width: 95, align: 'right' });
+            currentRightY += 15;
+
+            doc.fillColor('#666').text('Invoice Date:', 350, currentRightY, { width: 100, align: 'left' });
+            doc.fillColor('#333').text(invDate, 450, currentRightY, { width: 95, align: 'right' });
+            currentRightY += 15;
+
+            // BILL TO Section (Right Side)
+            currentRightY += 15; // some spacing
+            doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text('BILL TO:', 350, currentRightY);
+            currentRightY += 15;
+
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#000').text(client.company || client.name || 'Client Name', 350, currentRightY);
+            currentRightY += 15;
+
+            // Allow wrapping for address
+            doc.fontSize(9).font('Helvetica-Bold').text('Address: ', 350, currentRightY, { continued: true })
+                .font('Helvetica').fillColor('#333').text(client.address || 'Client Address', { width: 195, align: 'left' });
+
+            currentRightY = doc.y + 5;
+            if (client.gst || client.gstin) {
+                currentRightY += 5;
+                doc.font('Helvetica-Bold').fillColor('#000').text(`GSTIN: ${client.gst || client.gstin}`, 350, currentRightY);
+                currentRightY += 15;
+            }
+
+            const maxY = Math.max(currentLeftY, currentRightY) + 20;
+
+            // Status Badge (Optional, added near INVOICE area or below)
+            const statusColor = invoice.status === 'paid' ? '#16a34a' : invoice.status === 'overdue' ? '#dc2626' : '#f59e0b';
+            doc.roundedRect(445, maxY, 100, 24, 4).fill(statusColor);
+            doc.fillColor('#fff').fontSize(10).font('Helvetica-Bold')
+                .text(invoice.status?.toUpperCase() || 'PENDING', 445, maxY + 6, { width: 100, align: 'center' });
 
             // Divider
-            doc.moveTo(50, 140).lineTo(545, 140).strokeColor('#e2e8f0').stroke();
-
-            // Bill To
-            doc.fillColor('#666').fontSize(9).text('BILL TO', 50, 155);
-            doc.fillColor('#000').fontSize(12).font('Helvetica-Bold').text(client.name || 'Client', 50, 168);
-            doc.fontSize(9).font('Helvetica').fillColor('#666');
-            if (client.email) doc.text(client.email, 50, 184);
-            if (client.phone) doc.text(client.phone);
-            if (client.company) doc.text(client.company);
-
-            // Status Badge
-            const statusColor = invoice.status === 'paid' ? '#16a34a' : invoice.status === 'overdue' ? '#dc2626' : '#f59e0b';
-            doc.roundedRect(400, 155, 100, 24, 4).fill(statusColor);
-            doc.fillColor('#fff').fontSize(10).font('Helvetica-Bold')
-                .text(invoice.status?.toUpperCase() || 'PENDING', 400, 161, { width: 100, align: 'center' });
+            doc.moveTo(50, maxY + 35).lineTo(545, maxY + 35).strokeColor('#e2e8f0').stroke();
 
             // Table Header
-            const tableTop = 230;
+            const tableTop = maxY + 55;
             doc.fillColor('#f1f5f9');
             doc.rect(50, tableTop, 495, 25).fill();
 
@@ -106,6 +146,11 @@ const generateInvoicePDF = (invoice, client, companyProfile) => {
             doc.fontSize(14).font('Helvetica-Bold').fillColor('#0047AB');
             doc.text('Total:', 350, y, { width: 100, align: 'right' });
             doc.text(formatting.format(invoice.total || 0), 450, y, { width: 90, align: 'right' });
+
+            // Terms & Conditions
+            const termsStr = invoice.termsAndConditions || 'Thank you for your business. Payment is expected within the due date.';
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Terms & Conditions', 50, y);
+            doc.fontSize(9).font('Helvetica').fillColor('#666').text(termsStr, 50, y + 15, { width: 300, align: 'left' });
 
             // Footer
             const footerY = 750;

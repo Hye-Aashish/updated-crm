@@ -81,6 +81,15 @@ export function NewInvoicePage() {
                     console.error("Failed to load projects", e)
                 }
             }
+
+            try {
+                const res = await api.get('/settings');
+                if (res.data?.billing?.termsAndConditions) {
+                    setFormData(prev => ({ ...prev, termsAndConditions: res.data.billing.termsAndConditions }));
+                }
+            } catch (e) {
+                console.error("Failed to load settings", e);
+            }
         }
         loadData()
     }, [])
@@ -91,7 +100,8 @@ export function NewInvoicePage() {
         dueDate: '',
         taxRate: 18,
         frequency: 'once',
-        autoSend: false
+        autoSend: false,
+        termsAndConditions: 'Thank you for your business. Payment is expected within due date. Late payments may incur fees.'
     })
 
     const [items, setItems] = useState<InvoiceFormItem[]>([
@@ -179,7 +189,8 @@ export function NewInvoicePage() {
                 tax: taxAmount,
                 total,
                 frequency: formData.frequency,
-                autoSend: formData.autoSend
+                autoSend: formData.autoSend,
+                termsAndConditions: formData.termsAndConditions
             }
 
             const response = await api.post('/invoices', payload)
@@ -371,6 +382,20 @@ export function NewInvoicePage() {
                             <Button variant="outline" size="sm" onClick={addItem} className="mt-2">
                                 <Plus className="mr-2 h-3 w-3" /> Add Item
                             </Button>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Terms & Conditions</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <textarea
+                                value={formData.termsAndConditions}
+                                onChange={(e) => setFormData(prev => ({ ...prev, termsAndConditions: e.target.value }))}
+                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                placeholder="Enter specific terms and conditions for this invoice..."
+                            />
                         </CardContent>
                     </Card>
                 </div>
