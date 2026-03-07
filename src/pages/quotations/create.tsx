@@ -81,31 +81,41 @@ export default function QuotationBuilder() {
     };
 
     const handleTemplateApply = (template: any) => {
-        if (!confirm('Apply this template? It will override sections like Objective and Deliverables.')) return;
+        if (!confirm('Apply this template? It will override sections like Objective, Deliverables, pricing, etc.')) return;
 
         const client = clients.find(c => c._id === formData.clientId);
+
+        // Calculate the new anticipated grand total based on the template's modules
+        const tModules = template.modules?.length > 0 ? template.modules : formData.modules;
+        const totalAmt = tModules.filter((m: any) => m.included).reduce((sum: number, m: any) => sum + (Number(m.cost) || 0), 0);
+        const gstAmt = (totalAmt * formData.gstPercentage) / 100;
+        const gTotal = totalAmt + gstAmt - (Number(formData.discount) || 0);
+
         const replaceVars = (text: string) => {
             if (!text) return text;
             return text
-                .replace(/{{client_name}}/g, client?.name || '[Client Name]')
+                .replace(/{{client_name}}/g, client?.company || client?.name || '[Client Name]')
                 .replace(/{{project_title}}/g, formData.projectTitle || '[Project Title]')
-                .replace(/{{timeline}}/g, formData.timeline || '[Timeline]')
-                .replace(/{{grand_total}}/g, grandTotal.toLocaleString() || '0')
-                .replace(/{{warranty}}/g, formData.warrantyPeriod || '3 Months');
+                .replace(/{{timeline}}/g, template.timeline || formData.timeline || '[Timeline]')
+                .replace(/{{grand_total}}/g, gTotal.toLocaleString() || '0')
+                .replace(/{{warranty}}/g, template.warrantyPeriod || formData.warrantyPeriod || '3 Months');
         };
 
         setFormData((prev: any) => ({
             ...prev,
+            timeline: template.timeline || prev.timeline,
+            warrantyPeriod: template.warrantyPeriod || prev.warrantyPeriod,
             objective: replaceVars(template.sections?.[0]?.content) || prev.objective,
             projectScope: replaceVars(template.sections?.[1]?.content) || prev.projectScope,
-            sections: template.sections?.map((s: any) => ({
+            sections: template.sections?.slice(2).map((s: any) => ({
                 title: s.title,
                 content: replaceVars(s.content)
             })) || [],
             deliverables: template.defaultDeliverables?.length > 0
                 ? template.defaultDeliverables.map((d: any) => ({ ...d, included: true }))
                 : prev.deliverables,
-            modules: template.modules?.length > 0 ? template.modules : prev.modules,
+            modules: tModules,
+            milestones: template.milestones?.length > 0 ? template.milestones : prev.milestones,
             branding: template.branding || prev.branding
         }));
     };

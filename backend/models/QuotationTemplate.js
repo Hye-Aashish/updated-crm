@@ -27,6 +27,12 @@ const quotationTemplateSchema = new mongoose.Schema({
         coverPageTitle: String,
         coverPageSubtitle: String
     },
+    timeline: String,
+    warrantyPeriod: { type: String, default: '3 Months' },
+    milestones: [{
+        name: { type: String, required: true },
+        percentage: { type: Number, required: true }
+    }],
     isActive: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, {

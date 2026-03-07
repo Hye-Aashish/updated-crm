@@ -25,6 +25,12 @@ export default function QuotationTemplates() {
             { name: '3 Month Technical Support (Bug Fix Only)', included: true }
         ],
         modules: [],
+        timeline: '4 - 6 Weeks',
+        warrantyPeriod: '3 Months Support',
+        milestones: [
+            { name: 'Advance Payment', percentage: 50 },
+            { name: 'On Completion', percentage: 50 }
+        ],
         branding: {
             headerText: 'NEXPRISM IT SOLUTIONS',
             footerText: 'This is a computer-generated document. Digital signatures are legally binding as per the IT Act.',
@@ -187,6 +193,27 @@ export default function QuotationTemplates() {
                                     />
                                 </div>
 
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Standard Timeline</label>
+                                        <input
+                                            value={formData.timeline || ''}
+                                            onChange={e => setFormData({ ...formData, timeline: e.target.value })}
+                                            className="w-full h-12 px-4 bg-gray-50 border-none rounded-xl text-sm font-bold text-gray-900"
+                                            placeholder="e.g. 4 Weeks"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Warranty/Support</label>
+                                        <input
+                                            value={formData.warrantyPeriod || ''}
+                                            onChange={e => setFormData({ ...formData, warrantyPeriod: e.target.value })}
+                                            className="w-full h-12 px-4 bg-gray-50 border-none rounded-xl text-sm font-bold text-gray-900"
+                                            placeholder="e.g. 3 Months"
+                                        />
+                                    </div>
+                                </div>
+
                                 <div className="space-y-6">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Dynamic Sections</h3>
@@ -302,6 +329,54 @@ export default function QuotationTemplates() {
                                         >
                                             + Add Module Blueprint
                                         </button>
+                                    </div>
+                                </div>
+
+                                {/* Milestones Blueprint */}
+                                <div className="p-8 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm">
+                                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                                        <CheckCircle className="w-4 h-4 text-orange-500" /> Default Payment Milestones
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {formData.milestones?.map((m: any, idx: number) => (
+                                            <div key={idx} className="flex gap-4 items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                                <input
+                                                    value={m.name}
+                                                    onChange={e => {
+                                                        const nm = [...formData.milestones];
+                                                        nm[idx].name = e.target.value;
+                                                        setFormData({ ...formData, milestones: nm });
+                                                    }}
+                                                    className="flex-1 bg-white border-none rounded-lg text-xs font-bold"
+                                                    placeholder="Milestone Name"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    value={m.percentage}
+                                                    onChange={e => {
+                                                        const nm = [...formData.milestones];
+                                                        nm[idx].percentage = Number(e.target.value);
+                                                        setFormData({ ...formData, milestones: nm });
+                                                    }}
+                                                    className="w-20 bg-white border-none rounded-lg text-xs font-black text-blue-600"
+                                                    placeholder="%"
+                                                />
+                                                <button onClick={() => setFormData({ ...formData, milestones: formData.milestones.filter((_: any, i: number) => i !== idx) })} className="text-red-300 hover:text-red-500">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            onClick={() => setFormData({ ...formData, milestones: [...(formData.milestones || []), { name: 'New Phase', percentage: 20 }] })}
+                                            className="w-full p-3 border border-dashed border-gray-200 rounded-xl text-[10px] font-black text-gray-400 uppercase hover:bg-gray-50 transition-all"
+                                        >
+                                            + Add Milestone
+                                        </button>
+                                        <div className="text-right mt-2 text-xs font-bold">
+                                            Total: <span className={formData.milestones?.reduce((a: number, m: any) => a + (Number(m.percentage) || 0), 0) === 100 ? 'text-green-500' : 'text-orange-500'}>
+                                                {formData.milestones?.reduce((a: number, m: any) => a + (Number(m.percentage) || 0), 0) || 0}%
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
