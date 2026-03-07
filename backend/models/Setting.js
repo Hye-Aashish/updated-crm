@@ -17,7 +17,8 @@ const settingSchema = new mongoose.Schema({
         pan: String,
         currency: { type: String, default: 'INR' },
         timezone: { type: String, default: 'Asia/Kolkata' },
-        businessHours: String
+        businessHours: String,
+        subtitle: { type: String, default: 'Professional Services' }
     },
     billing: {
         razorpayKey: String,
@@ -29,6 +30,7 @@ const settingSchema = new mongoose.Schema({
         taxRate: { type: Number, default: 18 },
         paymentTerms: { type: String, default: '15' },
         termsAndConditions: { type: String, default: 'Thank you for your business. Payment is expected within due date. Late payments may incur fees.' },
+        bankDetails: { type: String, default: '' },
         lateFee: Number
     },
     notifications: {

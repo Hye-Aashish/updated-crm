@@ -36,6 +36,7 @@ export function InvoiceDetailPage() {
     const [loading, setLoading] = useState(true)
     const [invoice, setInvoice] = useState<Invoice | null>(null)
     const [client, setClient] = useState<Client | null>(null)
+    const [settings, setSettings] = useState<any>(null)
     const { currentUser } = useAppStore()
 
 
@@ -90,6 +91,14 @@ export function InvoiceDetailPage() {
                         setClient({ ...clientRes.data, id: clientRes.data._id })
                     } catch (e) { }
                 }
+
+                try {
+                    const setRes = await api.get('/settings');
+                    setSettings(setRes.data);
+                } catch (e) {
+                    console.error("Failed to fetch settings", e);
+                }
+
 
             } catch (error) {
                 console.error("Failed to fetch invoice", error)
@@ -167,8 +176,8 @@ export function InvoiceDetailPage() {
                             <Building2 className="h-8 w-8" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-black text-slate-800 tracking-tight">AGENCY PRO</h1>
-                            <p className="text-slate-500 font-medium tracking-wide">Digital Solutions</p>
+                            <h1 className="text-3xl font-black text-slate-800 tracking-tight">{settings?.companyProfile?.name || 'AGENCY PRO'}</h1>
+                            <p className="text-slate-500 font-medium tracking-wide">{settings?.companyProfile?.subtitle || 'Digital Solutions'}</p>
                         </div>
                     </div>
                     <div className="text-right">
@@ -224,9 +233,17 @@ export function InvoiceDetailPage() {
                 </div>
 
                 <div className="flex justify-between items-end">
-                    <div className="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl max-w-sm">
-                        <p className="font-bold text-slate-700 mb-1">Notes / Terms</p>
-                        <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
+                    <div className="flex flex-col gap-4 max-w-sm">
+                        <div className="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl">
+                            <p className="font-bold text-slate-700 mb-1">Notes / Terms</p>
+                            <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
+                        </div>
+                        {settings?.billing?.bankDetails && (
+                            <div className="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl">
+                                <p className="font-bold text-slate-700 mb-1">Payment Details</p>
+                                <p className="whitespace-pre-wrap">{settings.billing.bankDetails}</p>
+                            </div>
+                        )}
                     </div>
                     <div className="w-72 space-y-4">
                         <div className="flex justify-between text-slate-600 font-medium">
@@ -277,8 +294,8 @@ export function InvoiceDetailPage() {
             <div className="relative z-10">
                 <div className="flex justify-between items-start border-b-2 border-black pb-12 mb-12">
                     <div>
-                        <h1 className="text-xl font-bold uppercase tracking-widest text-black mb-1">YOUR COMPANY</h1>
-                        <p className="text-sm text-gray-500 uppercase tracking-wider">Professional Services</p>
+                        <h1 className="text-xl font-bold uppercase tracking-widest text-black mb-1">{settings?.companyProfile?.name || 'YOUR COMPANY'}</h1>
+                        <p className="text-sm text-gray-500 uppercase tracking-wider">{settings?.companyProfile?.subtitle || 'Professional Services'}</p>
                     </div>
                     <div className="text-right">
                         <h2 className="text-4xl font-light tracking-widest mb-4">INVOICE</h2>
@@ -316,9 +333,17 @@ export function InvoiceDetailPage() {
                 </div>
 
                 <div className="flex justify-between items-end">
-                    <div className="text-xs text-gray-500 uppercase tracking-wider max-w-[300px]">
-                        <p className="font-bold text-black mb-2">Terms</p>
-                        <p className="whitespace-pre-wrap lowercase first-letter:uppercase normal-case">{invoice.termsAndConditions || 'Due upon receipt.'}</p>
+                    <div className="flex flex-col gap-4 max-w-[300px]">
+                        <div className="text-xs text-gray-500 uppercase tracking-wider">
+                            <p className="font-bold text-black mb-2">Terms</p>
+                            <p className="whitespace-pre-wrap lowercase first-letter:uppercase normal-case">{invoice.termsAndConditions || 'Due upon receipt.'}</p>
+                        </div>
+                        {settings?.billing?.bankDetails && (
+                            <div className="text-xs text-gray-500 uppercase tracking-wider">
+                                <p className="font-bold text-black mb-2">Payment Details</p>
+                                <p className="whitespace-pre-wrap lowercase first-letter:uppercase normal-case">{settings.billing.bankDetails}</p>
+                            </div>
+                        )}
                     </div>
                     <div className="text-right w-64 text-sm uppercase tracking-wider">
                         <div className="flex justify-between mb-2">
@@ -370,8 +395,8 @@ export function InvoiceDetailPage() {
                 <div className="flex justify-between items-center mb-10">
                     <h1 className="text-4xl font-bold text-gray-700 tracking-wide">INVOICE</h1>
                     <div className="text-right">
-                        <h2 className="text-2xl font-bold" style={{ color: themeColor }}>Business Co.</h2>
-                        <p className="text-sm text-gray-500 mt-1">123 Business Road, Corporate District</p>
+                        <h2 className="text-2xl font-bold" style={{ color: themeColor }}>{settings?.companyProfile?.name || 'Business Co.'}</h2>
+                        <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{settings?.companyProfile?.address || '123 Business Road, Corporate District'}</p>
                     </div>
                 </div>
 
@@ -421,9 +446,17 @@ export function InvoiceDetailPage() {
                 </table>
 
                 <div className="flex justify-between">
-                    <div className="w-1/2 pr-8 text-xs text-gray-500 mt-4">
-                        <p className="font-bold uppercase tracking-widest mb-2">Terms & Conditions</p>
-                        <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Due upon receipt.'}</p>
+                    <div className="flex flex-col gap-4 w-1/2 pr-8 text-xs text-gray-500 mt-4">
+                        <div>
+                            <p className="font-bold uppercase tracking-widest mb-2">Terms & Conditions</p>
+                            <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Due upon receipt.'}</p>
+                        </div>
+                        {settings?.billing?.bankDetails && (
+                            <div>
+                                <p className="font-bold uppercase tracking-widest mb-2">Payment Details</p>
+                                <p className="whitespace-pre-wrap">{settings.billing.bankDetails}</p>
+                            </div>
+                        )}
                     </div>
                     <div className="w-1/3 min-w-[280px] space-y-3">
                         <div className="flex justify-between text-gray-600">
@@ -479,8 +512,8 @@ export function InvoiceDetailPage() {
                             <Building2 className="h-6 w-6" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Agency Name</h1>
-                            <p className="text-muted-foreground text-sm">Professional Digital Services</p>
+                            <h1 className="text-2xl font-bold tracking-tight">{settings?.companyProfile?.name || 'Agency Name'}</h1>
+                            <p className="text-muted-foreground text-sm">{settings?.companyProfile?.subtitle || 'Professional Digital Services'}</p>
                         </div>
                     </div>
                     <div className="text-right">
@@ -576,9 +609,9 @@ export function InvoiceDetailPage() {
         <Card className="overflow-hidden shadow-none border-0 bg-white grid md:grid-cols-12 min-h-[800px] relative">
             <div className="md:col-span-4 text-white p-10 flex flex-col justify-between relative z-10" style={{ backgroundColor: themeColor }}>
                 <div className="space-y-8">
-                    <div className="flex items-center gap-2 text-2xl font-bold">
+                    <div className="flex items-center gap-2 text-2xl font-bold uppercase">
                         <Building2 className="h-8 w-8 opacity-80" />
-                        <span>AGENCY.</span>
+                        <span>{settings?.companyProfile?.name || 'AGENCY.'}</span>
                     </div>
                     <div>
                         <div className="opacity-60 text-xs font-bold uppercase tracking-widest mb-4">Billed To</div>
@@ -593,10 +626,8 @@ export function InvoiceDetailPage() {
                     </div>
                     <div>
                         <div className="opacity-60 text-xs font-bold uppercase tracking-widest mb-4">Payment Details</div>
-                        <div className="space-y-2 text-sm opacity-80">
-                            <p>Bank: HDFC Bank</p>
-                            <p>Account: 1234 5678 9000</p>
-                            <p>IFSC: HDFC0001234</p>
+                        <div className="space-y-2 text-sm opacity-80 whitespace-pre-wrap">
+                            {settings?.billing?.bankDetails || "Bank: HDFC Bank\nAccount: 1234 5678 9000\nIFSC: HDFC0001234"}
                         </div>
                     </div>
                 </div>
@@ -656,9 +687,17 @@ export function InvoiceDetailPage() {
                         </table>
                     </div>
                     <div className="flex justify-between border-t border-slate-100 pt-8 gap-4">
-                        <div className="w-1/2 pr-8 text-xs text-slate-500 mt-2">
-                            <p className="font-bold uppercase tracking-widest mb-2 font-mono">Terms</p>
-                            <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Due upon receipt.'}</p>
+                        <div className="flex flex-col gap-4 w-1/2 pr-8 text-xs text-slate-500 mt-2">
+                            <div>
+                                <p className="font-bold uppercase tracking-widest mb-2 font-mono">Terms</p>
+                                <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Due upon receipt.'}</p>
+                            </div>
+                            {settings?.billing?.bankDetails && (
+                                <div>
+                                    <p className="font-bold uppercase tracking-widest mb-2 font-mono">Payment Details</p>
+                                    <p className="whitespace-pre-wrap">{settings.billing.bankDetails}</p>
+                                </div>
+                            )}
                         </div>
                         <div className="w-1/2 space-y-3 text-right">
                             <div className="flex justify-between text-slate-500">
@@ -715,8 +754,8 @@ export function InvoiceDetailPage() {
                     <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-white mb-6" style={{ backgroundColor: themeColor }}>
                         <Building2 className="h-8 w-8" />
                     </div>
-                    <h1 className="text-3xl font-serif font-bold text-slate-900 tracking-wide mb-2">AGENCY NAME</h1>
-                    <p className="text-slate-500 text-sm tracking-widest uppercase">Premium Invoice</p>
+                    <h1 className="text-3xl font-serif font-bold text-slate-900 tracking-wide mb-2 uppercase">{settings?.companyProfile?.name || 'AGENCY NAME'}</h1>
+                    <p className="text-slate-500 text-sm tracking-widest uppercase">{settings?.companyProfile?.subtitle || 'Premium Invoice'}</p>
                 </div>
                 <div className="flex justify-center gap-12 mb-12 border-y border-slate-100 py-8">
                     <div className="text-left">
@@ -774,9 +813,17 @@ export function InvoiceDetailPage() {
                         </Button>
                     )}
                 </div>
-                <div className="mt-16 text-left">
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1 border-b border-slate-100 pb-1">Terms & Conditions</p>
-                    <p className="text-slate-500 text-xs whitespace-pre-wrap font-serif italic">{invoice.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
+                <div className="mt-16 text-left flex gap-12">
+                    <div className="flex-1">
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1 border-b border-slate-100 pb-1">Terms & Conditions</p>
+                        <p className="text-slate-500 text-xs whitespace-pre-wrap font-serif italic">{invoice.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
+                    </div>
+                    {settings?.billing?.bankDetails && (
+                        <div className="flex-1">
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1 border-b border-slate-100 pb-1">Payment Details</p>
+                            <p className="text-slate-500 text-xs whitespace-pre-wrap font-serif italic">{settings.billing.bankDetails}</p>
+                        </div>
+                    )}
                 </div>
             </CardContent>
             <div className="h-2 w-full" style={{ backgroundColor: themeColor }}></div>

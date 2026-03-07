@@ -18,15 +18,18 @@ const generateInvoicePDF = (invoice, client, companyProfile, settings = {}) => {
             // Left Side: BILL FROM
             // We use a dummy logo placement or just large text for the company name for now
             doc.fontSize(24).font('Helvetica-Bold').fillColor('#0047AB').text(companyProfile.name || 'NEXPRISM', 50, startY);
+            if (companyProfile.subtitle) {
+                doc.fontSize(10).font('Helvetica').fillColor('#666').text(companyProfile.subtitle, 50, startY + 28);
+            }
 
-            let currentLeftY = startY + 35;
+            let currentLeftY = startY + 45;
             doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text('BILL FROM:', 50, currentLeftY);
             currentLeftY += 15;
             doc.fontSize(11).font('Helvetica-Bold').fillColor('#000').text(companyProfile.name || 'NEXPRISM', 50, currentLeftY);
             currentLeftY += 15;
 
             doc.fontSize(9).font('Helvetica-Bold').text('Address: ', 50, currentLeftY, { continued: true })
-                .font('Helvetica').fillColor('#333').text(companyProfile.address || 'Company Address', { width: 220, align: 'left' });
+                .font('Helvetica').fillColor('#333').text(companyProfile.address || '', { width: 220, align: 'left' });
 
             currentLeftY = doc.y + 5;
             if (companyProfile.phone) {
@@ -71,7 +74,7 @@ const generateInvoicePDF = (invoice, client, companyProfile, settings = {}) => {
 
             // Allow wrapping for address
             doc.fontSize(9).font('Helvetica-Bold').text('Address: ', 350, currentRightY, { continued: true })
-                .font('Helvetica').fillColor('#333').text(client.address || 'Client Address', { width: 195, align: 'left' });
+                .font('Helvetica').fillColor('#333').text(client.address || '', { width: 195, align: 'left' });
 
             currentRightY = doc.y + 5;
             if (client.gst || client.gstin) {
@@ -148,10 +151,20 @@ const generateInvoicePDF = (invoice, client, companyProfile, settings = {}) => {
             doc.text(formatting.format(invoice.total || 0), 450, y, { width: 90, align: 'right' });
 
             // Terms & Conditions
-            const fallbackTerms = settings?.billing?.termsAndConditions || 'Thank you for your business. Payment is expected within the due date.';
+            const fallbackTerms = settings?.billing?.termsAndConditions || '';
             const termsStr = invoice.termsAndConditions || fallbackTerms;
-            doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Terms & Conditions', 50, y);
-            doc.fontSize(9).font('Helvetica').fillColor('#666').text(termsStr, 50, y + 15, { width: 300, align: 'left' });
+            if (termsStr) {
+                doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Terms & Conditions', 50, y);
+                doc.fontSize(9).font('Helvetica').fillColor('#666').text(termsStr, 50, y + 15, { width: 300, align: 'left' });
+            }
+
+            // Bank Details
+            const bankDetails = settings?.billing?.bankDetails || '';
+            if (bankDetails) {
+                const bankY = termsStr ? y + 50 : y;
+                doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Payment Details', 50, bankY);
+                doc.fontSize(9).font('Helvetica').fillColor('#666').text(bankDetails, 50, bankY + 15, { width: 300, align: 'left' });
+            }
 
             // Footer
             const footerY = 750;

@@ -215,6 +215,10 @@ function CompanyProfileTab({ data, onSave, saving }: any) {
                         <Input id="name" value={formData.name || ''} onChange={handleChange} />
                     </div>
                     <div className="space-y-2">
+                        <Label htmlFor="subtitle">Company Subtitle (Displays on Invoices)</Label>
+                        <Input id="subtitle" value={formData.subtitle || ''} onChange={handleChange} placeholder="Professional Services" />
+                    </div>
+                    <div className="space-y-2">
                         <Label htmlFor="website">Website</Label>
                         <Input id="website" value={formData.website || ''} onChange={handleChange} placeholder="https://" />
                     </div>
@@ -659,6 +663,16 @@ function BillingTab({ data, onSave, saving }: any) {
                             onChange={handleChange}
                             className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             placeholder="Enter the default Terms & Conditions to be printed on invoices..."
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="bankDetails">Bank Details (Displays on Invoices)</Label>
+                        <textarea
+                            id="bankDetails"
+                            value={formData.bankDetails || ''}
+                            onChange={handleChange}
+                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            placeholder="Enter Bank Name, Account Number, IFSC etc..."
                         />
                     </div>
                 </div>
