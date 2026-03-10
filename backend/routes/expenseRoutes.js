@@ -19,8 +19,13 @@ router.get('/', protect, async (req, res) => {
     }
 });
 
-// Create expense
+// Create expense (Staff only — clients cannot create)
 router.post('/', protect, async (req, res) => {
+    // Block clients from creating expenses
+    if (req.user.role === 'client') {
+        return res.status(403).json({ message: 'Clients cannot create expenses' });
+    }
+
     const expense = new Expense({
         date: req.body.date,
         amount: req.body.amount,

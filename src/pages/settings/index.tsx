@@ -519,14 +519,18 @@ function UsersRolesTab() {
                                 <Label>{editingUser ? 'New Password (Optional)' : 'Password'}</Label>
                                 <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
                             </div>
-                            <div className="space-y-2">
-                                <Label>Designation</Label>
-                                <Input value={formData.designation} onChange={(e) => setFormData({ ...formData, designation: e.target.value })} placeholder="e.g. Senior Developer" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Monthly Salary (INR)</Label>
-                                <Input type="number" value={formData.salary} onChange={(e) => setFormData({ ...formData, salary: e.target.value })} placeholder="e.g. 25000" />
-                            </div>
+                            {formData.role !== 'client' && (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label>Designation</Label>
+                                        <Input value={formData.designation} onChange={(e) => setFormData({ ...formData, designation: e.target.value })} placeholder="e.g. Senior Developer" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Monthly Salary (INR)</Label>
+                                        <Input type="number" value={formData.salary} onChange={(e) => setFormData({ ...formData, salary: e.target.value })} placeholder="e.g. 25000" />
+                                    </div>
+                                </>
+                            )}
                             <div className="space-y-2">
                                 <Label>Role</Label>
                                 <Select value={formData.role} onValueChange={(val) => setFormData({ ...formData, role: val })}>
@@ -540,7 +544,6 @@ function UsersRolesTab() {
                                             <>
                                                 <SelectItem value="owner">Owner</SelectItem>
                                                 <SelectItem value="admin">Admin</SelectItem>
-                                                <SelectItem value="pm">Project Manager</SelectItem>
                                                 <SelectItem value="employee">Employee</SelectItem>
                                             </>
                                         )}

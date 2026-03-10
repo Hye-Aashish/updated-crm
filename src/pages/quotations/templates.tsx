@@ -3,7 +3,7 @@ import {
     Plus, Trash2, ArrowLeft, CheckCircle,
     Layout, Settings, Sparkles
 } from 'lucide-react';
-import axios from 'axios';
+import api from '@/lib/api-client';
 import { useNavigate } from 'react-router-dom';
 
 export default function QuotationTemplates() {
@@ -47,10 +47,7 @@ export default function QuotationTemplates() {
 
     const fetchTemplates = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/quotations/templates/all', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/quotations/templates/all');
             setTemplates(res.data);
         } catch (e) {
             console.error(e);
@@ -62,15 +59,10 @@ export default function QuotationTemplates() {
     const handleSave = async () => {
         if (!formData.name) return alert('Template name is required');
         try {
-            const token = localStorage.getItem('token');
             if ((formData as any)._id) {
-                await axios.put(`http://localhost:5000/api/quotations/templates/${(formData as any)._id}`, formData, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                await api.put(`/quotations/templates/${(formData as any)._id}`, formData);
             } else {
-                await axios.post('http://localhost:5000/api/quotations/templates', formData, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                await api.post('/quotations/templates', formData);
             }
             setShowModal(false);
             fetchTemplates();
@@ -125,7 +117,7 @@ export default function QuotationTemplates() {
                                     <button
                                         onClick={async () => {
                                             if (confirm('Delete blueprint?')) {
-                                                await axios.delete(`http://localhost:5000/api/quotations/templates/${t._id}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+                                                await api.delete(`/quotations/templates/${t._id}`);
                                                 fetchTemplates();
                                             }
                                         }}

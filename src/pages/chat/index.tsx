@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, MoreVertical, Phone, Video } from 'lucide-react';
+import { Search, Send, MoreVertical, Phone, Video, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '@/lib/api-client';
 import { useAppStore } from '@/store'; // Assuming you have a store for user info
@@ -139,12 +139,12 @@ export const ChatPage = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-2rem)] gap-4 p-4 bg-gray-50/50">
+        <div className="flex h-[calc(100dvh-12rem)] md:h-[calc(100dvh-10rem)] gap-0 md:gap-4 p-0 md:p-4 bg-gray-50/50 -mx-4 -mt-4 md:m-0">
             {/* Sidebar List */}
-            <div className="w-80 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-gray-100/50 overflow-hidden">
+            <div className={`w-full md:w-80 flex flex-col bg-white md:rounded-2xl shadow-xl md:shadow-sm border-r md:border border-gray-100 overflow-hidden ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b border-gray-100">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-semibold text-lg">Inbox</h2>
+                        <h2 className="font-bold text-xl md:text-lg">Inbox</h2>
                         <ChatWidgetsDialog />
                     </div>
                     <div className="relative">
@@ -189,44 +189,52 @@ export const ChatPage = () => {
             </div>
 
             {/* Chat Window */}
-            <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-100/50 overflow-hidden relative">
+            <div className={`flex-1 flex flex-col bg-white md:rounded-2xl shadow-xl md:shadow-sm border border-gray-100 overflow-hidden relative ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
                 {activeConversation ? (
                     <>
                         {/* Header */}
-                        <div className="h-16 border-b border-gray-100 flex items-center justify-between px-6 bg-white/80 backdrop-blur-sm z-10">
-                            <div className="flex items-center gap-3">
+                        <div className="h-16 border-b border-gray-100 flex items-center justify-between px-4 md:px-6 bg-white/80 backdrop-blur-sm z-10 shrink-0">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="md:hidden -ml-2"
+                                    onClick={() => setActiveConversation(null)}
+                                >
+                                    <ChevronLeft className="h-5 w-5" />
+                                </Button>
                                 <Avatar className="h-9 w-9">
                                     <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
                                         {activeConversation.visitor_name ? activeConversation.visitor_name[0] : 'V'}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div>
-                                    <h3 className="font-semibold text-sm">{activeConversation.visitor_name || 'Visitor'}</h3>
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-sm truncate">{activeConversation.visitor_name || 'Visitor'}</h3>
                                     <div className="flex items-center gap-1.5">
-                                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                                        <span className="text-xs text-gray-500">Online</span>
+                                        <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                                        <span className="text-[10px] text-gray-500">Online</span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="icon"><Phone className="h-4 w-4 text-gray-500" /></Button>
-                                <Button variant="ghost" size="icon"><Video className="h-4 w-4 text-gray-500" /></Button>
-                                <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4 text-gray-500" /></Button>
+                            <div className="flex items-center gap-1 md:gap-2">
+                                <Button variant="ghost" size="icon" className="h-8 w-8"><Phone className="h-4 w-4 text-gray-500" /></Button>
+                                <Button variant="ghost" size="icon" className="hidden sm:flex h-8 w-8"><Video className="h-4 w-4 text-gray-500" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4 text-gray-500" /></Button>
                             </div>
                         </div>
 
                         {/* Messages */}
-                        <div className="flex-1 p-6 bg-gray-50/30 overflow-y-auto">
-                            <div className="flex flex-col gap-4">
+                        <div className="flex-1 p-4 md:p-6 bg-gray-50/30 overflow-y-auto">
+                            <div className="flex flex-col gap-3 md:gap-4">
                                 {messages.map((msg, i) => (
                                     <div
                                         key={i}
                                         className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
                                     >
                                         <div
-                                            className={`max-w-[70%] p-3 px-4 rounded-2xl shadow-sm text-sm ${msg.sender_type === 'admin'
-                                                ? 'bg-blue-600 text-white rounded-br-none'
-                                                : 'bg-white border border-gray-100 text-gray-700 rounded-bl-none'
+                                            className={`max-w-[85%] md:max-w-[70%] p-3 px-4 rounded-2xl shadow-sm text-sm ${msg.sender_type === 'admin'
+                                                ? 'bg-blue-600 text-white rounded-br-none shadow-blue-500/10'
+                                                : 'bg-white border border-gray-100 text-gray-700 rounded-bl-none shadow-gray-200/20'
                                                 }`}
                                         >
                                             <p>{msg.message}</p>

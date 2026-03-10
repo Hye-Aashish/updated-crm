@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         default: 'employee',
-        enum: ['admin', 'owner', 'pm', 'employee', 'client', 'developer'] // Restrict valid roles
+        enum: ['admin', 'owner', 'employee', 'client', 'developer'] // Restrict valid roles
     },
     clientId: { type: String }, // Linked to Client model if role is 'client'
     employeeId: { type: String },

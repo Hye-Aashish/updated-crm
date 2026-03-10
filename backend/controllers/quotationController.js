@@ -299,8 +299,15 @@ exports.generatePDF = async (req, res) => {
         doc.moveDown(0.5);
         doc.fillColor('#475569').fontSize(10).font('Helvetica').text(quotation.objective || 'N/A', { width: 500, align: 'justify' });
 
-        if (quotation.sections && quotation.sections.length > 2) {
-            quotation.sections.slice(2).forEach(s => {
+        if (quotation.projectScope) {
+            doc.moveDown(1.5);
+            doc.fillColor(PRIMARY_COLOR).fontSize(10).font('Helvetica-Bold').text('PROJECT SCOPE');
+            doc.moveDown(0.5);
+            doc.fillColor('#475569').fontSize(10).font('Helvetica').text(quotation.projectScope, { width: 500, align: 'justify' });
+        }
+
+        if (quotation.sections && quotation.sections.length > 0) {
+            quotation.sections.forEach(s => {
                 doc.moveDown(1.5);
                 doc.fillColor(PRIMARY_COLOR).fontSize(10).font('Helvetica-Bold').text(s.title.toUpperCase());
                 doc.moveDown(0.5);
@@ -356,10 +363,13 @@ exports.generatePDF = async (req, res) => {
 
         doc.moveDown(1);
         doc.fillColor(PRIMARY_COLOR).fontSize(10).font('Helvetica-Bold').text('TECHNICAL DELIVERABLES', 50);
-        doc.moveDown(0.3);
+        doc.moveDown(0.5);
         doc.fillColor('#475569').fontSize(9).font('Helvetica');
-        const deliverablesList = quotation.deliverables.filter(d => d.included).map(d => d.name).join('  |  ');
-        doc.text(deliverablesList, 70, doc.y, { width: 480 });
+
+        quotation.deliverables.filter(d => d.included).forEach(d => {
+            doc.text(`•  ${d.name}`, 70, doc.y, { width: 480 });
+            doc.moveDown(0.2);
+        });
 
         // --- FOOTER ---
         const footerY = 750;

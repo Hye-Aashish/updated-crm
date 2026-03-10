@@ -217,19 +217,19 @@ export function useDashboardMetrics(settings: any) {
                     tasks: 'My Daily Tasks'
                 },
                 sectionOrder: ['hero', 'session', 'tasks', 'projects_overview', 'activity'],
-                hiddenSubItems: ['financials', 'revenue', 'expenses', 'profit', 'funnel', 'analytics', 'support_tickets', 'health', 'mini_stats']
+                hiddenSubItems: ['financials', 'revenue', 'expenses', 'profit', 'funnel', 'analytics', 'support_tickets', 'health']
             }
         } else {
             roleLayout = {
-                enabledSections: ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
+                enabledSections: ['hero', 'session', 'team_live', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
                 customLabels: {},
-                sectionOrder: ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
+                sectionOrder: ['hero', 'session', 'team_live', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity'],
                 hiddenSubItems: []
             }
         }
     }
 
-    const allSections = ['hero', 'session', 'financials', 'analytics', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity']
+    const allSections = ['hero', 'session', 'team_live', 'financials', 'analytics', 'expiry_alerts', 'amc', 'domains', 'hosting', 'deadlines', 'tasks', 'projects_overview', 'support_tickets', 'funnel', 'health', 'activity']
 
     const relevantTickets = useMemo(() => {
         if (canViewAll) return tickets
@@ -255,14 +255,27 @@ export function useDashboardMetrics(settings: any) {
 
     const currentLayout = roleLayout.enabledSections && roleLayout.enabledSections.length > 0
         ? [...roleLayout.enabledSections]
-        : allSections
+        : [...allSections]
+
+    // Force essential sections for administrators if they are missing from their custom layout
+    if (['admin', 'owner'].includes(currentUser.role)) {
+        if (!currentLayout.includes('team_live')) currentLayout.push('team_live')
+        if (!currentLayout.includes('amc')) currentLayout.push('amc')
+        if (!currentLayout.includes('domains')) currentLayout.push('domains')
+        if (!currentLayout.includes('hosting')) currentLayout.push('hosting')
+    }
 
     const sectionOrder = roleLayout.sectionOrder && roleLayout.sectionOrder.length > 0
         ? [...new Set(['projects_overview', 'support_tickets', ...roleLayout.sectionOrder, ...allSections])]
         : allSections
 
     const customLabels = roleLayout.customLabels || {}
-    const hiddenSubItems = roleLayout.hiddenSubItems || []
+    let hiddenSubItems = roleLayout.hiddenSubItems || []
+
+    // Ensure mini_stats is not hidden for employees and PMs to show overall performance HUD
+    if (userRole === 'employee' || userRole === 'pm') {
+        hiddenSubItems = hiddenSubItems.filter((item: string) => item !== 'mini_stats')
+    }
 
     const teamPerformance = useMemo(() => {
         if (currentUser?.role === 'client') return []

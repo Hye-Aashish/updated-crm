@@ -52,15 +52,16 @@ const sendEmail = async (options) => {
         return info;
     } catch (err) {
         console.error('[EMAIL ERROR]', err.message);
-        console.error('[EMAIL ERROR DETAILS]', JSON.stringify({
-            host,
-            port,
-            secure,
-            user,
-            senderEmail,
-            errorCode: err.code,
-            errorCommand: err.command
-        }));
+        if (process.env.NODE_ENV === 'development') {
+            console.error('[EMAIL ERROR DETAILS]', JSON.stringify({
+                host,
+                port,
+                secure,
+                user: user ? '***configured***' : 'MISSING',
+                errorCode: err.code,
+                errorCommand: err.command
+            }));
+        }
         throw new Error(`Email delivery failed: ${err.message}`);
     }
 };

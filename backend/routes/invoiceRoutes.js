@@ -194,7 +194,11 @@ router.put('/:id', protect, async (req, res) => {
             }
         }
 
-        const updatedInvoice = await Invoice.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        // Whitelist allowed update fields
+        const allowed = ['invoiceNumber', 'clientId', 'projectId', 'type', 'status', 'lineItems', 'subtotal', 'tax', 'total', 'date', 'dueDate', 'paidDate', 'termsAndConditions', 'autoSend', 'frequency'];
+        const updateData = {};
+        allowed.forEach(key => { if (req.body[key] !== undefined) updateData[key] = req.body[key]; });
+        const updatedInvoice = await Invoice.findByIdAndUpdate(req.params.id, updateData, { new: true });
         res.json(updatedInvoice);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -230,7 +234,9 @@ router.post('/:id/send', protect, async (req, res) => {
         const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
 
         const targetEmail = req.body.customEmail || client.email;
-        console.log(`[SEND] Starting send to ${targetEmail} for Invoice: ${invoice.invoiceNumber}`);
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`[SEND] Starting send to ${targetEmail} for Invoice: ${invoice.invoiceNumber}`);
+        }
 
         // Generate PDF attachment
         let pdfBuffer = null;
@@ -316,8 +322,8 @@ router.post('/:id/send', protect, async (req, res) => {
 });
 
 
-// Create Cashfree Payment Session (Publicly accessible for clients to pay)
-router.post('/:id/payment-session', async (req, res) => {
+// Create Cashfree Payment Session (Authenticated — client or admin)
+router.post('/:id/payment-session', protect, async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
@@ -460,8 +466,25 @@ router.get('/:id/verify-payment', protect, async (req, res) => {
 // Cashfree Webhook - Public
 router.post('/payment/webhook', async (req, res) => {
     try {
-        // Log webhook for debugging
-        console.log("Cashfree Webhook Received:", JSON.stringify(req.body));
+        // Log webhook for debugging (dev only)
+        if (process.env.NODE_ENV === 'development') {
+            console.log("Cashfree Webhook Received:", JSON.stringify(req.body));
+        }
+
+        // Verify webhook signature
+        const signature = req.headers['x-webhook-signature'];
+        if (signature) {
+            const Setting = require('../models/Setting');
+            const settings = await Setting.findOne({ type: 'general' });
+            const secret = settings?.billing?.cashfreeClientSecret || process.env.CASHFREE_CLIENT_SECRET;
+            if (secret) {
+                const expectedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('base64');
+                if (signature !== expectedSignature) {
+                    console.warn('[SECURITY] Invalid webhook signature rejected');
+                    return res.status(401).send('Invalid signature');
+                }
+            }
+        }
 
         // Cashfree can send webhook in different formats depending on version/config
         const orderId = req.body.data?.order?.order_id || req.body.order_id;

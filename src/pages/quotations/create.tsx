@@ -4,7 +4,7 @@ import {
     Plus, Trash2, ArrowLeft, FileText,
     Calculator, ChevronRight, Calendar, Sparkles, ShieldCheck
 } from 'lucide-react';
-import axios from 'axios';
+import api from '@/lib/api-client';
 
 const PROJECT_TYPES = [
     'Multivendor Ecommerce',
@@ -52,30 +52,21 @@ export default function QuotationBuilder() {
 
     const fetchClients = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/clients', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/clients');
             setClients(res.data);
         } catch (e) { console.error(e); }
     };
 
     const fetchTemplates = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/quotations/templates/all', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/quotations/templates/all');
             setTemplates(res.data);
         } catch (e) { console.error(e); }
     };
 
     const fetchQuotation = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:5000/api/quotations/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get(`/quotations/${id}`);
             setFormData(res.data);
         } catch (e) { console.error(e); }
     };
@@ -105,17 +96,28 @@ export default function QuotationBuilder() {
             ...prev,
             timeline: template.timeline || prev.timeline,
             warrantyPeriod: template.warrantyPeriod || prev.warrantyPeriod,
-            objective: replaceVars(template.sections?.[0]?.content) || prev.objective,
-            projectScope: replaceVars(template.sections?.[1]?.content) || prev.projectScope,
-            sections: template.sections?.slice(2).map((s: any) => ({
+            objective: template.sections?.[0] ? replaceVars(template.sections[0].content) : prev.objective,
+            projectScope: template.sections?.[1] ? replaceVars(template.sections[1].content) : prev.projectScope,
+            sections: template.sections?.length > 2 ? template.sections.slice(2).map((s: any) => ({
                 title: s.title,
                 content: replaceVars(s.content)
-            })) || [],
+            })) : (template.sections?.length > 0 ? [] : prev.sections),
             deliverables: template.defaultDeliverables?.length > 0
-                ? template.defaultDeliverables.map((d: any) => ({ ...d, included: true }))
+                ? template.defaultDeliverables.map((d: any) => ({
+                    ...d,
+                    name: replaceVars(d.name),
+                    included: true
+                }))
                 : prev.deliverables,
-            modules: tModules,
-            milestones: template.milestones?.length > 0 ? template.milestones : prev.milestones,
+            modules: tModules.map((m: any) => ({
+                ...m,
+                name: replaceVars(m.name),
+                description: replaceVars(m.description)
+            })),
+            milestones: template.milestones?.length > 0 ? template.milestones.map((m: any) => ({
+                ...m,
+                name: replaceVars(m.name)
+            })) : prev.milestones,
             branding: template.branding || prev.branding
         }));
     };
@@ -168,7 +170,6 @@ export default function QuotationBuilder() {
 
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
             const calculatedMilestones = formData.milestones.map((m: any) => ({
                 ...m,
                 amount: (grandTotal * (Number(m.percentage) || 0)) / 100
@@ -176,12 +177,10 @@ export default function QuotationBuilder() {
             const data = { ...formData, totalAmount, gstAmount, grandTotal, milestones: calculatedMilestones };
             if (statusOverride) data.status = statusOverride;
 
-            const url = id ? `http://localhost:5000/api/quotations/${id}` : 'http://localhost:5000/api/quotations';
+            const url = id ? `/quotations/${id}` : '/quotations';
             const method = id ? 'put' : 'post';
 
-            await axios[method](url, data, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api[method](url, data);
             navigate('/quotations');
         } catch (error: any) {
             console.error(error);
@@ -381,24 +380,57 @@ export default function QuotationBuilder() {
                         </div>
 
                         {/* Dynamic Blueprint Sections */}
-                        {formData.sections?.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {formData.sections.map((s: any, idx: number) => (
-                                    <div key={idx} className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.title}</h4>
-                                        <textarea
-                                            value={s.content}
-                                            onChange={e => {
-                                                const ns = [...formData.sections];
-                                                ns[idx].content = e.target.value;
-                                                setFormData({ ...formData, sections: ns });
-                                            }}
-                                            className="w-full h-32 p-4 bg-white border border-gray-100 rounded-2xl text-sm text-gray-600 focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
-                                        />
-                                    </div>
-                                ))}
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-gray-900">Custom Sections</h3>
+                                <button
+                                    onClick={() => setFormData({ ...formData, sections: [...(formData.sections || []), { title: 'Terms & Conditions', content: '' }] })}
+                                    className="px-4 py-2 bg-white text-purple-600 border border-purple-50 rounded-xl text-xs font-black shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+                                >
+                                    <Plus className="w-3 h-3" /> Add Section
+                                </button>
                             </div>
-                        )}
+
+                            {(formData.sections?.length > 0) ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {formData.sections.map((s: any, idx: number) => (
+                                        <div key={idx} className="space-y-4 group relative bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                                            <div className="flex justify-between items-center">
+                                                <input
+                                                    value={s.title}
+                                                    onChange={e => {
+                                                        const ns = [...formData.sections];
+                                                        ns[idx].title = e.target.value;
+                                                        setFormData({ ...formData, sections: ns });
+                                                    }}
+                                                    className="bg-transparent border-none p-0 text-[10px] font-black text-gray-400 uppercase tracking-widest focus:ring-0 w-full"
+                                                />
+                                                <button
+                                                    onClick={() => setFormData({ ...formData, sections: formData.sections.filter((_: any, i: number) => i !== idx) })}
+                                                    className="text-gray-300 hover:text-red-500 transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            <textarea
+                                                value={s.content}
+                                                onChange={e => {
+                                                    const ns = [...formData.sections];
+                                                    ns[idx].content = e.target.value;
+                                                    setFormData({ ...formData, sections: ns });
+                                                }}
+                                                className="w-full h-32 p-4 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm text-gray-600 focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                                                placeholder="Section content..."
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="px-6 py-10 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200 text-center">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No extra sections. Use a template or add manually.</p>
+                                </div>
+                            )}
+                        </div>
 
                         {/* Modules Table */}
                         <div className="space-y-6">

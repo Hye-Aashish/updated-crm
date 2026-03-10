@@ -55,31 +55,6 @@ const defaultRoles = [
         }
     },
     {
-        name: 'pm', label: 'Project Manager',
-        permissions: {
-            dashboard: { view: true },
-            user_tracker: { view: false },
-            clients: { view: true, create: true, edit: true, delete: false },
-            leads: { view: true, create: true, edit: true, delete: false },
-            projects: { view: true, create: true, edit: true, delete: false },
-            tasks: { view: true, create: true, edit: true, delete: true },
-            team: { view: true, create: false, edit: false, delete: false },
-            attendance: { view: true, manage: false },
-            time_tracking: { view: true, manage: true },
-            invoices: { view: true, create: true, edit: true, delete: false },
-            quotations: { view: true, create: true, edit: true, delete: false },
-            templates: { view: true, create: true, edit: true, delete: false },
-            expenses: { view: true, create: true, edit: true, delete: false },
-            payroll: { view: true, manage: false },
-            tickets: { view: true, create: true, edit: true, delete: false },
-            chat: { view: true, reply: true },
-            project_chat: { view: true, message: true },
-            reports: { view: true },
-            files: { view: true, upload: true, delete: true },
-            settings: { view: false, edit: false }
-        }
-    },
-    {
         name: 'client', label: 'Client',
         permissions: {
             dashboard: { view: true },
@@ -123,18 +98,28 @@ router.get('/', protect, async (req, res) => {
             return res.json(settings);
         }
 
-        // For non-admin, filter out sensitive data
+        // For non-admin, filter out ALL sensitive data
         const publicSettings = settings.toObject();
 
-        // Remove sensitive billing data
+        // Remove all sensitive billing data
         if (publicSettings.billing) {
             delete publicSettings.billing.razorpaySecret;
+            delete publicSettings.billing.razorpayKey;
+            delete publicSettings.billing.cashfreeClientId;
+            delete publicSettings.billing.cashfreeClientSecret;
+            delete publicSettings.billing.cashfreeMode;
         }
 
-        // Remove sensitive email data
+        // Remove all sensitive email/SMTP data
         if (publicSettings.emailSettings) {
             delete publicSettings.emailSettings.pass;
+            delete publicSettings.emailSettings.user;
+            delete publicSettings.emailSettings.host;
+            delete publicSettings.emailSettings.port;
         }
+
+        // Remove roles definitions from non-admin view
+        delete publicSettings.roles;
 
         // Return limited view
         res.json(publicSettings);

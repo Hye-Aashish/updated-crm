@@ -93,7 +93,7 @@ export function LeadsPage() {
             {/* 1. Header Navigation */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0">
                 <div className="space-y-1">
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground uppercase">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
                         Lead Pipeline
                     </h1>
                     <p className="text-sm text-muted-foreground font-medium">
@@ -138,7 +138,7 @@ export function LeadsPage() {
                             </DialogTrigger>
                             <DialogContent className="max-w-sm rounded-xl">
                                 <DialogHeader>
-                                    <DialogTitle className="font-bold text-xl uppercase">Pipeline Stages</DialogTitle>
+                                    <DialogTitle className="font-bold text-xl">Pipeline Stages</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
                                     <div className="space-y-2">
@@ -168,7 +168,7 @@ export function LeadsPage() {
                                                 <div key={s.id} className="flex items-center justify-between p-2 rounded-lg border border-border/20 bg-muted/5 group hover:bg-muted/10 transition-all">
                                                     <div className="flex items-center gap-2">
                                                         <div className={`w-2 h-2 rounded-full ${s.color}`} />
-                                                        <span className="text-[11px] font-bold uppercase tracking-tight">{s.label}</span>
+                                                        <span className="text-xs font-semibold uppercase tracking-wider">{s.label}</span>
                                                     </div>
                                                     <Button variant="ghost" size="sm" onClick={() => handleDeleteStage(s.id)} disabled={stages.length <= 1} className="h-7 w-7 rounded-md text-destructive">
                                                         <Trash2 className="h-4 w-4" />
@@ -190,7 +190,7 @@ export function LeadsPage() {
                             </DialogTrigger>
                             <DialogContent className="max-w-md rounded-xl">
                                 <DialogHeader>
-                                    <DialogTitle className="font-bold text-2xl uppercase tracking-tight pt-2">Add New Lead</DialogTitle>
+                                    <DialogTitle className="font-bold text-2xl tracking-tight pt-2">Add New Lead</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
                                     <div className="grid grid-cols-2 gap-4">
@@ -202,7 +202,7 @@ export function LeadsPage() {
                                         <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Source</Label><Input value={newLead.source} onChange={(e) => setNewLead({ ...newLead, source: e.target.value })} placeholder="e.g. Website" className="rounded-lg h-10" /></div>
                                     </div>
                                     <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Email</Label><Input value={newLead.email} onChange={(e) => setNewLead({ ...newLead, email: e.target.value })} placeholder="john@example.com" className="rounded-lg h-10" /></div>
-                                    <Button onClick={handleAddLead} className="w-full mt-2 font-bold rounded-lg h-11 uppercase tracking-wider">Create Lead</Button>
+                                    <Button onClick={handleAddLead} className="w-full mt-2 font-bold rounded-lg h-11 tracking-wide">Create Lead</Button>
                                 </div>
                             </DialogContent>
                         </Dialog>

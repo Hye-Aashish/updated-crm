@@ -137,7 +137,12 @@ router.put('/:id', protect, async (req, res) => {
             return res.status(403).json({ message: 'Not authorized' });
         }
 
-        const updatedFile = await File.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        // Whitelist allowed update fields
+        const allowed = ['name', 'type', 'projectId', 'clientId'];
+        const updateData = {};
+        allowed.forEach(key => { if (req.body[key] !== undefined) updateData[key] = req.body[key]; });
+        const updatedFile = await File.findByIdAndUpdate(req.params.id, updateData, { new: true });
+
         res.json(updatedFile);
     } catch (err) {
         res.status(400).json({ message: err.message });

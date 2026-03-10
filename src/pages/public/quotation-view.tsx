@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
+const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
+
 export default function PublicQuotationView() {
     const { id } = useParams();
     const [quotation, setQuotation] = useState<any>(null);
@@ -20,7 +22,7 @@ export default function PublicQuotationView() {
 
     const fetchQuotation = async () => {
         try {
-            const res = await axios.get(`http://localhost:5000/api/quotations/public/${id}`);
+            const res = await axios.get(`${API_BASE}/quotations/public/${id}`);
             setQuotation(res.data);
             if (res.data.status === 'approved') setApproved(true);
         } catch (e) { console.error(e); }
@@ -31,7 +33,7 @@ export default function PublicQuotationView() {
         if (!signature) return alert('Please enter your full name as signature');
         setAccepting(true);
         try {
-            await axios.patch(`http://localhost:5000/api/quotations/public/${id}/approve`, { signature });
+            await axios.patch(`${API_BASE}/quotations/public/${id}/approve`, { signature });
             setApproved(true);
             setQuotation({ ...quotation, status: 'approved' });
         } catch (e) { alert('Acceptance failed. Please contact support.'); }

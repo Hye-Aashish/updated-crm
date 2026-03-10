@@ -27,6 +27,7 @@ const server = http.createServer(app);
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:5173',
     'http://localhost:5173',
+    'http://127.0.0.1:5173',
     'http://localhost:3000'
 ].filter(Boolean);
 
@@ -116,6 +117,32 @@ const publicSubmitLimiter = rateLimit({
 });
 app.use('/api/lead-forms/public', publicSubmitLimiter);
 
+// 8. Rate limiter for public tracking endpoints (analytics abuse protection)
+const trackingLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 60,             // 60 req/min per IP
+    message: { message: 'Too many tracking requests.' }
+});
+app.use('/api/tracking/init', trackingLimiter);
+app.use('/api/tracking/event', trackingLimiter);
+app.use('/api/tracking/pulse', trackingLimiter);
+
+// 9. MongoDB ObjectId validation middleware
+const mongoose = require('mongoose');
+app.use('/api', (req, res, next) => {
+    // Validate :id parameters to prevent CastError crashes
+    const idParams = req.url.match(/\/([a-f0-9]{24})(?:\/|$|\?)/gi);
+    if (idParams) {
+        for (const match of idParams) {
+            const id = match.replace(/^\//, '').replace(/[\/\?]$/, '');
+            if (id.length === 24 && !mongoose.Types.ObjectId.isValid(id)) {
+                return res.status(400).json({ message: 'Invalid ID format' });
+            }
+        }
+    }
+    next();
+});
+
 // Request Logging (production-safe)
 app.use((req, res, next) => {
     const start = Date.now();
@@ -150,6 +177,7 @@ const routes = {
     quotations: require('./routes/quotationRoutes'),
     amc: require('./routes/amcRoutes'),
     domains: require('./routes/domainRoutes'),
+    'expiry-alerts': require('./routes/expiryAlertRoutes'),
     test: require('./routes/testRoutes')
 };
 

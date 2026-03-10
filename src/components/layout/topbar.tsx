@@ -213,7 +213,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                     {(searchQuery || searchResults.length > 0) && (
                         <div className="absolute top-14 left-0 w-full bg-popover/95 backdrop-blur-md border border-border/50 rounded-b-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                             <div className="p-2 border-b border-border/30 bg-muted/20 flex justify-between items-center px-4">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Results</span>
+                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Results</span>
                                 <span className="text-[10px] text-muted-foreground">{searchResults.length} matches</span>
                             </div>
                             <div className="max-h-[60vh] overflow-y-auto p-2">
@@ -286,7 +286,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                 {isSearchFocused && (searchQuery || searchResults.length > 0) && (
                     <div className="absolute top-12 left-0 w-full bg-popover/95 backdrop-blur-md border border-border/50 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="p-2 border-b border-border/30 bg-muted/20 flex justify-between items-center px-4">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quick Results</span>
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick Results</span>
                             <span className="text-[10px] text-muted-foreground">{searchResults.length} matches found</span>
                         </div>
                         <div className="max-h-[400px] overflow-y-auto p-2">
@@ -313,7 +313,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                                     <div className="flex flex-col flex-1 truncate">
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{res.title}</span>
-                                            <Badge variant="outline" className="text-[8px] h-4 uppercase font-black py-0 px-1.5 opacity-60 group-hover:opacity-100">{res.type}</Badge>
+                                            <Badge variant="outline" className="text-[10px] h-4 uppercase font-bold py-0 px-1.5 opacity-60 group-hover:opacity-100">{res.type}</Badge>
                                         </div>
                                         <span className="text-xs text-muted-foreground truncate">{res.subtitle}</span>
                                     </div>
@@ -346,13 +346,15 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                     <Search className="h-5 w-5" />
                 </Button>
                 {/* Add Expense - Primary Action */}
-                <Button
-                    onClick={() => setIsExpenseDialogOpen(true)}
-                    className="hidden sm:flex bg-gradient-to-r from-primary to-primary/90 hover:to-primary shadow-lg shadow-primary/20 hover:shadow-primary/30 text-primary-foreground border-0 rounded-xl h-9 px-4 font-semibold transition-all duration-300 hover:scale-[1.02]"
-                >
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    <span>New Expense</span>
-                </Button>
+                {['owner', 'admin'].includes(currentUser?.role || '') && (
+                    <Button
+                        onClick={() => setIsExpenseDialogOpen(true)}
+                        className="hidden sm:flex bg-primary hover:bg-primary/90 shadow-md transition-all h-9 px-4 font-semibold rounded-xl"
+                    >
+                        <Plus className="h-4 w-4 mr-1.5" />
+                        <span>New Expense</span>
+                    </Button>
+                )}
 
                 {/* Icons Container */}
                 <div className="flex items-center gap-1">
@@ -376,7 +378,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-80 p-0 rounded-xl border border-border/50 shadow-xl bg-popover/95 backdrop-blur-sm">
                             <div className="p-4 border-b border-border/40 flex justify-between items-center bg-muted/20">
-                                <span className="font-semibold text-sm">Notifications</span>
+                                <span className="font-bold text-sm">Notifications</span>
                                 {unreadCount > 0 && (
                                     <span className="text-xs text-primary font-medium cursor-pointer hover:underline" onClick={() => markAllNotificationsRead()}>Mark all read</span>
                                 )}
@@ -392,7 +394,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                                             {!n.read && <div className="h-2 w-2 mt-1.5 rounded-full bg-primary shrink-0 animate-pulse" />}
                                             <div className="flex flex-col gap-1 flex-1 overflow-hidden">
                                                 <div className="flex justify-between items-start gap-2">
-                                                    <span className={cn("text-sm leading-none truncate", !n.read ? "font-bold text-foreground" : "font-semibold text-muted-foreground")}>{n.title}</span>
+                                                    <span className={cn("text-sm leading-none truncate font-bold text-foreground")}>{n.title}</span>
                                                     <span className="text-[10px] text-muted-foreground/70 shrink-0 mt-0.5">
                                                         {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </span>

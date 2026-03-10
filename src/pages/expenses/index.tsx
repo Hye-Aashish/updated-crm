@@ -15,6 +15,7 @@ import api from '@/lib/api-client'
 import { mapExpense } from '@/lib/mappers'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
+import { usePermissions } from '@/hooks/use-permissions'
 
 // Fixed Categories (Admin only can add new)
 const EXPENSE_CATEGORIES = [
@@ -64,7 +65,8 @@ type Expense = {
 
 export function ExpensesPage() {
     const { toast } = useToast()
-    const { setExpenses: setGlobalExpenses } = useAppStore()
+    const { canCreate } = usePermissions()
+    const { setExpenses: setGlobalExpenses, currentUser } = useAppStore()
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [viewExpenseDialogOpen, setViewExpenseDialogOpen] = useState(false)
@@ -242,153 +244,159 @@ export function ExpensesPage() {
                     <p className="text-muted-foreground mt-1">Track company spending - 2 minute daily habit</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline">
-                        <Download className="mr-2 h-4 w-4" />
-                        Export CSV
-                    </Button>
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Expense
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Add New Expense</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="date">Date *</Label>
-                                        <Input
-                                            id="date"
-                                            type="date"
-                                            value={newExpense.date}
-                                            onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="amount">Amount (₹) *</Label>
-                                        <Input
-                                            id="amount"
-                                            type="number"
-                                            placeholder="5000"
-                                            value={newExpense.amount}
-                                            onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="category">Category *</Label>
-                                    <select
-                                        id="category"
-                                        value={newExpense.category}
-                                        onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
-                                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                                    >
-                                        <option value="">Select category</option>
-                                        {EXPENSE_CATEGORIES.map((cat) => (
-                                            <option key={cat.value} value={cat.value}>{cat.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="payment-mode">Payment Mode *</Label>
-                                        <select
-                                            id="payment-mode"
-                                            value={newExpense.paymentMode}
-                                            onChange={(e) => setNewExpense({ ...newExpense, paymentMode: e.target.value })}
-                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                                        >
-                                            {PAYMENT_MODES.map((mode) => (
-                                                <option key={mode} value={mode}>{mode}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="paid-by">Paid By *</Label>
-                                        <select
-                                            id="paid-by"
-                                            value={newExpense.paidBy}
-                                            onChange={(e) => setNewExpense({ ...newExpense, paidBy: e.target.value })}
-                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                                        >
-                                            {PAID_BY_OPTIONS.map((option) => (
-                                                <option key={option} value={option}>{option}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="note">Note (Optional)</Label>
-                                    <Input
-                                        id="note"
-                                        placeholder="Brief description..."
-                                        value={newExpense.note}
-                                        onChange={(e) => setNewExpense({ ...newExpense, note: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Attach Receipt (Optional)</Label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="file"
-                                            hidden
-                                            ref={fileInputRef}
-                                            onChange={handleFileChange}
-                                            accept="image/*,application/pdf"
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full"
-                                            onClick={() => fileInputRef.current?.click()}
-                                        >
-                                            <Upload className="mr-2 h-4 w-4" />
-                                            {newExpense.receipt ? 'Receipt Attached (Change)' : 'Upload Receipt'}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <Button onClick={handleAddExpense} className="w-full">
+                    {['owner', 'admin'].includes(currentUser?.role || '') && (
+                        <Button variant="outline">
+                            <Download className="mr-2 h-4 w-4" />
+                            Export CSV
+                        </Button>
+                    )}
+                    {canCreate('expenses') && (
+                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button>
+                                    <Plus className="mr-2 h-4 w-4" />
                                     Add Expense
                                 </Button>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Add New Expense</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="date">Date *</Label>
+                                            <Input
+                                                id="date"
+                                                type="date"
+                                                value={newExpense.date}
+                                                onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="amount">Amount (₹) *</Label>
+                                            <Input
+                                                id="amount"
+                                                type="number"
+                                                placeholder="5000"
+                                                value={newExpense.amount}
+                                                onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="category">Category *</Label>
+                                        <select
+                                            id="category"
+                                            value={newExpense.category}
+                                            onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                        >
+                                            <option value="">Select category</option>
+                                            {EXPENSE_CATEGORIES.map((cat) => (
+                                                <option key={cat.value} value={cat.value}>{cat.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="payment-mode">Payment Mode *</Label>
+                                            <select
+                                                id="payment-mode"
+                                                value={newExpense.paymentMode}
+                                                onChange={(e) => setNewExpense({ ...newExpense, paymentMode: e.target.value })}
+                                                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                            >
+                                                {PAYMENT_MODES.map((mode) => (
+                                                    <option key={mode} value={mode}>{mode}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="paid-by">Paid By *</Label>
+                                            <select
+                                                id="paid-by"
+                                                value={newExpense.paidBy}
+                                                onChange={(e) => setNewExpense({ ...newExpense, paidBy: e.target.value })}
+                                                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                            >
+                                                {PAID_BY_OPTIONS.map((option) => (
+                                                    <option key={option} value={option}>{option}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="note">Note (Optional)</Label>
+                                        <Input
+                                            id="note"
+                                            placeholder="Brief description..."
+                                            value={newExpense.note}
+                                            onChange={(e) => setNewExpense({ ...newExpense, note: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Attach Receipt (Optional)</Label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="file"
+                                                hidden
+                                                ref={fileInputRef}
+                                                onChange={handleFileChange}
+                                                accept="image/*,application/pdf"
+                                            />
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full"
+                                                onClick={() => fileInputRef.current?.click()}
+                                            >
+                                                <Upload className="mr-2 h-4 w-4" />
+                                                {newExpense.receipt ? 'Receipt Attached (Change)' : 'Upload Receipt'}
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <Button onClick={handleAddExpense} className="w-full">
+                                        Add Expense
+                                    </Button>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                    )}
                 </div>
             </div>
 
             {/* Quick Templates */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base">Quick Add Templates</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                        {QUICK_TEMPLATES.map((template) => {
-                            const Icon = template.icon
-                            return (
-                                <Button
-                                    key={template.category}
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleQuickAdd(template)}
-                                >
-                                    <Icon className="mr-2 h-4 w-4" />
-                                    {template.label}
-                                </Button>
-                            )
-                        })}
-                    </div>
-                </CardContent>
-            </Card>
+            {canCreate('expenses') && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Quick Add Templates</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-wrap gap-2">
+                            {QUICK_TEMPLATES.map((template) => {
+                                const Icon = template.icon
+                                return (
+                                    <Button
+                                        key={template.category}
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleQuickAdd(template)}
+                                    >
+                                        <Icon className="mr-2 h-4 w-4" />
+                                        {template.label}
+                                    </Button>
+                                )
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Monthly Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -539,17 +547,19 @@ export function ExpensesPage() {
                                             <div className="text-xl font-bold text-red-600">-{formatCurrency(expense.amount)}</div>
                                             <div className="text-xs text-muted-foreground">{formatDate(new Date(expense.date))}</div>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="opacity-50 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteExpense(expense.id);
-                                            }}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        {['owner', 'admin'].includes(currentUser?.role || '') && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="opacity-50 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteExpense(expense.id);
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             )
@@ -636,14 +646,16 @@ export function ExpensesPage() {
                                 <Button variant="outline" size="sm" onClick={() => setViewExpenseDialogOpen(false)}>
                                     Close
                                 </Button>
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleDeleteExpense(selectedExpense.id)}
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Transaction
-                                </Button>
+                                {['owner', 'admin'].includes(currentUser?.role || '') && (
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => handleDeleteExpense(selectedExpense.id)}
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete Transaction
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     )}

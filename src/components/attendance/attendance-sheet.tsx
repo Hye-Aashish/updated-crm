@@ -167,10 +167,12 @@ export function AttendanceSheet({ users, externalDate, onDateChange }: Attendanc
         return 'absent'
     }
 
-    const filteredUsers = users.filter(u =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (u.role && u.role.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
+    const filteredUsers = users.filter(u => {
+        const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (u.role && u.role.toLowerCase().includes(searchTerm.toLowerCase()))
+        const isNotClient = u.role?.toLowerCase() !== 'client'
+        return matchesSearch && isNotClient
+    })
 
     const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
     const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))

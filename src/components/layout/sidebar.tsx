@@ -18,7 +18,8 @@ import {
     LogOut,
     Activity,
     Shield,
-    Globe
+    Globe,
+    BellRing
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -104,6 +105,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Invoices', href: '/invoices', icon: FileText },
         { name: 'AMC', href: '/amc', icon: Shield },
         { name: 'Domains', href: '/domains', icon: Globe },
+        { name: 'Expiry Alerts', href: '/expiry-alerts', icon: BellRing },
         { name: 'Hosting', href: '/hosting', icon: LayoutDashboard },
         { name: 'Quotations', href: '/quotations', icon: FileText },
         { name: 'Templates', href: '/quotations/templates', icon: LayoutDashboard },
@@ -149,6 +151,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Invoices': return !!p.invoices?.view
             case 'AMC': return !!p.amc?.view
             case 'Domains': return !!p.domains?.view
+            case 'Expiry Alerts': return String(currentUser.role) === 'admin' || String(currentUser.role) === 'owner'
             case 'Hosting': return !!p.hosting?.view
             case 'Quotations': return !!p.quotations?.view
             case 'Templates': return !!p.templates?.view

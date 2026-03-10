@@ -45,6 +45,7 @@ import QuotationTemplates from './pages/quotations/templates'
 import AmcPage from './pages/amc'
 import DomainsPage from './pages/domains'
 import HostingPage from './pages/hosting'
+import ExpiryAlertsPage from './pages/expiry-alerts'
 
 export function AppRoutes() {
     return (
@@ -93,6 +94,7 @@ export function AppRoutes() {
                 <Route path="amc" element={<AmcPage />} />
                 <Route path="domains" element={<DomainsPage />} />
                 <Route path="hosting" element={<HostingPage />} />
+                <Route path="expiry-alerts" element={<ExpiryAlertsPage />} />
 
                 {/* Support & Analysis */}
                 <Route path="tickets" element={<TicketsPage />} />

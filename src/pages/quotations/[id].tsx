@@ -6,7 +6,7 @@ import {
     ShieldCheck, User, Calendar, ExternalLink,
     Box, Milestone, Info
 } from 'lucide-react';
-import axios from 'axios';
+import api from '@/lib/api-client';
 
 export default function QuotationDetailPage() {
     const { id } = useParams();
@@ -23,10 +23,7 @@ export default function QuotationDetailPage() {
 
     const fetchQuotation = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:5000/api/quotations/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get(`/quotations/${id}`);
             setQuotation(res.data);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
@@ -36,10 +33,7 @@ export default function QuotationDetailPage() {
         if (!confirm('Are you sure you want to approve this proposal? This will LOCK the project scope and activate Milestone Tracking.')) return;
         setActionLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.patch(`http://localhost:5000/api/quotations/${id}/approve`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.patch(`/quotations/${id}/approve`);
             fetchQuotation();
         } catch (e) { alert('Approval failed'); }
         finally { setActionLoading(false); }
@@ -47,9 +41,7 @@ export default function QuotationDetailPage() {
 
     const handleDownloadPDF = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/quotations/${id}/pdf`, {
-                headers: { Authorization: `Bearer ${token}` },
+            const response = await api.get(`/quotations/${id}/pdf`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -65,10 +57,7 @@ export default function QuotationDetailPage() {
         if (!crData.title) return alert('Title is required');
         setActionLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post(`http://localhost:5000/api/quotations/${id}/change-request`, crData, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.post(`/quotations/${id}/change-request`, crData);
             setShowCRModal(false);
             setCrData({ title: '', description: '', estimatedCost: 0 });
             fetchQuotation();
@@ -173,10 +162,21 @@ export default function QuotationDetailPage() {
                                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Project Objective</h3>
                                 <p className="text-gray-600 text-sm leading-relaxed">{quotation.objective || 'Objective details not provided in this revision.'}</p>
                             </section>
+
+                            {quotation.projectScope && (
+                                <>
+                                    <div className="h-px bg-gray-50"></div>
+                                    <section>
+                                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Project Scope</h3>
+                                        <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">{quotation.projectScope}</p>
+                                    </section>
+                                </>
+                            )}
+
                             <div className="h-px bg-gray-50"></div>
 
-                            {/* Dynamic Sections (Skip first 2 if they are redundant with Objective/Scope) */}
-                            {quotation.sections?.slice(2).map((s: any, i: number) => (
+                            {/* Dynamic Sections */}
+                            {quotation.sections?.map((s: any, i: number) => (
                                 <section key={i} className="pt-2">
                                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{s.title}</h3>
                                     <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">{s.content}</p>

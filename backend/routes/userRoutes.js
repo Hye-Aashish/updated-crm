@@ -40,11 +40,28 @@ router.get('/', protect, async (req, res) => {
 
 // CREATE a new user (Admin only)
 router.post('/', protect, authorize('admin', 'owner'), async (req, res) => {
-    const user = new User(req.body);
+    // Whitelist allowed fields to prevent mass-assignment attacks
+    const { name, email, password, role, department, designation, salary, phone, avatar } = req.body;
+
+    if (!name || !email || !password) {
+        return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+
+    // Prevent creating owner accounts (only existing owners should exist)
+    if (role === 'owner' && req.user.role !== 'owner') {
+        return res.status(403).json({ message: 'Only owners can create owner accounts' });
+    }
+
+    const user = new User({ name, email, password, role, department, designation, salary, phone, avatar });
     try {
         const newUser = await user.save();
-        res.status(201).json(newUser);
+        const userResponse = newUser.toObject();
+        delete userResponse.password;
+        res.status(201).json(userResponse);
     } catch (err) {
+        if (err.code === 11000) {
+            return res.status(400).json({ message: 'A user with this email already exists' });
+        }
         res.status(400).json({ message: err.message });
     }
 });
@@ -94,6 +111,19 @@ router.put('/:id', protect, async (req, res) => {
 // DELETE user (Admin only)
 router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
+        // Prevent self-deletion
+        if (req.params.id === req.user._id.toString()) {
+            return res.status(400).json({ message: 'You cannot delete your own account' });
+        }
+
+        const userToDelete = await User.findById(req.params.id);
+        if (!userToDelete) return res.status(404).json({ message: 'User not found' });
+
+        // Prevent admin from deleting owner
+        if (userToDelete.role === 'owner' && req.user.role !== 'owner') {
+            return res.status(403).json({ message: 'Only owners can delete owner accounts' });
+        }
+
         await User.findByIdAndDelete(req.params.id);
         res.json({ message: 'User deleted' });
     } catch (err) {

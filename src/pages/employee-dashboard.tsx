@@ -5,11 +5,12 @@ import api from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-    Briefcase, CheckSquare, Clock,
+    Briefcase, CheckSquare, Clock, Zap,
     Calendar, PlayCircle, StopCircle, Coffee, AlertCircle, ArrowUpRight
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useAttendance } from '@/hooks/use-attendance'
+import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
 
 export function EmployeeDashboardPage() {
     const navigate = useNavigate()
@@ -21,6 +22,8 @@ export function EmployeeDashboardPage() {
         currentTime, attendanceStatus, elapsedTime,
         handleClockIn, handleBreakToggle, handleClockOut, formatElapsedTime
     } = useAttendance(userId)
+
+    const { myPerformanceScore } = useDashboardMetrics(settings)
 
     useEffect(() => {
         api.get('/settings').then(res => setSettings(res.data)).catch(() => { })
@@ -97,6 +100,43 @@ export function EmployeeDashboardPage() {
                             </Card>
                         ))}
                     </div>
+
+                    {/* Overall Performance HUD */}
+                    {!layoutConfig.hiddenSubItems?.includes('mini_stats') && (
+                        <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/50 rounded-[1.5rem] p-6 relative overflow-hidden group/hud lg:col-span-full mt-6 shadow-xl w-full">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px]" />
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 relative z-10 gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-12 w-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary border border-primary/30 shadow-inner">
+                                        <Zap className="h-6 w-6 fill-primary/30 animate-pulse" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/80 mb-1">Performance HUD</p>
+                                        <h4 className="text-2xl font-black text-white leading-none">Overall Efficiency Score</h4>
+                                    </div>
+                                </div>
+                                <div className="text-left sm:text-right bg-slate-950/50 px-6 py-3 rounded-2xl border border-white/5">
+                                    <span className="text-4xl font-black text-white tabular-nums tracking-tighter shadow-sm">{myPerformanceScore ?? 0}<span className="text-sm text-slate-400 ml-1">/100</span></span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 relative z-10">
+                                <div className="h-3 w-full bg-slate-950/80 rounded-full overflow-hidden border border-white/5 shadow-inner">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 rounded-full transition-all duration-1000 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                                        style={{ width: `${Math.max(2, myPerformanceScore ?? 0)}%` }}
+                                    />
+                                </div>
+                                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest px-1">
+                                    <span className="flex items-center gap-2 text-slate-400">
+                                        <span className={`h-2 w-2 rounded-full ${(myPerformanceScore ?? 0) > 70 ? 'bg-emerald-500' : (myPerformanceScore ?? 0) > 40 ? 'bg-amber-500' : 'bg-rose-500'} animate-pulse`} />
+                                        System Active
+                                    </span>
+                                    <span className="text-primary/70">{(myPerformanceScore ?? 0) > 70 ? 'Optimal' : (myPerformanceScore ?? 0) > 40 ? 'Needs Focus' : 'Critical'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Attendance Widget */}

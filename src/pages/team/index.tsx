@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-    Plus, Mail, Phone, Briefcase, CheckSquare, Users, UserCog, Code,
+    Plus, Mail, Phone, Briefcase, CheckSquare, Users, Code,
     Clock, CheckCircle, Trash2, Upload, MoreHorizontal
 } from 'lucide-react'
 import { getInitials } from '@/lib/utils'
@@ -166,7 +166,6 @@ export function TeamPage() {
     // --- KPI Calculations (Members) ---
     const totalMembers = users.length
     const developers = users.filter(u => u.role === 'developer' || u.role === 'employee').length
-    const projectManagers = users.filter(u => u.role === 'pm').length
     const owners = users.filter(u => u.role === 'owner' || u.role === 'admin').length
 
     const StatsCard = ({ title, value, icon: Icon, color, bg }: any) => (
@@ -192,7 +191,7 @@ export function TeamPage() {
     }
 
     const roleColors: Record<string, 'default' | 'secondary' | 'outline'> = {
-        'owner': 'default', 'admin': 'default', 'pm': 'secondary', 'developer': 'outline', 'employee': 'outline', 'client': 'outline'
+        'owner': 'default', 'admin': 'default', 'developer': 'outline', 'employee': 'outline', 'client': 'outline'
     }
 
     return (
@@ -261,10 +260,12 @@ export function TeamPage() {
                                                     <Label>Employee Email *</Label>
                                                     <Input value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="email@example.com" />
                                                 </div>
-                                                <div className="space-y-2">
-                                                    <Label>Designation</Label>
-                                                    <Input value={newUser.designation} onChange={e => setNewUser({ ...newUser, designation: e.target.value })} placeholder="Senior Developer" />
-                                                </div>
+                                                {newUser.role !== 'client' && (
+                                                    <div className="space-y-2">
+                                                        <Label>Designation</Label>
+                                                        <Input value={newUser.designation} onChange={e => setNewUser({ ...newUser, designation: e.target.value })} placeholder="Senior Developer" />
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Row 3 */}
@@ -311,10 +312,12 @@ export function TeamPage() {
 
                                             {/* Row 5 */}
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label>Monthly Salary</Label>
-                                                    <Input value={newUser.salary} onChange={e => setNewUser({ ...newUser, salary: e.target.value })} placeholder="e.g. 50000" />
-                                                </div>
+                                                {newUser.role !== 'client' && (
+                                                    <div className="space-y-2">
+                                                        <Label>Monthly Salary</Label>
+                                                        <Input value={newUser.salary} onChange={e => setNewUser({ ...newUser, salary: e.target.value })} placeholder="e.g. 50000" />
+                                                    </div>
+                                                )}
                                                 <div className="space-y-2">
                                                     <Label>Reporting To</Label>
                                                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newUser.reportingTo} onChange={e => setNewUser({ ...newUser, reportingTo: e.target.value })}>
@@ -338,7 +341,6 @@ export function TeamPage() {
                                                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
                                                         <option value="employee">Employee</option>
                                                         <option value="developer">Developer</option>
-                                                        <option value="pm">Project Manager</option>
                                                         <option value="admin">Admin</option>
                                                         <option value="client">Client</option>
                                                     </select>
@@ -441,10 +443,9 @@ export function TeamPage() {
             {activeTab === 'members' ? (
                 <div className="space-y-6">
                     {/* Members KPIs */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <StatsCard title="Total Members" value={totalMembers} icon={Users} color="#3b82f6" bg="bg-blue-500/10" />
                         <StatsCard title="Developers" value={developers} icon={Code} color="#22c55e" bg="bg-green-500/10" />
-                        <StatsCard title="Project Managers" value={projectManagers} icon={UserCog} color="#8b5cf6" bg="bg-purple-500/10" />
                         <StatsCard title="Admins/Owners" value={owners} icon={Briefcase} color="#f59e0b" bg="bg-amber-500/10" />
                     </div>
 

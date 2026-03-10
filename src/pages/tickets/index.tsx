@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { MessageSquare, Plus, Search, Trash2, Clock, CheckCircle, AlertCircle, User, Upload } from 'lucide-react'
+import { MessageSquare, Plus, Search, Trash2, Clock, CheckCircle, AlertCircle, User, Upload, Briefcase } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
@@ -20,12 +20,13 @@ type Ticket = {
     assignedTo: string
     createdAt: string
     screenshot?: string
+    projectId?: string
 }
 
 import { useAppStore } from '@/store'
 
 export function TicketsPage() {
-    const { users, currentUser } = useAppStore()
+    const { users, currentUser, projects } = useAppStore()
     const { toast } = useToast()
     const [tickets, setTickets] = useState<Ticket[]>([])
     const [clients, setClients] = useState<{ _id: string, name: string }[]>([])
@@ -42,6 +43,7 @@ export function TicketsPage() {
         description: '',
         priority: 'medium',
         clientName: '',
+        projectId: '',
         assignedTo: '',
         screenshot: ''
     })
@@ -73,12 +75,14 @@ export function TicketsPage() {
         const fetchData = async () => {
             fetchTickets()
             try {
-                const [clientsRes, usersRes] = await Promise.all([
+                const [clientsRes, usersRes, projectsRes] = await Promise.all([
                     api.get('/clients'),
-                    api.get('/users')
+                    api.get('/users'),
+                    api.get('/projects'),
                 ])
                 setClients(clientsRes.data)
                 useAppStore.getState().setUsers(usersRes.data)
+                useAppStore.getState().setProjects(projectsRes.data)
             } catch (error) {
                 console.error("Failed to fetch data", error)
             }
@@ -92,12 +96,13 @@ export function TicketsPage() {
         try {
             const ticketData = {
                 ...newTicket,
-                clientName: currentUser?.role === 'client' ? currentUser.name : newTicket.clientName
+                clientName: currentUser?.role === 'client' ? currentUser.name : newTicket.clientName,
+                clientId: currentUser?.role === 'client' ? currentUser.id || (currentUser as any)._id : undefined,
             }
             await api.post('/tickets', ticketData)
             fetchTickets()
             setIsDialogOpen(false)
-            setNewTicket({ subject: '', description: '', priority: 'medium', clientName: '', assignedTo: '', screenshot: '' })
+            setNewTicket({ subject: '', description: '', priority: 'medium', clientName: '', projectId: '', assignedTo: '', screenshot: '' })
             toast({ description: "Ticket created successfully" })
         } catch (error) {
             toast({ title: "Error", description: "Failed to create ticket", variant: "destructive" })
@@ -228,6 +233,24 @@ export function TicketsPage() {
                                         <option value="critical">Critical</option>
                                     </select>
                                 </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Project (Optional)</Label>
+                                <select
+                                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    value={newTicket.projectId}
+                                    onChange={(e) => setNewTicket({ ...newTicket, projectId: e.target.value })}
+                                >
+                                    <option value="">Select Project</option>
+                                    {(currentUser?.role === 'client'
+                                        ? projects.filter(p => p.clientId === currentUser?.clientId || p.clientId === currentUser?.id || p.clientId === (currentUser as any)?._id)
+                                        : projects
+                                    ).map(project => (
+                                        <option key={project.id || (project as any)._id} value={project.id || (project as any)._id}>
+                                            {project.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                             {currentUser?.role !== 'client' && (
                                 <div className="space-y-2">
@@ -368,11 +391,17 @@ export function TicketsPage() {
                                         <h3 className="font-semibold text-lg">{ticket.subject}</h3>
                                         <p className="text-sm text-muted-foreground line-clamp-1">{ticket.description || 'No description provided'}</p>
 
-                                        <div className="flex items-center gap-4 mt-2 text-sm">
+                                        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
                                             {ticket.clientName && (
                                                 <div className="flex items-center text-muted-foreground">
                                                     <User className="h-3 w-3 mr-1" />
                                                     Client: {ticket.clientName}
+                                                </div>
+                                            )}
+                                            {ticket.projectId && (
+                                                <div className="flex items-center text-muted-foreground">
+                                                    <Briefcase className="h-3 w-3 mr-1" />
+                                                    Project: {projects.find(p => p.id === ticket.projectId || (p as any)._id === ticket.projectId)?.name || 'Unknown'}
                                                 </div>
                                             )}
                                             {ticket.assignedTo && (
@@ -446,6 +475,13 @@ export function TicketsPage() {
                                     <p className="font-medium mt-1 flex items-center">
                                         <User className="h-3 w-3 mr-1" />
                                         {selectedTicket.clientName || 'N/A'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-muted-foreground text-xs">Project</p>
+                                    <p className="font-medium mt-1 flex items-center">
+                                        <Briefcase className="h-3 w-3 mr-1" />
+                                        {selectedTicket.projectId ? projects.find(p => p.id === selectedTicket.projectId || (p as any)._id === selectedTicket.projectId)?.name || 'Unknown' : 'N/A'}
                                     </p>
                                 </div>
                                 <div>

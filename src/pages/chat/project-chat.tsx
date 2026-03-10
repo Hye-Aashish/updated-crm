@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 // Removed unused Avatar imports
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, MoreVertical, Briefcase, User, Paperclip } from 'lucide-react';
+import { Search, Send, MoreVertical, Briefcase, User, Paperclip, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '@/lib/api-client';
 import { useAppStore } from '@/store';
@@ -305,9 +305,9 @@ export const ProjectChatPage = () => {
     }
 
     return (
-        <div className="flex h-[calc(100vh-2rem)] gap-4 p-4 bg-gray-50/50">
+        <div className="flex h-[calc(100dvh-12rem)] md:h-[calc(100dvh-10rem)] gap-0 md:gap-4 p-0 md:p-4 bg-gray-50/50 overflow-hidden -mx-4 -mt-4 md:m-0">
             {/* Project List Sidebar */}
-            <div className="w-80 flex flex-col bg-white rounded-[2rem] shadow-xl shadow-blue-900/5 border border-gray-100 overflow-hidden">
+            <div className={`w-full md:w-80 flex flex-col bg-white md:rounded-[2rem] shadow-xl shadow-blue-900/5 border-r md:border border-gray-100 overflow-hidden ${activeProject ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-6 bg-gradient-to-br from-indigo-700 via-blue-700 to-blue-600 text-white relative overflow-hidden">
                     {/* Decorative element */}
                     <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
@@ -374,28 +374,36 @@ export const ProjectChatPage = () => {
             </div>
 
             {/* Chat Window */}
-            <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-100/50 overflow-hidden relative">
+            <div className={`flex-1 flex flex-col bg-white md:rounded-[2rem] shadow-xl md:shadow-sm border border-gray-100/50 overflow-hidden relative ${!activeProject ? 'hidden md:flex' : 'flex'}`}>
                 {activeProject ? (
                     <>
                         {/* Header */}
-                        <div className="h-16 border-b border-gray-100 flex items-center justify-between px-6 bg-white/80 backdrop-blur-sm z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+                        <div className="h-16 border-b border-gray-100 flex items-center justify-between px-4 md:px-6 bg-white/80 backdrop-blur-sm z-10 shrink-0">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="md:hidden -ml-2"
+                                    onClick={() => setActiveProject(null)}
+                                >
+                                    <ChevronLeft className="h-5 w-5 text-gray-400" />
+                                </Button>
+                                <div className="h-9 w-9 bg-blue-600 rounded-lg flex items-center justify-center text-white shrink-0">
                                     <Briefcase className="h-5 w-5" />
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-sm">{activeProject.name}</h3>
-                                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black">Project Discussion Room</p>
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-sm truncate">{activeProject.name}</h3>
+                                    <p className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-widest font-black truncate">Project Discussion</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="icon" className="rounded-full"><User className="h-4 w-4 text-gray-500" /></Button>
-                                <Button variant="ghost" size="icon" className="rounded-full"><MoreVertical className="h-4 w-4 text-gray-500" /></Button>
+                            <div className="flex items-center gap-1 md:gap-2">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><User className="h-4 w-4 text-gray-500" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreVertical className="h-4 w-4 text-gray-500" /></Button>
                             </div>
                         </div>
 
                         {/* Messages */}
-                        <div className="flex-1 p-6 bg-slate-50 overflow-y-auto space-y-4">
+                        <div className="flex-1 p-4 md:p-6 bg-slate-50 overflow-y-auto space-y-3 md:space-y-4">
                             {messages.map((msg, i) => {
                                 const isSystem = msg.senderRole === 'system';
                                 if (isSystem) {
@@ -412,7 +420,7 @@ export const ProjectChatPage = () => {
                                 const isMe = msg.senderId === (currentUser?.id || currentUser?._id);
                                 return (
                                     <div key={msg._id || i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`flex flex-col max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}>
+                                        <div className={`flex flex-col max-w-[85%] md:max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}>
                                             {!isMe && (
                                                 <div className="flex items-center gap-2 mb-1 px-1">
                                                     <span className="text-[10px] font-black text-gray-500 uppercase">{msg.senderName}</span>
@@ -442,12 +450,12 @@ export const ProjectChatPage = () => {
                         {/* Input Area */}
                         <div className="p-4 border-t border-gray-100 bg-white">
                             <div className={`flex items-center gap-2 ${hasMessagePermission ? 'bg-gray-50' : 'bg-gray-100 cursor-not-allowed'} p-1.5 rounded-2xl border border-gray-200`}>
-                                <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-[0.8rem]" disabled={!hasMessagePermission}>
+                                <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-[0.8rem]" disabled={!hasMessagePermission}>
                                     <Paperclip className="h-5 w-5" />
                                 </Button>
                                 <Input
-                                    className="border-none bg-transparent focus-visible:ring-0 shadow-none text-sm px-2"
-                                    placeholder={hasMessagePermission ? "Discuss anything about the project..." : "Viewing only (Permission restricted)"}
+                                    className="border-none bg-transparent focus-visible:ring-0 shadow-none text-sm px-2 h-10"
+                                    placeholder={hasMessagePermission ? "Type a message..." : "Viewing only"}
                                     value={inputValue}
                                     onChange={(e) => setInputValue(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && hasMessagePermission && sendMessage()}
@@ -456,7 +464,7 @@ export const ProjectChatPage = () => {
                                 <Button
                                     onClick={sendMessage}
                                     disabled={!hasMessagePermission || !inputValue.trim()}
-                                    className="h-10 w-10 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 rounded-[0.8rem] shrink-0"
+                                    className="h-9 w-9 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 rounded-[0.8rem] shrink-0"
                                 >
                                     <Send className="h-4 w-4" />
                                 </Button>

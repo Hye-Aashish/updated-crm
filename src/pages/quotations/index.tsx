@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, FileText, Download, Mail, Eye, Edit, Trash2 } from 'lucide-react';
-import axios from 'axios';
+import api from '@/lib/api-client';
 import { useNavigate } from 'react-router-dom';
 
 interface Quotation {
@@ -30,10 +30,7 @@ export default function QuotationsPage() {
 
     const fetchQuotations = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:5000/api/quotations', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get('/quotations');
             setQuotations(response.data);
         } catch (error) {
             console.error('Error fetching quotations:', error);
@@ -46,10 +43,7 @@ export default function QuotationsPage() {
         if (!confirm('Are you sure you want to delete this quotation?')) return;
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/quotations/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/quotations/${id}`);
             fetchQuotations();
         } catch (error) {
             console.error('Error deleting quotation:', error);
@@ -58,9 +52,7 @@ export default function QuotationsPage() {
 
     const handleDownloadPDF = async (id: string, quotationNumber: string) => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/quotations/${id}/pdf`, {
-                headers: { Authorization: `Bearer ${token}` },
+            const response = await api.get(`/quotations/${id}/pdf`, {
                 responseType: 'blob'
             });
 

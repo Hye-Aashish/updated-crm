@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button'
 import {
     CheckSquare, Clock, Briefcase, Banknote, TrendingUp, TrendingDown, AlertCircle, PlayCircle,
     StopCircle, Target, Layers, Wallet, CreditCard, Coffee, ArrowUpRight, Zap, LayoutDashboard,
-    CheckCircle, MessageSquare, Rocket, FileText
+    CheckCircle, MessageSquare, Rocket, FileText, Users, Shield, Globe, Server, XCircle, BellRing
 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getInitials } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -24,8 +24,12 @@ import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
 
 export function DashboardPage() {
     const navigate = useNavigate()
-    const { currentUser, leads, setLeads, setExpenses, setProjects, setInvoices, setTasks, invoices, setTickets } = useAppStore()
+    const { currentUser, leads, setLeads, setExpenses, setProjects, setInvoices, setTasks, invoices, setTickets, users } = useAppStore()
     const [settings, setSettings] = useState<any>(null)
+    const [todayAttendance, setTodayAttendance] = useState<any[]>([])
+    const [amcStats, setAmcStats] = useState<any>(null)
+    const [domainStats, setDomainStats] = useState<any>(null)
+    const [expirySummary, setExpirySummary] = useState<any>(null)
     const userId = currentUser?.id || (currentUser as any)?._id
 
     // Hooks for business logic
@@ -55,7 +59,7 @@ export function DashboardPage() {
             <div className="h-[80vh] w-full flex flex-col items-center justify-center space-y-4 animate-pulse">
                 <div className="h-16 w-16 rounded-2xl bg-muted" />
                 <div className="h-4 w-48 bg-muted rounded-full" />
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Syncing Enterprise Data...</p>
+                <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Syncing Enterprise Data...</p>
             </div>
         )
     }
@@ -73,7 +77,11 @@ export function DashboardPage() {
                     api.get('/tasks').then(res => { if (Array.isArray(res.data)) setTasks(res.data.map(mapTask)) }).catch(err => console.error(err)),
                     api.get('/users').then(res => { if (Array.isArray(res.data)) useAppStore.getState().setUsers(res.data.map(mapUser)) }).catch(err => console.error(err)),
                     api.get('/time-entries').then(res => { if (Array.isArray(res.data)) useAppStore.getState().setTimeEntries(res.data) }).catch(err => console.error(err)),
-                    api.get('/tickets').then(res => { if (Array.isArray(res.data)) setTickets(res.data) }).catch(err => console.error(err))
+                    api.get('/tickets').then(res => { if (Array.isArray(res.data)) setTickets(res.data) }).catch(err => console.error(err)),
+                    api.get(`/attendance/monthly?month=${new Date().getMonth()}&year=${new Date().getFullYear()}`).then(res => setTodayAttendance(res.data)).catch(err => console.error(err)),
+                    api.get('/amc/stats/summary').then(res => setAmcStats(res.data)).catch(() => null),
+                    api.get('/domains/stats/summary').then(res => setDomainStats(res.data)).catch(() => null),
+                    api.get('/expiry-alerts').then(res => setExpirySummary(res.data.summary)).catch(() => null)
                 ])
                 if (settingsRes?.data) setSettings(settingsRes.data)
             } catch (error) {
@@ -101,9 +109,9 @@ export function DashboardPage() {
                     )}
                 </div>
                 <div>
-                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] mb-1">{label}</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
                     <div className="flex items-end justify-between">
-                        <h3 className="text-3xl font-black tracking-tighter text-foreground leading-none">{value}</h3>
+                        <h3 className="text-3xl font-bold tracking-tight text-foreground leading-none">{value}</h3>
                         <ArrowUpRight className="h-4 w-4 text-muted-foreground/30 mb-0.5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                     </div>
                 </div>
@@ -133,7 +141,7 @@ export function DashboardPage() {
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-3">
-                                                <h1 className="text-4xl font-black tracking-tight tracking-[-0.04em]">{customLabels.hero || 'Dashboard'}</h1>
+                                                <h1 className="text-4xl font-bold tracking-tight">{customLabels.hero || 'Dashboard'}</h1>
                                                 <Badge className="bg-primary hover:bg-primary border-none text-[9px] h-5 px-2 font-black tracking-widest uppercase">System Active</Badge>
                                             </div>
                                             {!hiddenSubItems.includes('welcome_msg') && (
@@ -149,12 +157,12 @@ export function DashboardPage() {
                                         {['owner', 'admin'].includes(currentUser.role) ? (
                                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                                 {[
-                                                    { label: 'Revenue Net', value: formatCurrency(netProfit), color: 'from-emerald-400 to-teal-500' },
-                                                    { label: 'Project Success', value: `${winRate}%`, color: 'from-blue-400 to-indigo-500' },
-                                                    { label: 'Active Projects', value: inProgressProjects, color: 'from-indigo-400 to-purple-500' },
-                                                    { label: 'Project Portfolio', value: formatCurrency(totalProjectCost || 0), color: 'from-rose-400 to-orange-500' },
+                                                    { label: 'Revenue Net', value: formatCurrency(netProfit), color: 'from-emerald-400 to-teal-500', onClick: () => navigate('/invoices') },
+                                                    { label: 'Project Success', value: `${winRate}%`, color: 'from-blue-400 to-indigo-500', onClick: () => navigate('/projects') },
+                                                    { label: 'Active Projects', value: inProgressProjects, color: 'from-indigo-400 to-purple-500', onClick: () => navigate('/projects?status=in-progress') },
+                                                    { label: 'Project Portfolio', value: formatCurrency(totalProjectCost || 0), color: 'from-rose-400 to-orange-500', onClick: () => navigate('/projects') },
                                                 ].map((item, i) => (
-                                                    <div key={i} className="group/item relative p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
+                                                    <div key={i} className="group/item relative p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer" onClick={item.onClick}>
                                                         <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1 block">{item.label}</span>
                                                         <p className="text-xl font-black tracking-tighter text-white">{item.value}</p>
                                                     </div>
@@ -277,10 +285,10 @@ export function DashboardPage() {
                         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{customLabels.financials || 'Financial Overview'}</h3>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {!hiddenSubItems.includes('revenue') && <StatCard label={currentUser.role === 'client' ? 'Total Paid' : 'Total Revenue'} value={formatCurrency(totalRevenue)} trend={revenueTrend} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" />}
-                        {!hiddenSubItems.includes('expenses') && currentUser.role !== 'client' && <StatCard label="Total Expenses" value={formatCurrency(totalExpenses)} trend={expenseTrend} icon={Wallet} color="text-rose-600" bg="bg-rose-100" />}
-                        {!hiddenSubItems.includes('profit') && currentUser.role !== 'client' && <StatCard label="Net Profit" value={formatCurrency(netProfit)} trend={revenueTrend} icon={TrendingUp} color="text-blue-600" bg="bg-blue-100" />}
-                        {!hiddenSubItems.includes('outstanding') && <StatCard label={currentUser.role === 'client' ? 'Pending Payment' : 'Outstanding'} value={formatCurrency(outstandingInvoices)} trend={`${(invoices || []).filter((i: any) => i.status === 'pending').length} Invoices`} icon={CreditCard} color="text-amber-600" bg="bg-amber-100" />}
+                        {!hiddenSubItems.includes('revenue') && <StatCard label={currentUser.role === 'client' ? 'Total Paid' : 'Total Revenue'} value={formatCurrency(totalRevenue)} trend={revenueTrend} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/invoices')} />}
+                        {!hiddenSubItems.includes('expenses') && currentUser.role !== 'client' && <StatCard label="Total Expenses" value={formatCurrency(totalExpenses)} trend={expenseTrend} icon={Wallet} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/expenses')} />}
+                        {!hiddenSubItems.includes('profit') && currentUser.role !== 'client' && <StatCard label="Net Profit" value={formatCurrency(netProfit)} trend={revenueTrend} icon={TrendingUp} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/invoices')} />}
+                        {!hiddenSubItems.includes('outstanding') && <StatCard label={currentUser.role === 'client' ? 'Pending Payment' : 'Outstanding'} value={formatCurrency(outstandingInvoices)} trend={`${(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').length} Invoices`} icon={CreditCard} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/invoices')} />}
                     </div>
                 </div>
             )}
@@ -327,6 +335,78 @@ export function DashboardPage() {
                             )
                         }
 
+                        if (sectionId === 'team_live' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
+                            const today = new Date().setHours(0, 0, 0, 0);
+                            const staffRoles = ['admin', 'owner', 'employee', 'developer']
+                            const activeUsers = users.filter(usr =>
+                                usr.id !== userId &&
+                                staffRoles.includes(usr.role)
+                            );
+                            const teamStatus = (activeUsers || []).map(user => {
+                                const record = todayAttendance.find(a =>
+                                    a.userId === (user.id || (user as any)._id) &&
+                                    new Date(a.date).setHours(0, 0, 0, 0) === today
+                                );
+                                return { ...user, attendance: record };
+                            });
+
+                            const online = teamStatus.filter(u => u.attendance?.status === 'present');
+                            const onBreak = teamStatus.filter(u => u.attendance?.status === 'on-break');
+                            const completed = teamStatus.filter(u => u.attendance?.status === 'checked-out' || u.attendance?.status === 'half-day');
+                            const notJoined = teamStatus.filter(u => !u.attendance || u.attendance.status === 'absent');
+
+                            return (
+                                <div key={sectionId} className="space-y-6">
+                                    <div className="flex items-center justify-between px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                                                <Users className="h-5 w-5 text-primary" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl font-black tracking-tight">Team Live Presence</h3>
+                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mt-0.5">Real-time member activity</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        {[
+                                            { label: 'Online', count: online.length, users: online, color: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
+                                            { label: 'On Break', count: onBreak.length, users: onBreak, color: 'text-amber-600', bg: 'bg-amber-50', dot: 'bg-amber-500' },
+                                            { label: 'Completed', count: completed.length, users: completed, color: 'text-blue-600', bg: 'bg-blue-50', dot: 'bg-blue-500' },
+                                            { label: 'Not Joined', count: notJoined.length, users: notJoined, color: 'text-slate-400', bg: 'bg-slate-50', dot: 'bg-slate-300' },
+                                        ].map((group, idx) => (
+                                            <Card key={idx} className="p-4 rounded-[1.5rem] border-none shadow-sm bg-card/40 backdrop-blur-sm">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${group.color}`}>{group.label}</span>
+                                                    <Badge variant="outline" className="font-black h-5 min-w-[20px] justify-center border-none bg-muted/50">{group.count}</Badge>
+                                                </div>
+                                                <div className="flex -space-x-2 overflow-hidden mb-2">
+                                                    {group.users.slice(0, 5).map((u, i) => (
+                                                        <Avatar key={i} className="h-7 w-7 border-2 border-background ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
+                                                            <AvatarImage src={u.avatar} />
+                                                            <AvatarFallback className="text-[8px] font-black">{getInitials(u.name)}</AvatarFallback>
+                                                        </Avatar>
+                                                    ))}
+                                                    {group.users.length > 5 && (
+                                                        <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[8px] font-black border-2 border-background text-muted-foreground">
+                                                            +{group.users.length - 5}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mt-2">
+                                                    <span className={`h-1.5 w-1.5 rounded-full ${group.dot} ${group.label !== 'Not Joined' ? 'animate-pulse' : ''}`} />
+                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">
+                                                        {group.label === 'Online' ? 'Currently Active' : group.label === 'On Break' ? 'Away' : group.label === 'Completed' ? 'Shift Done' : 'Yet to Clock-in'}
+                                                    </span>
+                                                </div>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        }
+
                         if (sectionId === 'projects_overview') {
                             if (currentUser.role === 'client') {
                                 return (
@@ -337,8 +417,8 @@ export function DashboardPage() {
                                                     <Rocket className="h-5 w-5 text-primary" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-xl font-black tracking-tight">Active Project Tracking</h3>
-                                                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mt-0.5">Real-time delivery progress</p>
+                                                    <h3 className="text-xl font-bold tracking-tight">Active Project Tracking</h3>
+                                                    <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mt-0.5">Real-time delivery progress</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -348,9 +428,9 @@ export function DashboardPage() {
                                                 <Card key={project.id || project._id} className="relative overflow-hidden border-2 border-primary/5 bg-card/40 backdrop-blur-xl group hover:border-primary/20 transition-all duration-500 rounded-[2.5rem] p-6 shadow-sm">
                                                     <div className="flex items-start justify-between mb-6">
                                                         <div className="space-y-1">
-                                                            <h4 className="font-black text-lg text-foreground tracking-tight group-hover:text-primary transition-colors">{project.name}</h4>
+                                                            <h4 className="font-bold text-lg text-foreground tracking-tight group-hover:text-primary transition-colors">{project.name}</h4>
                                                             <div className="flex items-center gap-2">
-                                                                <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest bg-primary/5 text-primary border-primary/20">{project.type || 'Standard'}</Badge>
+                                                                <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wider bg-primary/5 text-primary border-primary/20">{project.type || 'Standard'}</Badge>
                                                                 <span className="text-[10px] font-bold text-muted-foreground">• Due {new Date(project.dueDate).toLocaleDateString()}</span>
                                                             </div>
                                                         </div>
@@ -362,12 +442,12 @@ export function DashboardPage() {
                                                     <div className="space-y-4">
                                                         <div className="grid grid-cols-2 gap-4 pb-2">
                                                             <div>
-                                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Project Budget</p>
-                                                                <p className="text-sm font-black">{formatCurrency(project.budget || 0)}</p>
+                                                                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Project Budget</p>
+                                                                <p className="text-sm font-bold">{formatCurrency(project.budget || 0)}</p>
                                                             </div>
                                                             <div className="text-right">
-                                                                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Paid Status</p>
-                                                                <p className="text-sm font-black text-emerald-600">
+                                                                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 mb-1">Paid Status</p>
+                                                                <p className="text-sm font-bold text-emerald-600">
                                                                     {formatCurrency((invoices || []).filter(i => i.projectId === (project.id || project._id) && i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0))}
                                                                 </p>
                                                             </div>
@@ -499,6 +579,146 @@ export function DashboardPage() {
                             )
                         }
 
+                        if (sectionId === 'expiry_alerts' && (currentUser.role === 'admin' || currentUser.role === 'owner') && expirySummary?.totalAlerts > 0) {
+                            return (
+                                <div key={sectionId} className="mb-12 border-2 border-amber-500/20 rounded-[2.5rem] p-6 bg-amber-50/10">
+                                    <div className="flex items-center justify-between mb-8 px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-12 w-12 rounded-2xl bg-amber-500/20 flex items-center justify-center">
+                                                <Zap className="h-6 w-6 text-amber-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-2xl font-black tracking-tight text-amber-900">Expiry Monitoring</h3>
+                                                <p className="text-xs font-black uppercase text-amber-500 tracking-widest mt-0.5">Critical renewals & overdue items</p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            onClick={() => navigate('/expiry-alerts')}
+                                            className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-widest h-8 px-4 rounded-xl shadow-lg shadow-amber-200"
+                                        >
+                                            Take Action <ArrowUpRight className="ml-2 h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <StatCard
+                                            label="Expired Items"
+                                            value={expirySummary?.expired || 0}
+                                            icon={XCircle}
+                                            color="text-red-600"
+                                            bg="bg-red-100"
+                                            onClick={() => navigate('/expiry-alerts?filter=expired')}
+                                            className={expirySummary?.expired > 0 ? "border-red-200 animate-pulse" : ""}
+                                        />
+                                        <StatCard
+                                            label="Critical (7 Days)"
+                                            value={expirySummary?.critical || 0}
+                                            icon={AlertCircle}
+                                            color="text-amber-600"
+                                            bg="bg-amber-100"
+                                            onClick={() => navigate('/expiry-alerts?filter=critical')}
+                                        />
+                                        <StatCard
+                                            label="Overdue Invoices"
+                                            value={expirySummary?.invoiceAlerts || 0}
+                                            icon={FileText}
+                                            color="text-rose-600"
+                                            bg="bg-rose-100"
+                                            onClick={() => navigate('/expiry-alerts?type=invoice')}
+                                        />
+                                        <StatCard
+                                            label="Total Alerts"
+                                            value={expirySummary?.totalAlerts || 0}
+                                            icon={BellRing}
+                                            color="text-blue-600"
+                                            bg="bg-blue-100"
+                                            onClick={() => navigate('/expiry-alerts')}
+                                        />
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'amc' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
+                            return (
+                                <div key={sectionId} className="mb-12 border-2 border-blue-500/20 rounded-[2.5rem] p-6 bg-blue-50/10">
+                                    <div className="flex items-center justify-between mb-8 px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-12 w-12 rounded-2xl bg-blue-500/20 flex items-center justify-center">
+                                                <Shield className="h-6 w-6 text-blue-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-2xl font-black tracking-tight text-blue-900">{customLabels.amc || 'AMC Monitoring'}</h3>
+                                                <p className="text-xs font-black uppercase text-blue-500 tracking-widest mt-0.5">Contract health & revenue</p>
+                                            </div>
+                                        </div>
+                                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest h-8" onClick={() => navigate('/amc')}>
+                                            View All <ArrowUpRight className="ml-2 h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <StatCard label="Active AMCs" value={amcStats?.active || 0} icon={Shield} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/amc')} />
+                                        <StatCard label="Expiring" value={amcStats?.expiringSoon || 0} icon={AlertCircle} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/amc?filter=expiring')} />
+                                        <StatCard label="Expired" value={amcStats?.expired || 0} icon={XCircle} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/amc?filter=expired')} />
+                                        <StatCard label="Monthly Rev" value={formatCurrency(amcStats?.totalRevenue || 0)} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/amc')} />
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'domains' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
+                            return (
+                                <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-[2.5rem] p-6 bg-indigo-50/10">
+                                    <div className="flex items-center justify-between mb-8 px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
+                                                <Globe className="h-6 w-6 text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-2xl font-black tracking-tight text-indigo-900">{customLabels.domains || 'Asset Lifecycle'}</h3>
+                                                <p className="text-xs font-black uppercase text-indigo-500 tracking-widest mt-0.5">Domain & Hosting tracking</p>
+                                            </div>
+                                        </div>
+                                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest h-8" onClick={() => navigate('/domains')}>
+                                            Manage Assets <ArrowUpRight className="ml-2 h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <StatCard label="Total Assets" value={domainStats?.total || 0} icon={Globe} color="text-indigo-600" bg="bg-indigo-100" onClick={() => navigate('/domains')} />
+                                        <StatCard label="Expiring" value={domainStats?.expiringSoon || 0} icon={Clock} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/domains?filter=expiring')} />
+                                        <StatCard label="Active SSL" value={domainStats?.activeSsl || 0} icon={Shield} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/domains')} />
+                                        <StatCard label="Pending" value={domainStats?.pendingRenewal || 0} icon={AlertCircle} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/domains')} />
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (sectionId === 'hosting' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
+                            return (
+                                <div key={sectionId} className="mb-12 border-2 border-orange-500/20 rounded-[2.5rem] p-6 bg-orange-50/10">
+                                    <div className="flex items-center justify-between mb-8 px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-12 w-12 rounded-2xl bg-orange-500/20 flex items-center justify-center">
+                                                <Server className="h-6 w-6 text-orange-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-2xl font-black tracking-tight text-orange-900">Hosting Management</h3>
+                                                <p className="text-xs font-black uppercase text-orange-500 tracking-widest mt-0.5">Server resources & uptime</p>
+                                            </div>
+                                        </div>
+                                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest h-8" onClick={() => navigate('/hosting')}>
+                                            Server List <ArrowUpRight className="ml-2 h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <StatCard label="Total Servers" value={domainStats?.totalServers || 0} icon={Server} color="text-orange-600" bg="bg-orange-100" onClick={() => navigate('/hosting')} />
+                                        <StatCard label="Expiring" value={domainStats?.hostingExpiring || 0} icon={Clock} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/hosting')} />
+                                        <StatCard label="Disk Usage" value="82%" icon={Shield} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/hosting')} />
+                                        <StatCard label="Suspended" value={0} icon={AlertCircle} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/hosting')} />
+                                    </div>
+                                </div>
+                            )
+                        }
+
 
 
                         return null;
@@ -591,7 +811,7 @@ export function DashboardPage() {
                                         )}
                                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                             <span className="text-3xl font-black">{leads.length}</span>
-                                            <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50">Opportunities</span>
+                                            <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50">{leads.length === 1 ? 'Opportunity' : 'Opportunities'}</span>
                                         </div>
                                     </div>
                                     {!hiddenSubItems.includes('velocity') && (
