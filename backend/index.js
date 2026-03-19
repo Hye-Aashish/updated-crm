@@ -5,8 +5,10 @@ const http = require('http');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { Server } = require('socket.io');
+const path = require('path');
 if (process.env.NODE_ENV !== 'production') {
-    require('dotenv').config();
+    require('dotenv').config({ path: path.join(__dirname, '.env') });
+    require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 }
 
 const connectDB = require('./config/db');
@@ -186,7 +188,6 @@ Object.entries(routes).forEach(([path, handler]) => {
 });
 
 // Serve static widget file
-const path = require('path');
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
 
