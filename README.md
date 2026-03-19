@@ -8,7 +8,8 @@ Complete SaaS-style Agency Management System frontend built with React, TypeScri
 - **Clients Management** - Complete client lifecycle management
 - **Projects** - Kanban board, milestones, time tracking
 - **Tasks** - Drag & drop, status management, assignments
-- **Team** - Developer management, workload tracking
+- **Team** - Developer management, workload tracking'
+- 
 - **Time Tracking** - Timer widget, reports, logs
 - **Invoices** - Create, manage, track payments
 - **Files** - Mock file management system
