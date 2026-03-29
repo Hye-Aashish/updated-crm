@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
+
 
 // Global cache for serverless environment to prevent multiple connections
 let cached = global.mongoose;
@@ -25,7 +27,9 @@ async function connectDB() {
             family: 4 // Use IPv4, skip trying IPv6 first
         };
 
+        dns.setServers(['8.8.8.8', '8.8.4.4']);
         cached.promise = mongoose.connect(process.env.MONGO_URI, opts).then((mongoose) => {
+
             console.log(`>>> DB CONNECTED: ${mongoose.connection.host} <<<`);
             return mongoose;
         }).catch(err => {

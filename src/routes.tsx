@@ -38,6 +38,7 @@ import { ChatPage } from './pages/chat'
 import { ChatWidgetsPage } from './pages/chat/widgets'
 import { ProjectChatPage } from './pages/chat/project-chat'
 import UserTrackerPage from './pages/user-tracker'
+import ScreenMonitoringPage from './pages/screen-monitoring'
 import QuotationsPage from './pages/quotations'
 import QuotationEditor from './pages/quotations/create'
 import QuotationDetailPage from './pages/quotations/[id]'
@@ -46,6 +47,7 @@ import AmcPage from './pages/amc'
 import DomainsPage from './pages/domains'
 import HostingPage from './pages/hosting'
 import ExpiryAlertsPage from './pages/expiry-alerts'
+import AIAssistantPage from './pages/ai-assistant'
 
 export function AppRoutes() {
     return (
@@ -102,10 +104,12 @@ export function AppRoutes() {
                 <Route path="project-chat" element={<ProjectChatPage />} />
                 <Route path="chat/widgets" element={<ChatWidgetsPage />} />
                 <Route path="user-tracker" element={<UserTrackerPage />} />
+                <Route path="screen-monitoring" element={<ScreenMonitoringPage />} />
                 <Route path="reports" element={<ReportsPage />} />
 
                 <Route path="files" element={<FilesPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="ai-assistant" element={<AIAssistantPage />} />
 
                 {/* Quotations */}
                 <Route path="quotations" element={<QuotationsPage />} />

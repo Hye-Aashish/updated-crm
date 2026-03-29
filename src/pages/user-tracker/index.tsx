@@ -43,6 +43,7 @@ import {
 import { GeoMapChart } from '@/components/analytics/geo-map';
 import { HeatmapViewer } from '@/components/analytics/heatmap-viewer';
 
+
 const UserTrackerPage = () => {
     const [summary, setSummary] = useState<any>(null);
     const [activeTab, setActiveTab] = useState('live'); // live | history
@@ -321,6 +322,8 @@ const UserTrackerPage = () => {
                     </TabsTrigger>
                 </TabsList>
 
+
+
                 <TabsContent value="live">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
@@ -483,6 +486,8 @@ const UserTrackerPage = () => {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+
         </div>
     );
 };

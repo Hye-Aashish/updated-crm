@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nexprism Employee Monitor</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f6; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 320px; text-align: center; }
+        h2 { margin-top: 0; color: #1a365d; }
+        input { width: 100%; padding: 0.75rem; margin: 0.5rem 0; border: 1px solid #e2e8f0; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 0.75rem; background: #3182ce; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 1rem; transition: background 0.2s; }
+        button:hover { background: #2b6cb0; }
+        button.stop { background: #e53e3e; }
+        button.stop:hover { background: #c53030; }
+        .status { margin-top: 1rem; font-size: 0.875rem; color: #718096; }
+        .status.active { color: #38a169; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Employee Monitor</h2>
+        <input type="text" id="backendUrl" placeholder="Backend URL" value="http://localhost:5000">
+        <input type="text" id="email" placeholder="Employee Email">
+        <button id="toggleBtn">Start Monitoring</button>
+        <div id="status" class="status">Disconnected</div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const toggleBtn = document.getElementById('toggleBtn');
+        const statusDiv = document.getElementById('status');
+        const backendInput = document.getElementById('backendUrl');
+        const emailInput = document.getElementById('email');
+
+        let isStreaming = false;
+        let socket = null;
+        let streamInterval = null;
+
+        // Load saved values
+        backendInput.value = localStorage.getItem('backendUrl') || 'http://localhost:5000';
+        emailInput.value = localStorage.getItem('email') || '';
+
+        toggleBtn.onclick = async () => {
+            if (isStreaming) {
+                stopStreaming();
+            } else {
+                startStreaming();
+            }
+        };
+
+        async function startStreaming() {
+            const email = emailInput.value.trim();
+            const backendUrl = backendInput.value.trim();
+
+            if (!email) {
+                alert('Please enter your employee email');
+                return;
+            }
+
+            // Save for next time
+            localStorage.setItem('backendUrl', backendUrl);
+            localStorage.setItem('email', email);
+
+            statusDiv.innerText = 'Connecting...';
+            socket = io(backendUrl);
+
+            socket.on('connect', async () => {
+                statusDiv.innerText = 'Monitoring Active';
+                statusDiv.classList.add('active');
+                toggleBtn.innerText = 'Stop Monitoring';
+                toggleBtn.classList.add('stop');
+                isStreaming = true;
+
+                socket.emit('start-streaming', {
+                    id: email,
+                    email: email,
+                    name: email.split('@')[0]
+                });
+
+                const sources = await window.electronAPI.getSources();
+                const screenSource = sources.find(s => s.name === 'Entire Screen' || s.name === 'Screen 1') || sources[0];
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: false,
+                        video: {
+                            mandatory: {
+                                chromeMediaSource: 'desktop',
+                                chromeMediaSourceId: screenSource.id,
+                                minWidth: 1280,
+                                maxWidth: 1280,
+                                minHeight: 720,
+                                maxHeight: 720
+                            }
+                        }
+                    });
+
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.play();
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 640;
+                    canvas.height = 360;
+                    const ctx = canvas.getContext('2d');
+
+                    streamInterval = setInterval(() => {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const frame = canvas.toDataURL('image/jpeg', 0.5);
+                        socket.emit('screen-frame', { userId: email, frame });
+                    }, 1000);
+
+                } catch (e) {
+                    console.error(e);
+                    stopStreaming();
+                }
+            });
+
+            socket.on('disconnect', () => {
+                stopStreaming();
+            });
+        }
+
+        function stopStreaming() {
+            if (socket) socket.disconnect();
+            if (streamInterval) clearInterval(streamInterval);
+            
+            statusDiv.innerText = 'Disconnected';
+            statusDiv.classList.remove('active');
+            toggleBtn.innerText = 'Start Monitoring';
+            toggleBtn.classList.remove('stop');
+            isStreaming = false;
+        }
+    </script>
+</body>
+</html>

@@ -67,6 +67,10 @@ const settingSchema = new mongoose.Schema({
             label: { type: String }
         }]
     },
+    apiKeys: {
+        gemini: { type: String, default: '' },
+        openai: { type: String, default: '' },
+    },
     updatedAt: { type: Date, default: Date.now }
 });
 

@@ -1,0 +1,33 @@
+﻿node.exe : [31merror 
+when starting dev server:
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (  
+  [31merror when starti   
+ ng dev server::String    
+) [], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+Error: listen EACCES: 
+permission denied ::1:5173
+    at 
+Server.setupListenHandle 
+[as _listen2] 
+(node:net:1918:21)
+    at listenInCluster 
+(node:net:1997:12)
+    at GetAddrInfoReqWrap.
+callback (node:net:2206:7)
+    at GetAddrInfoReqWrap.
+onlookupall [as 
+oncomplete] 
+(node:dns:134:8)[39m

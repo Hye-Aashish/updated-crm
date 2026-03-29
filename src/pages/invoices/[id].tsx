@@ -10,7 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Check, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote } from 'lucide-react'
+import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import api from '@/lib/api-client'
 import type { Invoice, Client } from '@/types'

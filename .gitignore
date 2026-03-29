@@ -9,6 +9,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-electron
 *.local
 
 # Editor directories and files
@@ -27,3 +28,13 @@ dist-ssr
 .env.*
 !.env.example
 backend/.env
+
+# Build outputs
+release/
+build/
+*.exe
+*.asar
+
+# Temp files
+vite-error*.txt
+push-error.txt

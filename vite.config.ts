@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vitejs.dev/config/
 export default defineConfig({
+    base: './', // CRITICAL FOR ELECTRON: Makes asset paths relative
     plugins: [react()],
     resolve: {
         alias: {

@@ -4,6 +4,7 @@ import {
     Briefcase,
     CheckSquare,
     Clock,
+    Monitor,
     FileText,
     Settings,
     FolderOpen,
@@ -19,7 +20,8 @@ import {
     Activity,
     Shield,
     Globe,
-    BellRing
+    BellRing,
+    Brain
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -96,6 +98,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'User Tracker', href: '/user-tracker', icon: Activity },
+        { name: 'Screen Monitoring', href: '/screen-monitoring', icon: Monitor },
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Projects', href: '/projects', icon: Briefcase },
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
@@ -117,6 +120,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Live Chat', href: '/chat', icon: MessageSquare },
         { name: 'Reports', href: '/reports', icon: BarChart },
         { name: 'Files', href: '/files', icon: FolderOpen },
+        { name: 'AI Assistant', href: '/ai-assistant', icon: Brain },
         { name: 'Settings', href: '/settings', icon: Settings },
     ]
     const filteredItems = navItems.filter(item => {
@@ -142,6 +146,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         switch (item.name) {
             case 'Dashboard': return !!p.dashboard?.view
             case 'User Tracker': return !!p.user_tracker?.view
+            case 'Screen Monitoring': return currentUser?.role === 'admin'
             case 'Clients': return !!p.clients?.view
             case 'Projects': return !!p.projects?.view
             case 'Tasks': return !!p.tasks?.view
@@ -164,6 +169,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Reports': return !!p.reports?.view
             case 'Files': return !!p.files?.view
             case 'Settings': return !!p.settings?.view
+            case 'AI Assistant': return currentUser?.role === 'admin' || currentUser?.role === 'owner'
             default: return true
         }
     })

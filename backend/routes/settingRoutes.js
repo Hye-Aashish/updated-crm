@@ -121,6 +121,9 @@ router.get('/', protect, async (req, res) => {
         // Remove roles definitions from non-admin view
         delete publicSettings.roles;
 
+        // Remove API keys from non-admin view
+        delete publicSettings.apiKeys;
+
         // Return limited view
         res.json(publicSettings);
 
@@ -162,6 +165,10 @@ router.put('/', protect, authorize('admin', 'owner'), async (req, res) => {
         if (req.body.payroll) {
             const current = settings.payroll ? settings.payroll.toObject() : {};
             settings.payroll = { ...current, ...req.body.payroll };
+        }
+        if (req.body.apiKeys) {
+            const current = settings.apiKeys ? settings.apiKeys.toObject() : {};
+            settings.apiKeys = { ...current, ...req.body.apiKeys };
         }
 
         settings.updatedAt = Date.now();

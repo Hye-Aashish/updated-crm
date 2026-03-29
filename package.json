@@ -2,13 +2,43 @@
     "name": "nexprism-agency-management",
     "private": true,
     "version": "1.0.0",
+    "description": "Nexprism Agency Management System with Employee Monitoring",
+    "author": "Nexprism",
     "type": "module",
+    "main": "electron/main.cjs",
     "scripts": {
         "dev": "vite",
         "dev:backend": "cd backend && npm run dev",
-        "build": "tsc && vite build",
+        "build": "vite build",
         "preview": "vite preview",
+        "electron": "electron .",
+        "electron:dev": "electron ./electron/main.cjs",
+        "build:electron": "electron-builder build --win --publish never",
         "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    },
+    "build": {
+        "appId": "com.nexprism.employee.monitor",
+        "productName": "Nexprism Employee Monitor",
+        "asar": true,
+        "directories": {
+            "output": "dist-electron"
+        },
+        "files": [
+            "electron/**/*",
+            "dist/**/*",
+            "public/**/*"
+        ],
+        "win": {
+            "target": "nsis",
+            "publish": null
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "perMachine": true,
+            "runAfterFinish": true
+        }
     },
     "dependencies": {
         "@dnd-kit/core": "^6.3.1",
@@ -65,9 +95,13 @@
         "@typescript-eslint/parser": "^6.14.0",
         "@vitejs/plugin-react": "^4.2.1",
         "autoprefixer": "^10.4.16",
+        "cross-env": "^10.1.0",
+        "electron": "^40.8.0",
+        "electron-builder": "^26.8.1",
         "eslint": "^8.55.0",
         "eslint-plugin-react-hooks": "^4.6.0",
         "eslint-plugin-react-refresh": "^0.4.5",
+        "is-dev": "^0.2.1",
         "postcss": "^8.4.32",
         "tailwindcss": "^3.4.0",
         "tailwindcss-animate": "^1.0.7",

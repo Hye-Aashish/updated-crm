@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import {
     Building2, Users, CreditCard, FolderKanban, Bell, MessageSquare,
     Upload, Save, Plus, Trash2, Edit, Eye, EyeOff, Shield, Mail, CheckCircle, AlertCircle, Loader2,
-    Layout, GripVertical, ChevronUp, ChevronDown
+    Layout, GripVertical, ChevronUp, ChevronDown, Brain, Sparkles, ExternalLink, KeyRound
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import api from '@/lib/api-client'
@@ -44,7 +44,7 @@ function hexToHSL(hex: string) {
     return `${(h * 360).toFixed(1)} ${(s * 100).toFixed(1)}% ${(l * 100).toFixed(1)}%`;
 }
 
-type SettingsTab = 'company' | 'users' | 'roles' | 'billing' | 'templates' | 'project-settings' | 'notifications' | 'email' | 'whatsapp' | 'dashboard-builder'
+type SettingsTab = 'company' | 'users' | 'roles' | 'billing' | 'templates' | 'project-settings' | 'notifications' | 'email' | 'whatsapp' | 'dashboard-builder' | 'ai-config'
 
 export function SettingsPage() {
     const [activeTab, setActiveTab] = useState<SettingsTab>('company')
@@ -99,6 +99,7 @@ export function SettingsPage() {
         { id: 'notifications' as SettingsTab, label: 'Notifications', icon: Bell },
         { id: 'email' as SettingsTab, label: 'SMTP Settings', icon: Mail },
         { id: 'whatsapp' as SettingsTab, label: 'WhatsApp API', icon: MessageSquare },
+        { id: 'ai-config' as SettingsTab, label: 'AI Configuration', icon: Brain },
     ]
 
     return (
@@ -132,6 +133,7 @@ export function SettingsPage() {
                                             {tab.id === 'notifications' && <Bell className="h-4 w-4" />}
                                             {tab.id === 'email' && <Mail className="h-4 w-4" />}
                                             {tab.id === 'whatsapp' && <MessageSquare className="h-4 w-4" />}
+                                            {tab.id === 'ai-config' && <Brain className="h-4 w-4" />}
                                             {tab.label}
                                         </button>
                                     )
@@ -155,6 +157,7 @@ export function SettingsPage() {
                             {activeTab === 'notifications' && <NotificationsTab data={settings?.notifications} onSave={(d: any) => updateSettings('notifications', d)} saving={saving} />}
                             {activeTab === 'email' && <EmailSettingsTab data={settings?.emailSettings} onSave={(d: any) => updateSettings('emailSettings', d)} saving={saving} />}
                             {activeTab === 'whatsapp' && <WhatsAppSettingsTab data={settings?.whatsappSettings} onSave={(d: any) => updateSettings('whatsappSettings', d)} saving={saving} />}
+                            {activeTab === 'ai-config' && <AIConfigTab data={settings?.apiKeys} onSave={(d: any) => updateSettings('apiKeys', d)} saving={saving} />}
                         </>
                     )}
                 </div>
@@ -1385,6 +1388,177 @@ function WhatsAppSettingsTab({ data, onSave, saving }: any) {
                         This integration uses the official WhatsApp Cloud API. Messages will be sent from your registered business number. Make sure your Meta App is in 'Live' mode for production use.
                     </AlertDescription>
                 </Alert>
+            </CardContent>
+        </Card>
+    )
+}
+
+function AIConfigTab({ data, onSave, saving }: any) {
+    const [formData, setFormData] = useState(data || { gemini: '', openai: '' })
+    const [showGemini, setShowGemini] = useState(false)
+    const [showOpenAI, setShowOpenAI] = useState(false)
+    const [testingAI, setTestingAI] = useState(false)
+    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+    const { toast } = useToast()
+
+    useEffect(() => { if (data) setFormData(data) }, [data])
+
+    const handleChange = (e: any) => {
+        setFormData({ ...formData, [e.target.id]: e.target.value })
+    }
+
+    const testGeminiKey = async () => {
+        if (!formData.gemini) {
+            setTestResult({ success: false, message: 'Please enter a Gemini API key first.' })
+            return
+        }
+        setTestingAI(true)
+        setTestResult(null)
+        try {
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${formData.gemini}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: 'Say "API Connected Successfully" in exactly those words.' }] }],
+                        generationConfig: { maxOutputTokens: 50 }
+                    })
+                }
+            )
+            if (res.ok) {
+                setTestResult({ success: true, message: '✅ Gemini API key is valid and working!' })
+            } else {
+                const err = await res.json().catch(() => ({}))
+                setTestResult({ success: false, message: `❌ Invalid key: ${err?.error?.message || 'Unknown error'}` })
+            }
+        } catch (err: any) {
+            setTestResult({ success: false, message: `❌ Connection failed: ${err.message}` })
+        } finally {
+            setTestingAI(false)
+        }
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
+                        <Brain className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            AI Configuration
+                            <span className="text-[10px] font-medium bg-gradient-to-r from-violet-500 to-indigo-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Beta</span>
+                        </CardTitle>
+                        <CardDescription>Configure AI API keys for the AI Assistant feature</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {testResult && (
+                    <Alert variant={testResult.success ? "default" : "destructive"} className={testResult.success ? "border-green-500 text-green-700 bg-green-50" : ""}>
+                        {testResult.success ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                        <AlertTitle>{testResult.success ? "Connection Successful" : "Connection Failed"}</AlertTitle>
+                        <AlertDescription>{testResult.message}</AlertDescription>
+                    </Alert>
+                )}
+
+                {/* Gemini API Key */}
+                <div className="space-y-4 p-4 rounded-xl border bg-gradient-to-br from-violet-50/50 to-indigo-50/50 dark:from-violet-950/20 dark:to-indigo-950/20">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-semibold flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-violet-500" />
+                            Google Gemini API
+                        </h3>
+                        <a
+                            href="https://aistudio.google.com/apikey"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                            Get Free API Key <ExternalLink className="h-3 w-3" />
+                        </a>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="gemini">API Key</Label>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="gemini"
+                                    value={formData.gemini || ''}
+                                    onChange={handleChange}
+                                    type={showGemini ? 'text' : 'password'}
+                                    placeholder="AIzaSy..."
+                                    className="pl-10"
+                                />
+                            </div>
+                            <Button variant="outline" size="icon" onClick={() => setShowGemini(!showGemini)}>
+                                {showGemini ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                            Powers the AI Assistant. Get a free key from{' '}
+                            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                                Google AI Studio
+                            </a>
+                        </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={testGeminiKey} disabled={testingAI || !formData.gemini}>
+                        {testingAI ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
+                        {testingAI ? 'Testing...' : 'Test Connection'}
+                    </Button>
+                </div>
+
+                {/* OpenAI API Key (Future) */}
+                <div className="space-y-4 p-4 rounded-xl border opacity-60">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-semibold flex items-center gap-2">
+                            OpenAI API
+                            <span className="text-[10px] font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Coming Soon</span>
+                        </h3>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="openai">API Key</Label>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="openai"
+                                    value={formData.openai || ''}
+                                    onChange={handleChange}
+                                    type={showOpenAI ? 'text' : 'password'}
+                                    placeholder="sk-..."
+                                    className="pl-10"
+                                    disabled
+                                />
+                            </div>
+                            <Button variant="outline" size="icon" onClick={() => setShowOpenAI(!showOpenAI)} disabled>
+                                {showOpenAI ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* How it works */}
+                <div className="rounded-xl border p-4 bg-muted/30">
+                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <Brain className="h-4 w-4 text-primary" /> How AI Assistant Works
+                    </h4>
+                    <ul className="text-xs text-muted-foreground space-y-1.5">
+                        <li>• AI reads your entire CRM data (projects, clients, invoices, tasks, leads, etc.)</li>
+                        <li>• You ask questions in Hindi, English, or Hinglish</li>
+                        <li>• AI gives you actionable business insights and recommendations</li>
+                        <li>• Only Admin & Owner can access the AI Assistant</li>
+                        <li>• Your data stays secure — it's only sent to the AI during your conversation</li>
+                    </ul>
+                </div>
+
+                <Button className="w-full" onClick={() => onSave(formData)} disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {saving ? 'Saving...' : 'Save AI Configuration'}
+                </Button>
             </CardContent>
         </Card>
     )

@@ -42,6 +42,7 @@ const io = new Server(server, {
 
 require('./socket/chatSocket')(io);
 require('./socket/projectChatSocket')(io);
+require('./socket/monitoringSocket')(io);
 
 const PORT = process.env.PORT || 5000;
 
@@ -180,7 +181,8 @@ const routes = {
     amc: require('./routes/amcRoutes'),
     domains: require('./routes/domainRoutes'),
     'expiry-alerts': require('./routes/expiryAlertRoutes'),
-    test: require('./routes/testRoutes')
+    test: require('./routes/testRoutes'),
+    'ai-assistant': require('./routes/aiAssistantRoutes')
 };
 
 Object.entries(routes).forEach(([path, handler]) => {

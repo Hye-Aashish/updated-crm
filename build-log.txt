@@ -1,0 +1,140 @@
+
+> nexprism-agency-management@1.0.0 build:electron
+> electron-builder build --win --publish never
+
+  • electron-builder  version=26.8.1 os=10.0.26200
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=40.8.0 arch=x64 buildFromSource=false workspaceRoot=D:\CRM-main projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=40.8.0 appOutDir=dist-electron\win-unpacked
+  • searching for node modules  pm=npm searchDir=D:\CRM-main
+(node:29692) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  • duplicate dependency references  dependencies=["react@18.3.1","@dnd-kit/utilities@3.2.2","react-dom@18.3.1","react@18.3.1","@dnd-kit/core@6.3.1","@dnd-kit/utilities@3.2.2","react@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-slot@1.2.4","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-presence@1.1.5","@radix-ui/react-slot@1.2.3","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@types/react@18.3.27","react-dom@18.3.1","@types/react@18.3.27","@types/react@18.3.27","react-style-singleton@2.2.3","react@18.3.1","@types/react@18.3.27","react@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-id@1.1.1","@radix-ui/react-collection@1.1.7","@types/react@18.3.27","react@18.3.1","@radix-ui/react-dismissable-layer@1.1.11","@radix-ui/react-focus-scope@1.1.7","@radix-ui/react-id@1.1.1","@radix-ui/react-popper@1.2.8","@radix-ui/react-portal@1.1.9","@radix-ui/react-presence@1.1.5","@radix-ui/react-slot@1.2.3","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-roving-focus@1.1.11","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","aria-hidden@1.2.6","react-dom@18.3.1","react-remove-scroll@2.7.2","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-primitive@2.1.4","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-dismissable-layer@1.1.11","@radix-ui/react-focus-scope@1.1.7","@radix-ui/react-id@1.1.1","@floating-ui/dom@1.7.5","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-use-size@1.1.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-portal@1.1.9","@radix-ui/react-presence@1.1.5","@radix-ui/react-slot@1.2.3","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@types/react@18.3.27","aria-hidden@1.2.6","react-dom@18.3.1","react-remove-scroll@2.7.2","react@18.3.1","@radix-ui/react-primitive@2.1.4","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-presence@1.1.5","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-slot@1.2.3","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-dismissable-layer@1.1.11","@radix-ui/react-focus-scope@1.1.7","@radix-ui/react-id@1.1.1","@radix-ui/react-popper@1.2.8","@radix-ui/react-portal@1.1.9","@radix-ui/react-slot@1.2.3","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","aria-hidden@1.2.6","react-dom@18.3.1","react-remove-scroll@2.7.2","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@radix-ui/react-use-size@1.1.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-id@1.1.1","@radix-ui/react-presence@1.1.5","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-collection@1.1.7","@types/react@18.3.27","react@18.3.1","@radix-ui/react-id@1.1.1","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-collection@1.1.7","@types/react@18.3.27","react@18.3.1","@radix-ui/react-dismissable-layer@1.1.11","@radix-ui/react-portal@1.1.9","@radix-ui/react-presence@1.1.5","@types/react@18.3.27","react@18.3.1","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@radix-ui/react-visually-hidden@1.2.3","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-dismissable-layer@1.1.11","@radix-ui/react-id@1.1.1","@radix-ui/react-popper@1.2.8","@radix-ui/react-portal@1.1.9","@radix-ui/react-presence@1.1.5","@radix-ui/react-slot@1.2.3","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","@types/react@18.3.27","react@18.3.1","@radix-ui/react-use-controllable-state@1.2.2","@radix-ui/react-visually-hidden@1.2.3","@types/react@18.3.27","react-dom@18.3.1","react@18.3.1","react-dom@18.3.1","react@18.3.1","call-bind-apply-helpers@1.0.2","es-object-atoms@1.1.1","hasown@2.0.2","hasown@2.0.2","rxjs@7.8.2","string-width@4.2.3","ansi-styles@4.3.0","string-width@4.2.3","strip-ansi@6.0.1","strip-ansi@6.0.1","d3-time@3.1.0","d3-array@3.2.4","debug@4.4.3","http-errors@2.0.1","on-finished@2.4.1","qs@6.15.0","http-errors@2.0.1","iconv-lite@0.7.2","type-is@2.0.1","debug@4.4.3","on-finished@2.4.1","call-bind-apply-helpers@1.0.2","get-intrinsic@1.3.0","get-intrinsic@1.3.0","call-bound@1.0.4","get-intrinsic@1.3.0","side-channel-map@1.0.1","debug@4.4.3","debug@4.4.3","http-errors@2.0.1","on-finished@2.4.1","send@1.2.1","react-dom@18.3.1","react@18.3.1","react@18.3.1","react@18.3.1","loose-envify@1.4.0","react@18.3.1","react-dom@18.3.1","react@18.3.1","react@18.3.1","loose-envify@1.4.0","react-dom@18.3.1","react@18.3.1","react-dom@18.3.1","react@18.3.1","loose-envify@1.4.0","react-dom@18.3.1","prop-types@15.8.1","react-dom@18.3.1","loose-envify@1.4.0","prop-types@15.8.1","react-dom@18.3.1","react@18.3.1","react@18.3.1","react@18.3.1","d3-array@3.2.4","d3-interpolate@3.0.1","d3-scale@4.0.2","d3-time@3.1.0","debug@4.4.3","debug@4.4.3","debug@4.4.3","@types/react@18.3.27","react@18.3.1","react@18.3.1"]
+  • updating asar integrity executable resource  executablePath=dist-electron\win-unpacked\Nexprism Employee Monitor.exe
+  • default Electron icon is used  reason=application icon is not set
+  • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=1.869s
+  ⨯ cannot execute  cause=exit status 2
+                    out=
+    7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+    
+    Scanning the drive for archives:
+    1 file, 5635384 bytes (5504 KiB)
+    
+    Extracting archive: C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\590244811.7z
+    --
+    Path = C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\590244811.7z
+    Type = 7z
+    Physical Size = 5635384
+    Headers Size = 1492
+    Method = LZMA2:24m LZMA:20 BCJ2
+    Solid = +
+    Blocks = 2
+    
+    
+    Sub items Errors: 2
+    
+    Archives with Errors: 1
+    
+    Sub items Errors: 2
+    
+                    errorOut=ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\590244811\darwin\10.12\lib\libcrypto.dylib
+    ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\590244811\darwin\10.12\lib\libssl.dylib
+    
+                    command='D:\CRM-main\node_modules\7zip-bin\win\x64\7za.exe' x -snld -bd 'C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\590244811.7z' '-oC:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\590244811'
+                    workingDir=C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign
+  • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=1.181s
+  ⨯ cannot execute  cause=exit status 2
+                    out=
+    7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+    
+    Scanning the drive for archives:
+    1 file, 5635384 bytes (5504 KiB)
+    
+    Extracting archive: C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\921163283.7z
+    --
+    Path = C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\921163283.7z
+    Type = 7z
+    Physical Size = 5635384
+    Headers Size = 1492
+    Method = LZMA2:24m LZMA:20 BCJ2
+    Solid = +
+    Blocks = 2
+    
+    
+    Sub items Errors: 2
+    
+    Archives with Errors: 1
+    
+    Sub items Errors: 2
+    
+                    errorOut=ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\921163283\darwin\10.12\lib\libcrypto.dylib
+    ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\921163283\darwin\10.12\lib\libssl.dylib
+    
+                    command='D:\CRM-main\node_modules\7zip-bin\win\x64\7za.exe' x -snld -bd 'C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\921163283.7z' '-oC:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\921163283'
+                    workingDir=C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign
+  • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=1.311s
+  ⨯ cannot execute  cause=exit status 2
+                    out=
+    7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+    
+    Scanning the drive for archives:
+    1 file, 5635384 bytes (5504 KiB)
+    
+    Extracting archive: C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\347551195.7z
+    --
+    Path = C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\347551195.7z
+    Type = 7z
+    Physical Size = 5635384
+    Headers Size = 1492
+    Method = LZMA2:24m LZMA:20 BCJ2
+    Solid = +
+    Blocks = 2
+    
+    
+    Sub items Errors: 2
+    
+    Archives with Errors: 1
+    
+    Sub items Errors: 2
+    
+                    errorOut=ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\347551195\darwin\10.12\lib\libcrypto.dylib
+    ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\347551195\darwin\10.12\lib\libssl.dylib
+    
+                    command='D:\CRM-main\node_modules\7zip-bin\win\x64\7za.exe' x -snld -bd 'C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\347551195.7z' '-oC:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\347551195'
+                    workingDir=C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign
+  • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=1.285s
+  ⨯ cannot execute  cause=exit status 2
+                    out=
+    7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+    
+    Scanning the drive for archives:
+    1 file, 5635384 bytes (5504 KiB)
+    
+    Extracting archive: C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\432459155.7z
+    --
+    Path = C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\432459155.7z
+    Type = 7z
+    Physical Size = 5635384
+    Headers Size = 1492
+    Method = LZMA2:24m LZMA:20 BCJ2
+    Solid = +
+    Blocks = 2
+    
+    
+    Sub items Errors: 2
+    
+    Archives with Errors: 1
+    
+    Sub items Errors: 2
+    
+                    errorOut=ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\432459155\darwin\10.12\lib\libcrypto.dylib
+    ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\432459155\darwin\10.12\lib\libssl.dylib
+    
+                    command='D:\CRM-main\node_modules\7zip-bin\win\x64\7za.exe' x -snld -bd 'C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\432459155.7z' '-oC:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign\432459155'
+                    workingDir=C:\Users\win\AppData\Local\electron-builder\Cache\winCodeSign
