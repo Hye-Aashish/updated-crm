@@ -169,8 +169,8 @@ export function InvoiceDetailPage() {
                     )}
                 </div>
             )}
-            <div className="p-12 relative z-10">
-                <div className="flex justify-between items-end border-b-2 pb-8 mb-8" style={{ borderColor: themeColor }}>
+            <div className="p-4 sm:p-12 relative z-10">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b-2 pb-8 mb-8" style={{ borderColor: themeColor }}>
                     <div className="flex items-center gap-4">
                         <div className="p-4 rounded-xl text-white shadow-md" style={{ backgroundColor: themeColor }}>
                             <Building2 className="h-8 w-8" />
@@ -186,7 +186,7 @@ export function InvoiceDetailPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-8 mb-12 bg-slate-50 p-8 rounded-2xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-12 bg-slate-50 p-6 sm:p-8 rounded-2xl">
                     <div>
                         <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Invoice To</p>
                         {client ? (
@@ -209,8 +209,8 @@ export function InvoiceDetailPage() {
                     </div>
                 </div>
 
-                <div className="mb-8 border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                    <table className="w-full">
+                <div className="mb-8 border border-slate-100 rounded-2xl overflow-x-auto shadow-sm">
+                    <table className="w-full min-w-[600px]">
                         <thead className="text-white" style={{ backgroundColor: themeColor }}>
                             <tr>
                                 <th className="py-4 px-6 text-left font-semibold">Service</th>
@@ -232,7 +232,7 @@ export function InvoiceDetailPage() {
                     </table>
                 </div>
 
-                <div className="flex justify-between items-end">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-8">
                     <div className="flex flex-col gap-4 max-w-sm">
                         <div className="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl">
                             <p className="font-bold text-slate-700 mb-1">Notes / Terms</p>
@@ -274,7 +274,7 @@ export function InvoiceDetailPage() {
 
     // 2. MINIMAL
     const MinimalTemplate = () => (
-        <Card className="overflow-hidden shadow-none rounded-none border border-black bg-white relative p-16 font-mono">
+        <Card className="overflow-hidden shadow-none rounded-none border border-black bg-white relative p-6 sm:p-16 font-mono">
             {/* Watermark in minimal is subtle */}
             {(watermarkType !== 'none' || invoice.status === 'paid') && (
                 <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none z-0 overflow-hidden">
@@ -292,7 +292,7 @@ export function InvoiceDetailPage() {
                 </div>
             )}
             <div className="relative z-10">
-                <div className="flex justify-between items-start border-b-2 border-black pb-12 mb-12">
+                <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 border-black pb-12 mb-12 gap-8">
                     <div>
                         <h1 className="text-xl font-bold uppercase tracking-widest text-black mb-1">{settings?.companyProfile?.name || 'YOUR COMPANY'}</h1>
                         <p className="text-sm text-gray-500 uppercase tracking-wider">{settings?.companyProfile?.subtitle || 'Professional Services'}</p>
@@ -315,7 +315,8 @@ export function InvoiceDetailPage() {
                     ) : <p className="text-sm uppercase tracking-wider text-gray-600">Client Info</p>}
                 </div>
 
-                <div className="mb-16 border-t border-b border-gray-200 py-4">
+                <div className="mb-16 border-t border-b border-gray-200 py-4 overflow-x-auto">
+                    <div className="min-w-[600px]">
                     <div className="grid grid-cols-12 gap-4 font-bold text-xs uppercase tracking-widest text-gray-400 mb-4">
                         <div className="col-span-6">Description</div>
                         <div className="col-span-2 text-center">Qty</div>
@@ -330,6 +331,7 @@ export function InvoiceDetailPage() {
                             <div className="col-span-2 text-right font-bold">{formatCurrency(item.quantity * item.rate)}</div>
                         </div>
                     ))}
+                    </div>
                 </div>
 
                 <div className="flex justify-between items-end">
@@ -374,7 +376,7 @@ export function InvoiceDetailPage() {
 
     // 3. CLASSIC
     const ClassicTemplate = () => (
-        <Card className="overflow-hidden shadow-none border border-gray-200 bg-white p-12 relative text-gray-800 font-serif">
+        <Card className="overflow-hidden shadow-none border border-gray-200 bg-white p-6 sm:p-12 relative text-gray-800 font-serif">
             {/* Watermark */}
             {(watermarkType !== 'none' || invoice.status === 'paid') && (
                 <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none z-0 overflow-hidden">
@@ -392,7 +394,7 @@ export function InvoiceDetailPage() {
                 </div>
             )}
             <div className="relative z-10">
-                <div className="flex justify-between items-center mb-10">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-8">
                     <h1 className="text-4xl font-bold text-gray-700 tracking-wide">INVOICE</h1>
                     <div className="text-right">
                         <h2 className="text-2xl font-bold" style={{ color: themeColor }}>{settings?.companyProfile?.name || 'Business Co.'}</h2>
@@ -400,8 +402,8 @@ export function InvoiceDetailPage() {
                     </div>
                 </div>
 
-                <div className="flex justify-between border-y border-gray-200 py-8 mb-10">
-                    <div className="w-1/2">
+                <div className="flex flex-col sm:flex-row justify-between border-y border-gray-200 py-8 mb-10 gap-8">
+                    <div className="w-full sm:w-1/2">
                         <h3 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Bill To</h3>
                         {client ? (
                             <div>
@@ -410,7 +412,7 @@ export function InvoiceDetailPage() {
                             </div>
                         ) : <p className="text-gray-500 italic">Client details empty</p>}
                     </div>
-                    <div className="w-1/2 flex justify-end gap-16 text-sm">
+                    <div className="w-full sm:w-1/2 flex justify-start sm:justify-end gap-16 text-sm">
                         <div>
                             <p className="font-bold text-gray-500 uppercase tracking-widest mb-2">Invoice #</p>
                             <p className="font-medium text-lg">{invoice.invoiceNumber}</p>
@@ -424,7 +426,8 @@ export function InvoiceDetailPage() {
                     </div>
                 </div>
 
-                <table className="w-full mb-10 border-collapse">
+                <div className="overflow-x-auto mb-10">
+                    <table className="w-full border-collapse min-w-[600px]">
                     <thead>
                         <tr className="bg-gray-100/50 text-gray-600 border-b-2 border-gray-800">
                             <th className="py-3 px-4 text-left font-bold uppercase tracking-wider text-xs">Description</th>
@@ -444,9 +447,10 @@ export function InvoiceDetailPage() {
                         ))}
                     </tbody>
                 </table>
+                </div>
 
-                <div className="flex justify-between">
-                    <div className="flex flex-col gap-4 w-1/2 pr-8 text-xs text-gray-500 mt-4">
+                <div className="flex flex-col sm:flex-row justify-between gap-8">
+                    <div className="flex flex-col gap-4 w-full sm:w-1/2 pr-0 sm:pr-8 text-xs text-gray-500 mt-4">
                         <div>
                             <p className="font-bold uppercase tracking-widest mb-2">Terms & Conditions</p>
                             <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Due upon receipt.'}</p>
@@ -505,8 +509,8 @@ export function InvoiceDetailPage() {
                 </div>
             )}
             <div className="h-4 w-full relative z-10" style={{ backgroundColor: themeColor }}></div>
-            <CardContent className="p-10 relative z-10">
-                <div className="flex justify-between items-start mb-12">
+            <CardContent className="p-4 sm:p-10 relative z-10">
+                <div className="flex flex-col sm:flex-row justify-between items-start mb-12 gap-8">
                     <div className="flex items-center gap-3">
                         <div className="p-3 rounded-lg text-white" style={{ backgroundColor: themeColor }}>
                             <Building2 className="h-6 w-6" />
@@ -547,8 +551,8 @@ export function InvoiceDetailPage() {
                         </div>
                     </div>
                 </div>
-                <div className="mb-8 rounded-lg overflow-hidden border border-slate-100">
-                    <table className="w-full">
+                <div className="mb-8 rounded-lg overflow-x-auto border border-slate-100">
+                    <table className="w-full min-w-[600px]">
                         <thead className="bg-slate-50 border-b border-slate-100">
                             <tr>
                                 <th className="text-left py-4 px-6 text-xs font-bold uppercase text-slate-500">Item Description</th>
@@ -570,7 +574,7 @@ export function InvoiceDetailPage() {
                     </table>
                 </div>
                 <div className="flex justify-end">
-                    <div className="w-full md:w-1/3 space-y-3">
+                    <div className="w-full sm:w-1/3 space-y-3">
                         <div className="flex justify-between text-sm text-slate-500">
                             <span>Subtotal</span>
                             <span>{formatCurrency(invoice.subtotal)}</span>
@@ -607,7 +611,7 @@ export function InvoiceDetailPage() {
     // 3. CREATIVE
     const CreativeTemplate = () => (
         <Card className="overflow-hidden shadow-none border-0 bg-white grid md:grid-cols-12 min-h-[800px] relative">
-            <div className="md:col-span-4 text-white p-10 flex flex-col justify-between relative z-10" style={{ backgroundColor: themeColor }}>
+            <div className="md:col-span-4 text-white p-6 sm:p-10 flex flex-col justify-between relative z-10" style={{ backgroundColor: themeColor }}>
                 <div className="space-y-8">
                     <div className="flex items-center gap-2 text-2xl font-bold uppercase">
                         <Building2 className="h-8 w-8 opacity-80" />
@@ -636,7 +640,7 @@ export function InvoiceDetailPage() {
                     <div className="text-4xl font-bold">{formatCurrency(invoice.total)}</div>
                 </div>
             </div>
-            <div className="md:col-span-8 p-10 bg-white relative">
+            <div className="md:col-span-8 p-6 sm:p-10 bg-white relative">
                 {/* Watermark */}
                 {(watermarkType !== 'none' || invoice.status === 'paid') && (
                     <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none z-0 overflow-hidden">
@@ -664,8 +668,8 @@ export function InvoiceDetailPage() {
                             <p className="font-bold text-slate-700">{formatDate(invoice.date)}</p>
                         </div>
                     </div>
-                    <div className="mb-12">
-                        <table className="w-full text-left">
+                    <div className="overflow-x-auto mb-12">
+                        <table className="w-full text-left min-w-[600px]">
                             <thead>
                                 <tr className="border-b-2 border-slate-100">
                                     <th className="py-3 text-sm font-bold text-slate-400 uppercase">Description</th>
@@ -749,7 +753,7 @@ export function InvoiceDetailPage() {
                     )}
                 </div>
             )}
-            <CardContent className="p-16 text-center relative z-10">
+            <CardContent className="p-6 sm:p-16 text-center relative z-10">
                 <div className="mb-12">
                     <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-white mb-6" style={{ backgroundColor: themeColor }}>
                         <Building2 className="h-8 w-8" />

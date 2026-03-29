@@ -56,18 +56,18 @@ export function ClientsPage() {
                 </div>
             )}
 
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
                     <p className="text-muted-foreground mt-1">Manage your client relationships and contacts.</p>
                 </div>
-                <Button onClick={() => navigate('/clients/new')}>
+                <Button onClick={() => navigate('/clients/new')} className="w-full sm:w-auto">
                     <Plus className="mr-2 h-4 w-4" /> Add Client
                 </Button>
             </div>
 
             {/* --- Module Specific KPIs --- */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <StatsCard title="Total Clients" value={totalClients} icon={Users} color="#3b82f6" bg="bg-blue-50" />
                 <StatsCard title="Active" value={activeClients} icon={UserCheck} color="#22c55e" bg="bg-green-50" />
                 <StatsCard title="Inactive" value={inactiveClients} icon={UserX} color="#ef4444" bg="bg-red-50" />

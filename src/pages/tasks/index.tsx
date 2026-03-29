@@ -1061,7 +1061,7 @@ export function TasksPage() {
             </Dialog>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-shrink-0">
                 <StatsCard title="Total Tasks" value={totalTasks} icon={CheckSquare} color="#8b5cf6" bg="bg-purple-50" />
                 <StatsCard title="Pending" value={pendingTasks} icon={Circle} color="#f59e0b" bg="bg-amber-50" />
                 <StatsCard title="Due Today" value={tasksDueToday} icon={Calendar} color="#eab308" bg="bg-yellow-50" />

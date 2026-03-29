@@ -169,9 +169,9 @@ export function AttendancePage() {
                     </CardHeader>
                     <CardContent className="space-y-8 py-6">
                         <div className="text-center space-y-2 relative">
-                            <h2 className="text-5xl md:text-7xl font-black font-mono tracking-tighter text-primary">
+                            <h2 className="text-3xl sm:text-5xl md:text-7xl font-black font-mono tracking-tighter text-primary">
                                 {format(currentTime, 'hh:mm:ss')}
-                                <span className="text-xl md:text-2xl ml-2 font-sans font-bold text-muted-foreground">{format(currentTime, 'a')}</span>
+                                <span className="text-lg sm:text-xl md:text-2xl ml-2 font-sans font-bold text-muted-foreground">{format(currentTime, 'a')}</span>
                             </h2>
                             <p className="text-sm font-medium text-muted-foreground">Current Session Time</p>
                         </div>

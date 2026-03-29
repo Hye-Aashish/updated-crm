@@ -329,7 +329,7 @@ export function AttendanceSheet({ users, externalDate, onDateChange }: Attendanc
                     <table className="w-full border-collapse text-[11px]">
                         <thead>
                             <tr className="bg-muted/30">
-                                <th className="sticky left-0 z-20 bg-card border-b border-r py-4 px-4 min-w-[200px] text-left font-bold text-slate-500 uppercase tracking-wider">
+                                <th className="sticky left-0 z-20 bg-card border-b border-r py-4 px-4 min-w-[150px] text-left font-bold text-slate-500 uppercase tracking-wider">
                                     Employee
                                 </th>
                                 <th className="border-b border-r py-4 px-2 min-w-[100px] text-emerald-500 font-bold uppercase tracking-wider bg-emerald-500/5">

@@ -111,7 +111,7 @@ export function DashboardPage() {
                 <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
                     <div className="flex items-end justify-between">
-                        <h3 className="text-3xl font-bold tracking-tight text-foreground leading-none">{value}</h3>
+                        <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground leading-none">{value}</h3>
                         <ArrowUpRight className="h-4 w-4 text-muted-foreground/30 mb-0.5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                     </div>
                 </div>
@@ -141,7 +141,7 @@ export function DashboardPage() {
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-3">
-                                                <h1 className="text-4xl font-bold tracking-tight">{customLabels.hero || 'Dashboard'}</h1>
+                                                <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{customLabels.hero || 'Dashboard'}</h1>
                                                 <Badge className="bg-primary hover:bg-primary border-none text-[9px] h-5 px-2 font-black tracking-widest uppercase">System Active</Badge>
                                             </div>
                                             {!hiddenSubItems.includes('welcome_msg') && (
@@ -183,7 +183,7 @@ export function DashboardPage() {
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <span className="text-3xl font-black text-white tabular-nums tracking-tighter">{myPerformanceScore ?? 0}<span className="text-xs text-slate-500 ml-1">/100</span></span>
+                                                            <span className="text-2xl md:text-3xl font-black text-white tabular-nums tracking-tighter">{myPerformanceScore ?? 0}<span className="text-xs text-slate-500 ml-1">/100</span></span>
                                                         </div>
                                                     </div>
 
@@ -214,7 +214,7 @@ export function DashboardPage() {
                             <div className="flex justify-between items-start relative z-10">
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">{customLabels.session || 'Live Session'}</p>
-                                    <h2 className="text-4xl font-black tabular-nums tracking-tighter">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
+                                    <h2 className="text-3xl md:text-4xl font-black tabular-nums tracking-tighter">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
                                 </div>
                                 <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${(attendanceStatus === 'out' || attendanceStatus === 'checked-out')
                                     ? 'bg-slate-500/10 text-slate-600 border-slate-500/20'
@@ -369,7 +369,7 @@ export function DashboardPage() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                         {[
                                             { label: 'Online', count: online.length, users: online, color: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
                                             { label: 'On Break', count: onBreak.length, users: onBreak, color: 'text-amber-600', bg: 'bg-amber-50', dot: 'bg-amber-500' },

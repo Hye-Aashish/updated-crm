@@ -7,7 +7,7 @@
     "type": "module",
     "main": "electron/main.cjs",
     "scripts": {
-        "dev": "vite",
+        "dev": "vite --host",
         "dev:backend": "cd backend && npm run dev",
         "build": "vite build",
         "preview": "vite preview",
