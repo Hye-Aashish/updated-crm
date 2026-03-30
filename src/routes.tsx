@@ -26,6 +26,7 @@ import { NewInvoicePage } from './pages/invoices/new'
 import { InvoiceDetailPage } from './pages/invoices/[id]'
 import { FilesPage } from './pages/files'
 import { SettingsPage } from './pages/settings'
+import { RolesPermissionsPage } from './pages/settings/roles-permissions'
 import { TicketsPage } from './pages/tickets'
 import { ReportsPage } from './pages/reports'
 import { LeadsPage } from './pages/leads'
@@ -109,6 +110,7 @@ export function AppRoutes() {
 
                 <Route path="files" element={<FilesPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="settings/roles" element={<RolesPermissionsPage />} />
                 <Route path="ai-assistant" element={<AIAssistantPage />} />
 
                 {/* Quotations */}

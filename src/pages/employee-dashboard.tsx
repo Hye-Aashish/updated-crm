@@ -176,6 +176,10 @@ export function EmployeeDashboardPage() {
                                     <PlayCircle className="h-5 w-5" />
                                     Clock In
                                 </Button>
+                            ) : attendanceStatus === 'checked-out' ? (
+                                <div className="col-span-2 text-center py-2 text-sm font-medium text-muted-foreground bg-secondary/20 rounded-lg border border-dashed">
+                                    Today's shift completed. See you tomorrow!
+                                </div>
                             ) : (
                                 <>
                                     {attendanceStatus === 'in' ? (
@@ -183,12 +187,12 @@ export function EmployeeDashboardPage() {
                                             <Coffee className="h-4 w-4" />
                                             Take Break
                                         </Button>
-                                    ) : (
+                                    ) : attendanceStatus === 'break' ? (
                                         <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={handleBreakToggle}>
                                             <PlayCircle className="h-4 w-4" />
                                             Resume
                                         </Button>
-                                    )}
+                                    ) : null}
                                     <Button variant="destructive" className="gap-2" onClick={handleClockOut}>
                                         <StopCircle className="h-4 w-4" />
                                         Clock Out

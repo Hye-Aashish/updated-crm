@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
+import { showSystemNotification } from '@/lib/notifications'
 
 export function useAttendance(userId: string | undefined) {
     const { toast } = useToast()
     const [currentTime, setCurrentTime] = useState(new Date())
     const [attendanceStatus, setAttendanceStatus] = useState<'out' | 'in' | 'break' | 'checked-out' | 'half-day'>('out')
-    const [clockInTime, setClockInTime] = useState<Date | null>(null)
-    const [elapsedTime, setElapsedTime] = useState(0)
+    const [elapsedTime, setElapsedTime] = useState(0) // Now tracks actual work seconds
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -26,10 +26,15 @@ export function useAttendance(userId: string | undefined) {
                     else setAttendanceStatus('out')
 
                     if (data.checkIn) {
-                        setClockInTime(new Date(data.checkIn))
-                        if (data.status === 'present' || data.status === 'on-break') {
+                        if (data.status === 'present') {
+                            // Calculate current session seconds if present
+                            // Note: Backend might not return accurate live seconds without this
                             const diff = Math.floor((new Date().getTime() - new Date(data.checkIn).getTime()) / 1000)
-                            setElapsedTime(diff)
+                            // Better: calculate since checkIn minus totalBreakTime stored in DB
+                            const workSecondsSinceCheckIn = Math.max(0, diff - (data.totalBreakTime || 0) * 60)
+                            setElapsedTime(workSecondsSinceCheckIn)
+                        } else if (data.status === 'on-break') {
+                            setElapsedTime((data.totalWorkTime || 0) * 60)
                         }
                     }
                 }
@@ -39,21 +44,18 @@ export function useAttendance(userId: string | undefined) {
 
     useEffect(() => {
         let interval: any
-        if (attendanceStatus === 'in' && clockInTime) {
+        if (attendanceStatus === 'in') {
             interval = setInterval(() => {
-                const now = new Date()
-                const seconds = Math.floor((now.getTime() - clockInTime.getTime()) / 1000)
-                setElapsedTime(seconds)
+                setElapsedTime(prev => prev + 1) // Simply increment work seconds while status is 'in'
             }, 1000)
         }
         return () => clearInterval(interval)
-    }, [attendanceStatus, clockInTime])
+    }, [attendanceStatus])
 
     const handleClockIn = async () => {
         try {
             await api.post('/attendance/check-in', { userId })
             setAttendanceStatus('in')
-            setClockInTime(new Date())
             toast({ description: "Clocked in successfully" })
         } catch (error: any) {
             toast({ title: "Error", description: error.response?.data?.message || "Failed to clock in", variant: "destructive" })
@@ -66,10 +68,12 @@ export function useAttendance(userId: string | undefined) {
                 await api.post('/attendance/break-start', { userId })
                 setAttendanceStatus('break')
                 toast({ description: "Break started" })
+                showSystemNotification("Break Started", "Your work session is paused. Take a rest!")
             } else {
                 await api.post('/attendance/break-end', { userId })
                 setAttendanceStatus('in')
                 toast({ description: "Break ended" })
+                showSystemNotification("Work Resumed", "Your clock has started automatically. Welcome back!")
             }
         } catch (error: any) {
             toast({ title: "Error", description: error.response?.data?.message || "Action failed", variant: "destructive" })

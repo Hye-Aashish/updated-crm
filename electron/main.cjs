@@ -1,4 +1,4 @@
-const { app, BrowserWindow, desktopCapturer, ipcMain, powerMonitor } = require('electron');
+const { app, BrowserWindow, desktopCapturer, ipcMain, powerMonitor, Menu } = require('electron');
 const path = require('path');
 
 let mainWindow;
@@ -13,8 +13,45 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.cjs')
         },
         title: 'Nexprism CRM - Employee Monitor',
-        icon: path.join(__dirname, '..', 'public', 'vite.svg')
+        icon: path.join(__dirname, '..', 'public', 'vite.svg'),
+        autoHideMenuBar: true // Hide by default, show on Alt
     });
+
+    // Create a minimal menu
+    const template = [
+        {
+            label: 'App',
+            submenu: [
+                { role: 'reload', label: 'Refresh' },
+                { type: 'separator' },
+                { role: 'quit', label: 'Exit Application' }
+            ]
+        },
+        {
+            label: 'Edit',
+            submenu: [
+                { role: 'undo' },
+                { role: 'redo' },
+                { type: 'separator' },
+                { role: 'cut' },
+                { role: 'copy' },
+                { role: 'paste' },
+                { role: 'selectAll' }
+            ]
+        }
+    ];
+
+    if (!app.isPackaged) {
+        template.push({
+            label: 'Debug',
+            submenu: [
+                { role: 'toggleDevTools' }
+            ]
+        });
+    }
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
 
     const isPackaged = app.isPackaged;
     if (isPackaged) {

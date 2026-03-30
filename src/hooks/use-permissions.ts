@@ -54,5 +54,11 @@ export function usePermissions() {
         return !!permissions[module]?.delete
     }
 
-    return { permissions, loading, canView, canCreate, canEdit, canDelete }
+    const hasPermission = (module: string, action: string) => {
+        if (currentUser?.role === 'owner') return true
+        if (!permissions) return false
+        return !!permissions[module]?.[action]
+    }
+
+    return { permissions, loading, canView, canCreate, canEdit, canDelete, hasPermission }
 }

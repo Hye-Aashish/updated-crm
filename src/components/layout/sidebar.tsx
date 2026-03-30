@@ -121,6 +121,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Reports', href: '/reports', icon: BarChart },
         { name: 'Files', href: '/files', icon: FolderOpen },
         { name: 'AI Assistant', href: '/ai-assistant', icon: Brain },
+        { name: 'Roles & Permissions', href: '/settings/roles', icon: Shield },
         { name: 'Settings', href: '/settings', icon: Settings },
     ]
     const filteredItems = navItems.filter(item => {
@@ -146,7 +147,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         switch (item.name) {
             case 'Dashboard': return !!p.dashboard?.view
             case 'User Tracker': return !!p.user_tracker?.view
-            case 'Screen Monitoring': return currentUser?.role === 'admin'
+            case 'Screen Monitoring': return !!p.screen_monitoring?.view
             case 'Clients': return !!p.clients?.view
             case 'Projects': return !!p.projects?.view
             case 'Tasks': return !!p.tasks?.view
@@ -156,7 +157,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Invoices': return !!p.invoices?.view
             case 'AMC': return !!p.amc?.view
             case 'Domains': return !!p.domains?.view
-            case 'Expiry Alerts': return String(currentUser.role) === 'admin' || String(currentUser.role) === 'owner'
+            case 'Expiry Alerts': return !!p.expiry_alerts?.view
             case 'Hosting': return !!p.hosting?.view
             case 'Quotations': return !!p.quotations?.view
             case 'Templates': return !!p.templates?.view
@@ -165,11 +166,12 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Payroll': return !!p.payroll?.view
             case 'Support Tickets': return !!p.tickets?.view
             case 'Project Chat': return !!p.project_chat?.view
-            case 'Live Chat': return !!p.chat?.view && currentUser.role === 'admin'
+            case 'Live Chat': return !!p.chat?.view
             case 'Reports': return !!p.reports?.view
             case 'Files': return !!p.files?.view
             case 'Settings': return !!p.settings?.view
-            case 'AI Assistant': return currentUser?.role === 'admin' || currentUser?.role === 'owner'
+            case 'Roles & Permissions': return !!p.roles?.view || String(currentUser?.role) === 'admin'
+            case 'AI Assistant': return !!p.ai_assistant?.use || String(currentUser?.role) === 'admin'
             default: return true
         }
     })
