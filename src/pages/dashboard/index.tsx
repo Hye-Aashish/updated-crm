@@ -57,7 +57,7 @@ export function DashboardPage() {
     if (!currentUser) {
         return (
             <div className="h-[80vh] w-full flex flex-col items-center justify-center space-y-4 animate-pulse">
-                <div className="h-16 w-16 rounded-2xl bg-muted" />
+                <div className="h-12 w-12 rounded-2xl bg-muted" />
                 <div className="h-4 w-48 bg-muted rounded-full" />
                 <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Syncing Enterprise Data...</p>
             </div>
@@ -94,25 +94,27 @@ export function DashboardPage() {
     const StatCard = ({ label, value, trend, icon: Icon, color, bg, onClick, className }: any) => {
         return (
             <div
-                className={`group relative bg-card/60 backdrop-blur-sm border border-border/40 hover:border-primary/40 p-5 rounded-[1.5rem] transition-all duration-500 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] active:scale-[0.98] cursor-pointer overflow-hidden ${className || ''}`}
+                className={`group relative bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/20 p-5 rounded-2xl transition-all duration-300 hover:shadow-md active:scale-[0.99] cursor-pointer overflow-hidden ${className || ''}`}
                 onClick={onClick}
             >
-                <div className="flex justify-between items-start mb-4">
-                    <div className={`p-3 rounded-2xl ${bg} ${color} shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500`}>
-                        <Icon className="h-6 w-6" />
+                <div className="flex justify-between items-start mb-4 relative z-10">
+                    <div className={`p-2.5 rounded-xl ${bg} ${color} shadow-sm group-hover:scale-110 transition-transform duration-500`}>
+                        <Icon className="h-5 w-5 stroke-[2px]" />
                     </div>
                     {trend && (
-                        <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg border ${!trend.includes('-') ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>
-                            {!trend.includes('-') ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg border ${!trend.includes('-') ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-700 bg-rose-50 border-rose-100'}`}>
                             {trend}
                         </div>
                     )}
                 </div>
-                <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
-                    <div className="flex items-end justify-between">
-                        <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground leading-none">{value}</h3>
-                        <ArrowUpRight className="h-4 w-4 text-muted-foreground/30 mb-0.5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                
+                <div className="relative z-10">
+                    <p className="text-[9px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-1">{label}</p>
+                    <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground leading-none min-w-0 flex-1">
+                            {value}
+                        </h3>
+                        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-primary transition-all" />
                     </div>
                 </div>
             </div>
@@ -122,27 +124,27 @@ export function DashboardPage() {
     const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
 
     return (
-        <div className="max-w-[1700px] mx-auto space-y-4 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
+        <div className="w-full max-w-[1600px] px-6 md:px-8 mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans selection:bg-primary/10">
 
             {/* 1. Header & Command Hub */}
             {(currentLayout.includes('hero') || currentLayout.includes('session')) && (
                 <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
                     {/* Brand Hero */}
                     {currentLayout.includes('hero') && (
-                        <div className={`${currentLayout.includes('session') ? 'xl:col-span-8' : 'xl:col-span-12'} bg-slate-950 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl group border border-white/5`}>
+                        <div className={`${currentLayout.includes('session') ? 'xl:col-span-8' : 'xl:col-span-12'} bg-gradient-to-br from-slate-950 via-[#0a0f1e] to-[#0d122b] rounded-3xl p-6 text-white relative overflow-hidden shadow-2xl group border border-white/5`}>
                             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full -mr-48 -mt-48 blur-[120px] animate-pulse" />
                             <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-600/10 rounded-full -ml-20 -mb-20 blur-[100px]" />
 
                             <div className="relative z-10 h-full flex flex-col justify-between">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                                     <div className="flex items-center gap-5">
-                                        <div className="h-16 w-16 rounded-2xl bg-white/5 backdrop-blur-xl flex items-center justify-center border border-white/10 shadow-inner group-hover:rotate-12 transition-transform duration-700">
+                                        <div className="h-12 w-12 rounded-2xl bg-white/5 backdrop-blur-xl flex items-center justify-center border border-white/10 shadow-inner group-hover:rotate-12 transition-transform duration-700">
                                             <WelcomeAnimation />
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-3">
-                                                <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{customLabels.hero || 'Dashboard'}</h1>
-                                                <Badge className="bg-primary hover:bg-primary border-none text-[9px] h-5 px-2 font-black tracking-widest uppercase">System Active</Badge>
+                                                <h1 className="text-2xl md:text-xl font-bold tracking-tight">{customLabels.hero || 'Dashboard'}</h1>
+                                                <Badge className="bg-primary hover:bg-primary border-none text-[9px] h-5 px-2 font-bold tracking-widest uppercase">System Active</Badge>
                                             </div>
                                             {!hiddenSubItems.includes('welcome_msg') && (
                                                 <p className="text-slate-400 font-medium mt-1 text-sm">Welcome back, <span className="text-white font-bold">{currentUser.name}</span>. Here's your workspace today.</p>
@@ -163,8 +165,8 @@ export function DashboardPage() {
                                                     { label: 'Project Portfolio', value: formatCurrency(totalProjectCost || 0), color: 'from-rose-400 to-orange-500', onClick: () => navigate('/projects') },
                                                 ].map((item, i) => (
                                                     <div key={i} className="group/item relative p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer" onClick={item.onClick}>
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1 block">{item.label}</span>
-                                                        <p className="text-xl font-black tracking-tighter text-white">{item.value}</p>
+                                                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">{item.label}</span>
+                                                        <p className="text-xl font-bold tracking-tight text-white">{item.value}</p>
                                                     </div>
                                                 ))}
                                             </div>
@@ -178,12 +180,12 @@ export function DashboardPage() {
                                                                 <Zap className="h-4 w-4 fill-primary/20 animate-pulse" />
                                                             </div>
                                                             <div>
-                                                                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/80">Performance HUD</p>
-                                                                <h4 className="text-lg font-black text-white leading-none mt-0.5">Efficiency Score</h4>
+                                                                <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-primary/80">Performance HUD</p>
+                                                                <h4 className="text-lg font-bold text-white leading-none mt-0.5">Efficiency Score</h4>
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <span className="text-2xl md:text-3xl font-black text-white tabular-nums tracking-tighter">{myPerformanceScore ?? 0}<span className="text-xs text-slate-500 ml-1">/100</span></span>
+                                                            <span className="text-2xl md:text-xl font-bold text-white tabular-nums tracking-tight">{myPerformanceScore ?? 0}<span className="text-xs text-slate-500 ml-1">/100</span></span>
                                                         </div>
                                                     </div>
 
@@ -194,7 +196,7 @@ export function DashboardPage() {
                                                                 style={{ width: `${Math.max(2, myPerformanceScore ?? 0)}%` }}
                                                             />
                                                         </div>
-                                                        <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-slate-500 px-1">
+                                                        <div className="flex justify-between items-center text-[8px] font-bold uppercase tracking-widest text-slate-500 px-1">
                                                             <span className="flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" /> Live</span>
                                                             <span className="text-primary/70">Stable Engine</span>
                                                         </div>
@@ -210,13 +212,13 @@ export function DashboardPage() {
 
                     {/* Session Hub */}
                     {currentLayout.includes('session') && currentUser?.role !== 'client' && (
-                        <div className={`${currentLayout.includes('hero') ? 'xl:col-span-4' : 'xl:col-span-12'} bg-card border border-border/40 rounded-[3rem] p-10 flex flex-col justify-between shadow-xl relative overflow-hidden group/session`}>
+                        <div className={`${currentLayout.includes('hero') ? 'xl:col-span-4' : 'xl:col-span-12'} bg-card border border-border/40 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden group/session`}>
                             <div className="flex justify-between items-start relative z-10">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">{customLabels.session || 'Live Session'}</p>
-                                    <h2 className="text-3xl md:text-4xl font-black tabular-nums tracking-tighter">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
+                                 <div className="space-y-1">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{customLabels.session || 'Live Session'}</p>
+                                    <h2 className="text-xl md:text-xl font-bold tabular-nums tracking-tight">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
                                 </div>
-                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${(attendanceStatus === 'out' || attendanceStatus === 'checked-out')
+                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${(attendanceStatus === 'out' || attendanceStatus === 'checked-out')
                                     ? 'bg-slate-500/10 text-slate-600 border-slate-500/20'
                                     : attendanceStatus === 'break'
                                         ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
@@ -234,9 +236,9 @@ export function DashboardPage() {
 
                             {!hiddenSubItems.includes('timer') && (
                                 <div className="mt-8 space-y-4 relative z-10">
-                                    <div className="flex items-center justify-between text-[11px] font-black text-muted-foreground uppercase tracking-widest">
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
                                         <div className="flex items-center gap-2"><Clock className="h-3 w-3" /> Duration</div>
-                                        <span className="text-foreground font-black tabular-nums">{formatElapsedTime(elapsedTime)}</span>
+                                        <span className="text-foreground font-bold tabular-nums">{formatElapsedTime(elapsedTime)}</span>
                                     </div>
                                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                                         <div className="h-full brand-gradient shimmer rounded-full transition-all duration-1000" style={{ width: (attendanceStatus === 'out' || attendanceStatus === 'checked-out') ? '0%' : '75%' }} />
@@ -247,7 +249,7 @@ export function DashboardPage() {
                             {!hiddenSubItems.includes('clock_actions') && (
                                 <div className="mt-8 grid grid-cols-1 gap-3 relative z-10">
                                     {attendanceStatus === 'out' ? (
-                                        <Button onClick={handleClockIn} className="w-full h-16 rounded-[1.5rem] brand-gradient text-white font-black text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_30px_-10px_rgba(37,99,235,0.4)]">
+                                        <Button onClick={handleClockIn} className="w-full h-16 rounded-[1.5rem] brand-gradient text-white font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_30px_-10px_rgba(37,99,235,0.4)]">
                                             <PlayCircle className="h-5 w-5 mr-3" />
                                             CLOCK IN START SESSION
                                         </Button>
@@ -256,16 +258,16 @@ export function DashboardPage() {
                                             <div className="h-12 w-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                                 <CheckCircle className="h-6 w-6 text-emerald-600" />
                                             </div>
-                                            <h4 className="text-emerald-900 font-black text-sm uppercase tracking-tight">Shift Completed</h4>
+                                            <h4 className="text-emerald-900 font-bold text-sm uppercase tracking-tight">Shift Completed</h4>
                                             <p className="text-emerald-600/60 text-[10px] font-bold mt-1 uppercase tracking-widest">Great work today, {currentUser.name.split(' ')[0]}!</p>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-2 gap-3">
-                                            <Button variant="outline" onClick={handleBreakToggle} className={`h-16 rounded-[1.5rem] font-black text-xs border-2 shadow-sm ${attendanceStatus === 'break' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'hover:border-primary/40'}`}>
+                                            <Button variant="outline" onClick={handleBreakToggle} className={`h-16 rounded-[1.5rem] font-bold text-xs border-2 shadow-sm ${attendanceStatus === 'break' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'hover:border-primary/40'}`}>
                                                 <Coffee className="h-4 w-4 mr-2" />
                                                 {attendanceStatus === 'break' ? 'RESUME' : 'BREAK'}
                                             </Button>
-                                            <Button variant="destructive" onClick={handleClockOut} className="h-16 rounded-[1.5rem] font-black text-xs shadow-[0_15px_30px_-10px_rgba(244,63,94,0.3)]" disabled={attendanceStatus === 'break'}>
+                                            <Button variant="destructive" onClick={handleClockOut} className="h-16 rounded-[1.5rem] font-bold text-xs shadow-[0_15px_30px_-10px_rgba(244,63,94,0.3)]" disabled={attendanceStatus === 'break'}>
                                                 <StopCircle className="h-4 w-4 mr-2" />
                                                 CLOCK OUT
                                             </Button>
@@ -282,7 +284,7 @@ export function DashboardPage() {
             {currentLayout.includes('financials') && (
                 <div className="space-y-3 animate-in fade-in duration-500">
                     <div className="flex items-center justify-between px-2">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{customLabels.financials || 'Financial Overview'}</h3>
+                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{customLabels.financials || 'Financial Overview'}</h3>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {!hiddenSubItems.includes('revenue') && <StatCard label={currentUser.role === 'client' ? 'Total Paid' : 'Total Revenue'} value={formatCurrency(totalRevenue)} trend={revenueTrend} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/invoices')} />}
@@ -296,8 +298,40 @@ export function DashboardPage() {
             {/* 3. Operational Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                {/* Primary Intelligence Area */}
-                <div className="lg:col-span-8 space-y-8">
+                {/* 1. Full-Width Premium Intelligence Hub */}
+                {currentLayout.includes('amc') && (currentUser.role === 'admin' || currentUser.role === 'owner') && (
+                    <div className="col-span-12">
+                         <div className="bg-card border border-border/40 rounded-3xl p-6 md:p-6 relative overflow-hidden group/amc">
+                                    <div className="flex items-center justify-between mb-8 px-2 relative z-10">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-12 w-12 rounded-2xl bg-primary/5 flex items-center justify-center group-hover/amc:scale-105 transition-all duration-700 border border-primary/10">
+                                                <Shield className="h-6 w-6 text-primary stroke-[2px]" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl font-bold tracking-tight text-foreground">{customLabels.amc || 'AMC Monitoring'}</h3>
+                                                <p className="text-[10px] font-bold uppercase text-muted-foreground/60 tracking-widest mt-1">Status Overview</p>
+                                            </div>
+                                        </div>
+                                        <Button 
+                                            variant="ghost" 
+                                            className="bg-muted/30 hover:bg-muted text-[10px] font-bold uppercase tracking-widest h-10 px-5 rounded-xl border border-border/20" 
+                                            onClick={() => navigate('/amc')}
+                                        >
+                                            Manage <ArrowUpRight className="ml-2 h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+                                        <StatCard label="Active AMCs" value={amcStats?.active || 0} icon={Shield} color="text-blue-600" bg="bg-blue-50" onClick={() => navigate('/amc')} />
+                                        <StatCard label="Expiring Soon" value={amcStats?.expiringSoon || 0} icon={AlertCircle} color="text-amber-600" bg="bg-amber-50" onClick={() => navigate('/amc?filter=expiring')} />
+                                        <StatCard label="Expired" value={amcStats?.expired || 0} icon={XCircle} color="text-rose-600" bg="bg-rose-50" onClick={() => navigate('/amc?filter=expired')} />
+                                        <StatCard label="Portfolio" value={formatCurrency(amcStats?.totalRevenue || 0)} icon={Banknote} color="text-emerald-600" bg="bg-emerald-50" onClick={() => navigate('/amc')} />
+                                    </div>
+                                </div>
+                    </div>
+                )}
+
+                {/* Primary Intelligence Area (8) */}
+                <div className="lg:col-span-8 space-y-6">
                     {(sectionOrder || []).map((sectionId: string) => {
                         if (!currentLayout.includes(sectionId)) return null;
 
@@ -311,11 +345,11 @@ export function DashboardPage() {
                                                 <CheckSquare className="h-5 w-5 text-primary" />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-black tracking-tight">{customLabels.tasks || 'Task Center'}</h3>
-                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mt-0.5">Distribution across status</p>
+                                                <h3 className="text-xl font-bold tracking-tight">{customLabels.tasks || 'Task Center'}</h3>
+                                                <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-0.5">Distribution across status</p>
                                             </div>
                                         </div>
-                                        <Badge className="bg-primary/10 text-primary border-none text-[10px] px-3 font-black underline decoration-primary/20 underline-offset-4">LIVE ENGINE</Badge>
+                                        <Badge className="bg-primary/10 text-primary border-none text-[10px] px-3 font-bold underline decoration-primary/20 underline-offset-4">LIVE ENGINE</Badge>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                         {!hiddenSubItems.includes('todo') && (
@@ -363,42 +397,60 @@ export function DashboardPage() {
                                                 <Users className="h-5 w-5 text-primary" />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-black tracking-tight">Team Live Presence</h3>
-                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mt-0.5">Real-time member activity</p>
+                                                <h3 className="text-xl font-bold tracking-tight">Team Live Presence</h3>
+                                                <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-0.5">Real-time member activity</p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                                         {[
-                                            { label: 'Online', count: online.length, users: online, color: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
-                                            { label: 'On Break', count: onBreak.length, users: onBreak, color: 'text-amber-600', bg: 'bg-amber-50', dot: 'bg-amber-500' },
-                                            { label: 'Completed', count: completed.length, users: completed, color: 'text-blue-600', bg: 'bg-blue-50', dot: 'bg-blue-500' },
-                                            { label: 'Not Joined', count: notJoined.length, users: notJoined, color: 'text-slate-400', bg: 'bg-slate-50', dot: 'bg-slate-300' },
+                                            { label: 'Online', count: online.length, users: online, color: 'text-emerald-600', bg: 'bg-emerald-500/10', dot: 'bg-emerald-500' },
+                                            { label: 'On Break', count: onBreak.length, users: onBreak, color: 'text-amber-600', bg: 'bg-amber-500/10', dot: 'bg-amber-500' },
+                                            { label: 'Completed', count: completed.length, users: completed, color: 'text-blue-600', bg: 'bg-blue-500/10', dot: 'bg-blue-500' },
+                                            { label: 'Not Joined', count: notJoined.length, users: notJoined, color: 'text-slate-400', bg: 'bg-slate-500/10', dot: 'bg-slate-300' },
                                         ].map((group, idx) => (
-                                            <Card key={idx} className="p-4 rounded-[1.5rem] border-none shadow-sm bg-card/40 backdrop-blur-sm">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${group.color}`}>{group.label}</span>
-                                                    <Badge variant="outline" className="font-black h-5 min-w-[20px] justify-center border-none bg-muted/50">{group.count}</Badge>
-                                                </div>
-                                                <div className="flex -space-x-2 overflow-hidden mb-2">
-                                                    {group.users.slice(0, 5).map((u, i) => (
-                                                        <Avatar key={i} className="h-7 w-7 border-2 border-background ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
-                                                            <AvatarImage src={u.avatar} />
-                                                            <AvatarFallback className="text-[8px] font-black">{getInitials(u.name)}</AvatarFallback>
-                                                        </Avatar>
-                                                    ))}
-                                                    {group.users.length > 5 && (
-                                                        <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[8px] font-black border-2 border-background text-muted-foreground">
-                                                            +{group.users.length - 5}
+                                            <Card key={idx} className="p-6 rounded-2xl border border-border/40 shadow-xl shadow-black/[0.02] bg-card/50 backdrop-blur-xl group/card hover:border-primary/30 transition-all duration-500">
+                                                 <div className="flex items-center justify-between mb-6">
+                                                    <div className="space-y-1 text-left">
+                                                        <span className={`text-[11px] font-bold uppercase tracking-[0.2em] ${group.color}`}>{group.label}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`h-2 w-2 rounded-full ${group.dot} ${group.label !== 'Not Joined' ? 'animate-pulse' : ''}`} />
+                                                            <span className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-widest leading-none">
+                                                                {group.label === 'Online' ? 'Active' : group.label === 'On Break' ? 'Away' : group.label === 'Completed' ? 'Done' : 'Away'}
+                                                            </span>
                                                         </div>
-                                                    )}
+                                                    </div>
+                                                    <div className="text-xl md:text-xl font-bold tracking-tight tabular-nums text-right">
+                                                        {group.count}
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 mt-2">
-                                                    <span className={`h-1.5 w-1.5 rounded-full ${group.dot} ${group.label !== 'Not Joined' ? 'animate-pulse' : ''}`} />
-                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">
-                                                        {group.label === 'Online' ? 'Currently Active' : group.label === 'On Break' ? 'Away' : group.label === 'Completed' ? 'Shift Done' : 'Yet to Clock-in'}
-                                                    </span>
+
+                                                <div className="flex items-center justify-between pt-4 border-t border-border/30">
+                                                    <div className="flex -space-x-3 overflow-hidden">
+                                                        {(group.users || []).length > 0 ? (
+                                                            <>
+                                                                {group.users.slice(0, 4).map((u, i) => (
+                                                                    <Avatar key={i} className="h-9 w-9 border-2 border-background ring-2 ring-primary/5 transition-all hover:scale-110 hover:z-10">
+                                                                        <AvatarImage src={u.avatar} />
+                                                                        <AvatarFallback className="text-[10px] font-bold bg-muted">{getInitials(u.name)}</AvatarFallback>
+                                                                    </Avatar>
+                                                                ))}
+                                                                {group.users.length > 4 && (
+                                                                    <div className="h-9 w-9 rounded-full bg-primary/5 flex items-center justify-center text-[10px] font-bold border-2 border-background text-primary">
+                                                                        +{group.users.length - 4}
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <div className="h-9 flex items-center">
+                                                                <span className="text-[9px] font-bold text-muted-foreground/30 uppercase tracking-[0.2em]">Queue Empty</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className={`h-8 w-8 rounded-xl ${group.bg} flex items-center justify-center ${group.color} opacity-40 group-hover/card:opacity-100 transition-opacity`}>
+                                                        <ArrowUpRight className="h-4 w-4" />
+                                                    </div>
                                                 </div>
                                             </Card>
                                         ))}
@@ -425,7 +477,7 @@ export function DashboardPage() {
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             {relevantProjects.filter(p => p.status !== 'completed').map((project: any) => (
-                                                <Card key={project.id || project._id} className="relative overflow-hidden border-2 border-primary/5 bg-card/40 backdrop-blur-xl group hover:border-primary/20 transition-all duration-500 rounded-[2.5rem] p-6 shadow-sm">
+                                                <Card key={project.id || project._id} className="relative overflow-hidden border-2 border-primary/5 bg-card/40 backdrop-blur-xl group hover:border-primary/20 transition-all duration-500 rounded-2xl p-6 shadow-sm">
                                                     <div className="flex items-start justify-between mb-6">
                                                         <div className="space-y-1">
                                                             <h4 className="font-bold text-lg text-foreground tracking-tight group-hover:text-primary transition-colors">{project.name}</h4>
@@ -455,8 +507,8 @@ export function DashboardPage() {
 
                                                         <div className="space-y-2">
                                                             <div className="flex justify-between items-end">
-                                                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Delivery Milestone</span>
-                                                                <span className="text-sm font-black text-primary">{project.progress || 0}%</span>
+                                                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Delivery Milestone</span>
+                                                                <span className="text-sm font-bold text-primary">{project.progress || 0}%</span>
                                                             </div>
                                                             <Progress value={project.progress || 0} className="h-2.5 bg-muted rounded-full" />
                                                         </div>
@@ -465,15 +517,15 @@ export function DashboardPage() {
                                                             <div className="flex items-center gap-3">
                                                                 <Avatar className="h-8 w-8 border-2 border-primary/10 shadow-sm">
                                                                     <AvatarImage src="/avatars/pm.png" />
-                                                                    <AvatarFallback className="bg-primary/5 text-primary text-[10px] font-black">PM</AvatarFallback>
+                                                                    <AvatarFallback className="bg-primary/5 text-primary text-[10px] font-bold">PM</AvatarFallback>
                                                                 </Avatar>
                                                                 <div className="min-w-0">
-                                                                    <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Project Manager</p>
+                                                                    <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Project Manager</p>
                                                                     <p className="text-[10px] font-bold truncate">Nexprism Team</p>
                                                                 </div>
                                                             </div>
                                                             <div className="flex justify-end items-center">
-                                                                <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase tracking-widest hover:bg-primary/5 group/btn" onClick={() => navigate(`/projects/${project.id || project._id}`)}>
+                                                                <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-widest hover:bg-primary/5 group/btn" onClick={() => navigate(`/projects/${project.id || project._id}`)}>
                                                                     Project Docs <ArrowUpRight className="ml-2 h-3 w-3 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
                                                                 </Button>
                                                             </div>
@@ -482,8 +534,8 @@ export function DashboardPage() {
                                                 </Card>
                                             ))}
                                             {relevantProjects.filter(p => p.status !== 'completed').length === 0 && (
-                                                <div className="md:col-span-2 py-12 text-center border-2 border-dashed border-muted rounded-[2.5rem] bg-muted/5">
-                                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground opacity-40">No active projects currently being tracked</p>
+                                                <div className="md:col-span-2 py-12 text-center border-2 border-dashed border-muted rounded-2xl bg-muted/5">
+                                                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground opacity-40">No active projects currently being tracked</p>
                                                 </div>
                                             )}
                                         </div>
@@ -491,15 +543,15 @@ export function DashboardPage() {
                                 )
                             }
                             return (
-                                <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-[2.5rem] p-6 bg-indigo-50/10">
+                                <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-2xl p-6 bg-indigo-50/10">
                                     <div className="flex items-center justify-between mb-8 px-2">
                                         <div className="flex items-center gap-3">
                                             <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
                                                 <Briefcase className="h-6 w-6 text-indigo-600" />
                                             </div>
                                             <div>
-                                                <h3 className="text-2xl font-black tracking-tight text-indigo-900">{customLabels.projects_overview || (['owner', 'admin'].includes(currentUser.role) ? 'Projects Portfolio' : 'Projects Assigned to Me')}</h3>
-                                                <p className="text-xs font-black uppercase text-indigo-500 tracking-widest mt-0.5">Project status overview</p>
+                                                <h3 className="text-2xl font-bold tracking-tight text-indigo-900">{customLabels.projects_overview || (['owner', 'admin'].includes(currentUser.role) ? 'Projects Portfolio' : 'Projects Assigned to Me')}</h3>
+                                                <p className="text-xs font-bold uppercase text-indigo-500 tracking-widest mt-0.5">Project status overview</p>
                                             </div>
                                         </div>
                                     </div>
@@ -516,15 +568,15 @@ export function DashboardPage() {
                         if (sectionId === 'analytics') {
                             if (currentUser.role === 'client') return null;
                             return (
-                                <div key={sectionId} className="bg-card border border-border/40 rounded-[2.5rem] p-8 shadow-sm animate-in fade-in slide-in-from-left-4 duration-500">
+                                <div key={sectionId} className="bg-card border border-border/40 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-left-4 duration-500">
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
                                         <div className="flex items-center gap-3">
                                             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                                                 <LayoutDashboard className="h-5 w-5" />
                                             </div>
                                             <div>
-                                                <h3 className="text-lg font-black tracking-tight">{customLabels.analytics || 'Financial Velocity'}</h3>
-                                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">Performance tracking across current cycle</p>
+                                                <h3 className="text-lg font-bold tracking-tight">{customLabels.analytics || 'Financial Velocity'}</h3>
+                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Performance tracking across current cycle</p>
                                             </div>
                                         </div>
                                     </div>
@@ -552,15 +604,15 @@ export function DashboardPage() {
 
                         if (sectionId === 'support_tickets') {
                             return (
-                                <div key={sectionId} className="mb-12 border-2 border-rose-500/20 rounded-[2.5rem] p-6 bg-rose-50/10">
+                                <div key={sectionId} className="mb-12 border-2 border-rose-500/20 rounded-2xl p-6 bg-rose-50/10">
                                     <div className="flex items-center justify-between mb-8 px-2">
                                         <div className="flex items-center gap-3">
                                             <div className="h-12 w-12 rounded-2xl bg-rose-500/20 flex items-center justify-center">
                                                 <MessageSquare className="h-6 w-6 text-rose-600" />
                                             </div>
                                             <div>
-                                                <h3 className="text-2xl font-black tracking-tight text-rose-900">{customLabels.support_tickets || 'Support Tickets'}</h3>
-                                                <p className="text-xs font-black uppercase text-rose-500 tracking-widest mt-0.5">Customer issues snapshot</p>
+                                                <h3 className="text-2xl font-bold tracking-tight text-rose-900">{customLabels.support_tickets || 'Support Tickets'}</h3>
+                                                <p className="text-xs font-bold uppercase text-rose-500 tracking-widest mt-0.5">Customer issues snapshot</p>
                                             </div>
                                         </div>
                                     </div>
@@ -581,20 +633,20 @@ export function DashboardPage() {
 
                         if (sectionId === 'expiry_alerts' && (currentUser.role === 'admin' || currentUser.role === 'owner') && expirySummary?.totalAlerts > 0) {
                             return (
-                                <div key={sectionId} className="mb-12 border-2 border-amber-500/20 rounded-[2.5rem] p-6 bg-amber-50/10">
+                                <div key={sectionId} className="mb-12 border-2 border-amber-500/20 rounded-2xl p-6 bg-amber-50/10">
                                     <div className="flex items-center justify-between mb-8 px-2">
                                         <div className="flex items-center gap-3">
                                             <div className="h-12 w-12 rounded-2xl bg-amber-500/20 flex items-center justify-center">
                                                 <Zap className="h-6 w-6 text-amber-600" />
                                             </div>
                                             <div>
-                                                <h3 className="text-2xl font-black tracking-tight text-amber-900">Expiry Monitoring</h3>
-                                                <p className="text-xs font-black uppercase text-amber-500 tracking-widest mt-0.5">Critical renewals & overdue items</p>
+                                                <h3 className="text-2xl font-bold tracking-tight text-amber-900">Expiry Monitoring</h3>
+                                                <p className="text-xs font-bold uppercase text-amber-500 tracking-widest mt-0.5">Critical renewals & overdue items</p>
                                             </div>
                                         </div>
                                         <Button
                                             onClick={() => navigate('/expiry-alerts')}
-                                            className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-widest h-8 px-4 rounded-xl shadow-lg shadow-amber-200"
+                                            className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold uppercase tracking-widest h-8 px-4 rounded-xl shadow-lg shadow-amber-200"
                                         >
                                             Take Action <ArrowUpRight className="ml-2 h-3 w-3" />
                                         </Button>
@@ -638,47 +690,21 @@ export function DashboardPage() {
                             )
                         }
 
-                        if (sectionId === 'amc' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
-                            return (
-                                <div key={sectionId} className="mb-12 border-2 border-blue-500/20 rounded-[2.5rem] p-6 bg-blue-50/10">
-                                    <div className="flex items-center justify-between mb-8 px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-12 w-12 rounded-2xl bg-blue-500/20 flex items-center justify-center">
-                                                <Shield className="h-6 w-6 text-blue-600" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-black tracking-tight text-blue-900">{customLabels.amc || 'AMC Monitoring'}</h3>
-                                                <p className="text-xs font-black uppercase text-blue-500 tracking-widest mt-0.5">Contract health & revenue</p>
-                                            </div>
-                                        </div>
-                                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest h-8" onClick={() => navigate('/amc')}>
-                                            View All <ArrowUpRight className="ml-2 h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <StatCard label="Active AMCs" value={amcStats?.active || 0} icon={Shield} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/amc')} />
-                                        <StatCard label="Expiring" value={amcStats?.expiringSoon || 0} icon={AlertCircle} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/amc?filter=expiring')} />
-                                        <StatCard label="Expired" value={amcStats?.expired || 0} icon={XCircle} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/amc?filter=expired')} />
-                                        <StatCard label="Monthly Rev" value={formatCurrency(amcStats?.totalRevenue || 0)} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/amc')} />
-                                    </div>
-                                </div>
-                            )
-                        }
 
                         if (sectionId === 'domains' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
                             return (
-                                <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-[2.5rem] p-6 bg-indigo-50/10">
+                                <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-2xl p-6 bg-indigo-50/10">
                                     <div className="flex items-center justify-between mb-8 px-2">
                                         <div className="flex items-center gap-3">
                                             <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
                                                 <Globe className="h-6 w-6 text-indigo-600" />
                                             </div>
                                             <div>
-                                                <h3 className="text-2xl font-black tracking-tight text-indigo-900">{customLabels.domains || 'Asset Lifecycle'}</h3>
-                                                <p className="text-xs font-black uppercase text-indigo-500 tracking-widest mt-0.5">Domain & Hosting tracking</p>
+                                                <h3 className="text-2xl font-bold tracking-tight text-indigo-900">{customLabels.domains || 'Asset Lifecycle'}</h3>
+                                                <p className="text-xs font-bold uppercase text-indigo-500 tracking-widest mt-0.5">Domain & Hosting tracking</p>
                                             </div>
                                         </div>
-                                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest h-8" onClick={() => navigate('/domains')}>
+                                        <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase tracking-widest h-8" onClick={() => navigate('/domains')}>
                                             Manage Assets <ArrowUpRight className="ml-2 h-3 w-3" />
                                         </Button>
                                     </div>
@@ -694,18 +720,18 @@ export function DashboardPage() {
 
                         if (sectionId === 'hosting' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
                             return (
-                                <div key={sectionId} className="mb-12 border-2 border-orange-500/20 rounded-[2.5rem] p-6 bg-orange-50/10">
+                                <div key={sectionId} className="mb-12 border-2 border-orange-500/20 rounded-2xl p-6 bg-orange-50/10">
                                     <div className="flex items-center justify-between mb-8 px-2">
                                         <div className="flex items-center gap-3">
                                             <div className="h-12 w-12 rounded-2xl bg-orange-500/20 flex items-center justify-center">
                                                 <Server className="h-6 w-6 text-orange-600" />
                                             </div>
                                             <div>
-                                                <h3 className="text-2xl font-black tracking-tight text-orange-900">Hosting Management</h3>
-                                                <p className="text-xs font-black uppercase text-orange-500 tracking-widest mt-0.5">Server resources & uptime</p>
+                                                <h3 className="text-2xl font-bold tracking-tight text-orange-900">Hosting Management</h3>
+                                                <p className="text-xs font-bold uppercase text-orange-500 tracking-widest mt-0.5">Server resources & uptime</p>
                                             </div>
                                         </div>
-                                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest h-8" onClick={() => navigate('/hosting')}>
+                                        <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase tracking-widest h-8" onClick={() => navigate('/hosting')}>
                                             Server List <ArrowUpRight className="ml-2 h-3 w-3" />
                                         </Button>
                                     </div>
@@ -726,21 +752,21 @@ export function DashboardPage() {
                 </div>
 
                 {/* Secondary Sidebar Area */}
-                <div className="lg:col-span-4 space-y-8">
+                <div className="lg:col-span-4 space-y-6">
                     {currentUser.role === 'client' && (
-                        <div className="bg-primary/5 border border-primary/10 rounded-[2.5rem] p-8 shadow-sm group">
-                            <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-8 text-primary">
+                        <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 shadow-sm group">
+                            <h3 className="text-xs font-bold uppercase tracking-[0.2em] flex items-center gap-2 mb-8 text-primary">
                                 <Zap className="h-4 w-4 fill-primary/20 animate-pulse" />
                                 Client Quick Control
                             </h3>
                             <div className="space-y-3">
-                                <Button className="w-full h-14 rounded-2xl brand-gradient text-white font-black text-xs hover:scale-[1.02] shadow-lg shadow-primary/20" onClick={() => navigate('/invoices')}>
+                                <Button className="w-full h-14 rounded-2xl brand-gradient text-white font-bold text-xs hover:scale-[1.02] shadow-lg shadow-primary/20" onClick={() => navigate('/invoices')}>
                                     <Banknote className="mr-2 h-4 w-4" /> PAY LATEST INVOICE
                                 </Button>
-                                <Button variant="outline" className="w-full h-14 rounded-2xl font-black text-xs hover:bg-card border-2" onClick={() => navigate('/tickets')}>
+                                <Button variant="outline" className="w-full h-14 rounded-2xl font-bold text-xs hover:bg-card border-2" onClick={() => navigate('/tickets')}>
                                     <MessageSquare className="mr-2 h-4 w-4 text-primary" /> RAISE SUPPORT TICKET
                                 </Button>
-                                <Button variant="outline" className="w-full h-14 rounded-2xl font-black text-xs hover:bg-card border-2" onClick={() => navigate('/chat')}>
+                                <Button variant="outline" className="w-full h-14 rounded-2xl font-bold text-xs hover:bg-card border-2" onClick={() => navigate('/chat')}>
                                     <Coffee className="mr-2 h-4 w-4 text-emerald-500" /> START COLLABORATION
                                 </Button>
                             </div>
@@ -750,41 +776,57 @@ export function DashboardPage() {
                                         <Target className="h-5 w-5" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Managed by</p>
-                                        <p className="text-xs font-black">Senior Account Lead</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Managed by</p>
+                                        <p className="text-xs font-bold">Senior Account Lead</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                     {/* 4. Smart Sidebar HUD */}
+                    {currentUser.role !== 'client' && (
+                        <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden group/hud">
+                            <div className="relative z-10">
+                                <p className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-40 mb-1">System Status</p>
+                                <h3 className="text-xl font-bold tracking-tight mb-4">Pulse</h3>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                                        <p className="text-[8px] font-bold uppercase opacity-40">Uptime</p>
+                                        <p className="text-lg font-bold">99.9%</p>
+                                    </div>
+                                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                                        <p className="text-[8px] font-bold uppercase opacity-40">Health</p>
+                                        <p className="text-lg font-bold">Stable</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {currentUser.role === 'client' && (
-                        <Card className="bg-card border-border/40 rounded-[2.5rem] p-8 shadow-sm">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-6 text-muted-foreground">
-                                <FileText className="h-4 w-4" />
-                                Pending Actions
+                    {/* Pending Actions for Client or Admin */}
+                    {(currentUser.role !== 'employee') && (
+                        <Card className="bg-card border border-border/40 rounded-3xl p-6 shadow-sm">
+                            <h3 className="text-[9px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 mb-4 text-muted-foreground">
+                                <FileText className="h-3.5 w-3.5" />
+                                {currentUser.role === 'client' ? 'Pending' : 'Invoices'}
                             </h3>
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 {(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').slice(0, 3).map((inv: any) => (
-                                    <div key={inv.id || inv._id} className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border/50 hover:border-primary/30 transition-all group/inv cursor-pointer" onClick={() => navigate(`/invoices/${inv.id || inv._id}`)}>
+                                    <div key={inv.id || inv._id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/40 hover:border-primary/20 transition-all cursor-pointer" onClick={() => navigate(`/invoices/${inv.id || inv._id}`)}>
                                         <div className="min-w-0">
-                                            <p className="text-[10px] font-black text-muted-foreground uppercase truncate">Invoice #{inv.invoiceNumber}</p>
-                                            <p className="font-black text-sm">{formatCurrency(inv.total)}</p>
+                                            <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">#{inv.invoiceNumber}</p>
+                                            <p className="font-bold text-xs">{formatCurrency(inv.total)}</p>
                                         </div>
-                                        <Badge className={`${inv.status === 'overdue' ? 'bg-rose-500/10 text-rose-600' : 'bg-amber-500/10 text-amber-600'} border-none text-[8px] font-black uppercase`}>
+                                        <Badge className={`${inv.status === 'overdue' ? 'bg-rose-500/10 text-rose-600' : 'bg-amber-500/10 text-amber-600'} border-none text-[8px] font-bold py-0 h-4`}>
                                             {inv.status}
                                         </Badge>
                                     </div>
                                 ))}
-                                {(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').length === 0 && (
-                                    <div className="py-8 text-center bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
-                                        <CheckCircle className="h-8 w-8 text-emerald-500 mx-auto mb-2 opacity-20" />
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/60">No Pending Payments</p>
-                                    </div>
-                                )}
                             </div>
                         </Card>
                     )}
+
 
                     {(sectionOrder || []).map((sectionId: string) => {
                         if (!currentLayout.includes(sectionId)) return null;
@@ -793,9 +835,9 @@ export function DashboardPage() {
                         if (sectionId === 'funnel') {
                             if (currentUser.role === 'client') return null;
                             return (
-                                <div key={sectionId} className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group">
+                                <div key={sectionId} className="bg-slate-900 rounded-2xl p-6 text-white shadow-2xl relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-[80px]" />
-                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-8 pr-12 leading-relaxed">
+                                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] flex items-center gap-2 mb-8 pr-12 leading-relaxed">
                                         <Target className="h-4 w-4 text-primary" />
                                         {customLabels.funnel || 'Business Conversion Pipeline'}
                                     </h3>
@@ -810,8 +852,8 @@ export function DashboardPage() {
                                             </ResponsiveContainer>
                                         )}
                                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                            <span className="text-3xl font-black">{leads.length}</span>
-                                            <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50">{leads.length === 1 ? 'Opportunity' : 'Opportunities'}</span>
+                                            <span className="text-xl font-bold">{leads.length}</span>
+                                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-50">{leads.length === 1 ? 'Opportunity' : 'Opportunities'}</span>
                                         </div>
                                     </div>
                                     {!hiddenSubItems.includes('velocity') && (
@@ -822,7 +864,7 @@ export function DashboardPage() {
                                                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                                                         <span className="opacity-60 group-hover/item:opacity-100 transition-opacity uppercase tracking-widest">{item.name}</span>
                                                     </div>
-                                                    <span className="font-black">{item.value}</span>
+                                                    <span className="font-bold">{item.value}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -834,20 +876,20 @@ export function DashboardPage() {
                         if (sectionId === 'health') {
                             if (currentUser.role === 'client') return null;
                             return (
-                                <div key={sectionId} className="bg-card border border-border/40 rounded-[2.5rem] p-8 shadow-sm">
+                                <div key={sectionId} className="bg-card border border-border/40 rounded-2xl p-6 shadow-sm">
                                     <div className="flex items-center gap-3 mb-8">
                                         <Zap className="h-5 w-5 text-primary" />
-                                        <h3 className="text-sm font-black uppercase tracking-[0.1em]">{customLabels.health || 'Metric Pulse'}</h3>
+                                        <h3 className="text-sm font-bold uppercase tracking-[0.1em]">{customLabels.health || 'Metric Pulse'}</h3>
                                     </div>
-                                    <div className="space-y-8">
+                                    <div className="space-y-6">
                                         {healthMetrics.map((m, i) => {
                                             const itemKey = m.label.toLowerCase().includes('success') ? 'success_rate' : 'throughput'
                                             if (hiddenSubItems.includes(itemKey)) return null
                                             return (
                                                 <div key={i} className="space-y-3">
                                                     <div className="flex justify-between items-end">
-                                                        <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{m.label}</span>
-                                                        <span className="text-sm font-black text-primary">{m.value}%</span>
+                                                        <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">{m.label}</span>
+                                                        <span className="text-sm font-bold text-primary">{m.value}%</span>
                                                     </div>
                                                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                                                         <div className={`h-full ${m.color} rounded-full shimmer transition-all duration-1000`} style={{ width: `${m.value}%` }} />
@@ -862,10 +904,10 @@ export function DashboardPage() {
 
                         if (sectionId === 'deadlines') {
                             return (
-                                <div key={sectionId} className="bg-rose-500/5 rounded-[2.5rem] p-8 border border-rose-500/10">
+                                <div key={sectionId} className="bg-rose-500/5 rounded-2xl p-6 border border-rose-500/10">
                                     <div className="flex items-center gap-3 mb-6">
                                         <AlertCircle className="h-5 w-5 text-rose-500" />
-                                        <h3 className="text-sm font-black uppercase tracking-[0.1em] text-rose-600">{customLabels.deadlines || 'Urgent Tasks'}</h3>
+                                        <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-rose-600">{customLabels.deadlines || 'Urgent Tasks'}</h3>
                                     </div>
                                     <div className="space-y-3">
                                         {!hiddenSubItems.includes('overdue') && relevantTasks.filter(t => t.status !== 'done').slice(0, 3).map((t, i) => (
@@ -876,13 +918,13 @@ export function DashboardPage() {
                                             >
                                                 <span className="text-xs font-bold font-sans line-clamp-1 block mb-1">{t.title}</span>
                                                 <div className="flex items-center justify-between">
-                                                    <Badge className="bg-rose-500/10 text-rose-600 border-none text-[8px] px-2 py-0 font-black h-4">OVERDUE</Badge>
+                                                    <Badge className="bg-rose-500/10 text-rose-600 border-none text-[8px] px-2 py-0 font-bold h-4">OVERDUE</Badge>
                                                     <ArrowUpRight className="h-3 w-3 text-rose-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                                                 </div>
                                             </div>
                                         ))}
                                         {relevantTasks.filter(t => t.status !== 'done').length === 0 && (
-                                            <div className="py-6 text-center text-[10px] font-black text-muted-foreground uppercase opacity-50">Zero incidents reported</div>
+                                            <div className="py-6 text-center text-[10px] font-bold text-muted-foreground uppercase opacity-50">Zero incidents reported</div>
                                         )}
                                     </div>
                                 </div>
@@ -891,21 +933,34 @@ export function DashboardPage() {
 
                         if (sectionId === 'activity') {
                             return (
-                                <div key={sectionId} className="px-4">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-6">{customLabels.activity || 'Network Stream'}</h3>
+                                <div key={sectionId} className="bg-slate-50/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6 shadow-sm">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                            {customLabels.activity || 'Network Stream'}
+                                        </h3>
+                                        <Badge variant="outline" className="text-[8px] font-bold border-muted-foreground/30 text-muted-foreground uppercase py-0 h-4">Live</Badge>
+                                    </div>
                                     <div className="space-y-6">
-                                        {!hiddenSubItems.includes('system_logs') && recentActivities.slice(0, 4).map((log, i) => (
-                                            <div key={i} className="flex gap-4 items-center group">
-                                                <div className={`h-11 w-11 rounded-2xl ${log.bg} ${log.color} flex items-center justify-center shrink-0 shadow-sm group-hover:scale-95 transition-transform`}>
-                                                    <log.icon className="h-5 w-5" />
+                                        {!hiddenSubItems.includes('system_logs') && recentActivities.slice(0, 5).map((log, i) => (
+                                            <div key={i} className="flex gap-4 items-start group">
+                                                <div className={`h-10 w-10 rounded-xl ${log.bg} ${log.color} flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform duration-300`}>
+                                                    <log.icon className="h-4.5 w-4.5" />
                                                 </div>
-                                                <div className="flex flex-col min-w-0 flex-1">
-                                                    <span className="text-xs font-bold text-foreground truncate tracking-tight">{log.action}</span>
-                                                    <span className="text-[10px] font-black text-muted-foreground uppercase mt-0.5 opacity-60">{log.user} • {log.time}</span>
+                                                <div className="flex flex-col min-w-0 flex-1 border-b border-border/10 pb-4 group-last:border-0 last:pb-0">
+                                                    <span className="text-xs font-bold text-foreground truncate tracking-tight group-hover:text-primary transition-colors cursor-default">{log.action}</span>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">{log.user}</span>
+                                                        <span className="h-0.5 w-0.5 rounded-full bg-muted-foreground/30" />
+                                                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60 tracking-tight">{log.time}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
+                                    <Button variant="ghost" className="w-full mt-6 text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors h-10 border-t border-border/10 pt-6">
+                                        VIEW FULL ACTIVITY LOG
+                                    </Button>
                                 </div>
                             )
                         }
