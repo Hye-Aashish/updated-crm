@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Lead = require('../models/Lead');
 const PipelineStage = require('../models/PipelineStage');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 
 // --- STAGES ROUTES ---
 
@@ -57,10 +57,15 @@ router.delete('/stages/:id', protect, authorize('admin', 'owner'), async (req, r
 // --- LEADS ROUTES ---
 
 // GET all leads
-router.get('/', protect, async (req, res) => {
+router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
     try {
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const userRole = settings?.roles?.find(r => r.name === req.user.role);
+        const canViewAll = userRole?.permissions?.leads?.view_all || req.user.role === 'owner' || req.user.role === 'admin';
+
         let filter = {};
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (!canViewAll) {
             filter = { assignedTo: req.user._id.toString() };
         }
         const leads = await Lead.find(filter).sort({ createdAt: -1 });
@@ -71,7 +76,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // POST new lead
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, checkPermission('leads', 'create'), async (req, res) => {
     try {
         const lead = new Lead(req.body);
         const newLead = await lead.save();
@@ -108,7 +113,7 @@ router.get('/:id', protect, async (req, res) => {
     }
 });
 
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) => {
     try {
         const lead = await Lead.findById(req.params.id);
         if (!lead) return res.status(404).json({ message: 'Lead not found' });
@@ -125,7 +130,7 @@ router.put('/:id', protect, async (req, res) => {
 });
 
 // DELETE lead
-router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
+router.delete('/:id', protect, checkPermission('leads', 'delete'), async (req, res) => {
     try {
         await Lead.findByIdAndDelete(req.params.id);
         res.json({ message: 'Lead deleted' });

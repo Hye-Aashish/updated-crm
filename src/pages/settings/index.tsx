@@ -104,9 +104,9 @@ export function SettingsPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Settings</h1>
-                <p className="text-muted-foreground mt-1">Manage your CRM configuration and preferences</p>
+            <div className="space-y-1">
+                <h1 className="text-xl sm:text-3xl font-bold tracking-tight">Settings</h1>
+                <p className="text-xs sm:text-base text-muted-foreground">Manage your CRM configuration and preferences</p>
             </div>
 
             <div className="flex flex-col md:flex-row gap-6">
@@ -114,27 +114,19 @@ export function SettingsPage() {
                 <div className="w-full md:w-64 flex-shrink-0">
                     <Card>
                         <CardContent className="p-2">
-                            <nav className="space-y-1">
+                            <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 no-scrollbar">
                                 {tabs.map((tab) => {
                                     return (
                                         <button
                                             key={tab.id}
                                             onClick={() => setActiveTab(tab.id)}
-                                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === tab.id
-                                                ? 'bg-primary text-primary-foreground'
+                                            className={`flex-shrink-0 flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${activeTab === tab.id
+                                                ? 'bg-primary text-primary-foreground shadow-sm'
                                                 : 'hover:bg-muted text-muted-foreground'
                                                 }`}
                                         >
-                                            {tab.id === 'company' && <Building2 className="h-4 w-4" />}
-                                            {tab.id === 'users' && <Users className="h-4 w-4" />}
-                                            {tab.id === 'roles' && <Shield className="h-4 w-4" />}
-                                            {tab.id === 'billing' && <CreditCard className="h-4 w-4" />}
-                                            {tab.id === 'dashboard-builder' && <Layout className="h-4 w-4" />}
-                                            {tab.id === 'notifications' && <Bell className="h-4 w-4" />}
-                                            {tab.id === 'email' && <Mail className="h-4 w-4" />}
-                                            {tab.id === 'whatsapp' && <MessageSquare className="h-4 w-4" />}
-                                            {tab.id === 'ai-config' && <Brain className="h-4 w-4" />}
-                                            {tab.label}
+                                            <tab.icon className="h-4 w-4" />
+                                            <span className="whitespace-nowrap">{tab.label}</span>
                                         </button>
                                     )
                                 })}

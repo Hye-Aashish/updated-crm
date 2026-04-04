@@ -197,33 +197,33 @@ export function TeamPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold">Team & Attendance</h1>
-                    <p className="text-muted-foreground mt-1">Manage team members, roles, and track daily attendance.</p>
+                <div className="space-y-1">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Team & Attendance</h1>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Manage team members, roles, and track daily attendance.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button
                         variant={activeTab === 'members' ? 'default' : 'outline'}
-                        className={activeTab === 'members' ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600" : ""}
+                        className={`h-9 px-3 sm:px-4 text-xs sm:text-sm ${activeTab === 'members' ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600" : ""}`}
                         onClick={() => { setActiveTab('members'); navigate('/team?tab=members', { replace: true }) }}
                     >
-                        <Users className="mr-2 h-4 w-4" /> Members
+                        <Users className="mr-1.5 sm:mr-2 h-4 w-4" /> Members
                     </Button>
                     <Button
                         variant={activeTab === 'attendance' ? 'default' : 'outline'}
-                        className={activeTab === 'attendance' ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600" : ""}
+                        className={`h-9 px-3 sm:px-4 text-xs sm:text-sm ${activeTab === 'attendance' ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600" : ""}`}
                         onClick={() => { setActiveTab('attendance'); navigate('/team?tab=attendance', { replace: true }) }}
                     >
-                        <Clock className="mr-2 h-4 w-4" /> Attendance
+                        <Clock className="mr-1.5 sm:mr-2 h-4 w-4" /> Attendance
                     </Button>
                     {activeTab === 'members' && (
                         <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
                             <DialogTrigger asChild>
-                                <Button>
-                                    <Plus className="mr-2 h-4 w-4" /> Add Member
+                                <Button className="h-9 px-3 sm:px-4 text-xs sm:text-sm">
+                                    <Plus className="mr-1.5 sm:mr-2 h-4 w-4" /> Add Member
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0">
+                            <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0">
                                 <DialogHeader className="p-6 border-b">
                                     <DialogTitle className="text-xl">Account Details</DialogTitle>
                                     <DialogDescription>Enter the employee's information.</DialogDescription>

@@ -4,13 +4,17 @@ const Project = require('../models/Project');
 exports.getClients = async (req, res, next) => {
     try {
         let filter = {};
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const userRole = settings?.roles?.find(r => r.name === req.user.role);
+        const canViewAll = userRole?.permissions?.clients?.view_all || req.user.role === 'owner' || req.user.role === 'admin';
+
         if (req.user && req.user.role === 'client') {
             filter = { _id: req.user.clientId };
-        } else if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
+        } else if (!canViewAll && req.user && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
 
-            // Clients assigned to me
-            // OR Clients for projects where I am PM or member
+            // Clients for projects where I am PM or member
             const myProjects = await Project.find({
                 $or: [{ pmId: userId }, { members: userId }]
             }).select('clientId');
@@ -35,11 +39,16 @@ exports.getClientById = async (req, res, next) => {
         const client = await Client.findById(req.params.id);
         if (!client) return res.status(404).json({ message: 'Client not found' });
 
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const userRole = settings?.roles?.find(r => r.name === req.user.role);
+        const canViewAll = userRole?.permissions?.clients?.view_all || req.user.role === 'owner' || req.user.role === 'admin';
+
         if (req.user && req.user.role === 'client') {
             if (client._id.toString() !== req.user.clientId) {
                 return res.status(403).json({ message: 'Not authorized to view this client' });
             }
-        } else if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
+        } else if (!canViewAll && req.user && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             if (client.assignedTo !== userId) {
                 // Secondary check: Are they working on any of this client's projects?
@@ -90,8 +99,13 @@ exports.updateClient = async (req, res, next) => {
         const client = await Client.findById(req.params.id);
         if (!client) return res.status(404).json({ message: 'Client not found' });
 
-        // RBAC Check
-        if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
+        // RBAC Check for Updates
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const userRole = settings?.roles?.find(r => r.name === req.user.role);
+        const canEditAll = userRole?.permissions?.clients?.edit_all || req.user.role === 'owner' || req.user.role === 'admin';
+
+        if (!canEditAll && req.user && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             if (client.assignedTo !== userId) {
                 const hasProject = await Project.findOne({

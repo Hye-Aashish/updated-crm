@@ -9,6 +9,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
     base: './', // CRITICAL FOR ELECTRON: Makes asset paths relative
     plugins: [react()],
+    define: {
+        'process.env': {} // Shim for libraries that expect process.env
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),

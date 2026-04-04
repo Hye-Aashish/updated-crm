@@ -62,10 +62,16 @@ export class ErrorBoundary extends Component<Props, State> {
                                 <RefreshCw className="mr-2 h-4 w-4" />
                                 Reload Page
                             </Button>
-                            <Button variant="outline" onClick={() => window.location.href = '/'}>
-                                <Home className="mr-2 h-4 w-4" />
-                                Go Home
-                            </Button>
+                             <Button variant="outline" onClick={() => {
+                                 if (window.location.protocol === 'file:') {
+                                     window.location.hash = '#/';
+                                 } else {
+                                     window.location.href = '/';
+                                 }
+                             }}>
+                                 <Home className="mr-2 h-4 w-4" />
+                                 Go Home
+                             </Button>
                         </div>
                     </div>
                 </div>

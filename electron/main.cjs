@@ -63,9 +63,8 @@ function createWindow() {
         mainWindow.loadURL(startUrl);
     }
 
-    if (!app.isPackaged) {
-        mainWindow.webContents.openDevTools();
-    }
+    // Always open DevTools for debugging packaged build (temp fix for white screen)
+    // mainWindow.webContents.openDevTools();
 
     // Check system idle time every 10 seconds
     setInterval(() => {

@@ -208,13 +208,10 @@ router.get('/', protect, async (req, res) => {
             delete publicSettings.emailSettings.port;
         }
 
-        // Remove roles definitions from non-admin view
-        delete publicSettings.roles;
-
         // Remove API keys from non-admin view
         delete publicSettings.apiKeys;
 
-        // Return limited view
+        // Return limited view (roles are kept for frontend sidebar permissions)
         res.json(publicSettings);
 
     } catch (err) {

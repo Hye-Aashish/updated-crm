@@ -141,7 +141,10 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             return allowedForClient.includes(item.name)
         }
 
-        if (!permissions) return true
+        if (!permissions && currentUser?.role !== 'owner') {
+            // Safe Default: If permissions haven't loaded yet, only show Dashboard.
+            return ['Dashboard'].includes(item.name)
+        }
 
         const p = permissions
         switch (item.name) {
@@ -179,10 +182,18 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
     return (
         <>
             {/* Mobile Sidebar */}
-            {mobileOpen && (
-                <div className="fixed inset-0 z-[100] flex" onClick={() => setMobileOpen(false)}>
-                    <div className="fixed inset-0 bg-black/50" />
-                    <div className="relative flex w-64 flex-col bg-card shadow-xl transition-transform" onClick={e => e.stopPropagation()}>
+            <div className={cn(
+                "fixed inset-0 z-[100] transition-opacity duration-300 lg:hidden",
+                mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            )} onClick={() => setMobileOpen(false)}>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+                <div 
+                    className={cn(
+                        "fixed inset-y-0 left-0 flex w-72 flex-col bg-card shadow-2xl transition-transform duration-300 ease-in-out z-[101]",
+                        mobileOpen ? "translate-x-0" : "-translate-x-full"
+                    )}
+                    onClick={e => e.stopPropagation()}
+                >
                         {/* Mobile Logo */}
                         <div className="flex h-16 shrink-0 items-center px-4 border-b">
                             {logo ? (
@@ -213,9 +224,8 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
                                 })}
                             </nav>
                         </div>
-                    </div>
                 </div>
-            )}
+            </div>
 
             {/* Desktop Sidebar */}
             <div className={cn(

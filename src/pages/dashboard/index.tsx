@@ -124,11 +124,11 @@ export function DashboardPage() {
     const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
 
     return (
-        <div className="w-full max-w-[1600px] px-6 md:px-8 mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans selection:bg-primary/10">
+        <div className="w-full max-w-[1600px] px-3 sm:px-6 md:px-8 mx-auto space-y-4 md:space-y-6 pb-20 md:pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans selection:bg-primary/10">
 
             {/* 1. Header & Command Hub */}
             {(currentLayout.includes('hero') || currentLayout.includes('session')) && (
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-stretch">
                     {/* Brand Hero */}
                     {currentLayout.includes('hero') && (
                         <div className={`${currentLayout.includes('session') ? 'xl:col-span-8' : 'xl:col-span-12'} bg-gradient-to-br from-slate-950 via-[#0a0f1e] to-[#0d122b] rounded-3xl p-6 text-white relative overflow-hidden shadow-2xl group border border-white/5`}>
@@ -143,7 +143,7 @@ export function DashboardPage() {
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-3">
-                                                <h1 className="text-2xl md:text-xl font-bold tracking-tight">{customLabels.hero || 'Dashboard'}</h1>
+                                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{customLabels.hero || 'Dashboard'}</h1>
                                                 <Badge className="bg-primary hover:bg-primary border-none text-[9px] h-5 px-2 font-bold tracking-widest uppercase">System Active</Badge>
                                             </div>
                                             {!hiddenSubItems.includes('welcome_msg') && (
@@ -157,16 +157,16 @@ export function DashboardPage() {
                                 {!hiddenSubItems.includes('mini_stats') && (
                                     <div className="mt-6 pt-6 border-t border-white/5">
                                         {['owner', 'admin'].includes(currentUser.role) ? (
-                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                                 {[
                                                     { label: 'Revenue Net', value: formatCurrency(netProfit), color: 'from-emerald-400 to-teal-500', onClick: () => navigate('/invoices') },
                                                     { label: 'Project Success', value: `${winRate}%`, color: 'from-blue-400 to-indigo-500', onClick: () => navigate('/projects') },
                                                     { label: 'Active Projects', value: inProgressProjects, color: 'from-indigo-400 to-purple-500', onClick: () => navigate('/projects?status=in-progress') },
                                                     { label: 'Project Portfolio', value: formatCurrency(totalProjectCost || 0), color: 'from-rose-400 to-orange-500', onClick: () => navigate('/projects') },
                                                 ].map((item, i) => (
-                                                    <div key={i} className="group/item relative p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer" onClick={item.onClick}>
+                                                    <div key={i} className="group/item relative p-3 sm:p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer" onClick={item.onClick}>
                                                         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">{item.label}</span>
-                                                        <p className="text-xl font-bold tracking-tight text-white">{item.value}</p>
+                                                        <p className="text-lg sm:text-xl font-bold tracking-tight text-white">{item.value}</p>
                                                     </div>
                                                 ))}
                                             </div>
@@ -212,7 +212,7 @@ export function DashboardPage() {
 
                     {/* Session Hub */}
                     {currentLayout.includes('session') && currentUser?.role !== 'client' && (
-                        <div className={`${currentLayout.includes('hero') ? 'xl:col-span-4' : 'xl:col-span-12'} bg-card border border-border/40 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden group/session`}>
+                        <div className={`${currentLayout.includes('hero') ? 'xl:col-span-4' : 'xl:col-span-12'} bg-card border border-border/40 rounded-3xl p-4 sm:p-6 flex flex-col justify-between shadow-xl relative overflow-hidden group/session`}>
                             <div className="flex justify-between items-start relative z-10">
                                  <div className="space-y-1">
                                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{customLabels.session || 'Live Session'}</p>
@@ -300,8 +300,8 @@ export function DashboardPage() {
 
                 {/* 1. Full-Width Premium Intelligence Hub */}
                 {currentLayout.includes('amc') && (currentUser.role === 'admin' || currentUser.role === 'owner') && (
-                    <div className="col-span-12">
-                         <div className="bg-card border border-border/40 rounded-3xl p-6 md:p-6 relative overflow-hidden group/amc">
+                    <div className="lg:col-span-12">
+                         <div className="bg-card border border-border/40 rounded-3xl p-4 sm:p-6 relative overflow-hidden group/amc">
                                     <div className="flex items-center justify-between mb-8 px-2 relative z-10">
                                         <div className="flex items-center gap-4">
                                             <div className="h-12 w-12 rounded-2xl bg-primary/5 flex items-center justify-center group-hover/amc:scale-105 transition-all duration-700 border border-primary/10">
@@ -410,7 +410,7 @@ export function DashboardPage() {
                                             { label: 'Completed', count: completed.length, users: completed, color: 'text-blue-600', bg: 'bg-blue-500/10', dot: 'bg-blue-500' },
                                             { label: 'Not Joined', count: notJoined.length, users: notJoined, color: 'text-slate-400', bg: 'bg-slate-500/10', dot: 'bg-slate-300' },
                                         ].map((group, idx) => (
-                                            <Card key={idx} className="p-6 rounded-2xl border border-border/40 shadow-xl shadow-black/[0.02] bg-card/50 backdrop-blur-xl group/card hover:border-primary/30 transition-all duration-500">
+                                            <Card key={idx} className="p-4 sm:p-6 rounded-2xl border border-border/40 shadow-xl shadow-black/[0.02] bg-card/50 backdrop-blur-xl group/card hover:border-primary/30 transition-all duration-500">
                                                  <div className="flex items-center justify-between mb-6">
                                                     <div className="space-y-1 text-left">
                                                         <span className={`text-[11px] font-bold uppercase tracking-[0.2em] ${group.color}`}>{group.label}</span>
@@ -788,9 +788,9 @@ export function DashboardPage() {
                         <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden group/hud">
                             <div className="relative z-10">
                                 <p className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-40 mb-1">System Status</p>
-                                <h3 className="text-xl font-bold tracking-tight mb-4">Pulse</h3>
+                                <h3 className="text-xl font-bold tracking-tight mb-4 text-white">Pulse</h3>
                                 
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="bg-white/5 rounded-xl p-3 border border-white/10">
                                         <p className="text-[8px] font-bold uppercase opacity-40">Uptime</p>
                                         <p className="text-lg font-bold">99.9%</p>
@@ -827,8 +827,8 @@ export function DashboardPage() {
                         </Card>
                     )}
 
-
-                    {(sectionOrder || []).map((sectionId: string) => {
+                    <div className="space-y-6">
+                        {(sectionOrder || []).map((sectionId: string) => {
                         if (!currentLayout.includes(sectionId)) return null;
 
                         // Render Sidebar Sections
@@ -967,6 +967,7 @@ export function DashboardPage() {
 
                         return null;
                     })}
+                    </div>
                 </div>
             </div>
 

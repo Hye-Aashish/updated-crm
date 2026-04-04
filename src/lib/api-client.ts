@@ -5,12 +5,18 @@ const getBaseURL = () => {
     const envURL = (import.meta as any).env.VITE_API_URL;
     if (envURL) return envURL;
 
-    // 2. Production: Use relative path (avoids localhost security issues)
+    // 2. Electron: Always use absolute URL to avoid 'file://' protocol issues
+    const isElectron = !!(window as any).electronAPI || navigator.userAgent.includes('Electron');
+    if (isElectron) {
+        return envURL || 'http://localhost:5000/api';
+    }
+
+    // 3. Web Production: Use relative path (standard reverse proxy setup)
     if ((import.meta as any).env.PROD) {
         return '/api';
     }
 
-    // 3. Development: Default to localhost
+    // 4. Web Development: Default to localhost
     return 'http://localhost:5000/api';
 };
 
@@ -40,13 +46,20 @@ api.interceptors.response.use(
     (error) => {
         // Handle 401 — token expired or invalid
         if (error.response?.status === 401) {
-            const currentPath = window.location.pathname;
-            // Don't redirect if already on login page or it's the login request itself
-            if (currentPath !== '/login' && !error.config?.url?.includes('/auth/login')) {
+            const currentHash = window.location.hash;
+            const isLoginPage = currentHash.includes('/login') || error.config?.url?.includes('/auth/login');
+
+            if (!isLoginPage) {
                 console.warn('🔒 Session expired — redirecting to login');
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                window.location.href = '/login';
+                
+                // For Electron/HashRouter, we must only change the hash
+                if (window.location.protocol === 'file:') {
+                    window.location.hash = '#/login';
+                } else {
+                    window.location.href = '/login';
+                }
                 return new Promise(() => { }); // Prevent further error handling
             }
         }

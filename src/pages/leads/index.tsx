@@ -101,7 +101,7 @@ export function LeadsPage() {
                     </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
                     <div className="flex bg-muted/30 rounded-lg p-1 border border-border/40">
                         <Button
                             variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
@@ -124,15 +124,15 @@ export function LeadsPage() {
                     </div>
 
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setIsLeadFormDialogOpen(true)} className="h-9 px-4 rounded-lg font-semibold text-xs border-border/60">
-                            <FileText className="mr-2 h-4 w-4 text-primary" />
+                        <Button variant="outline" onClick={() => setIsLeadFormDialogOpen(true)} className="h-9 px-3 sm:px-4 rounded-lg font-semibold text-[10px] sm:text-xs border-border/60">
+                            <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                             Web Forms
                         </Button>
 
                         <Dialog open={isStageDialogOpen} onOpenChange={setIsStageDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline" className="h-9 px-4 rounded-lg font-semibold text-xs border-border/60">
-                                    <Settings className="mr-2 h-4 w-4 text-primary" />
+                                <Button variant="outline" className="h-9 px-3 sm:px-4 rounded-lg font-semibold text-[10px] sm:text-xs border-border/60">
+                                    <Settings className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                                     Stages
                                 </Button>
                             </DialogTrigger>
@@ -183,8 +183,8 @@ export function LeadsPage() {
 
                         <Dialog open={isLeadDialogOpen} onOpenChange={setIsLeadDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button className="h-9 px-4 rounded-lg font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md">
-                                    <Plus className="mr-2 h-4 w-4" />
+                                <Button className="h-9 px-3 sm:px-4 rounded-lg font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md text-[10px] sm:text-xs">
+                                    <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                                     Add Lead
                                 </Button>
                             </DialogTrigger>
