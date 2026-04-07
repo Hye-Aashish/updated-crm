@@ -87,3 +87,5 @@ export function EditClientPage() {
         </div>
     )
 }
+
+export default EditClientPage

@@ -3,6 +3,7 @@ import { Plus, Search, Filter, FileText, AlertCircle, Banknote, Loader2, Mail, S
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { Badge } from '@/components/ui/badge'
 import {
     Table,
@@ -189,11 +190,7 @@ export function InvoicesPage() {
     )
 
     if (loading && invoices.length === 0) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        )
+        return <PageSkeleton />
     }
 
     return (
@@ -440,3 +437,5 @@ export function InvoicesPage() {
         </div>
     )
 }
+
+export default InvoicesPage

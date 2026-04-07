@@ -19,8 +19,11 @@ const parseUserAgent = (ua) => {
 const getLocationFromIP = (ip) => {
     try {
         const cleanIP = ip.replace(/^::ffff:/, '');
-        if (cleanIP === '127.0.0.1' || cleanIP === 'localhost' || cleanIP.startsWith('::1')) {
-            return { country: 'Local', city: 'Development', region: 'Internal' };
+        const isLocal = cleanIP === '127.0.0.1' || cleanIP === 'localhost' || cleanIP.startsWith('::1') ||
+            cleanIP.startsWith('192.168.') || cleanIP.startsWith('10.') || cleanIP.startsWith('172.');
+
+        if (isLocal) {
+            return { country: 'Local Network', city: 'Development', region: 'LAN' };
         }
         const geo = geoip.lookup(cleanIP);
         if (geo) {
@@ -392,10 +395,7 @@ exports.getAnalyticsSummary = async (req, res) => {
         // 2. Active Sessions (Realtime - Last 5 mins)
         const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
         const activeSessionsDocs = await VisitSession.find({
-            $or: [
-                { end_time: { $gte: fiveMinsAgo } },
-                { start_time: { $gte: fiveMinsAgo } }
-            ]
+            updatedAt: { $gte: fiveMinsAgo }
         })
             .populate('visitor_id', 'location ip_address identified_name identified_email')
             .sort({ updatedAt: -1 })

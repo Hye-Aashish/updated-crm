@@ -1555,3 +1555,5 @@ function AIConfigTab({ data, onSave, saving }: any) {
         </Card>
     )
 }
+
+export default SettingsPage

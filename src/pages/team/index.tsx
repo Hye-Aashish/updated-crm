@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -38,6 +39,7 @@ export function TeamPage() {
     const location = useLocation()
     const { toast } = useToast()
     const { users, setUsers, tasks, clients, setClients } = useAppStore()
+    const [loading, setLoading] = useState(true)
 
     // UI State
     const [activeTab, setActiveTab] = useState<'members' | 'attendance'>('members')
@@ -109,8 +111,18 @@ export function TeamPage() {
                 }
             }
         }
-        fetchUsers()
-        fetchClients()
+        const fetchData = async () => {
+            setLoading(true)
+            try {
+                await Promise.all([
+                    fetchUsers(),
+                    fetchClients()
+                ])
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchData()
     }, [users.length, clients.length, setUsers, setClients])
 
     // File Upload Handler
@@ -194,6 +206,10 @@ export function TeamPage() {
         'owner': 'default', 'admin': 'default', 'developer': 'outline', 'employee': 'outline', 'client': 'outline'
     }
 
+    if (loading && users.length === 0) {
+        return <PageSkeleton />
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -216,7 +232,7 @@ export function TeamPage() {
                     >
                         <Clock className="mr-1.5 sm:mr-2 h-4 w-4" /> Attendance
                     </Button>
-                    {activeTab === 'members' && (
+                    {activeTab === 'members' && (['admin', 'owner'].includes(useAppStore.getState().currentUser?.role)) && (
                         <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
                             <DialogTrigger asChild>
                                 <Button className="h-9 px-3 sm:px-4 text-xs sm:text-sm">
@@ -450,7 +466,13 @@ export function TeamPage() {
                     </div>
 
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {users.map((user) => {
+                        {users.filter(u => {
+                            const current = useAppStore.getState().currentUser;
+                            if (!current) return true;
+                            if (current.role === 'admin' || current.role === 'owner') return true;
+                            // Employees see themselves and admins/owners
+                            return u.id === current.id || ['admin', 'owner'].includes(u.role);
+                        }).map((user) => {
                             const stats = getUserStats(user.id)
                             return (
                                 <Card key={user.id} className="cursor-pointer hover:shadow-md transition-all">
@@ -462,7 +484,11 @@ export function TeamPage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent>
                                                     <DropdownMenuItem onClick={() => navigate(`/team/${user.id}`)}>View Profile</DropdownMenuItem>
-                                                    <DropdownMenuItem className="text-red-600" onClick={() => setUserToDelete(user.id)}><Trash2 className="mr-2 h-4 w-4" /> Release</DropdownMenuItem>
+                                                    {['admin', 'owner'].includes(useAppStore.getState().currentUser?.role) && (
+                                                        <DropdownMenuItem className="text-red-600" onClick={() => setUserToDelete(user.id)}>
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Release
+                                                        </DropdownMenuItem>
+                                                    )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
@@ -533,3 +559,5 @@ export function TeamPage() {
         </div>
     )
 }
+
+export default TeamPage

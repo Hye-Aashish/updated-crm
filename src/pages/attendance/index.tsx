@@ -20,6 +20,7 @@ import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { useAppStore } from '@/store'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { AttendanceSheet } from '@/components/attendance/attendance-sheet'
 
 export function AttendancePage() {
@@ -30,17 +31,28 @@ export function AttendancePage() {
     const [users, setUsers] = useState<any[]>([])
     const [currentTime, setCurrentTime] = useState(new Date())
     const [selectedDate, setSelectedDate] = useState(new Date())
+    const [loading, setLoading] = useState(true)
 
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner'
     const displayUsers = isAdmin ? users : (currentUser ? [currentUser] : [])
 
     useEffect(() => {
-        if (currentUser?.id || (currentUser as any)?._id) {
-            fetchStatus()
-            fetchHistory()
-            if (isAdmin) {
-                fetchUsers()
+        const init = async () => {
+            setLoading(true)
+            try {
+                await Promise.all([
+                    fetchStatus(),
+                    fetchHistory()
+                ])
+                if (isAdmin) {
+                    await fetchUsers()
+                }
+            } finally {
+                setLoading(false)
             }
+        }
+        if (currentUser?.id || (currentUser as any)?._id) {
+            init()
         }
     }, [currentUser, isAdmin, selectedDate])
 
@@ -121,6 +133,8 @@ export function AttendancePage() {
 
     const prevMonth = () => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1))
     const nextMonth = () => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1))
+
+    if (loading) return <PageSkeleton />
 
     return (
         <div className="p-6 space-y-8 max-w-6xl mx-auto animate-in fade-in duration-700">

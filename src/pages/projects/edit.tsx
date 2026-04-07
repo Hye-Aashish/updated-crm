@@ -325,3 +325,5 @@ export function EditProjectPage() {
         </div>
     )
 }
+
+export default EditProjectPage

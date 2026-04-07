@@ -1059,3 +1059,5 @@ function MetricCard({ label, value, trend, icon: Icon, color }: any) {
         </Card>
     )
 }
+
+export default ReportsPage

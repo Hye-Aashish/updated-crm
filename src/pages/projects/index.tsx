@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { ProjectService } from '@/lib/services/project.service'
 import { ClientService } from '@/lib/services/client.service'
 import { StatsCard } from '@/components/stats-card'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 
 export function ProjectsPage() {
     const navigate = useNavigate()
@@ -40,14 +41,14 @@ export function ProjectsPage() {
 
     // --- Date Filter Logic ---
     const today = new Date()
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+    const startOfYear = new Date(today.getFullYear(), 0, 1)
+    const endOfYear = new Date(today.getFullYear(), 11, 31)
 
     const formatDateForInput = (d: Date) => d.toISOString().split('T')[0]
 
     const [dateRange, setDateRange] = useState({
-        start: formatDateForInput(startOfMonth),
-        end: formatDateForInput(endOfMonth)
+        start: formatDateForInput(startOfYear),
+        end: formatDateForInput(endOfYear)
     })
 
     const handleDateChange = (key: 'start' | 'end', value: string) => {
@@ -63,18 +64,24 @@ export function ProjectsPage() {
         return date >= start && date <= end
     }
 
-    // --- KPI Calculations (Filtered) ---
-    const filteredProjects = projects.filter(p => isDateInFilter(p.startDate))
-    const totalProjects = filteredProjects.length
-    const activeProjects = filteredProjects.filter(p => p.status === 'in-progress').length
-    const completedProjects = filteredProjects.filter(p => p.status === 'completed').length
-    const delayedProjects = filteredProjects.filter(p => {
+    // --- KPI Calculations (Comprehensive) ---
+    // Count based on all projects to avoid '0' issue while filter is loading or restrictive
+    const totalProjects = projects.length
+    const activeProjects = projects.filter(p => ['in-progress', 'planning', 'on-hold'].includes(p.status)).length
+    const completedProjects = projects.filter(p => p.status === 'completed').length
+    const delayedProjects = projects.filter(p => {
         if (p.status === 'completed') return false
-        return new Date(p.dueDate) < new Date()
+        return p.dueDate && new Date(p.dueDate) < new Date()
     }).length
 
+    // Projects to display in the grid (can be filtered by date if needed)
+    const displayProjects = projects.filter(p => {
+        // Only apply date filter if not showing all
+        return isDateInFilter(p.startDate) || isDateInFilter(p.createdAt)
+    })
+    
     if (loading && projects.length === 0) {
-        return <div className="flex items-center justify-center h-full">Loading...</div>
+        return <PageSkeleton />
     }
 
     return (
@@ -143,7 +150,7 @@ export function ProjectsPage() {
 
             {/* --- Projects Grid --- */}
             <div className={view === 'grid' ? 'grid gap-6 md:grid-cols-2 lg:grid-cols-3' : 'space-y-4'}>
-                {projects.map((project) => {
+                {displayProjects.map((project) => {
                     const client = clients.find((c) => c.id === project.clientId)
                     return (
                         <Card key={project.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
@@ -205,3 +212,5 @@ export function ProjectsPage() {
     )
 }
 
+
+export default ProjectsPage

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
@@ -73,6 +74,7 @@ export function TasksPage() {
     const [pendingApprovalTask, setPendingApprovalTask] = useState<any>(null)
     const [approvalNote, setApprovalNote] = useState('')
     const [approvalFile, setApprovalFile] = useState<{ name: string, data: string, type: string } | null>(null)
+    const [loading, setLoading] = useState(true)
 
     const [newTask, setNewTask] = useState({
         title: '',
@@ -153,7 +155,15 @@ export function TasksPage() {
                 }
             }
         }
-        fetchData()
+        const startFetch = async () => {
+            setLoading(true)
+            try {
+                await fetchData()
+            } finally {
+                setLoading(false)
+            }
+        }
+        startFetch()
     }, [storeTasks.length, users.length, projects.length, setStoreTasks, setUsers, setProjects])
 
     // --- KPI Calculations ---
@@ -634,6 +644,10 @@ export function TasksPage() {
 
     // Get selected task details helper
 
+
+    if (loading && tasks.length === 0) {
+        return <PageSkeleton />
+    }
 
     return (
         <div className="space-y-4 h-[calc(100dvh-120px)] flex flex-col w-full overflow-hidden">
@@ -1224,3 +1238,5 @@ export function TasksPage() {
         </div>
     )
 }
+
+export default TasksPage

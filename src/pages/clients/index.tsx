@@ -9,6 +9,7 @@ import { useAppStore } from '@/store'
 import { EmptyState } from '@/components/empty-state'
 import { ClientService } from '@/lib/services/client.service'
 import { StatsCard } from '@/components/stats-card'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 
 export function ClientsPage() {
     const navigate = useNavigate()
@@ -41,7 +42,7 @@ export function ClientsPage() {
     const retainerClients = clients.filter(c => c.type === 'retainer').length
 
     if (loading && clients.length === 0) {
-        return <div className="flex items-center justify-center h-full">Loading...</div>
+        return <PageSkeleton />
     }
 
     return (
@@ -133,3 +134,5 @@ export function ClientsPage() {
     )
 }
 
+
+export default ClientsPage

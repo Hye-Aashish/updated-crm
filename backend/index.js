@@ -200,8 +200,9 @@ app.use(errorHandler);
 
 // Start Server
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-    server.listen(PORT, () => {
-        console.log(`\n🚀 Server established on port ${PORT}`);
+    server.listen(PORT, '0.0.0.0', () => {
+        console.log(`\n🚀 Server established on all interfaces (0.0.0.0) on port ${PORT}`);
+        console.log(`📡 Network: ${process.env.BACKEND_URL || `http://localhost:${PORT}`}`);
         console.log(`📡 Local: http://localhost:${PORT}`);
         console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
         console.log(`🔒 Security: Helmet ✓ | Rate Limit ✓ | CORS ✓ | Mongo Sanitize ✓\n`);

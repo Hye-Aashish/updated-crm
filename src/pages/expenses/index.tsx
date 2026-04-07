@@ -15,6 +15,7 @@ import api from '@/lib/api-client'
 import { mapExpense } from '@/lib/mappers'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { usePermissions } from '@/hooks/use-permissions'
 
 // Fixed Categories (Admin only can add new)
@@ -74,6 +75,7 @@ export function ExpensesPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [filterCategory, setFilterCategory] = useState('')
     const [filterPaymentMode, setFilterPaymentMode] = useState('')
+    const [loading, setLoading] = useState(true)
     const formatDateLocal = (date: Date) => {
         const y = date.getFullYear()
         const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -122,6 +124,7 @@ export function ExpensesPage() {
 
     // Fetch Expenses
     const fetchData = async () => {
+        setLoading(true)
         try {
             const res = await api.get('/expenses')
             const mapped = res.data.map((e: any) => {
@@ -137,6 +140,8 @@ export function ExpensesPage() {
         } catch (error) {
             console.error("Failed to fetch expenses", error)
             toast({ title: "Error", description: "Failed to load expenses", variant: "destructive" })
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -233,6 +238,10 @@ export function ExpensesPage() {
     const getCategoryLabel = (category: string) => {
         const cat = EXPENSE_CATEGORIES.find(c => c.value === category)
         return cat?.label || category
+    }
+
+    if (loading && expenses.length === 0) {
+        return <PageSkeleton />
     }
 
     return (
@@ -681,3 +690,5 @@ export function ExpensesPage() {
         </div>
     )
 }
+
+export default ExpensesPage

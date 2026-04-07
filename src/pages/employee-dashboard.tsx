@@ -267,3 +267,5 @@ export function EmployeeDashboardPage() {
         </div>
     )
 }
+
+export default EmployeeDashboardPage

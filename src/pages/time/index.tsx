@@ -634,3 +634,5 @@ export function TimePage() {
         </div>
     )
 }
+
+export default TimePage

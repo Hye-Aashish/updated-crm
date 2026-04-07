@@ -54,10 +54,15 @@ function createWindow() {
     Menu.setApplicationMenu(menu);
 
     const isPackaged = app.isPackaged;
+    const PRODUCTION_URL = 'http://192.168.1.16:5173'; // Your Server IP
+
     if (isPackaged) {
-        // Correct path for packaged application
-        const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
-        mainWindow.loadFile(indexPath);
+        // Try to load the live server first for automatic updates
+        mainWindow.loadURL(PRODUCTION_URL).catch(() => {
+            // Fallback to local files if server is offline
+            const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
+            mainWindow.loadFile(indexPath);
+        });
     } else {
         const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:5173';
         mainWindow.loadURL(startUrl);

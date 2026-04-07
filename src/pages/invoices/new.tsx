@@ -435,3 +435,5 @@ export function NewInvoicePage() {
         </div>
     )
 }
+
+export default NewInvoicePage

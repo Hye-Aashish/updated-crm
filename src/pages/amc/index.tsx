@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -212,13 +213,7 @@ export default function AmcPage() {
         return days
     }
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
-            </div>
-        )
-    }
+    if (loading) return <PageSkeleton />
 
     return (
         <div className="space-y-6 p-1 animate-in fade-in duration-300">

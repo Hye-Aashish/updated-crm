@@ -21,6 +21,7 @@ import { Card } from '@/components/ui/card'
 import { WelcomeAnimation } from '@/components/welcome-animation'
 import { useAttendance } from '@/hooks/use-attendance'
 import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 
 export function DashboardPage() {
     const navigate = useNavigate()
@@ -30,6 +31,7 @@ export function DashboardPage() {
     const [amcStats, setAmcStats] = useState<any>(null)
     const [domainStats, setDomainStats] = useState<any>(null)
     const [expirySummary, setExpirySummary] = useState<any>(null)
+    const [isLoading, setIsLoading] = useState(true)
     const userId = currentUser?.id || (currentUser as any)?._id
 
     // Hooks for business logic
@@ -54,19 +56,14 @@ export function DashboardPage() {
     } = useDashboardMetrics(settings)
 
     // Loading state guard
-    if (!currentUser) {
-        return (
-            <div className="h-[80vh] w-full flex flex-col items-center justify-center space-y-4 animate-pulse">
-                <div className="h-12 w-12 rounded-2xl bg-muted" />
-                <div className="h-4 w-48 bg-muted rounded-full" />
-                <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Syncing Enterprise Data...</p>
-            </div>
-        )
+    if (!currentUser || isLoading) {
+        return <PageSkeleton />
     }
 
     // Data Fetching
     useEffect(() => {
         const loadInitialData = async () => {
+            setIsLoading(true)
             try {
                 const [settingsRes] = await Promise.all([
                     api.get('/settings').catch(() => ({ data: null })),
@@ -86,6 +83,8 @@ export function DashboardPage() {
                 if (settingsRes?.data) setSettings(settingsRes.data)
             } catch (error) {
                 console.error("Dashboard Load Error", error)
+            } finally {
+                setIsLoading(false)
             }
         }
         loadInitialData()

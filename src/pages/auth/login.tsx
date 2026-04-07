@@ -50,6 +50,16 @@ export function LoginPage() {
             }
 
             setCurrentUser(userData)
+            
+            // Identify in Tracker if available
+            try {
+                if ((window as any).CRMTracker) {
+                    (window as any).CRMTracker.identify(userData.email, userData.name);
+                }
+            } catch (e) {
+                console.warn('Tracker identify failed', e);
+            }
+
             toast({ description: `Welcome back, ${userData.name}` })
             navigate('/dashboard')
         } catch (error: any) {

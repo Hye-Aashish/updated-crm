@@ -24,3 +24,5 @@ export function NewClientPage() {
         </div>
     )
 }
+
+export default NewClientPage

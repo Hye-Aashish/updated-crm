@@ -13,6 +13,7 @@ import { KanbanBoard } from '@/components/leads/kanban-board'
 import { LeadsList } from '@/components/leads/leads-list'
 import { LeadDetailsDialog } from '@/components/leads/lead-details-dialog'
 import { LeadFormBuilder } from '@/components/leads/lead-form-builder'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import type { Lead } from '@/types'
 
 const COLOR_OPTIONS = [
@@ -26,7 +27,7 @@ export function LeadsPage() {
     const { toast } = useToast()
     const {
         leads, stages, leadForms, setLeads, setStages, setLeadForms,
-        updateLeadStage, deleteLead, addActivity, fetchData
+        updateLeadStage, deleteLead, addActivity, fetchData, loading
     } = useLeadsData()
 
     const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
@@ -86,6 +87,10 @@ export function LeadsPage() {
         } catch (error) {
             toast({ title: "Error", description: "Process failed", variant: "destructive" })
         }
+    }
+
+    if (loading && leads.length === 0) {
+        return <PageSkeleton />
     }
 
     return (

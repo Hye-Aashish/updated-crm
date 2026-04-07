@@ -19,6 +19,7 @@ import {
 import { Wallet, Calendar, TrendingUp, Clock, Edit2 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
@@ -95,7 +96,7 @@ export function SalaryPage() {
         }
     }
 
-    if (loading) return <div className="p-8 text-center">Loading payroll data...</div>
+    if (loading) return <PageSkeleton />
 
     return (
         <div className="space-y-6">
@@ -337,3 +338,5 @@ function Button({ children, variant = "default", size = "default", className = "
         </button>
     )
 }
+
+export default SalaryPage

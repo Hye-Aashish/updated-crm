@@ -9,8 +9,10 @@ export function useLeadsData() {
     const { leads, setLeads } = useAppStore()
     const [stages, setStages] = useState<PipelineStage[]>([])
     const [leadForms, setLeadForms] = useState<LeadForm[]>([])
+    const [loading, setLoading] = useState(true)
 
     const fetchData = async () => {
+        setLoading(true)
         try {
             const [stagesRes, leadsRes, formsRes] = await Promise.all([
                 api.get('/leads/stages'),
@@ -36,6 +38,8 @@ export function useLeadsData() {
         } catch (error) {
             console.error("Failed to fetch leads data", error)
             toast({ title: "Error", description: "Failed to load pipeline data", variant: "destructive" })
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -92,6 +96,7 @@ export function useLeadsData() {
         fetchData,
         updateLeadStage,
         deleteLead,
-        addActivity
+        addActivity,
+        loading
     }
 }
