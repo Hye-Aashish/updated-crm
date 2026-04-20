@@ -104,6 +104,22 @@ export function InvoicesPage() {
         }
     }
 
+    // --- Filters & Search ---
+    const [searchQuery, setSearchQuery] = useState('')
+    const [statusFilter, setStatusFilter] = useState('all')
+
+    const filteredInvoices = invoices.filter(invoice => {
+        const client = clients.find(c => c.id === invoice.clientId)
+        const matchesSearch = 
+            invoice.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            client?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            client?.company.toLowerCase().includes(searchQuery.toLowerCase())
+        
+        const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter
+        
+        return matchesSearch && matchesStatus
+    })
+
     useEffect(() => {
         const fetchInvoicesAndClients = async () => {
             try {
@@ -214,14 +230,39 @@ export function InvoicesPage() {
                 <StatsCard title="Due Amount" value={formatCurrency(totalDue)} icon={AlertCircle} color="#ef4444" bg="bg-rose-500/15 dark:bg-rose-500/10" />
             </div>
 
-            <div className="flex items-center gap-4">
-                <div className="relative flex-1 max-w-sm">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative flex-1 w-full sm:max-w-sm">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input placeholder="Search invoices..." className="pl-10 bg-card/60 backdrop-blur-sm focus:bg-card transition-all" />
+                    <Input 
+                        placeholder="Search by invoice # or client..." 
+                        className="pl-10 bg-card/60 backdrop-blur-sm focus:bg-card transition-all" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
                 </div>
-                <Button variant="outline" className="bg-card/60 backdrop-blur-sm hover:bg-accent transition-all">
-                    <Filter className="mr-2 h-4 w-4" /> Filter
-                </Button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <select 
+                        className="h-10 px-3 rounded-md border border-input bg-background text-sm flex-1 sm:w-40"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="draft">Draft</option>
+                    </select>
+                    {(searchQuery || statusFilter !== 'all') && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
+                            className="text-muted-foreground"
+                        >
+                            Reset
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <div className="rounded-md border bg-card shadow-sm overflow-hidden">
@@ -238,14 +279,27 @@ export function InvoicesPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {invoices.length === 0 ? (
+                        {filteredInvoices.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                                    No invoices found. Create one to get started.
+                                <TableCell colSpan={7} className="h-64 text-center">
+                                    <div className="flex flex-col items-center justify-center space-y-3 opacity-60">
+                                        <div className="h-16 w-16 rounded-3xl bg-muted flex items-center justify-center">
+                                            <FileText className="h-8 w-8 text-muted-foreground" />
+                                        </div>
+                                        <div>
+                                            <p className="text-lg font-bold">No Invoices Found</p>
+                                            <p className="text-sm text-muted-foreground">Try adjusting your search or filters.</p>
+                                        </div>
+                                        {['owner', 'admin'].includes(currentUser?.role || '') && (
+                                            <Button variant="outline" size="sm" onClick={() => navigate('/invoices/new')} className="mt-2 text-primary border-primary/20 hover:bg-primary/5">
+                                                Create First Invoice
+                                            </Button>
+                                        )}
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            invoices.map((invoice) => {
+                            filteredInvoices.map((invoice) => {
                                 const client = clients.find((c) => c.id === invoice.clientId)
                                 return (
                                     <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/30 transition-colors border-border/50" onClick={() => navigate(`/invoices/${invoice.id}`)}>

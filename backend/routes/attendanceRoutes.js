@@ -11,7 +11,13 @@ router.get('/today/:userId', protect, async (req, res) => {
             return res.status(403).json({ message: 'Not authorized to view this record' });
         }
 
-        const today = new Date();
+        const { date } = req.query;
+        let today;
+        if (date) {
+            today = new Date(date);
+        } else {
+            today = new Date();
+        }
         today.setHours(0, 0, 0, 0);
 
         const attendance = await Attendance.findOne({
@@ -29,7 +35,14 @@ router.get('/today/:userId', protect, async (req, res) => {
 router.post('/check-in', protect, async (req, res) => {
     try {
         const userId = req.user._id.toString(); // Use authenticated user ID for security
-        const today = new Date();
+        const { localDate } = req.body;
+        
+        let today;
+        if (localDate) {
+            today = new Date(localDate);
+        } else {
+            today = new Date();
+        }
         today.setHours(0, 0, 0, 0);
 
         let attendance = await Attendance.findOne({ userId, date: today });

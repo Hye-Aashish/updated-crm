@@ -62,8 +62,8 @@ export function AttendancePage() {
     }, [])
 
     const fetchStatus = async () => {
-        try {
-            const res = await api.get(`/attendance/today/${currentUser?.id || (currentUser as any)._id}`)
+            const localDate = format(new Date(), 'yyyy-MM-dd')
+            const res = await api.get(`/attendance/today/${currentUser?.id || (currentUser as any)._id}?date=${localDate}`)
             setStatus(res.data)
         } catch (error) {
             console.error('Failed to fetch status')
@@ -92,7 +92,11 @@ export function AttendancePage() {
 
     const handleAction = async (endpoint: string, successMsg: string) => {
         try {
-            const res = await api.post(`/attendance/${endpoint}`, { userId: currentUser?.id })
+            const localDate = format(new Date(), 'yyyy-MM-dd')
+            const res = await api.post(`/attendance/${endpoint}`, { 
+                userId: currentUser?.id,
+                localDate
+            })
             setStatus(res.data)
             toast({
                 title: 'SUCCESS',

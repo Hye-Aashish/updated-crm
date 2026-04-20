@@ -1124,50 +1124,60 @@ export function TasksPage() {
                     </div>
                 </div>
             ) : (
-                <div className="flex-1 overflow-y-auto space-y-4">
-                    {tasks.map((task) => {
-                        const assignee = users.find((u) => u.id === task.assigneeId)
-                        return (
-                            <Card key={task.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedTask(task)}>
-                                <CardContent className="p-4 flex items-center justify-between gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <button className="text-muted-foreground hover:text-primary">
-                                            {task.status === 'done' ? (
-                                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                            ) : (
-                                                <Circle className="h-5 w-5" />
-                                            )}
-                                        </button>
-                                        <div>
-                                            <h3 className={`font-medium ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
-                                                {task.title}
-                                            </h3>
-                                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                                <span className="flex items-center gap-1">
-                                                    <Clock className="h-3 w-3" /> {formatDate(task.dueDate)}
-                                                </span>
-                                                <span>•</span>
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-muted capitalize">
-                                                    {task.priority}
-                                                </span>
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                    {tasks.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-24 opacity-60">
+                            <div className="h-16 w-16 rounded-3xl bg-muted flex items-center justify-center mb-4">
+                                <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                            <p className="text-lg font-bold text-foreground">All Clear!</p>
+                            <p className="text-sm text-muted-foreground">No tasks found matching these criteria.</p>
+                        </div>
+                    ) : (
+                        tasks.map((task) => {
+                            const assignee = users.find((u) => u.id === task.assigneeId)
+                            return (
+                                <Card key={task.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedTask(task)}>
+                                    <CardContent className="p-4 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <button className="text-muted-foreground hover:text-primary">
+                                                {task.status === 'done' ? (
+                                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                                ) : (
+                                                    <Circle className="h-5 w-5" />
+                                                )}
+                                            </button>
+                                            <div>
+                                                <h3 className={`font-medium ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
+                                                    {task.title}
+                                                </h3>
+                                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock className="h-3 w-3" /> {formatDate(task.dueDate)}
+                                                    </span>
+                                                    <span>•</span>
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted capitalize">
+                                                        {task.priority}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className="flex items-center gap-4">
-                                        {assignee && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                                    {assignee.name.charAt(0)}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                        <Badge variant="outline" className="capitalize">{task.status}</Badge>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
+                                        <div className="flex items-center gap-4">
+                                            {assignee && (
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                                        {assignee.name.charAt(0)}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                            )}
+                                            <Badge variant="outline" className="capitalize">{task.status}</Badge>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })
+                    )}
                 </div>
             )
             }

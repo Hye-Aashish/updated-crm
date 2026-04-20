@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import {
     Bell, Menu, Moon, Search, Sun, User, Settings, Plus,
-    DollarSign, Zap, Code, Megaphone, Wifi, Car, LogOut
+    DollarSign, Zap, Code, Megaphone, Wifi, Car, LogOut, Loader2
 } from 'lucide-react'
+import api from '@/lib/api-client'
+import { useToast } from '@/hooks/use-toast'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
@@ -111,6 +113,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     // Quick Add Expense State
     const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
     const [lastCategory, setLastCategory] = useState('salary')
+    const [isSaving, setIsSaving] = useState(false)
     const [expense, setExpense] = useState({
         amount: '',
         category: '',
@@ -152,31 +155,72 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [isExpenseDialogOpen, expense])
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!expense.amount || !expense.category) {
-            alert('Amount and Category are required!')
+            toast({ title: 'Validation Error', description: 'Amount and Category are required!', variant: 'destructive' })
             return
         }
-        // Save expense (mock)
-        console.log('Expense saved:', { ...expense, createdBy: currentUser?.id })
-        // eslint-disable-next-line no-alert
-        alert('✅ Expense Added!')
-        setLastCategory(expense.category)
-        setIsExpenseDialogOpen(false)
-        resetForm()
+        
+        setIsSaving(true)
+        try {
+            await api.post('/expenses', {
+                ...expense,
+                amount: Number(expense.amount),
+                date: new Date(),
+                paymentMode: 'Cash',
+                paidBy: 'Company'
+            })
+            toast({
+                title: 'SUCCESS',
+                description: 'Expense added to ledger.',
+                variant: 'success'
+            })
+            setLastCategory(expense.category)
+            setIsExpenseDialogOpen(false)
+            resetForm()
+        } catch (error: any) {
+            toast({
+                title: 'ERROR',
+                description: error.response?.data?.message || 'Failed to save expense',
+                variant: 'destructive'
+            })
+        } finally {
+            setIsSaving(false)
+        }
     }
 
-    const handleSaveAndAddAnother = () => {
+    const handleSaveAndAddAnother = async () => {
         if (!expense.amount || !expense.category) {
-            alert('Amount and Category are required!')
+            toast({ title: 'Validation Error', description: 'Amount and Category are required!', variant: 'destructive' })
             return
         }
-        console.log('Expense saved:', { ...expense, createdBy: currentUser?.id })
-        // eslint-disable-next-line no-alert
-        alert('✅ Expense Added!')
-        setLastCategory(expense.category)
-        resetForm()
-        setTimeout(() => amountInputRef.current?.focus(), 100)
+
+        setIsSaving(true)
+        try {
+            await api.post('/expenses', {
+                ...expense,
+                amount: Number(expense.amount),
+                date: new Date(),
+                paymentMode: 'Cash',
+                paidBy: 'Company'
+            })
+            toast({
+                title: 'SUCCESS',
+                description: 'Expense recorded. Ready for next.',
+                variant: 'success'
+            })
+            setLastCategory(expense.category)
+            resetForm()
+            setTimeout(() => amountInputRef.current?.focus(), 100)
+        } catch (error: any) {
+            toast({
+                title: 'ERROR',
+                description: error.response?.data?.message || 'Failed to save expense',
+                variant: 'destructive'
+            })
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     const resetForm = () => {
@@ -540,10 +584,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                             Enter = Save, Ctrl+Enter = Save & Add Next
                         </span>
                         <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={handleSaveAndAddAnother}>
-                                + Add Another
+                            <Button variant="outline" size="sm" onClick={handleSaveAndAddAnother} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : '+'} Add Another
                             </Button>
-                            <Button size="sm" onClick={handleSave}>
+                            <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                                 Save Expense
                             </Button>
                         </div>

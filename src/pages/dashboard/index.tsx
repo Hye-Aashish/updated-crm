@@ -55,11 +55,6 @@ export function DashboardPage() {
         relevantInvoices
     } = useDashboardMetrics(settings)
 
-    // Loading state guard
-    if (!currentUser || isLoading) {
-        return <PageSkeleton />
-    }
-
     // Data Fetching
     useEffect(() => {
         const loadInitialData = async () => {
@@ -80,7 +75,9 @@ export function DashboardPage() {
                     api.get('/domains/stats/summary').then(res => setDomainStats(res.data)).catch(() => null),
                     api.get('/expiry-alerts').then(res => setExpirySummary(res.data.summary)).catch(() => null)
                 ])
-                if (settingsRes?.data) setSettings(settingsRes.data)
+                if (settingsRes?.data) {
+                    setSettings(settingsRes.data)
+                }
             } catch (error) {
                 console.error("Dashboard Load Error", error)
             } finally {
@@ -89,6 +86,11 @@ export function DashboardPage() {
         }
         loadInitialData()
     }, [setLeads, setExpenses, setProjects, setInvoices, setTasks])
+
+    // Loading state guard
+    if (!currentUser || isLoading) {
+        return <PageSkeleton />
+    }
 
     const StatCard = ({ label, value, trend, icon: Icon, color, bg, onClick, className }: any) => {
         return (

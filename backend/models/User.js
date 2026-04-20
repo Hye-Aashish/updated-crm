@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
     documentAadhar: { type: String },
     documentPan: { type: String },
     documentOfferLetter: { type: String },
-    salary: { type: String },
+    salary: { type: Number },
     createdAt: { type: Date, default: Date.now }
 });
 

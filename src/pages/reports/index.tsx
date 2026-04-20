@@ -32,6 +32,11 @@ export function ReportsPage() {
         loading: true
     })
 
+    const dateRange = {
+        start: subDays(new Date(), 90),
+        end: new Date()
+    }
+
     useEffect(() => {
         const fetchAllData = async () => {
             try {

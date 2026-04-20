@@ -84,7 +84,7 @@ export function ExpensesPage() {
     }
 
     const [dateRange, setDateRange] = useState({
-        start: formatDateLocal(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+        start: formatDateLocal(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)),
         end: formatDateLocal(new Date())
     })
 
@@ -530,49 +530,57 @@ export function ExpensesPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-3">
-                        {filteredExpenses.map((expense) => {
-                            const Icon = getCategoryIcon(expense.category)
-                            return (
-                                <div
-                                    key={expense.id}
-                                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors group cursor-pointer"
-                                    onClick={() => { setSelectedExpense(expense); setViewExpenseDialogOpen(true); }}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <Icon className="h-5 w-5 text-primary" />
-                                        </div>
-                                        <div>
-                                            <div className="font-medium">{getCategoryLabel(expense.category)}</div>
-                                            <div className="text-sm text-muted-foreground">{expense.note || 'No description'}</div>
-                                            <div className="flex gap-2 mt-1">
-                                                <Badge variant="outline" className="text-xs">{expense.paymentMode}</Badge>
-                                                <Badge variant="secondary" className="text-xs">{expense.paidBy}</Badge>
+                        {filteredExpenses.length === 0 ? (
+                            <div className="text-center py-20 bg-muted/20 rounded-2xl border-2 border-dashed">
+                                <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
+                                <h3 className="text-lg font-bold text-muted-foreground">No expenses found</h3>
+                                <p className="text-sm text-muted-foreground/60 max-w-[200px] mx-auto mt-1">Try adjusting your filters or date range.</p>
+                            </div>
+                        ) : (
+                            filteredExpenses.map((expense) => {
+                                const Icon = getCategoryIcon(expense.category)
+                                return (
+                                    <div
+                                        key={expense.id}
+                                        className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors group cursor-pointer"
+                                        onClick={() => { setSelectedExpense(expense); setViewExpenseDialogOpen(true); }}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                                <Icon className="h-5 w-5 text-primary" />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium">{getCategoryLabel(expense.category)}</div>
+                                                <div className="text-sm text-muted-foreground">{expense.note || 'No description'}</div>
+                                                <div className="flex gap-2 mt-1">
+                                                    <Badge variant="outline" className="text-xs">{expense.paymentMode}</Badge>
+                                                    <Badge variant="secondary" className="text-xs">{expense.paidBy}</Badge>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="text-right flex items-center gap-4">
-                                        <div>
-                                            <div className="text-xl font-bold text-red-600">-{formatCurrency(expense.amount)}</div>
-                                            <div className="text-xs text-muted-foreground">{formatDate(new Date(expense.date))}</div>
+                                        <div className="text-right flex items-center gap-4">
+                                            <div>
+                                                <div className="text-xl font-bold text-red-600">-{formatCurrency(expense.amount)}</div>
+                                                <div className="text-xs text-muted-foreground">{formatDate(new Date(expense.date))}</div>
+                                            </div>
+                                            {['owner', 'admin'].includes(currentUser?.role || '') && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="opacity-50 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteExpense(expense.id);
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
-                                        {['owner', 'admin'].includes(currentUser?.role || '') && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="opacity-50 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteExpense(expense.id);
-                                                }}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        )}
                                     </div>
-                                </div>
-                            )
-                        })}
+                                )
+                            })
+                        )}
                     </div>
                 </CardContent>
             </Card>
