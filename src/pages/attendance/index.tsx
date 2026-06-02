@@ -62,6 +62,7 @@ export function AttendancePage() {
     }, [])
 
     const fetchStatus = async () => {
+        try {
             const localDate = format(new Date(), 'yyyy-MM-dd')
             const res = await api.get(`/attendance/today/${currentUser?.id || (currentUser as any)._id}?date=${localDate}`)
             setStatus(res.data)
