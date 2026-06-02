@@ -31,8 +31,8 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:3000',
-    'https://updated-crm-qjaz.vercel.app',
-    'https://updated-crm-qjaz.vercel.app/'
+    'https://updated-crm-cpzi.vercel.app',
+    'https://updated-crm-cpzi.vercel.app/'
 ].filter(Boolean);
 
 
