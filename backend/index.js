@@ -35,6 +35,7 @@ const allowedOrigins = [
     'https://updated-crm-qjaz.vercel.app/'
 ].filter(Boolean);
 
+
 const io = new Server(server, {
     cors: {
         origin: allowedOrigins,
