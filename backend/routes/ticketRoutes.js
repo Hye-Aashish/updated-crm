@@ -13,12 +13,13 @@ router.get('/', protect, async (req, res) => {
         if (req.user.role === 'client') {
             filter = { clientId: req.user.clientId };
         } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-            // Employees see tickets assigned to them (by ID or Name)
+            // Employees see tickets assigned to them or created by them
             filter = {
                 $or: [
                     { assignedTo: req.user._id.toString() },
                     { assignedTo: req.user.name },
-                    { assignedTo: { $regex: new RegExp('^' + escapeRegex(req.user.name) + '$', 'i') } }
+                    { assignedTo: { $regex: new RegExp('^' + escapeRegex(req.user.name) + '$', 'i') } },
+                    { createdBy: req.user._id.toString() }
                 ]
             };
         }
@@ -39,7 +40,8 @@ router.post('/', protect, async (req, res) => {
         clientId: req.user.role === 'client' ? req.user.clientId : req.body.clientId,
         projectId: req.body.projectId,
         assignedTo: req.body.assignedTo,
-        screenshot: req.body.screenshot
+        screenshot: req.body.screenshot,
+        createdBy: req.user._id.toString()
     });
     try {
         const newTicket = await ticket.save();
@@ -55,6 +57,7 @@ router.get('/:id', protect, async (req, res) => {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
+        const isCreator = ticket.createdBy === req.user._id.toString();
         const isAssigned = ticket.assignedTo === req.user._id.toString() ||
             ticket.assignedTo === req.user.name ||
             (ticket.assignedTo && ticket.assignedTo.toLowerCase() === req.user.name.toLowerCase());
@@ -63,7 +66,7 @@ router.get('/:id', protect, async (req, res) => {
             if (ticket.clientId !== req.user.clientId) {
                 return res.status(403).json({ message: 'Not authorized' });
             }
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned) {
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned && !isCreator) {
             return res.status(403).json({ message: 'Not authorized' });
         }
         res.json(ticket);
@@ -78,6 +81,7 @@ router.put('/:id', protect, async (req, res) => {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
+        const isCreator = ticket.createdBy === req.user._id.toString();
         const isAssigned = ticket.assignedTo === req.user._id.toString() ||
             ticket.assignedTo === req.user.name ||
             (ticket.assignedTo && ticket.assignedTo.toLowerCase() === req.user.name.toLowerCase());
@@ -86,7 +90,7 @@ router.put('/:id', protect, async (req, res) => {
             if (ticket.clientId !== req.user.clientId) {
                 return res.status(403).json({ message: 'Not authorized' });
             }
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned) {
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned && !isCreator) {
             return res.status(403).json({ message: 'Not authorized' });
         }
 

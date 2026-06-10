@@ -72,7 +72,38 @@ exports.getChatProjects = async (req, res) => {
         }
 
         const projects = await Project.find(query).select('name status clientId members pmId');
-        res.status(200).json(projects);
+        
+        const projectsWithLastMsg = await Promise.all(projects.map(async (p) => {
+            const lastMsg = await ProjectMessage.findOne({ projectId: p._id })
+                .sort({ createdAt: -1 });
+            const pObj = p.toObject();
+            if (lastMsg) {
+                pObj.lastMessage = lastMsg.message;
+                pObj.lastMessageAt = lastMsg.createdAt;
+            }
+            return pObj;
+        }));
+
+        res.status(200).json(projectsWithLastMsg);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Delete a message
+exports.deleteProjectMessage = async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const msg = await ProjectMessage.findById(messageId);
+        if (!msg) return res.status(404).json({ message: 'Message not found' });
+
+        // Only the sender of the message (or an owner/admin) can delete it
+        if (msg.senderId.toString() !== req.user._id.toString() && req.user.role !== 'owner' && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to delete this message' });
+        }
+
+        await ProjectMessage.findByIdAndDelete(messageId);
+        res.status(200).json({ message: 'Message deleted successfully', messageId });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

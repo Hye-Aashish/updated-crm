@@ -493,9 +493,10 @@ export function TasksPage() {
                 estimatedHours: selectedTask.estimatedHours
             }
 
-            await api.put(`/tasks/${selectedTask.id}`, taskData)
+            const response = await api.put(`/tasks/${selectedTask.id}`, taskData)
+            const updatedTask = mapTask(response.data)
 
-            updateStoreTask(selectedTask.id, taskData)
+            updateStoreTask(selectedTask.id, updatedTask)
             // useEffect will sync to local tasks if needed, but updateStoreTask should trigger it
 
             toast({
@@ -809,7 +810,7 @@ export function TasksPage() {
                         </Dialog>
                     )}
 
-                    {['owner', 'admin', 'pm'].includes(currentUser?.role || '') && (
+                    {['owner', 'admin', 'pm', 'employee', 'developer'].includes(currentUser?.role || '') && (
                         <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button size="sm" className="h-9">
@@ -954,6 +955,7 @@ export function TasksPage() {
                                             className="text-2xl font-bold border-none px-0 focus-visible:ring-0"
                                             value={selectedTask.title}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, title: e.target.value })}
+                                            disabled={['client', 'employee', 'developer'].includes(currentUser?.role || '')}
                                         />
                                     </div>
                                     <Badge variant="secondary" className={`capitalize ${selectedTask.priority === 'urgent' ? 'bg-red-100 text-red-700' :
@@ -974,7 +976,7 @@ export function TasksPage() {
                                             className="w-full h-9 rounded-md border border-input bg-background px-3 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.projectId}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, projectId: e.target.value })}
-                                            disabled={currentUser?.role === 'client'}
+                                            disabled={['client', 'employee', 'developer'].includes(currentUser?.role || '')}
                                         >
                                             {projects.map(p => (
                                                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -989,7 +991,7 @@ export function TasksPage() {
                                             className="w-full h-9 rounded-md border border-input bg-background px-3 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.assigneeId}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, assigneeId: e.target.value })}
-                                            disabled={currentUser?.role === 'client'}
+                                            disabled={['client', 'employee', 'developer'].includes(currentUser?.role || '')}
                                         >
                                             {users.map(u => (
                                                 <option key={u.id} value={u.id}>{u.name}</option>
@@ -1005,7 +1007,7 @@ export function TasksPage() {
                                             className="h-9 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.dueDate instanceof Date ? selectedTask.dueDate.toISOString().split('T')[0] : selectedTask.dueDate?.split('T')[0]}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, dueDate: e.target.value })}
-                                            disabled={currentUser?.role === 'client'}
+                                            disabled={['client', 'employee', 'developer'].includes(currentUser?.role || '')}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -1016,7 +1018,7 @@ export function TasksPage() {
                                             className="w-full h-9 rounded-md border border-input bg-background px-3 capitalize disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.status}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, status: e.target.value })}
-                                            disabled={currentUser?.role === 'client'}
+                                            disabled={currentUser?.role === 'client' && selectedTask.status !== 'client-approval'}
                                         >
                                             {statuses.map(s => (
                                                 <option key={s.id} value={s.id}>{s.label}</option>
@@ -1032,7 +1034,7 @@ export function TasksPage() {
                                         value={selectedTask.description || ''}
                                         onChange={(e) => setSelectedTask({ ...selectedTask, description: e.target.value })}
                                         placeholder="Add more details about this task..."
-                                        disabled={currentUser?.role === 'client'}
+                                        disabled={['employee', 'developer'].includes(currentUser?.role || '')}
                                     />
                                 </div>
 
@@ -1065,7 +1067,7 @@ export function TasksPage() {
                             </div>
                             <DialogFooter className="border-t pt-4">
                                 <Button variant="outline" onClick={() => setSelectedTask(null)}>Close</Button>
-                                {['owner', 'admin', 'pm'].includes(currentUser?.role || '') && (
+                                {((['owner', 'admin', 'pm', 'employee', 'developer'].includes(currentUser?.role || '')) || currentUser?.role === 'client') && (
                                     <Button onClick={handleUpdateTask}>Save Changes</Button>
                                 )}
                             </DialogFooter>
@@ -1093,8 +1095,8 @@ export function TasksPage() {
                                 <div
                                     key={status.id}
                                     className="w-[280px] flex-shrink-0 flex flex-col h-full bg-muted/30 rounded-lg border"
-                                    onDragOver={handleDragOver}
-                                    onDrop={() => handleDrop(status.id)}
+                                    onDragOver={(e) => currentUser?.role !== 'client' && handleDragOver(e)}
+                                    onDrop={() => currentUser?.role !== 'client' && handleDrop(status.id)}
                                 >
                                     <div className="p-4 border-b bg-muted/40">
                                         <div className="flex items-center justify-between mb-1">

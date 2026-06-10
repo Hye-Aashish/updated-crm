@@ -92,7 +92,10 @@ export function AttendanceSheet({ users, externalDate, onDateChange }: Attendanc
         const days = new Date(year, month + 1, 0).getDate()
         return Array.from({ length: days }, (_, i) => {
             const date = new Date(year, month, i + 1)
-            const dateStr = date.toISOString().split('T')[0]
+            const yearStr = date.getFullYear()
+            const monthStr = String(date.getMonth() + 1).padStart(2, '0')
+            const dayStr = String(date.getDate()).padStart(2, '0')
+            const dateStr = `${yearStr}-${monthStr}-${dayStr}`
             const isWeekend = offDays.includes(date.getDay())
             const isHoliday = holidays.some(h => h.date === dateStr)
             return {
@@ -140,15 +143,40 @@ export function AttendanceSheet({ users, externalDate, onDateChange }: Attendanc
 
     const setStatus = async (userId: string, dateStr: string, status: AttendanceStatus) => {
         try {
+            const finalStatus = status === 'leave' ? 'absent' : status
+            
+            // Optimistically update the UI state immediately
+            const targetDay = new Date(dateStr).getDate()
+            const targetMonth = new Date(dateStr).getMonth()
+            const targetYear = new Date(dateStr).getFullYear()
+
+            setAttendanceData(prev => {
+                const idx = prev.findIndex(a => {
+                    const d = new Date(a.date)
+                    return a.userId === userId && 
+                        d.getDate() === targetDay &&
+                        d.getMonth() === targetMonth &&
+                        d.getFullYear() === targetYear
+                })
+                if (idx > -1) {
+                    const newArr = [...prev]
+                    newArr[idx] = { ...newArr[idx], status: finalStatus }
+                    return newArr
+                } else {
+                    return [...prev, { userId, date: dateStr, status: finalStatus }]
+                }
+            })
+
             await api.post('/attendance/manual', {
                 userId,
                 date: dateStr,
-                status: status === 'leave' ? 'absent' : status
+                status: finalStatus
             })
             toast({ title: "ATTENDANCE UPDATED", description: "Status changed successfully", variant: 'success' })
             fetchAllData()
         } catch (error: any) {
             toast({ title: "UPDATE FAILED", description: error.response?.data?.message || "Could not update status", variant: "destructive" })
+            fetchAllData() // Rollback/refresh if failed
         }
     }
 

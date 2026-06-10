@@ -1,14 +1,87 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { User, Bell, Lock, Save, Camera } from 'lucide-react'
+import { User, Bell, Lock, Save, Camera, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store'
+import api from '@/lib/api-client'
+import { useToast } from '@/hooks/use-toast'
 
 export function EmployeeSettingsPage() {
-    const { currentUser } = useAppStore()
+    const { currentUser, setCurrentUser } = useAppStore()
     const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications'>('profile')
+    const { toast } = useToast()
+
+    const [name, setName] = useState(currentUser?.name || '')
+    const [phone, setPhone] = useState(currentUser?.phone || '')
+    const [currentPassword, setCurrentPassword] = useState('')
+    const [newPassword, setNewPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [avatar, setAvatar] = useState(currentUser?.avatar || '')
+    const avatarInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        if (currentUser) {
+            setName(currentUser.name || '')
+            setPhone(currentUser.phone || '')
+            setAvatar(currentUser.avatar || '')
+        }
+    }, [currentUser])
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setAvatar(reader.result as string)
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
+    const handleProfileSave = async () => {
+        if (!name.trim()) {
+            toast({ description: "Full Name is required", variant: "destructive" })
+            return
+        }
+        setLoading(true)
+        try {
+            const res = await api.put(`/users/${currentUser?._id}`, { name, phone, avatar })
+            setCurrentUser(res.data)
+            toast({ description: "Profile details updated successfully", variant: "success" })
+        } catch (error: any) {
+            console.error(error)
+            toast({ description: error.response?.data?.message || "Failed to update profile", variant: "destructive" })
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleSecuritySave = async () => {
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            toast({ description: "Please fill in all password fields", variant: "destructive" })
+            return
+        }
+        if (newPassword !== confirmPassword) {
+            toast({ description: "New passwords do not match", variant: "destructive" })
+            return
+        }
+        setLoading(true)
+        try {
+            await api.put(`/users/${currentUser?._id}`, { password: newPassword })
+            setCurrentPassword('')
+            setNewPassword('')
+            setConfirmPassword('')
+            toast({ description: "Password updated successfully", variant: "success" })
+        } catch (error: any) {
+            console.error(error)
+            toast({ description: error.response?.data?.message || "Failed to update password", variant: "destructive" })
+        } finally {
+            setLoading(false)
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -56,12 +129,26 @@ export function EmployeeSettingsPage() {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="flex items-center gap-6">
-                                    <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center text-3xl font-bold text-primary relative group cursor-pointer overflow-hidden">
-                                        {currentUser?.name?.charAt(0) || 'U'}
+                                    <div 
+                                        className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center text-3xl font-bold text-primary relative group cursor-pointer overflow-hidden"
+                                        onClick={() => avatarInputRef.current?.click()}
+                                    >
+                                        {avatar ? (
+                                            <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            currentUser?.name?.charAt(0) || 'U'
+                                        )}
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                             <Camera className="h-6 w-6 text-white" />
                                         </div>
                                     </div>
+                                    <input 
+                                        type="file" 
+                                        ref={avatarInputRef} 
+                                        className="hidden" 
+                                        accept="image/*" 
+                                        onChange={handleAvatarChange} 
+                                    />
                                     <div>
                                         <h3 className="font-semibold text-lg">{currentUser?.name}</h3>
                                         <p className="text-muted-foreground">{currentUser?.role}</p>
@@ -71,7 +158,7 @@ export function EmployeeSettingsPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="name">Full Name</Label>
-                                        <Input id="name" defaultValue={currentUser?.name} />
+                                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="email">Email Address</Label>
@@ -79,7 +166,7 @@ export function EmployeeSettingsPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="phone">Phone Number</Label>
-                                        <Input id="phone" defaultValue={currentUser?.phone || ''} placeholder="+91 99999 99999" />
+                                        <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 99999 99999" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="designation">Designation</Label>
@@ -91,8 +178,9 @@ export function EmployeeSettingsPage() {
                                     </div>
                                 </div>
 
-                                <Button>
-                                    <Save className="mr-2 h-4 w-4" /> Save Changes
+                                <Button onClick={handleProfileSave} disabled={loading}>
+                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    Save Changes
                                 </Button>
                             </CardContent>
                         </Card>
@@ -108,20 +196,23 @@ export function EmployeeSettingsPage() {
                                 <div className="space-y-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="current-password">Current Password</Label>
-                                        <Input id="current-password" type="password" />
+                                        <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="new-password">New Password</Label>
-                                            <Input id="new-password" type="password" />
+                                            <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="confirm-password">Confirm New Password</Label>
-                                            <Input id="confirm-password" type="password" />
+                                            <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
                                         </div>
                                     </div>
                                 </div>
-                                <Button>Update Password</Button>
+                                <Button onClick={handleSecuritySave} disabled={loading}>
+                                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Update Password
+                                </Button>
                             </CardContent>
                         </Card>
                     )}

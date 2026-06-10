@@ -46,6 +46,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     const navigate = useNavigate()
     const { currentUser, notifications, markNotificationRead, markAllNotificationsRead, leads, projects, tasks, clients } = useAppStore()
 
+
     // Global Search State
     const [searchQuery, setSearchQuery] = useState('')
     const [searchResults, setSearchResults] = useState<{ type: string, id: string, title: string, subtitle?: string, link: string }[]>([])
@@ -472,13 +473,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                             <p className="text-sm font-medium leading-none">{currentUser?.name}</p>
                             <p className="text-xs leading-none text-muted-foreground">{currentUser?.email}</p>
                         </div>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="cursor-pointer rounded-lg" onClick={() => navigate('/settings')}>
-                            <User className="mr-2 h-4 w-4 text-muted-foreground" /> Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer rounded-lg" onClick={() => navigate('/settings')}>
-                            <Settings className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
-                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}>
                             <LogOut className="mr-2 h-4 w-4" /> Log out

@@ -73,8 +73,14 @@ export function ProjectFileDialog({ project, open, onOpenChange }: ProjectFileDi
 
             addFile({
                 id: response.data._id || response.data.id,
-                ...response.data,
-                uploadedAt: new Date(),
+                name: response.data.name,
+                type: response.data.type,
+                size: response.data.size,
+                url: response.data.url,
+                projectId: response.data.projectId,
+                clientId: response.data.clientId,
+                uploadedBy: response.data.uploadedBy,
+                uploadedAt: response.data.uploadedAt ? new Date(response.data.uploadedAt) : new Date(),
             })
 
             toast({

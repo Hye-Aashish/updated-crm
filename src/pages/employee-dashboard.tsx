@@ -58,12 +58,22 @@ export function EmployeeDashboardPage() {
 
     const myRecentTasks = myTasks.filter(t => t.status !== 'done').slice(0, 5)
 
+    const roleConfig = settings?.roles?.find((r: any) => r.name === currentUser.role)
+    const permissions = roleConfig?.permissions
+    const isTasksViewAllowed = currentUser?.role === 'owner' || (permissions ? !!permissions.tasks?.view : true)
+    const isAttendanceViewAllowed = currentUser?.role === 'owner' || (permissions ? !!permissions.attendance?.view : true)
+
     const metrics = [
-        { title: 'My Active Tasks', value: myPendingTasks, icon: CheckSquare, color: '#3b82f6', bg: 'bg-blue-50', link: '/employee/tasks' },
-        { title: 'Due Today', value: myTasksDueToday, icon: Calendar, color: '#eab308', bg: 'bg-yellow-50', link: '/employee/tasks?due=today' },
-        { title: 'Assigned Projects', value: myActiveProjects, icon: Briefcase, color: '#8b5cf6', bg: 'bg-purple-50', link: '/employee/projects' },
-        { title: 'Logged Hours', value: "24h", icon: Clock, color: '#10b981', bg: 'bg-emerald-50', link: '/employee/time' },
-    ]
+        { title: 'My Active Tasks', value: myPendingTasks, icon: CheckSquare, color: '#3b82f6', bg: 'bg-blue-50', link: '/employee/tasks', permissionKey: 'tasks' },
+        { title: 'Due Today', value: myTasksDueToday, icon: Calendar, color: '#eab308', bg: 'bg-yellow-50', link: '/employee/tasks?due=today', permissionKey: 'tasks' },
+        { title: 'Assigned Projects', value: myActiveProjects, icon: Briefcase, color: '#8b5cf6', bg: 'bg-purple-50', link: '/employee/projects', permissionKey: 'projects' },
+        { title: 'Logged Hours', value: "24h", icon: Clock, color: '#10b981', bg: 'bg-emerald-50', link: '/employee/time', permissionKey: 'time_tracking' },
+    ].filter(m => {
+        if (currentUser?.role === 'owner') return true
+        if (!settings) return true
+        if (!permissions) return false
+        return !!permissions[m.permissionKey]?.view
+    })
 
     const overdueTasks = myTasks.filter(t => t.status !== 'done' && new Date(t.dueDate) < new Date()).slice(0, 3)
 
@@ -140,71 +150,73 @@ export function EmployeeDashboardPage() {
                 </div>
 
                 {/* Attendance Widget */}
-                <Card className="flex-shrink-0 w-full xl:w-96 border-l-4 border-l-primary shadow-sm">
-                    <CardContent className="p-5">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Clock className="h-5 w-5 text-primary" />
-                                <h3 className="font-semibold text-lg">Attendance</h3>
+                {isAttendanceViewAllowed && (
+                    <Card className="flex-shrink-0 w-full xl:w-96 border-l-4 border-l-primary shadow-sm">
+                        <CardContent className="p-5">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <Clock className="h-5 w-5 text-primary" />
+                                    <h3 className="font-semibold text-lg">Attendance</h3>
+                                </div>
+                                <Badge variant={attendanceStatus === 'in' ? 'default' : attendanceStatus === 'break' ? 'secondary' : 'outline'} className="capitalize px-3 py-1">
+                                    {attendanceStatus === 'out' ? 'Clocked Out' : attendanceStatus === 'in' ? 'Clocked In' : 'On Break'}
+                                </Badge>
                             </div>
-                            <Badge variant={attendanceStatus === 'in' ? 'default' : attendanceStatus === 'break' ? 'secondary' : 'outline'} className="capitalize px-3 py-1">
-                                {attendanceStatus === 'out' ? 'Clocked Out' : attendanceStatus === 'in' ? 'Clocked In' : 'On Break'}
-                            </Badge>
-                        </div>
 
-                        <div className="text-center py-2 bg-muted/20 rounded-lg mb-4">
-                            <div className="text-3xl font-mono font-bold tracking-wider">
-                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </div>
-                            <div className="text-sm text-muted-foreground mt-1">
-                                {currentTime.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
-                            </div>
-                        </div>
-
-                        {attendanceStatus === 'in' && (
-                            <div className="text-center mb-4">
-                                <span className="text-xs text-muted-foreground uppercase tracking-widest">Session Duration</span>
-                                <div className="text-xl font-mono font-medium text-primary mt-1">
-                                    {formatElapsedTime(elapsedTime)}
+                            <div className="text-center py-2 bg-muted/20 rounded-lg mb-4">
+                                <div className="text-3xl font-mono font-bold tracking-wider">
+                                    {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-1">
+                                    {currentTime.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
                                 </div>
                             </div>
-                        )}
 
-                        <div className="grid grid-cols-2 gap-3">
-                            {attendanceStatus === 'out' ? (
-                                <Button className="col-span-2 w-full gap-2 bg-green-600 hover:bg-green-700" onClick={handleClockIn}>
-                                    <PlayCircle className="h-5 w-5" />
-                                    Clock In
-                                </Button>
-                            ) : attendanceStatus === 'checked-out' ? (
-                                <div className="col-span-2 text-center py-2 text-sm font-medium text-muted-foreground bg-secondary/20 rounded-lg border border-dashed">
-                                    Today's shift completed. See you tomorrow!
+                            {attendanceStatus === 'in' && (
+                                <div className="text-center mb-4">
+                                    <span className="text-xs text-muted-foreground uppercase tracking-widest">Session Duration</span>
+                                    <div className="text-xl font-mono font-medium text-primary mt-1">
+                                        {formatElapsedTime(elapsedTime)}
+                                    </div>
                                 </div>
-                            ) : (
-                                <>
-                                    {attendanceStatus === 'in' ? (
-                                        <Button variant="outline" className="gap-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50" onClick={handleBreakToggle}>
-                                            <Coffee className="h-4 w-4" />
-                                            Take Break
-                                        </Button>
-                                    ) : attendanceStatus === 'break' ? (
-                                        <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={handleBreakToggle}>
-                                            <PlayCircle className="h-4 w-4" />
-                                            Resume
-                                        </Button>
-                                    ) : null}
-                                    <Button variant="destructive" className="gap-2" onClick={handleClockOut}>
-                                        <StopCircle className="h-4 w-4" />
-                                        Clock Out
-                                    </Button>
-                                </>
                             )}
-                        </div>
-                    </CardContent>
-                </Card>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                {attendanceStatus === 'out' ? (
+                                    <Button className="col-span-2 w-full gap-2 bg-green-600 hover:bg-green-700" onClick={handleClockIn}>
+                                        <PlayCircle className="h-5 w-5" />
+                                        Clock In
+                                    </Button>
+                                ) : attendanceStatus === 'checked-out' ? (
+                                    <div className="col-span-2 text-center py-2 text-sm font-medium text-muted-foreground bg-secondary/20 rounded-lg border border-dashed">
+                                        Today's shift completed. See you tomorrow!
+                                    </div>
+                                ) : (
+                                    <>
+                                        {attendanceStatus === 'in' ? (
+                                            <Button variant="outline" className="gap-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50" onClick={handleBreakToggle}>
+                                                <Coffee className="h-4 w-4" />
+                                                Take Break
+                                            </Button>
+                                        ) : attendanceStatus === 'break' ? (
+                                            <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={handleBreakToggle}>
+                                                <PlayCircle className="h-4 w-4" />
+                                                Resume
+                                            </Button>
+                                        ) : null}
+                                        <Button variant="destructive" className="gap-2" onClick={handleClockOut}>
+                                            <StopCircle className="h-4 w-4" />
+                                            Clock Out
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Urgent Tasks Section for Employee */}
-                {isDeadlinesEnabled && overdueTasks.length > 0 && !layoutConfig.hiddenSubItems?.includes('overdue') && (
+                {isDeadlinesEnabled && isTasksViewAllowed && overdueTasks.length > 0 && !layoutConfig.hiddenSubItems?.includes('overdue') && (
                     <div className="flex-shrink-0 w-full xl:w-96 bg-rose-500/5 rounded-[2.5rem] p-8 border border-rose-500/10 self-stretch">
                         <div className="flex items-center gap-3 mb-6">
                             <AlertCircle className="h-5 w-5 text-rose-500" />
@@ -230,7 +242,7 @@ export function EmployeeDashboardPage() {
             </div>
 
             {/* My Tasks List */}
-            {isTasksEnabled && (
+            {isTasksEnabled && isTasksViewAllowed && (
                 <div className="grid gap-6">
                     <Card>
                         <CardHeader>

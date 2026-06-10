@@ -59,12 +59,14 @@ export function TaskBoardCardV2({ task, users, setSelectedTask, handleDragStart,
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
     }
 
+    const isClient = currentUser?.role === 'client'
+
     return (
         <Card
-            draggable
+            draggable={!isClient}
             onClick={() => setSelectedTask(task)}
-            onDragStart={() => handleDragStart(task)}
-            className="shadow-sm hover:shadow-md transition-shadow cursor-pointer active:cursor-grabbing border-l-4"
+            onDragStart={() => !isClient && handleDragStart(task)}
+            className={`shadow-sm hover:shadow-md transition-shadow border-l-4 ${isClient ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
             style={{ borderLeftColor: task.isTimerRunning ? '#22c55e' : 'transparent' }}
         >
             <CardContent className="p-3">

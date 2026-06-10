@@ -432,7 +432,7 @@ export function ProjectDetailPage() {
                 <TabsContent value="tasks" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold">Tasks</h3>
-                        {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
+                        {['owner', 'admin', 'pm', 'employee', 'developer'].includes(currentUser?.role || '') && (
                             <Button size="sm" onClick={() => {
                                 setSelectedTaskForEdit(null)
                                 setTaskDialogOpen(true)

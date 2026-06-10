@@ -7,7 +7,8 @@ import {
     LifeBuoy,
     ChevronLeft,
     ChevronRight,
-    LogOut
+    LogOut,
+    FolderOpen
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,7 @@ export function ClientSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOp
     const location = useLocation()
     const navigate = useNavigate()
     const { currentUser } = useAppStore()
+    const [permissions, setPermissions] = useState<any>(null)
     const [logo, setLogo] = useState<string | null>(null)
     const [companyName, setCompanyName] = useState('Client Portal')
 
@@ -37,17 +39,40 @@ export function ClientSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOp
                 if (cp.logo) setLogo(cp.logo)
                 if (cp.name) setCompanyName(cp.name)
             }
-        }).catch(err => console.error("Logo fetch error", err))
-    }, [])
+            if (currentUser?.role && res.data.roles) {
+                const role = res.data.roles.find((r: any) => r.name === currentUser.role)
+                if (role) setPermissions(role.permissions)
+            }
+        }).catch(err => console.error("Logo/Permissions fetch error", err))
+    }, [currentUser])
 
     const navItems = [
         { name: 'Dashboard', href: '/client/dashboard', icon: LayoutDashboard },
         { name: 'Projects', href: '/client/projects', icon: Briefcase },
         { name: 'Tasks', href: '/client/tasks', icon: CheckSquare },
         { name: 'Invoices', href: '/client/invoices', icon: FileText },
+        { name: 'Files', href: '/client/files', icon: FolderOpen },
         { name: 'Support Tickets', href: '/client/tickets', icon: LifeBuoy },
         { name: 'Profile Settings', href: '/client/settings', icon: Settings },
     ]
+
+    const filteredItems = navItems.filter(item => {
+        if (currentUser?.role === 'owner') return true
+        if (!permissions) {
+            return ['Dashboard'].includes(item.name)
+        }
+        const p = permissions
+        switch (item.name) {
+            case 'Dashboard': return !!p.dashboard?.view
+            case 'Projects': return !!p.projects?.view
+            case 'Tasks': return !!p.tasks?.view
+            case 'Invoices': return !!p.invoices?.view
+            case 'Files': return p.files ? !!p.files.view : true
+            case 'Support Tickets': return !!p.tickets?.view
+            case 'Profile Settings': return !!p.settings?.view
+            default: return true
+        }
+    })
 
     return (
         <>
@@ -65,7 +90,7 @@ export function ClientSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOp
                         </div>
                         <div className="flex-1 overflow-y-auto py-4">
                             <nav className="grid gap-1 px-2">
-                                {navItems.map((item, index) => {
+                                {filteredItems.map((item, index) => {
                                     const isActive = location.pathname === item.href
                                     return (
                                         <Link
@@ -109,7 +134,7 @@ export function ClientSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOp
 
                 <div className="flex-1 overflow-y-auto py-6">
                     <nav className="grid gap-1 px-3">
-                        {navItems.map((item, index) => {
+                        {filteredItems.map((item, index) => {
                             const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)
                             return (
                                 <Link

@@ -108,17 +108,30 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
 
 // UPLAOD/CREATE a new file record (metadata)
 router.post('/', protect, async (req, res) => {
-    const file = new File({
-        name: req.body.name,
-        type: req.body.type,
-        size: req.body.size,
-        url: req.body.url,
-        projectId: req.body.projectId,
-        clientId: req.body.clientId,
-        uploadedBy: req.user._id.toString() // Enforce current user
-    });
-
     try {
+        let clientId = req.body.clientId;
+
+        if (req.body.projectId) {
+            const project = await Project.findById(req.body.projectId);
+            if (project) {
+                clientId = project.clientId;
+            }
+        }
+
+        if (req.user.role === 'client') {
+            clientId = req.user.clientId;
+        }
+
+        const file = new File({
+            name: req.body.name,
+            type: req.body.type,
+            size: req.body.size,
+            url: req.body.url,
+            projectId: req.body.projectId,
+            clientId: clientId,
+            uploadedBy: req.user._id.toString()
+        });
+
         const newFile = await file.save();
         res.status(201).json(newFile);
     } catch (err) {

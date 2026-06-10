@@ -9,6 +9,7 @@ const ticketSchema = new mongoose.Schema({
     clientId: { type: String }, // Linked to Client model
     projectId: { type: String }, // Linked to Project model
     assignedTo: { type: String },
+    createdBy: { type: String },
     screenshot: { type: String }, // Base64 or URL
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

@@ -2,6 +2,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Briefcase, CheckSquare, MessageSquare, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
+import { useState, useEffect } from 'react'
+import api from '@/lib/api-client'
 
 interface BottomNavProps {
     onMenuClick: () => void
@@ -11,6 +13,16 @@ export function BottomNav({ onMenuClick }: BottomNavProps) {
     const navigate = useNavigate()
     const location = useLocation()
     const { currentUser } = useAppStore()
+    const [permissions, setPermissions] = useState<any>(null)
+
+    useEffect(() => {
+        api.get('/settings').then(res => {
+            if (currentUser?.role && res.data.roles) {
+                const role = res.data.roles.find((r: any) => r.name === currentUser.role)
+                if (role) setPermissions(role.permissions)
+            }
+        }).catch(err => console.error("Permissions fetch error", err))
+    }, [currentUser])
 
     const getBaseUrl = () => {
         if (currentUser?.role === 'client') return '/client'
@@ -46,10 +58,25 @@ export function BottomNav({ onMenuClick }: BottomNavProps) {
         },
     ]
 
+    const filteredItems = navItems.filter(item => {
+        if (currentUser?.role === 'owner') return true
+        if (!permissions) {
+            return ['Home'].includes(item.label)
+        }
+        const p = permissions
+        switch (item.label) {
+            case 'Home': return !!p.dashboard?.view
+            case 'Projects': return !!p.projects?.view
+            case 'Tasks': return !!p.tasks?.view
+            case 'Chat': return !!p.project_chat?.view
+            default: return true
+        }
+    })
+
     return (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 pb-safe shadow-[0_-8px_40px_rgba(0,0,0,0.08)]">
             <div className="flex justify-around items-center h-16 px-4">
-                {navItems.map((item) => {
+                {filteredItems.map((item) => {
                     const isActive = location.pathname === item.path
                     return (
                         <button

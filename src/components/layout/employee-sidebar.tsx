@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Link, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store'
+import { useState, useEffect } from 'react'
+import api from '@/lib/api-client'
 
 interface SidebarProps {
     collapsed: boolean
@@ -24,6 +26,16 @@ interface SidebarProps {
 export function EmployeeSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: SidebarProps) {
     const location = useLocation()
     const { currentUser } = useAppStore()
+    const [permissions, setPermissions] = useState<any>(null)
+
+    useEffect(() => {
+        api.get('/settings').then(res => {
+            if (currentUser?.role && res.data.roles) {
+                const role = res.data.roles.find((r: any) => r.name === currentUser.role)
+                if (role) setPermissions(role.permissions)
+            }
+        }).catch(err => console.error("Permissions fetch error", err))
+    }, [currentUser])
 
     const navItems = [
         { name: 'Dashboard', href: '/employee/dashboard', icon: LayoutDashboard },
@@ -35,6 +47,25 @@ export function EmployeeSidebar({ collapsed, setCollapsed, mobileOpen, setMobile
         { name: 'Support Tickets', href: '/employee/tickets', icon: LifeBuoy },
         { name: 'Profile Settings', href: '/employee/settings', icon: Settings },
     ]
+
+    const filteredItems = navItems.filter(item => {
+        if (currentUser?.role === 'owner') return true
+        if (!permissions) {
+            return ['Dashboard'].includes(item.name)
+        }
+        const p = permissions
+        switch (item.name) {
+            case 'Dashboard': return !!p.dashboard?.view
+            case 'My Projects': return !!p.projects?.view
+            case 'My Tasks': return !!p.tasks?.view
+            case 'Attendance': return !!p.attendance?.view
+            case 'Time Tracking': return !!p.time_tracking?.view
+            case 'My Files': return !!p.files?.view
+            case 'Support Tickets': return !!p.tickets?.view
+            case 'Profile Settings': return !!p.settings?.view
+            default: return true
+        }
+    })
 
     return (
         <>
@@ -88,7 +119,7 @@ export function EmployeeSidebar({ collapsed, setCollapsed, mobileOpen, setMobile
                 {/* Navigation */}
                 <div className="flex-1 overflow-y-auto py-4">
                     <nav className="grid gap-1 px-2">
-                        {navItems.map((item, index) => {
+                        {filteredItems.map((item, index) => {
                             const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)
                             return (
                                 <Link

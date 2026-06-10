@@ -45,5 +45,15 @@ module.exports = (io) => {
                 console.error('Project Socket Error:', error);
             }
         });
+
+        // Delete message event
+        socket.on('delete_project_message', async (data) => {
+            try {
+                const { messageId, projectId } = data;
+                io.to(`project_${projectId}`).emit('project_message_deleted', messageId);
+            } catch (error) {
+                console.error('Socket Delete Error:', error);
+            }
+        });
     });
 };

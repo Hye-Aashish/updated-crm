@@ -156,6 +156,37 @@ router.post('/check-out', protect, async (req, res) => {
         }
 
         await attendance.save();
+
+        // --- AUTOMATIC TIMER STOP ON CHECK-OUT ---
+        try {
+            const Task = require('../models/Task');
+            const TimeEntry = require('../models/TimeEntry');
+            const runningTasks = await Task.find({ assigneeId: userId, isTimerRunning: true });
+            for (const task of runningTasks) {
+                const now = Date.now();
+                const elapsed = now - (task.lastStartTime || now);
+                task.isTimerRunning = false;
+                task.totalTimeSpent = (task.totalTimeSpent || 0) + elapsed;
+                task.lastStartTime = null;
+
+                if (task.timeEntryId) {
+                    const timeEntry = await TimeEntry.findById(task.timeEntryId);
+                    if (timeEntry && timeEntry.isRunning) {
+                        timeEntry.endTime = new Date();
+                        timeEntry.isRunning = false;
+                        const start = new Date(timeEntry.startTime);
+                        timeEntry.duration = Math.max(0, Math.floor((timeEntry.endTime - start) / 1000 / 60)); // minutes
+                        await timeEntry.save();
+                    }
+                }
+                task.timeEntryId = null;
+                await task.save();
+            }
+        } catch (timerErr) {
+            console.error('Failed to auto-stop timers on check-out:', timerErr);
+        }
+        // ------------------------------------------
+
         res.json(attendance);
     } catch (error) {
         res.status(400).json({ message: error.message });

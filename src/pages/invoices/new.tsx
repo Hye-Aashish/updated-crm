@@ -261,7 +261,7 @@ export function NewInvoicePage() {
                         <CardContent className="space-y-6">
                             <div className="grid sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label>Client</Label>
+                                    <Label>Company</Label>
                                     <Select
                                         value={formData.clientId}
                                         onValueChange={(value) => setFormData(prev => ({ ...prev, clientId: value, projectId: '' }))}

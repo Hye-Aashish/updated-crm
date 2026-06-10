@@ -43,8 +43,29 @@ export const ProjectChatPage = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [permissions, setPermissions] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [stagedAttachments, setStagedAttachments] = useState<any[]>([]);
+    const [uploadingAttachment, setUploadingAttachment] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const filteredProjects = projects.filter(p =>
+    const getProjectLastMessageTime = (p: ProjectChat) => {
+        const pId = p._id || p.id || '';
+        const realTimeMsg = lastMessages[pId];
+        if (realTimeMsg) {
+            return new Date(realTimeMsg.createdAt).getTime();
+        }
+        if (p.lastMessageAt) {
+            return new Date(p.lastMessageAt).getTime();
+        }
+        return 0;
+    };
+
+    const sortedProjects = [...projects].sort((a, b) => {
+        const timeA = getProjectLastMessageTime(a);
+        const timeB = getProjectLastMessageTime(b);
+        return timeB - timeA;
+    });
+
+    const filteredProjects = sortedProjects.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -115,6 +136,10 @@ export const ProjectChatPage = () => {
             window.dispatchEvent(new CustomEvent('project-message', { detail: msg }));
         });
 
+        newSocket.on('project_message_deleted', (messageId: string) => {
+            window.dispatchEvent(new CustomEvent('project-message-deleted', { detail: messageId }));
+        });
+
         setSocket(newSocket);
         fetchProjects();
 
@@ -122,6 +147,29 @@ export const ProjectChatPage = () => {
             newSocket.disconnect();
         };
     }, [currentUser]); // Remove activeProject from deps
+
+    // Join project room when activeProject or socket changes/connects
+    useEffect(() => {
+        if (!socket || !activeProject) return;
+
+        const pId = activeProject._id || activeProject.id;
+        if (!pId) return;
+
+        const joinRoom = () => {
+            socket.emit('join_project_chat', pId);
+            console.log('Joined project chat room:', pId);
+        };
+
+        if (socket.connected) {
+            joinRoom();
+        }
+
+        socket.on('connect', joinRoom);
+
+        return () => {
+            socket.off('connect', joinRoom);
+        };
+    }, [socket, activeProject]);
 
     // Handle incoming messages via event to avoid closure stale state
     useEffect(() => {
@@ -146,6 +194,15 @@ export const ProjectChatPage = () => {
         return () => window.removeEventListener('project-message', handler);
     }, [activeProject]);
 
+    useEffect(() => {
+        const handler = (e: any) => {
+            const messageId = e.detail;
+            setMessages(prev => prev.filter(m => m._id !== messageId));
+        };
+        window.addEventListener('project-message-deleted', handler);
+        return () => window.removeEventListener('project-message-deleted', handler);
+    }, []);
+
     // Scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -156,7 +213,12 @@ export const ProjectChatPage = () => {
         try {
             const res = await api.get('/project-chat/projects');
             if (Array.isArray(res.data)) {
-                setProjects(res.data);
+                const normalized = res.data.map((p: any) => ({
+                    ...p,
+                    id: p._id || p.id,
+                    _id: p._id || p.id
+                }));
+                setProjects(normalized);
             }
         } catch (error) {
             console.error(error);
@@ -168,7 +230,12 @@ export const ProjectChatPage = () => {
         const pId = project._id || project.id;
         if (!pId) return;
 
-        setActiveProject(project);
+        const normalizedProject = {
+            ...project,
+            id: pId,
+            _id: pId
+        };
+        setActiveProject(normalizedProject);
 
         // Clear unread count when project is selected
         setUnreadCounts(prev => ({
@@ -245,7 +312,7 @@ export const ProjectChatPage = () => {
                         </div>
                         <div className="flex items-center justify-between">
                             <p className={`text-xs truncate max-w-[140px] ${isActive ? 'text-blue-700/70' : unreadCount > 0 ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
-                                {lastMsg ? lastMsg.message : 'Click to view discussion'}
+                                {lastMsg ? lastMsg.message : (project.lastMessage || 'Click to view discussion')}
                             </p>
                         </div>
                     </div>
@@ -254,8 +321,78 @@ export const ProjectChatPage = () => {
         );
     };
 
+    const deleteMessage = async (messageId: string) => {
+        if (!activeProject) return;
+        const pId = activeProject._id || activeProject.id;
+        if (!pId) return;
+
+        try {
+            await api.delete(`/project-chat/messages/${messageId}`);
+            if (socket) {
+                socket.emit('delete_project_message', { messageId, projectId: pId });
+            }
+            toast({
+                title: "Message Deleted",
+                description: "Your message has been deleted successfully.",
+            });
+        } catch (error) {
+            console.error(error);
+            toast({
+                title: "Delete Failed",
+                description: "Failed to delete the message.",
+                variant: "destructive"
+            });
+        }
+    };
+
+    const handleAttachmentClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingAttachment(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadRes = await api.post('/files/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            setStagedAttachments(prev => [
+                ...prev,
+                {
+                    name: uploadRes.data.name,
+                    url: uploadRes.data.url,
+                    fileType: file.type.startsWith('image/') ? 'image' : (file.name.split('.').pop() || 'file')
+                }
+            ]);
+            toast({
+                title: "Attachment Staged",
+                description: `${file.name} is ready to send.`,
+            });
+        } catch (error) {
+            console.error(error);
+            toast({
+                title: "Upload Failed",
+                description: "Failed to upload attachment.",
+                variant: "destructive"
+            });
+        } finally {
+            setUploadingAttachment(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const removeStagedAttachment = (index: number) => {
+        setStagedAttachments(prev => prev.filter((_, i) => i !== index));
+    };
+
     const sendMessage = async () => {
-        if (!inputValue.trim() || !activeProject) return;
+        if ((!inputValue.trim() && stagedAttachments.length === 0) || !activeProject) return;
 
         if (!socket || !socket.connected) {
             toast({
@@ -275,11 +412,12 @@ export const ProjectChatPage = () => {
             senderName: currentUser?.name,
             senderRole: currentUser?.role,
             message: inputValue,
-            attachments: []
+            attachments: stagedAttachments
         };
 
         socket.emit('send_project_message', msgData);
         setInputValue('');
+        setStagedAttachments([]);
     };
 
     if (loading) {
@@ -419,7 +557,16 @@ export const ProjectChatPage = () => {
 
                                 const isMe = msg.senderId === (currentUser?.id || currentUser?._id);
                                 return (
-                                    <div key={msg._id || i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                    <div key={msg._id || i} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group/msg relative`}>
+                                        {!isMe && (['owner', 'admin'].includes(currentUser?.role || '')) && (
+                                            <button 
+                                                onClick={() => deleteMessage(msg._id)}
+                                                className="opacity-0 group-hover/msg:opacity-100 transition-opacity self-center mr-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-lg shrink-0 order-last ml-2"
+                                                title="Delete message"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                            </button>
+                                        )}
                                         <div className={`flex flex-col max-w-[85%] md:max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}>
                                             {!isMe && (
                                                 <div className="flex items-center gap-2 mb-1 px-1">
@@ -433,7 +580,35 @@ export const ProjectChatPage = () => {
                                                 ? 'bg-blue-600 text-white rounded-tr-none'
                                                 : 'bg-white border border-gray-100 text-gray-700 rounded-tl-none'}`}
                                             >
-                                                <p className="whitespace-pre-wrap">{msg.message}</p>
+                                                {msg.message && <p className="whitespace-pre-wrap">{msg.message}</p>}
+                                                
+                                                {msg.attachments && msg.attachments.length > 0 && (
+                                                    <div className="mt-2 space-y-2">
+                                                        {msg.attachments.map((att, index) => {
+                                                            const isImg = att.fileType === 'image' || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(att.fileType?.toLowerCase());
+                                                            if (isImg) {
+                                                                return (
+                                                                    <div key={index} className="rounded-xl overflow-hidden max-w-[200px] border border-gray-200 shadow-sm cursor-pointer hover:opacity-95 transition-opacity" onClick={() => window.open(att.url, '_blank')}>
+                                                                        <img src={att.url} alt={att.name} className="w-full h-auto object-cover max-h-[150px]" />
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <div 
+                                                                    key={index} 
+                                                                    className={`flex items-center gap-2 p-2 rounded-xl max-w-[220px] cursor-pointer border transition-all ${isMe 
+                                                                        ? 'bg-white/10 text-white border-white/20 hover:bg-white/20' 
+                                                                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`} 
+                                                                    onClick={() => window.open(att.url, '_blank')}
+                                                                >
+                                                                    <Paperclip className={`h-4 w-4 shrink-0 ${isMe ? 'text-blue-100' : 'text-gray-400'}`} />
+                                                                    <span className={`text-xs truncate font-medium ${isMe ? 'text-blue-50' : 'text-gray-600'}`}>{att.name}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+
                                                 <div className={`flex items-center justify-end gap-1 mt-1 ${isMe ? 'text-blue-100' : 'text-gray-400'}`}>
                                                     <span className="text-[9px] font-bold">
                                                         {format(new Date(msg.createdAt || Date.now()), 'hh:mm a')}
@@ -441,6 +616,15 @@ export const ProjectChatPage = () => {
                                                 </div>
                                             </div>
                                         </div>
+                                        {isMe && (
+                                            <button 
+                                                onClick={() => deleteMessage(msg._id)}
+                                                className="opacity-0 group-hover/msg:opacity-100 transition-opacity self-center ml-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-lg shrink-0"
+                                                title="Delete message"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -449,8 +633,50 @@ export const ProjectChatPage = () => {
 
                         {/* Input Area */}
                         <div className="p-4 border-t border-gray-100 bg-white">
+                            {/* Staged Attachments Preview */}
+                            {stagedAttachments.length > 0 && (
+                                <div className="mb-2 p-2 bg-gray-50 border border-gray-100 rounded-xl flex flex-wrap gap-2">
+                                    {stagedAttachments.map((att, idx) => (
+                                        <div key={idx} className="relative flex items-center gap-2 p-1.5 px-3 bg-white border border-gray-200 rounded-xl max-w-xs pr-8 group">
+                                            <div className="h-6 w-6 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                                                <Paperclip className="h-3.5 w-3.5" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-bold text-gray-700 truncate">{att.name}</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => removeStagedAttachment(idx)}
+                                                className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] shadow-sm font-bold"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {uploadingAttachment && (
+                                <div className="mb-2 p-2 bg-gray-50 border border-gray-100 rounded-xl flex items-center gap-2">
+                                    <div className="h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-xs text-gray-500 font-medium">Uploading attachment...</span>
+                                </div>
+                            )}
+
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleAttachmentChange} 
+                                className="hidden" 
+                            />
+
                             <div className={`flex items-center gap-2 ${hasMessagePermission ? 'bg-gray-50' : 'bg-gray-100 cursor-not-allowed'} p-1.5 rounded-2xl border border-gray-200`}>
-                                <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-[0.8rem]" disabled={!hasMessagePermission}>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="hidden sm:flex h-10 w-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-[0.8rem]" 
+                                    disabled={!hasMessagePermission}
+                                    onClick={handleAttachmentClick}
+                                >
                                     <Paperclip className="h-5 w-5" />
                                 </Button>
                                 <Input
@@ -463,7 +689,7 @@ export const ProjectChatPage = () => {
                                 />
                                 <Button
                                     onClick={sendMessage}
-                                    disabled={!hasMessagePermission || !inputValue.trim()}
+                                    disabled={!hasMessagePermission || (!inputValue.trim() && stagedAttachments.length === 0)}
                                     className="h-9 w-9 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 rounded-[0.8rem] shrink-0"
                                 >
                                     <Send className="h-4 w-4" />

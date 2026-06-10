@@ -21,6 +21,7 @@ type Ticket = {
     createdAt: string
     screenshot?: string
     projectId?: string
+    createdBy?: string
 }
 
 import { useAppStore } from '@/store'
@@ -167,8 +168,10 @@ export function TicketsPage() {
         const assignedVal = (t.assignedTo || '').toLowerCase().trim()
 
         const matchesAssignment = isOwner ||
+            role === 'client' ||
             assignedVal === currentName ||
-            assignedVal === currentId?.toString().toLowerCase()
+            assignedVal === currentId?.toString().toLowerCase() ||
+            (t.createdBy && t.createdBy.toLowerCase() === currentId?.toString().toLowerCase())
 
         return matchesSearch && matchesStatus && matchesAssignment
     })
@@ -191,7 +194,7 @@ export function TicketsPage() {
                             Create Ticket
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Create Support Ticket</DialogTitle>
                         </DialogHeader>
@@ -453,7 +456,7 @@ export function TicketsPage() {
 
             {/* Ticket Details Dialog */}
             <Dialog open={viewTicketDialogOpen} onOpenChange={setViewTicketDialogOpen}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Ticket Details</DialogTitle>
                     </DialogHeader>

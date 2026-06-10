@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
+import { useAppStore } from '@/store'
+import { EmployeeSettingsPage } from '../employee-settings'
 
 function hexToHSL(hex: string) {
     let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -47,6 +49,12 @@ function hexToHSL(hex: string) {
 type SettingsTab = 'company' | 'users' | 'roles' | 'billing' | 'templates' | 'project-settings' | 'notifications' | 'email' | 'whatsapp' | 'dashboard-builder' | 'ai-config'
 
 export function SettingsPage() {
+    const { currentUser } = useAppStore()
+
+    if (currentUser && currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+        return <EmployeeSettingsPage />
+    }
+
     const [activeTab, setActiveTab] = useState<SettingsTab>('company')
     const [settings, setSettings] = useState<any>(null)
     const { toast } = useToast()

@@ -133,6 +133,18 @@ router.put('/:id', protect, async (req, res) => {
             if (!project || project.clientId !== req.user.clientId) {
                 return res.status(403).json({ message: 'Not authorized' });
             }
+            if (req.body.status && req.body.status !== task.status) {
+                const isApproved = task.status === 'client-approval' && (req.body.status === 'done' || req.body.status === 'completed');
+                if (!isApproved) {
+                    return res.status(403).json({ message: 'Clients are only authorized to change status to done or completed when task is in client-approval' });
+                }
+            }
+            const allowedUpdates = ['status', 'description'];
+            const attemptedUpdates = Object.keys(req.body);
+            const isAttemptingUnauthorizedUpdates = attemptedUpdates.some(key => !allowedUpdates.includes(key) && req.body[key] !== undefined && req.body[key] !== task[key]);
+            if (isAttemptingUnauthorizedUpdates) {
+                return res.status(403).json({ message: 'Clients can only update task status and description' });
+            }
         } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();
             const project = await Project.findById(task.projectId);
@@ -145,6 +157,32 @@ router.put('/:id', protect, async (req, res) => {
                 console.warn(`Unauthorized task update attempt by user ${userId} on task ${req.params.id}. Roles: ${req.user.role}`);
                 return res.status(403).json({ message: 'Not authorized to update this task' });
             }
+        }
+
+        // If status is updated to done or completed, automatically stop any running timer
+        if ((req.body.status === 'done' || req.body.status === 'completed' || req.body.status === 'client-approval') && task.isTimerRunning) {
+            const now = Date.now();
+            const elapsed = now - (task.lastStartTime || now);
+            req.body.isTimerRunning = false;
+            req.body.totalTimeSpent = (task.totalTimeSpent || 0) + elapsed;
+            req.body.lastStartTime = null;
+
+            if (task.timeEntryId) {
+                try {
+                    const TimeEntry = require('../models/TimeEntry');
+                    const timeEntry = await TimeEntry.findById(task.timeEntryId);
+                    if (timeEntry && timeEntry.isRunning) {
+                        timeEntry.endTime = new Date();
+                        timeEntry.isRunning = false;
+                        const start = new Date(timeEntry.startTime);
+                        timeEntry.duration = Math.max(0, Math.floor((timeEntry.endTime - start) / 1000 / 60)); // minutes
+                        await timeEntry.save();
+                    }
+                } catch (timerErr) {
+                    console.error('Failed to auto-stop time entry for task:', timerErr);
+                }
+            }
+            req.body.timeEntryId = null;
         }
 
         const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, {
