@@ -95,10 +95,13 @@ export function TicketsPage() {
     const handleCreateTicket = async () => {
         if (!newTicket.subject) return
         try {
+            const selectedClientObj = clients.find(c => c.name === newTicket.clientName)
             const ticketData = {
                 ...newTicket,
                 clientName: currentUser?.role === 'client' ? currentUser.name : newTicket.clientName,
-                clientId: currentUser?.role === 'client' ? currentUser.id || (currentUser as any)._id : undefined,
+                clientId: currentUser?.role === 'client'
+                    ? currentUser.clientId || currentUser.id || (currentUser as any)?._id
+                    : (selectedClientObj ? selectedClientObj._id : undefined),
             }
             await api.post('/tickets', ticketData)
             fetchTickets()
@@ -115,6 +118,9 @@ export function TicketsPage() {
         try {
             await api.put(`/tickets/${id}`, { status: newStatus })
             setTickets(tickets.map(t => t._id === id ? { ...t, status: newStatus as any } : t))
+            if (selectedTicket && selectedTicket._id === id) {
+                setSelectedTicket({ ...selectedTicket, status: newStatus as any })
+            }
             toast({ description: "Status updated" })
         } catch (error) {
             toast({ title: "Error", description: "Failed to update status", variant: "destructive" })

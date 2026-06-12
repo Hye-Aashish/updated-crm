@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const TimeEntry = require('../models/TimeEntry');
+const Task = require('../models/Task');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Get all time entries with filters
@@ -86,6 +87,20 @@ router.post('/', protect, async (req, res) => {
         });
 
         const newTimeEntry = await timeEntry.save();
+
+        if (req.body.taskId && (req.body.isRunning !== false)) {
+            const task = await Task.findById(req.body.taskId);
+            if (task) {
+                task.isTimerRunning = true;
+                task.lastStartTime = new Date(newTimeEntry.startTime).getTime();
+                task.timeEntryId = newTimeEntry._id.toString();
+                if (task.status === 'todo') {
+                    task.status = 'in-progress';
+                }
+                await task.save();
+            }
+        }
+
         const populated = await TimeEntry.findById(newTimeEntry._id)
             .populate('userId', 'name email')
             .populate('projectId', 'name status')
@@ -126,6 +141,25 @@ router.put('/:id', protect, async (req, res) => {
         }
 
         const updatedTimeEntry = await timeEntry.save();
+
+        if (req.body.isRunning === false && timeEntry.taskId) {
+            const task = await Task.findById(timeEntry.taskId);
+            if (task) {
+                const now = Date.now();
+                const start = new Date(timeEntry.startTime).getTime();
+                const elapsed = now - (task.lastStartTime || start);
+                
+                task.isTimerRunning = false;
+                task.totalTimeSpent = (task.totalTimeSpent || 0) + elapsed;
+                task.lastStartTime = null;
+                task.timeEntryId = null;
+                if (task.status === 'in-progress') {
+                    task.status = 'todo';
+                }
+                await task.save();
+            }
+        }
+
         const populated = await TimeEntry.findById(updatedTimeEntry._id)
             .populate('userId', 'name email')
             .populate('projectId', 'name status')
@@ -149,6 +183,19 @@ router.delete('/:id', protect, async (req, res) => {
         // Authorization check
         if (req.user.role !== 'admin' && req.user.role !== 'owner' && timeEntry.userId.toString() !== req.user._id.toString()) {
             return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        if (timeEntry.isRunning && timeEntry.taskId) {
+            const task = await Task.findById(timeEntry.taskId);
+            if (task) {
+                task.isTimerRunning = false;
+                task.lastStartTime = null;
+                task.timeEntryId = null;
+                if (task.status === 'in-progress') {
+                    task.status = 'todo';
+                }
+                await task.save();
+            }
         }
 
         await timeEntry.deleteOne();

@@ -138,8 +138,8 @@ export function TeamPage() {
 
     // Add User
     const handleAddUser = async () => {
-        if (!newUser.name || !newUser.email) {
-            toast({ variant: "destructive", title: "Validation Error", description: "Name and Email are required" })
+        if (!newUser.name || !newUser.email || !newUser.password) {
+            toast({ variant: "destructive", title: "Validation Error", description: "Name, Email, and Password are required" })
             return
         }
         try {
@@ -271,10 +271,14 @@ export function TeamPage() {
                                             </div>
 
                                             {/* Row 2 */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                 <div className="space-y-2">
                                                     <Label>Employee Email *</Label>
                                                     <Input value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="email@example.com" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Password *</Label>
+                                                    <Input type="text" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="Enter custom password" />
                                                 </div>
                                                 {newUser.role !== 'client' && (
                                                     <div className="space-y-2">
@@ -474,25 +478,29 @@ export function TeamPage() {
                             return u.id === current.id || ['admin', 'owner'].includes(u.role);
                         }).map((user) => {
                             const stats = getUserStats(user.id)
+                            const current = useAppStore.getState().currentUser;
+                            const canManage = current && (['admin', 'owner'].includes(current.role) || current.id === user.id);
                             return (
-                                <Card key={user.id} className="cursor-pointer hover:shadow-md transition-all">
-                                    <CardContent className="p-6">
-                                        <div className="flex justify-end -mt-2 -mr-2">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem onClick={() => navigate(`/team/${user.id}`)}>View Profile</DropdownMenuItem>
-                                                    {['admin', 'owner'].includes(useAppStore.getState().currentUser?.role) && (
-                                                        <DropdownMenuItem className="text-red-600" onClick={() => setUserToDelete(user.id)}>
-                                                            <Trash2 className="mr-2 h-4 w-4" /> Release
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                        <div className="flex flex-col items-center text-center space-y-4 -mt-4">
+                                <Card key={user.id} className="cursor-pointer hover:shadow-md transition-all relative">
+                                    <CardContent className="p-6 pt-8">
+                                        {canManage && (
+                                            <div className="absolute right-2 top-2">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        <DropdownMenuItem onClick={() => navigate(`/team/${user.id}`)}>View Profile</DropdownMenuItem>
+                                                        {['admin', 'owner'].includes(useAppStore.getState().currentUser?.role) && (
+                                                            <DropdownMenuItem className="text-red-600" onClick={() => setUserToDelete(user.id)}>
+                                                                <Trash2 className="mr-2 h-4 w-4" /> Release
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        )}
+                                        <div className="flex flex-col items-center text-center space-y-4">
                                             <Avatar className="h-20 w-20">
                                                 {user.avatar ? (
                                                     <img src={user.avatar} className="h-full w-full object-cover" />

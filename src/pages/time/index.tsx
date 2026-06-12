@@ -31,7 +31,7 @@ import { useAppStore } from '@/store'
 export function TimePage() {
     const navigate = useNavigate()
     const { toast } = useToast()
-    const { currentUser, tasks: globalTasks, projects: globalProjects, users: globalUsers } = useAppStore()
+    const { currentUser, tasks: globalTasks, projects: globalProjects, users: globalUsers, updateTask } = useAppStore()
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner'
 
     // State
@@ -134,12 +134,25 @@ export function TimePage() {
                 throw new Error("User not authenticated")
             }
 
-            await timeEntryService.startTimer(
+            const newEntry = await timeEntryService.startTimer(
                 finalUserId,
                 selectedProject,
                 selectedTask || undefined,
                 timerNote || undefined
             )
+
+            if (selectedTask) {
+                const task = globalTasks.find(t => t.id === selectedTask)
+                if (task) {
+                    const nextStatus = task.status === 'todo' ? 'in-progress' : task.status
+                    updateTask(selectedTask, {
+                        isTimerRunning: true,
+                        lastStartTime: new Date(newEntry.startTime).getTime(),
+                        timeEntryId: newEntry._id,
+                        status: nextStatus as any
+                    })
+                }
+            }
 
             toast({
                 title: 'Timer Started',
@@ -168,7 +181,25 @@ export function TimePage() {
 
     const handleStopTimer = async (entryId: string) => {
         try {
+            const entry = timeEntries.find(e => e._id === entryId)
             await timeEntryService.stopTimer(entryId)
+
+            if (entry && entry.taskId) {
+                const taskId = typeof entry.taskId === 'object' ? entry.taskId._id : entry.taskId
+                const task = globalTasks.find(t => t.id === taskId)
+                if (task) {
+                    const elapsed = Date.now() - (task.lastStartTime || new Date(entry.startTime).getTime())
+                    const nextStatus = task.status === 'in-progress' ? 'todo' : task.status
+                    updateTask(taskId, {
+                        isTimerRunning: false,
+                        lastStartTime: null as any,
+                        timeEntryId: null as any,
+                        totalTimeSpent: (task.totalTimeSpent || 0) + elapsed,
+                        status: nextStatus as any
+                    })
+                }
+            }
+
             toast({
                 title: 'Timer Stopped',
                 description: 'Time entry has been saved'
@@ -321,7 +352,24 @@ export function TimePage() {
                                     onClick={async () => {
                                         if (confirm("Stop all running timers?")) {
                                             const active = timeEntries.filter(e => e.isRunning)
-                                            await Promise.all(active.map(e => timeEntryService.stopTimer(e._id)))
+                                            await Promise.all(active.map(async (e) => {
+                                                await timeEntryService.stopTimer(e._id)
+                                                if (e.taskId) {
+                                                    const taskId = typeof e.taskId === 'object' ? e.taskId._id : e.taskId
+                                                    const task = globalTasks.find(t => t.id === taskId)
+                                                    if (task) {
+                                                        const elapsed = Date.now() - (task.lastStartTime || new Date(e.startTime).getTime())
+                                                        const nextStatus = task.status === 'in-progress' ? 'todo' : task.status
+                                                        updateTask(taskId, {
+                                                            isTimerRunning: false,
+                                                            lastStartTime: null as any,
+                                                            timeEntryId: null as any,
+                                                            totalTimeSpent: (task.totalTimeSpent || 0) + elapsed,
+                                                            status: nextStatus as any
+                                                        })
+                                                    }
+                                                }
+                                            }))
                                             fetchData()
                                         }
                                     }}

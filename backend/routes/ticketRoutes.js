@@ -13,13 +13,23 @@ router.get('/', protect, async (req, res) => {
         if (req.user.role === 'client') {
             filter = { clientId: req.user.clientId };
         } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-            // Employees see tickets assigned to them or created by them
+            const Project = require('../models/Project');
+            const userProjects = await Project.find({
+                $or: [
+                    { pmId: req.user._id.toString() },
+                    { members: req.user._id.toString() }
+                ]
+            });
+            const projectIds = userProjects.map(p => p._id.toString());
+
+            // Employees see tickets assigned to them, created by them, or associated with their projects
             filter = {
                 $or: [
                     { assignedTo: req.user._id.toString() },
                     { assignedTo: req.user.name },
                     { assignedTo: { $regex: new RegExp('^' + escapeRegex(req.user.name) + '$', 'i') } },
-                    { createdBy: req.user._id.toString() }
+                    { createdBy: req.user._id.toString() },
+                    { projectId: { $in: projectIds } }
                 ]
             };
         }
@@ -57,6 +67,15 @@ router.get('/:id', protect, async (req, res) => {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
+        const Project = require('../models/Project');
+        const isProjectMember = ticket.projectId ? await Project.exists({
+            _id: ticket.projectId,
+            $or: [
+                { pmId: req.user._id.toString() },
+                { members: req.user._id.toString() }
+            ]
+        }) : false;
+
         const isCreator = ticket.createdBy === req.user._id.toString();
         const isAssigned = ticket.assignedTo === req.user._id.toString() ||
             ticket.assignedTo === req.user.name ||
@@ -66,7 +85,7 @@ router.get('/:id', protect, async (req, res) => {
             if (ticket.clientId !== req.user.clientId) {
                 return res.status(403).json({ message: 'Not authorized' });
             }
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned && !isCreator) {
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned && !isCreator && !isProjectMember) {
             return res.status(403).json({ message: 'Not authorized' });
         }
         res.json(ticket);
@@ -81,6 +100,15 @@ router.put('/:id', protect, async (req, res) => {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
+        const Project = require('../models/Project');
+        const isProjectMember = ticket.projectId ? await Project.exists({
+            _id: ticket.projectId,
+            $or: [
+                { pmId: req.user._id.toString() },
+                { members: req.user._id.toString() }
+            ]
+        }) : false;
+
         const isCreator = ticket.createdBy === req.user._id.toString();
         const isAssigned = ticket.assignedTo === req.user._id.toString() ||
             ticket.assignedTo === req.user.name ||
@@ -90,7 +118,7 @@ router.put('/:id', protect, async (req, res) => {
             if (ticket.clientId !== req.user.clientId) {
                 return res.status(403).json({ message: 'Not authorized' });
             }
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned && !isCreator) {
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner' && !isAssigned && !isCreator && !isProjectMember) {
             return res.status(403).json({ message: 'Not authorized' });
         }
 

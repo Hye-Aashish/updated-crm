@@ -139,11 +139,38 @@ router.put('/:id', protect, async (req, res) => {
                     return res.status(403).json({ message: 'Clients are only authorized to change status to done or completed when task is in client-approval' });
                 }
             }
-            const allowedUpdates = ['status', 'description'];
-            const attemptedUpdates = Object.keys(req.body);
-            const isAttemptingUnauthorizedUpdates = attemptedUpdates.some(key => !allowedUpdates.includes(key) && req.body[key] !== undefined && req.body[key] !== task[key]);
-            if (isAttemptingUnauthorizedUpdates) {
-                return res.status(403).json({ message: 'Clients can only update task status and description' });
+            
+            const allowedFields = ['status', 'description'];
+            for (const key of Object.keys(req.body)) {
+                if (!allowedFields.includes(key) && req.body[key] !== undefined) {
+                    let dbVal = task[key];
+                    let reqVal = req.body[key];
+
+                    // Normalize dates
+                    if (key === 'dueDate') {
+                        const dbTime = dbVal ? new Date(dbVal).getTime() : 0;
+                        const reqTime = reqVal ? new Date(reqVal).getTime() : 0;
+                        if (dbTime !== reqTime) {
+                            return res.status(403).json({ message: 'Clients can only update task status and description' });
+                        }
+                        continue;
+                    }
+
+                    // Normalize empty/null/undefined
+                    if (dbVal === null || dbVal === undefined) dbVal = '';
+                    if (reqVal === null || reqVal === undefined) reqVal = '';
+
+                    if (dbVal.toString() !== reqVal.toString()) {
+                        return res.status(403).json({ message: 'Clients can only update task status and description' });
+                    }
+                }
+            }
+
+            // Clean req.body to only contain status and description so that other fields are not mutated
+            for (const key of Object.keys(req.body)) {
+                if (!allowedFields.includes(key)) {
+                    delete req.body[key];
+                }
             }
         } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const userId = req.user._id.toString();

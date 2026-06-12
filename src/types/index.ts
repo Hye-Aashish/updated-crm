@@ -136,6 +136,7 @@ export interface Task {
     totalTimeSpent?: number // in milliseconds
     lastStartTime?: number // timestamp
     isTimerRunning?: boolean
+    timeEntryId?: string
 
     createdAt: Date
     updatedAt: Date

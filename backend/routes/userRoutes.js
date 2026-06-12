@@ -41,7 +41,12 @@ router.get('/', protect, async (req, res) => {
 // CREATE a new user (Admin only)
 router.post('/', protect, authorize('admin', 'owner'), async (req, res) => {
     // Whitelist allowed fields to prevent mass-assignment attacks
-    const { name, email, password, role, department, designation, salary, phone, avatar } = req.body;
+    const {
+        name, email, password, role, department, designation, salary, phone, avatar,
+        employeeId, salutation, country, gender, dateOfBirth, joiningDate, reportingTo,
+        language, address, about, aadharNumber, panNumber, documentAadhar, documentPan,
+        documentOfferLetter, clientId
+    } = req.body;
 
     if (!name || !email || !password) {
         return res.status(400).json({ message: 'Name, email, and password are required' });
@@ -52,7 +57,12 @@ router.post('/', protect, authorize('admin', 'owner'), async (req, res) => {
         return res.status(403).json({ message: 'Only owners can create owner accounts' });
     }
 
-    const user = new User({ name, email, password, role, department, designation, salary, phone, avatar });
+    const user = new User({
+        name, email, password, role, department, designation, salary, phone, avatar,
+        employeeId, salutation, country, gender, dateOfBirth, joiningDate, reportingTo,
+        language, address, about, aadharNumber, panNumber, documentAadhar, documentPan,
+        documentOfferLetter, clientId
+    });
     try {
         const newUser = await user.save();
         const userResponse = newUser.toObject();

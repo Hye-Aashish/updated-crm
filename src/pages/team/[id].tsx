@@ -86,6 +86,23 @@ export function TeamMemberPage() {
     if (id === 'new') return <div className="p-8">Please use the 'Add Member' button on the Team page.</div>
     if (!user) return <div className="p-8">User not found</div>
 
+    const current = useAppStore.getState().currentUser
+    const isAdminOrOwner = current && ['admin', 'owner'].includes(current.role)
+    const isSelf = current && current.id === id
+
+    if (current && !isAdminOrOwner && !isSelf) {
+        return (
+            <div className="p-8 max-w-md mx-auto text-center space-y-4 border rounded-lg bg-card shadow mt-10">
+                <Shield className="h-12 w-12 text-destructive mx-auto" />
+                <h2 className="text-xl font-bold text-destructive">Access Denied</h2>
+                <p className="text-muted-foreground text-sm">You do not have permission to view other members' private profiles.</p>
+                <Button onClick={() => navigate('/team')} className="w-full mt-4">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Team
+                </Button>
+            </div>
+        )
+    }
+
     // --- VIEW USER PROFILE ---
     return (
         <div className="space-y-6">
@@ -99,9 +116,11 @@ export function TeamMemberPage() {
                         <p className="text-muted-foreground text-sm">View full employee details.</p>
                     </div>
                 </div>
-                <Button onClick={() => setIsEditDialogOpen(true)} className="gap-2">
-                    <Edit className="h-4 w-4" /> Edit Profile
-                </Button>
+                {(isAdminOrOwner || isSelf) && (
+                    <Button onClick={() => setIsEditDialogOpen(true)} className="gap-2">
+                        <Edit className="h-4 w-4" /> Edit Profile
+                    </Button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -312,17 +331,17 @@ export function TeamMemberPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Designation</Label>
-                                <Input value={editForm.designation} onChange={e => setEditForm({ ...editForm, designation: e.target.value })} />
+                                <Input value={editForm.designation} onChange={e => setEditForm({ ...editForm, designation: e.target.value })} disabled={!isAdminOrOwner} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Department</Label>
-                                <Input value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} />
+                                <Input value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} disabled={!isAdminOrOwner} />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Monthly Salary</Label>
-                                <Input value={editForm.salary} onChange={e => setEditForm({ ...editForm, salary: e.target.value })} placeholder="e.g. 50000" />
+                                <Input value={editForm.salary} onChange={e => setEditForm({ ...editForm, salary: e.target.value })} placeholder="e.g. 50000" disabled={!isAdminOrOwner} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Phone</Label>
