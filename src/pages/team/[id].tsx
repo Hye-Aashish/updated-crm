@@ -23,9 +23,16 @@ export function TeamMemberPage() {
     const [loading, setLoading] = useState(true)
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
     const [editForm, setEditForm] = useState<any>({})
+    const [newPassword, setNewPassword] = useState('')
     const { toast } = useToast()
 
     // State for New Member Form (Simulated here if ID is new, but main Add is in Modal now)
+
+    useEffect(() => {
+        if (!isEditDialogOpen) {
+            setNewPassword('')
+        }
+    }, [isEditDialogOpen])
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -57,9 +64,16 @@ export function TeamMemberPage() {
 
     const handleUpdateUser = async () => {
         try {
-            const res = await api.put(`/users/${id}`, editForm)
+            const payload = { ...editForm }
+            if (newPassword) {
+                payload.password = newPassword
+            } else {
+                delete payload.password
+            }
+            const res = await api.put(`/users/${id}`, payload)
             const updated = { ...res.data, id: res.data._id }
             setUser(updated)
+            setNewPassword('')
             setIsEditDialogOpen(false)
             toast({ title: "Success", description: "User updated successfully" })
         } catch (error) {
@@ -351,6 +365,15 @@ export function TeamMemberPage() {
                         <div className="space-y-2">
                             <Label>Address</Label>
                             <Textarea value={editForm.address} onChange={e => setEditForm({ ...editForm, address: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Change Password (leave blank to keep current)</Label>
+                            <Input 
+                                type="password" 
+                                value={newPassword} 
+                                onChange={e => setNewPassword(e.target.value)} 
+                                placeholder="Enter new password" 
+                            />
                         </div>
                     </div>
                     <DialogFooter className="p-4 border-t gap-2">

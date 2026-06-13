@@ -3,7 +3,6 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const http = require('http');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const { Server } = require('socket.io');
 const path = require('path');
 if (process.env.NODE_ENV !== 'production') {
@@ -94,44 +93,6 @@ app.use((req, res, next) => {
     if (req.params) sanitizeObject(req.params);
     next();
 });
-
-// 5. Rate Limiting — Global API limiter
-const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500,                  // Limit each IP to 500 requests per window
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { message: 'Too many requests, please try again later.' }
-});
-app.use('/api', globalLimiter);
-
-// 6. Strict limiter for auth endpoints (brute-force protection)
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 15,                   // 15 login attempts per 15 minutes
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { message: 'Too many login attempts, please try again after 15 minutes.' }
-});
-app.use('/api/auth/login', authLimiter);
-
-// 7. Rate limiter for public form submissions (spam protection)
-const publicSubmitLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 20,                   // 20 submissions per hour per IP
-    message: { message: 'Too many submissions, please try again later.' }
-});
-app.use('/api/lead-forms/public', publicSubmitLimiter);
-
-// 8. Rate limiter for public tracking endpoints (analytics abuse protection)
-const trackingLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 60,             // 60 req/min per IP
-    message: { message: 'Too many tracking requests.' }
-});
-app.use('/api/tracking/init', trackingLimiter);
-app.use('/api/tracking/event', trackingLimiter);
-app.use('/api/tracking/pulse', trackingLimiter);
 
 // 9. MongoDB ObjectId validation middleware
 const mongoose = require('mongoose');
