@@ -54,8 +54,10 @@ export function usePermissions() {
 
     const canView = (module: string) => {
         if (currentUser?.role === 'owner') return true
+        if (module === 'ai_assistant' && currentUser?.role === 'admin') return true
         if (module === 'files' && currentUser?.role === 'client') return true
         if (!permissions) return false
+        if (module === 'ai_assistant') return !!permissions[module]?.use
         return !!permissions[module]?.view
     }
 
