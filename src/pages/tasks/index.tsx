@@ -254,31 +254,28 @@ export function TasksPage() {
             }
         } else if (targetStatus === 'done') {
             // Stop Timer - Update time entry in backend
-            if (draggedTask.isTimerRunning && timeEntryId) {
-                try {
-                    await timeEntryService.stopTimer(
-                        timeEntryId,
-                        `Completed: ${draggedTask.title}`
-                    )
-
-                    const elapsed = now - (draggedTask.lastStartTime || now)
-                    updates.isTimerRunning = false
-                    updates.totalTimeSpent = (draggedTask.totalTimeSpent || 0) + elapsed
-                    updates.lastStartTime = null
-
-                    toast({
-                        title: 'TIMER STOPPED',
-                        description: `Time entry saved for "${draggedTask.title}"`,
-                        variant: 'success'
-                    })
-                } catch (error: any) {
-                    console.error('Failed to stop timer:', error)
-                    toast({
-                        title: 'TASK ERROR',
-                        description: error.response?.data?.message || error.message || "Failed to stop timer",
-                        variant: 'destructive'
-                    })
+            if (draggedTask.isTimerRunning) {
+                if (timeEntryId) {
+                    try {
+                        await timeEntryService.stopTimer(
+                            timeEntryId,
+                            `Completed: ${draggedTask.title}`
+                        )
+                    } catch (error: any) {
+                        console.error('Failed to stop timer:', error)
+                    }
                 }
+                const elapsed = now - (draggedTask.lastStartTime || now)
+                updates.isTimerRunning = false
+                updates.totalTimeSpent = (draggedTask.totalTimeSpent || 0) + elapsed
+                updates.lastStartTime = null
+                updates.timeEntryId = null
+
+                toast({
+                    title: 'TIMER STOPPED',
+                    description: `Time entry saved for "${draggedTask.title}"`,
+                    variant: 'success'
+                })
             }
         } else if (draggedTask.isTimerRunning && targetStatus !== 'in-progress') {
             // Pause Timer (if moved out of in-progress to anything other than done, e.g. review)
@@ -288,21 +285,21 @@ export function TasksPage() {
                         timeEntryId,
                         `Paused: ${draggedTask.title}`
                     )
-
-                    const elapsed = now - (draggedTask.lastStartTime || now)
-                    updates.isTimerRunning = false
-                    updates.totalTimeSpent = (draggedTask.totalTimeSpent || 0) + elapsed
-                    updates.lastStartTime = null
-
-                    toast({
-                        title: 'TIMER PAUSED',
-                        description: `Time tracking paused for "${draggedTask.title}"`,
-                        variant: 'success'
-                    })
                 } catch (error) {
                     console.error('Failed to pause timer:', error)
                 }
             }
+            const elapsed = now - (draggedTask.lastStartTime || now)
+            updates.isTimerRunning = false
+            updates.totalTimeSpent = (draggedTask.totalTimeSpent || 0) + elapsed
+            updates.lastStartTime = null
+            updates.timeEntryId = null
+
+            toast({
+                title: 'TIMER PAUSED',
+                description: `Time tracking paused for "${draggedTask.title}"`,
+                variant: 'success'
+            })
         } else if (targetStatus === 'in-progress' && !draggedTask.isTimerRunning && draggedTask.status !== 'in-progress') {
             // Resume Timer (if moved back to in-progress) - Create new time entry
             try {

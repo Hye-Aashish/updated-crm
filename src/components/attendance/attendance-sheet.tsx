@@ -196,7 +196,9 @@ export function AttendanceSheet({ users, externalDate, onDateChange }: Attendanc
     }
 
     const filteredUsers = users.filter(u => {
-        if (!isAdmin && u.id !== (currentUser?.id || (currentUser as any)?._id)) return false;
+        const uId = u.id || (u as any)._id;
+        const currentId = currentUser?.id || (currentUser as any)?._id;
+        if (!isAdmin && uId !== currentId) return false;
         
         const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (u.role && u.role.toLowerCase().includes(searchTerm.toLowerCase()))

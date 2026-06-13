@@ -32,6 +32,7 @@ const taskSchema = new mongoose.Schema({
     lastStartTime: { type: Number },
     totalTimeSpent: { type: Number, default: 0 },
     timeEntryId: { type: String }, // Reference to current time entry
+    wasPausedByBreak: { type: Boolean, default: false }, // Remember if timer was auto-paused during break
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

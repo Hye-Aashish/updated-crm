@@ -71,7 +71,13 @@ router.post('/check-in', protect, async (req, res) => {
 router.post('/break-start', protect, async (req, res) => {
     try {
         const userId = req.user._id.toString();
-        const today = new Date();
+        const { localDate } = req.body;
+        let today;
+        if (localDate) {
+            today = new Date(localDate);
+        } else {
+            today = new Date();
+        }
         today.setHours(0, 0, 0, 0);
 
         const attendance = await Attendance.findOne({ userId, date: today });
@@ -88,6 +94,35 @@ router.post('/break-start', protect, async (req, res) => {
         attendance.status = 'on-break';
         await attendance.save();
 
+        // --- AUTOMATIC TIMER PAUSE ON BREAK START ---
+        try {
+            const Task = require('../models/Task');
+            const TimeEntry = require('../models/TimeEntry');
+            const runningTasks = await Task.find({ assigneeId: userId, isTimerRunning: true });
+            for (const task of runningTasks) {
+                const now = Date.now();
+                const elapsed = now - (task.lastStartTime || now);
+                task.isTimerRunning = false;
+                task.totalTimeSpent = (task.totalTimeSpent || 0) + elapsed;
+                task.lastStartTime = null;
+                task.wasPausedByBreak = true; // Set flag to auto-resume later
+
+                if (task.timeEntryId) {
+                    const timeEntry = await TimeEntry.findById(task.timeEntryId);
+                    if (timeEntry && timeEntry.isRunning) {
+                        timeEntry.endTime = new Date();
+                        timeEntry.isRunning = false;
+                        const start = new Date(timeEntry.startTime);
+                        timeEntry.duration = Math.max(0, Math.floor((timeEntry.endTime - start) / 1000 / 60)); // minutes
+                        await timeEntry.save();
+                    }
+                }
+                await task.save();
+            }
+        } catch (timerErr) {
+            console.error('Failed to auto-pause timers on break start:', timerErr);
+        }
+
         res.json(attendance);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -98,7 +133,13 @@ router.post('/break-start', protect, async (req, res) => {
 router.post('/break-end', protect, async (req, res) => {
     try {
         const userId = req.user._id.toString();
-        const today = new Date();
+        const { localDate } = req.body;
+        let today;
+        if (localDate) {
+            today = new Date(localDate);
+        } else {
+            today = new Date();
+        }
         today.setHours(0, 0, 0, 0);
 
         const attendance = await Attendance.findOne({ userId, date: today });
@@ -115,6 +156,35 @@ router.post('/break-end', protect, async (req, res) => {
         attendance.status = 'present';
 
         await attendance.save();
+
+        // --- AUTOMATIC TIMER RESUME ON BREAK END ---
+        try {
+            const Task = require('../models/Task');
+            const TimeEntry = require('../models/TimeEntry');
+            const pausedTasks = await Task.find({ assigneeId: userId, wasPausedByBreak: true });
+            
+            for (const task of pausedTasks) {
+                // Create a new TimeEntry in the database
+                const timeEntry = new TimeEntry({
+                    userId,
+                    projectId: task.projectId,
+                    taskId: task._id,
+                    startTime: new Date(),
+                    isRunning: true,
+                    note: `Resumed after break: ${task.title}`
+                });
+                await timeEntry.save();
+
+                task.isTimerRunning = true;
+                task.lastStartTime = Date.now();
+                task.timeEntryId = timeEntry._id.toString();
+                task.wasPausedByBreak = false; // Reset the flag
+                await task.save();
+            }
+        } catch (timerErr) {
+            console.error('Failed to auto-resume timers on break end:', timerErr);
+        }
+
         res.json(attendance);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -125,7 +195,13 @@ router.post('/break-end', protect, async (req, res) => {
 router.post('/check-out', protect, async (req, res) => {
     try {
         const userId = req.user._id.toString();
-        const today = new Date();
+        const { localDate } = req.body;
+        let today;
+        if (localDate) {
+            today = new Date(localDate);
+        } else {
+            today = new Date();
+        }
         today.setHours(0, 0, 0, 0);
 
         const attendance = await Attendance.findOne({ userId, date: today });

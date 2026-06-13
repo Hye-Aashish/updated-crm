@@ -471,15 +471,20 @@ export function TeamPage() {
 
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                         {users.filter(u => {
+                            if (u.role === 'client') return false;
+
                             const current = useAppStore.getState().currentUser;
                             if (!current) return true;
                             if (current.role === 'admin' || current.role === 'owner') return true;
-                            // Employees see themselves and admins/owners
-                            return u.id === current.id || ['admin', 'owner'].includes(u.role);
+                            
+                            // Employees/PMs/Developers can see all team members (non-clients)
+                            return true;
                         }).map((user) => {
                             const stats = getUserStats(user.id)
                             const current = useAppStore.getState().currentUser;
-                            const canManage = current && (['admin', 'owner'].includes(current.role) || current.id === user.id);
+                            const currentId = current?.id || (current as any)?._id;
+                            const userId = user.id || (user as any)._id;
+                            const canManage = current && (['admin', 'owner'].includes(current.role) || currentId === userId);
                             return (
                                 <Card key={user.id} className="cursor-pointer hover:shadow-md transition-all relative">
                                     <CardContent className="p-6 pt-8">

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { showSystemNotification } from '@/lib/notifications'
+import { format } from 'date-fns'
 
 export function useAttendance(userId: string | undefined) {
     const { toast } = useToast()
@@ -16,7 +17,8 @@ export function useAttendance(userId: string | undefined) {
 
     useEffect(() => {
         if (!userId) return
-        api.get(`/attendance/today/${userId}`)
+        const localDate = format(new Date(), 'yyyy-MM-dd')
+        api.get(`/attendance/today/${userId}?date=${localDate}`)
             .then(res => {
                 const data = res.data
                 if (data.status) {
@@ -54,7 +56,8 @@ export function useAttendance(userId: string | undefined) {
 
     const handleClockIn = async () => {
         try {
-            await api.post('/attendance/check-in', { userId })
+            const localDate = format(new Date(), 'yyyy-MM-dd')
+            await api.post('/attendance/check-in', { userId, localDate })
             setAttendanceStatus('in')
             toast({ description: "Clocked in successfully" })
         } catch (error: any) {
@@ -64,13 +67,14 @@ export function useAttendance(userId: string | undefined) {
 
     const handleBreakToggle = async () => {
         try {
+            const localDate = format(new Date(), 'yyyy-MM-dd')
             if (attendanceStatus === 'in') {
-                await api.post('/attendance/break-start', { userId })
+                await api.post('/attendance/break-start', { userId, localDate })
                 setAttendanceStatus('break')
                 toast({ description: "Break started" })
                 showSystemNotification("Break Started", "Your work session is paused. Take a rest!")
             } else {
-                await api.post('/attendance/break-end', { userId })
+                await api.post('/attendance/break-end', { userId, localDate })
                 setAttendanceStatus('in')
                 toast({ description: "Break ended" })
                 showSystemNotification("Work Resumed", "Your clock has started automatically. Welcome back!")
@@ -82,7 +86,8 @@ export function useAttendance(userId: string | undefined) {
 
     const handleClockOut = async () => {
         try {
-            const res = await api.post('/attendance/check-out', { userId })
+            const localDate = format(new Date(), 'yyyy-MM-dd')
+            const res = await api.post('/attendance/check-out', { userId, localDate })
             setAttendanceStatus('checked-out')
             setElapsedTime(0)
             if (res.data.isHalfDay) {
