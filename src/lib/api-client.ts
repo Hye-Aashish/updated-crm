@@ -54,12 +54,8 @@ api.interceptors.response.use(
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
                 
-                // For Electron/HashRouter, we must only change the hash
-                if (window.location.protocol === 'file:') {
-                    window.location.hash = '#/login';
-                } else {
-                    window.location.href = '/login';
-                }
+                // For HashRouter, we must only change the hash
+                window.location.hash = '#/login';
                 return new Promise(() => { }); // Prevent further error handling
             }
         }
