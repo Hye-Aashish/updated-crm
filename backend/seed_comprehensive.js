@@ -77,7 +77,7 @@ const seedComprehensive = async () => {
         const usersData = [
             { name: 'Demo Admin', email: 'admin@example.com', password: rawPassword, role: 'admin', designation: 'Technical Administrator' },
             { name: 'Demo Employee', email: 'employee@example.com', password: rawPassword, role: 'employee', designation: 'Software Engineer' },
-            { name: 'Rahul PM', email: 'rahul@crm.com', password: rawPassword, role: 'pm', designation: 'Project Manager' },
+            { name: 'Rahul PM', email: 'rahul@crm.com', password: rawPassword, role: 'employee', designation: 'Project Manager' },
             { name: 'Sneha Dev', email: 'sneha@crm.com', password: rawPassword, role: 'developer', designation: 'Sr. Backend Developer' },
             { name: 'Amit Dev', email: 'amit@crm.com', password: rawPassword, role: 'developer', designation: 'Frontend Developer' }
         ];
@@ -100,10 +100,24 @@ const seedComprehensive = async () => {
         const clientsData = [
             { name: 'Vikram Mehta', company: 'Global Logistics Inc', email: 'vikram@global.com', phone: '9876543210', status: 'active', type: 'retainer', industry: 'Logistics', city: 'Mumbai' },
             { name: 'Anita Desai', company: 'Desai & Co', email: 'anita@desai.com', phone: '9822113344', status: 'active', type: 'one-time', industry: 'Legal', city: 'Delhi' },
-            { name: 'Robert Fox', company: 'Fox Studios', email: 'robert@fox.com', phone: '9000012345', status: 'confirmed', type: 'retainer', industry: 'Media', city: 'London' }
+            { name: 'Robert Fox', company: 'Fox Studios', email: 'robert@fox.com', phone: '9000012345', status: 'confirmed', type: 'retainer', industry: 'Media', city: 'London' },
+            { name: 'John Smith', company: 'SmithCo Solutions', email: 'john@smithco.com', phone: '9876543211', status: 'active', type: 'retainer', industry: 'Consulting', city: 'Boston' }
         ];
         const clients = await Client.insertMany(clientsData);
         console.log('✅ Clients Seeded');
+
+        const johnClient = clients.find(c => c.email === 'john@smithco.com');
+        if (johnClient) {
+            await User.create({
+                name: 'John Smith',
+                email: 'john@smithco.com',
+                password: 'client123',
+                role: 'client',
+                clientId: johnClient._id.toString(),
+                designation: 'Client Representative'
+            });
+            console.log('✅ Client User (john@smithco.com) Seeded');
+        }
 
         // 6. Seed Leads
         const leadsData = [

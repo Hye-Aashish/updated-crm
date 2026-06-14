@@ -13,7 +13,7 @@
         "preview": "vite preview",
         "electron": "electron .",
         "electron:dev": "electron ./electron/main.cjs",
-        "build:electron": "electron-builder build --win --publish never",
+        "build:electron": "cross-env ELECTRON=true vite build && electron-builder build --win --publish never",
         "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
     },
     "build": {

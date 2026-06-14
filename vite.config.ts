@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    base: './', // CRITICAL FOR ELECTRON: Makes asset paths relative
+    base: process.env.ELECTRON === 'true' ? './' : '/', // Relative path for Electron, absolute path for web
     plugins: [react()],
     define: {
         'process.env': {} // Shim for libraries that expect process.env
