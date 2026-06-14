@@ -8,7 +8,8 @@ const getBaseURL = () => {
     // 2. Electron: Always use absolute URL to avoid 'file://' protocol issues
     const isElectron = !!(window as any).electronAPI || navigator.userAgent.includes('Electron');
     if (isElectron) {
-        return envURL || 'http://localhost:5000/api';
+        return envURL || 'http://localhost:5008/api';
+        // return envURL || 'http://localhost:5000/api';
     }
 
     // 3. Web Production: Use relative path (standard reverse proxy setup)
@@ -17,7 +18,8 @@ const getBaseURL = () => {
     }
 
     // 4. Web Development: Default to localhost
-    return 'http://localhost:5000/api';
+    return 'http://localhost:5008/api';
+    // return 'http://localhost:5000/api';
 };
 
 const api = axios.create({
