@@ -1,25 +1,121 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
     ChevronLeft, Mail, Phone, MapPin, FileText,
-    DollarSign, Clock, Edit, Trash2, ExternalLink
+    DollarSign, Clock, Edit, Trash2, ExternalLink, Shield, Key, UserCheck, UserX, Lock
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
 import api from '@/lib/api-client'
 import { VisitorSessionsTimeline } from '@/components/contacts/visitor-sessions-timeline'
+import { useToast } from '@/hooks/use-toast'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 
 export function ClientDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
-    const { clients, projects, invoices, setClients, deleteClient } = useAppStore()
+    const { toast } = useToast()
+    const { clients, projects, invoices, setClients, deleteClient, users, setUsers } = useAppStore()
 
     const client = clients.find((c) => c.id === id)
+
+    // Portal Access State
+    const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
+    const [isCreatePortalDialogOpen, setIsCreatePortalDialogOpen] = useState(false)
+    const [portalPassword, setPortalPassword] = useState('')
+    const [portalEmail, setPortalEmail] = useState('')
+
+    // Fetch users if store is empty
+    useEffect(() => {
+        const fetchUsers = async () => {
+            if (users.length === 0) {
+                try {
+                    const res = await api.get('/users')
+                    setUsers(res.data.map((u: any) => ({ id: u._id, ...u })))
+                } catch (error) {
+                    console.error("Failed to fetch users", error)
+                }
+            }
+        }
+        fetchUsers()
+    }, [users.length, setUsers])
+
+    useEffect(() => {
+        if (client) {
+            setPortalEmail(client.email || '')
+        }
+    }, [client])
+
+    const clientUser = users.find(u => u.clientId === client?.id || (u.role === 'client' && u.email?.toLowerCase() === client?.email?.toLowerCase()))
+
+    const handleCreatePortal = async () => {
+        if (!portalEmail || !portalPassword) {
+            toast({ variant: "destructive", title: "Validation Error", description: "Email and password are required" })
+            return
+        }
+        try {
+            const payload = {
+                name: client.name,
+                email: portalEmail,
+                password: portalPassword,
+                role: 'client',
+                clientId: client.id
+            }
+            const res = await api.post('/users', payload)
+            const created = { id: res.data._id, ...res.data }
+            setUsers([...users, created])
+            setIsCreatePortalDialogOpen(false)
+            setPortalPassword('')
+            toast({ title: "Portal Access Enabled", description: `Login account created for ${client.name}.` })
+        } catch (error: any) {
+            const msg = error.response?.data?.message || "Failed to create portal user"
+            toast({ variant: "destructive", title: "Error", description: msg })
+        }
+    }
+
+    const handleResetPassword = async () => {
+        if (!portalPassword) {
+            toast({ variant: "destructive", title: "Validation Error", description: "Password cannot be empty" })
+            return
+        }
+        try {
+            await api.put(`/users/${clientUser.id}`, { password: portalPassword })
+            setIsPasswordDialogOpen(false)
+            setPortalPassword('')
+            toast({ title: "Password Updated", description: "Client's password has been successfully updated." })
+        } catch (error: any) {
+            const msg = error.response?.data?.message || "Failed to update password"
+            toast({ variant: "destructive", title: "Error", description: msg })
+        }
+    }
+
+    const handleDisablePortal = async () => {
+        if (!window.confirm("Are you sure you want to disable login portal access for this client? This will delete their login user account.")) {
+            return
+        }
+        try {
+            await api.delete(`/users/${clientUser.id}`)
+            setUsers(users.filter(u => u.id !== clientUser.id))
+            toast({ title: "Portal Access Disabled", description: "The login account has been removed." })
+        } catch (error: any) {
+            const msg = error.response?.data?.message || "Failed to delete portal user"
+            toast({ variant: "destructive", title: "Error", description: msg })
+        }
+    }
 
     const handleDelete = async () => {
         if (!client) return
@@ -248,6 +344,65 @@ export function ClientDetailPage() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* Portal Access Card */}
+                    <Card className="mt-6 border-l-4 border-l-blue-500 shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <Shield className="h-5 w-5 text-blue-500" />
+                                Client Portal Login Access
+                            </CardTitle>
+                            <CardDescription>
+                                Enable or manage login access for the client's dashboard.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {clientUser ? (
+                                <div className="space-y-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded-lg text-emerald-600 dark:text-emerald-400">
+                                                <UserCheck className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Portal Access Active</div>
+                                                <div className="text-xs text-muted-foreground mt-0.5">
+                                                    Logged in with: <span className="font-semibold text-emerald-700 dark:text-emerald-400">{clientUser.email}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setPortalPassword(''); setIsPasswordDialogOpen(true); }}>
+                                                <Key className="h-3.5 w-3.5" /> Reset Password
+                                            </Button>
+                                            <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleDisablePortal}>
+                                                <UserX className="h-3.5 w-3.5" /> Disable Access
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg text-amber-600 dark:text-amber-400">
+                                                <UserX className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-semibold text-amber-800 dark:text-amber-300">No Login Account Enabled</div>
+                                                <div className="text-xs text-muted-foreground mt-0.5">
+                                                    This client does not currently have login access to the CRM dashboard.
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5" onClick={() => { setPortalPassword(''); setIsCreatePortalDialogOpen(true); }}>
+                                            <Lock className="h-3.5 w-3.5" /> Setup Client Login
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 <TabsContent value="projects">
@@ -321,6 +476,72 @@ export function ClientDetailPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Create Portal Access Dialog */}
+            <Dialog open={isCreatePortalDialogOpen} onOpenChange={setIsCreatePortalDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Setup Client Portal Login</DialogTitle>
+                        <DialogDescription>
+                            Create login credentials for {client.name} to access their CRM portal.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="portal-email">Login Email</Label>
+                            <Input
+                                id="portal-email"
+                                type="email"
+                                value={portalEmail}
+                                onChange={(e) => setPortalEmail(e.target.value)}
+                                placeholder="client@example.com"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="portal-password">Password</Label>
+                            <Input
+                                id="portal-password"
+                                type="text"
+                                value={portalPassword}
+                                onChange={(e) => setPortalPassword(e.target.value)}
+                                placeholder="Set password (min 6 characters)"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCreatePortalDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreatePortal} className="bg-blue-600 hover:bg-blue-700 text-white">Enable Access</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Reset Password Dialog */}
+            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Reset Client Password</DialogTitle>
+                        <DialogDescription>
+                            Set a new login password for {client.name}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="reset-password">New Password</Label>
+                            <Input
+                                id="reset-password"
+                                type="text"
+                                value={portalPassword}
+                                onChange={(e) => setPortalPassword(e.target.value)}
+                                placeholder="Enter new password (min 6 characters)"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleResetPassword} className="bg-blue-600 hover:bg-blue-700 text-white">Save Password</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
