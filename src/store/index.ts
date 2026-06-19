@@ -103,7 +103,13 @@ interface AppState {
     // Ticket actions
     setTickets: (tickets: Ticket[]) => void
     addTicket: (ticket: Ticket) => void
+
+    // Settings actions
+    settings: any | null
+    setSettings: (settings: any) => void
+    fetchSettings: () => Promise<void>
 }
+
 
 export const useAppStore = create<AppState>((set) => ({
     // Initial state with data transformations
@@ -122,6 +128,8 @@ export const useAppStore = create<AppState>((set) => ({
     expenses: [],
     tickets: [],
     runningTimer: null,
+    settings: null,
+
 
 
     // Actions
@@ -383,4 +391,15 @@ export const useAppStore = create<AppState>((set) => ({
     addTicket: (ticket) => set((state) => ({
         tickets: [...state.tickets, ticket],
     })),
+
+    // Settings actions
+    setSettings: (settings) => set({ settings }),
+    fetchSettings: async () => {
+        try {
+            const res = await api.get('/settings')
+            set({ settings: res.data })
+        } catch (error) {
+            console.error("Failed to fetch settings in store", error)
+        }
+    },
 }))

@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
 import { useAppStore } from '@/store'
 import { EmployeeSettingsPage } from '../employee-settings'
+import { formatCurrency } from '@/lib/utils'
 
 function hexToHSL(hex: string) {
     let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -49,7 +50,7 @@ function hexToHSL(hex: string) {
 type SettingsTab = 'company' | 'users' | 'roles' | 'billing' | 'templates' | 'project-settings' | 'notifications' | 'email' | 'whatsapp' | 'dashboard-builder' | 'ai-config'
 
 export function SettingsPage() {
-    const { currentUser } = useAppStore()
+    const { currentUser, setSettings: setGlobalSettings } = useAppStore()
 
     if (currentUser && currentUser.role !== 'owner' && currentUser.role !== 'admin') {
         return <EmployeeSettingsPage />
@@ -67,6 +68,7 @@ export function SettingsPage() {
         try {
             const res = await api.get('/settings')
             setSettings(res.data)
+            setGlobalSettings(res.data)
         } catch (error) {
             console.error("Failed to fetch settings", error)
         }
@@ -80,6 +82,7 @@ export function SettingsPage() {
         try {
             const res = await api.put('/settings', { [section]: data })
             setSettings(res.data)
+            setGlobalSettings(res.data)
             toast({
                 title: 'SETTINGS UPDATED',
                 description: "Configuration saved successfully.",
@@ -335,9 +338,19 @@ function CompanyProfileTab({ data, onSave, saving }: any) {
                     <div className="space-y-2">
                         <Label htmlFor="currency">Default Currency</Label>
                         <select id="currency" value={formData.currency || 'INR'} onChange={handleChange} className="w-full h-10 px-3 rounded-md border border-input bg-background">
-                            <option value="INR">INR (₹)</option>
-                            <option value="USD">USD ($)</option>
-                            <option value="EUR">EUR (€)</option>
+                            <option value="USD">USD - US Dollar ($)</option>
+                            <option value="EUR">EUR - Euro (€)</option>
+                            <option value="GBP">GBP - Pound Sterling (£)</option>
+                            <option value="INR">INR - Indian Rupee (₹)</option>
+                            <option value="CAD">CAD - Canadian Dollar (C$)</option>
+                            <option value="AUD">AUD - Australian Dollar (A$)</option>
+                            <option value="JPY">JPY - Japanese Yen (¥)</option>
+                            <option value="CHF">CHF - Swiss Franc (CHF)</option>
+                            <option value="CNY">CNY - Chinese Yuan (¥)</option>
+                            <option value="AED">AED - UAE Dirham (AED)</option>
+                            <option value="SAR">SAR - Saudi Riyal (SAR)</option>
+                            <option value="SGD">SGD - Singapore Dollar (S$)</option>
+                            <option value="NZD">NZD - New Zealand Dollar (NZ$)</option>
                         </select>
                     </div>
                     <div className="space-y-2">
@@ -484,7 +497,7 @@ function UsersRolesTab() {
                                     <div className="font-medium">{user.name}</div>
                                     <div className="text-xs text-muted-foreground">
                                         {user.email} • <span className="capitalize">{user.role}</span>
-                                        {user.salary && <span className="ml-2 text-emerald-600 font-bold">• ₹{user.salary}</span>}
+                                        {user.salary && <span className="ml-2 text-emerald-600 font-bold">• {formatCurrency(Number(user.salary))}</span>}
                                     </div>
                                 </div>
                             </div>

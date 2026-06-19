@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
+import { formatCurrency } from '@/lib/utils'
 import {
     Send, AlertTriangle, Shield, Globe, Server,
     FileText, RefreshCw, CheckCircle, Mail, ChevronDown, ChevronUp,
@@ -371,7 +372,7 @@ export default function ExpiryAlertsPage() {
 
                                             {/* Amount */}
                                             <div className="text-center min-w-[100px]">
-                                                <div className="text-lg font-black text-foreground">₹{alert.amount?.toLocaleString('en-IN')}</div>
+                                                <div className="text-lg font-black text-foreground">{formatCurrency(alert.amount)}</div>
                                                 <div className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{alert.type === 'invoice' ? 'Due' : 'Renewal'}</div>
                                             </div>
 

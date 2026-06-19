@@ -11,7 +11,7 @@ export function ClientLayout() {
     const [collapsed, setCollapsed] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
     const navigate = useNavigate()
-    const { currentUser, setCurrentUser } = useAppStore()
+    const { currentUser, setCurrentUser, settings, fetchSettings } = useAppStore()
     const [authLoading, setAuthLoading] = useState(true)
 
     useEffect(() => {
@@ -43,6 +43,13 @@ export function ClientLayout() {
         }
         checkAuth()
     }, [currentUser, navigate, setCurrentUser])
+
+    // Load Settings
+    useEffect(() => {
+        if (currentUser && !settings) {
+            fetchSettings()
+        }
+    }, [currentUser, settings, fetchSettings])
 
     if (authLoading) {
         return (

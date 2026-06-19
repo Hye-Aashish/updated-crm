@@ -144,7 +144,28 @@ router.post('/send-reminder', protect, authorize('admin', 'owner'), async (req, 
         const companyProfile = settings?.companyProfile || {};
         const companyName = companyProfile.name || 'CRM System';
 
-        const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+        const currency = companyProfile.currency || 'INR';
+        let locale = 'en-US';
+        if (currency === 'INR') {
+            locale = 'en-IN';
+        } else if (currency === 'EUR') {
+            locale = 'de-DE';
+        } else if (currency === 'GBP') {
+            locale = 'en-GB';
+        } else if (currency === 'JPY') {
+            locale = 'ja-JP';
+        } else if (currency === 'CNY') {
+            locale = 'zh-CN';
+        } else if (currency === 'CAD') {
+            locale = 'en-CA';
+        } else if (currency === 'AUD') {
+            locale = 'en-AU';
+        } else if (currency === 'SGD') {
+            locale = 'en-SG';
+        } else if (currency === 'NZD') {
+            locale = 'en-NZ';
+        }
+        const formatting = new Intl.NumberFormat(locale, { style: 'currency', currency: currency });
         const formattedDate = new Date(expiryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
         const daysLeft = Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
 

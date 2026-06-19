@@ -917,7 +917,7 @@ function TeamSection({ data }: { data: any }) {
                                                 <div>
                                                     <div className="font-bold text-base">{emp.name}</div>
                                                     <div className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{emp.designation || emp.role}</div>
-                                                    <div className="text-[10px] font-bold text-emerald-600">₹{emp.salary || 0}/mo</div>
+                                                    <div className="text-[10px] font-bold text-emerald-600">{formatCurrency(emp.salary || 0)}/mo</div>
                                                 </div>
                                             </div>
                                         </td>
@@ -956,7 +956,7 @@ function TeamSection({ data }: { data: any }) {
                                         </td>
                                         <td className="px-6 py-6">
                                             <div className="flex flex-col">
-                                                <span className="text-xl font-black tabular-nums text-rose-600">₹{emp.calculatedCost}</span>
+                                                <span className="text-xl font-black tabular-nums text-rose-600">{formatCurrency(Number(emp.calculatedCost) || 0)}</span>
                                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Cost Contribution</span>
                                             </div>
                                         </td>
@@ -970,7 +970,7 @@ function TeamSection({ data }: { data: any }) {
                                                         </div>
                                                         <div className="flex justify-between text-[10px] text-muted-foreground">
                                                             <span>{p.completed}/{p.tasks} Tasks</span>
-                                                            <span className="font-bold text-rose-500">₹{p.cost} cost</span>
+                                                            <span className="font-bold text-rose-500">{formatCurrency(Number(p.cost) || 0)} cost</span>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -1020,16 +1020,16 @@ function TeamSection({ data }: { data: any }) {
                                 <div className="space-y-4">
                                     <div className="flex justify-between text-xs">
                                         <span className="text-slate-400 uppercase font-bold tracking-widest">Budget</span>
-                                        <span className="font-black">₹{budget.toLocaleString()}</span>
+                                        <span className="font-black">{formatCurrency(budget)}</span>
                                     </div>
                                     <div className="flex justify-between text-xs">
                                         <span className="text-slate-400 uppercase font-bold tracking-widest">Est. Cost</span>
-                                        <span className="font-black text-rose-400">₹{cost.toLocaleString()}</span>
+                                        <span className="font-black text-rose-400">{formatCurrency(cost)}</span>
                                     </div>
                                     <div className="pt-4 border-t border-white/5 flex justify-between items-center">
                                         <span className="text-xs uppercase font-black text-slate-500">Net Return</span>
                                         <span className={`text-xl font-black ${isProfitable ? 'text-emerald-400' : 'text-rose-500'}`}>
-                                            {isProfitable ? '+' : ''}₹{profit.toLocaleString()}
+                                            {isProfitable ? '+' : ''}{formatCurrency(profit)}
                                         </span>
                                     </div>
                                 </div>

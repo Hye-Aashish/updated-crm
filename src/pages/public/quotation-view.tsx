@@ -8,6 +8,35 @@ import axios from 'axios';
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
 
+function formatCurrencyPublic(amount: number, currency: string = 'INR'): string {
+    let locale = 'en-US'
+    if (currency === 'INR') {
+        locale = 'en-IN'
+    } else if (currency === 'EUR') {
+        locale = 'de-DE'
+    } else if (currency === 'GBP') {
+        locale = 'en-GB'
+    } else if (currency === 'JPY') {
+        locale = 'ja-JP'
+    } else if (currency === 'CNY') {
+        locale = 'zh-CN'
+    } else if (currency === 'CAD') {
+        locale = 'en-CA'
+    } else if (currency === 'AUD') {
+        locale = 'en-AU'
+    } else if (currency === 'SGD') {
+        locale = 'en-SG'
+    } else if (currency === 'NZD') {
+        locale = 'en-NZ'
+    }
+
+    return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: currency,
+        maximumFractionDigits: 0,
+    }).format(amount)
+}
+
 export default function PublicQuotationView() {
     const { id } = useParams();
     const [quotation, setQuotation] = useState<any>(null);
@@ -112,7 +141,7 @@ export default function PublicQuotationView() {
                                     <div className="flex-1 border-b border-gray-50 pb-8">
                                         <div className="flex justify-between items-center mb-2">
                                             <h4 className="text-lg font-bold text-gray-900">{m.name}</h4>
-                                            <span className="font-black text-blue-600">₹{m.cost.toLocaleString()}</span>
+                                            <span className="font-black text-blue-600">{formatCurrencyPublic(m.cost, quotation.currency)}</span>
                                         </div>
                                         <p className="text-sm text-gray-500 font-medium leading-relaxed">{m.description || 'Deliverable details specified in technical scope.'}</p>
                                     </div>
@@ -126,16 +155,16 @@ export default function PublicQuotationView() {
                                 <div className="space-y-3">
                                     <div className="flex justify-between text-sm font-bold text-gray-600">
                                         <span>Subtotal</span>
-                                        <span>₹{quotation.totalAmount.toLocaleString()}</span>
+                                        <span>{formatCurrencyPublic(quotation.totalAmount, quotation.currency)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm font-bold text-gray-600">
                                         <span>GST ({quotation.gstPercentage}%)</span>
-                                        <span>₹{quotation.gstAmount.toLocaleString()}</span>
+                                        <span>{formatCurrencyPublic(quotation.gstAmount, quotation.currency)}</span>
                                     </div>
                                     <div className="h-px bg-gray-200 my-4"></div>
                                     <div className="flex justify-between items-center">
                                         <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Grand Total</span>
-                                        <span className="text-3xl font-black text-blue-600">₹{quotation.grandTotal.toLocaleString()}</span>
+                                        <span className="text-3xl font-black text-blue-600">{formatCurrencyPublic(quotation.grandTotal, quotation.currency)}</span>
                                     </div>
                                 </div>
                             </div>

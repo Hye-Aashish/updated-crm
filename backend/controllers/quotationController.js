@@ -230,6 +230,10 @@ exports.generatePDF = async (req, res) => {
         const quotation = await Quotation.findById(req.params.id).populate('clientId');
         if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
 
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const currency = settings?.companyProfile?.currency || 'INR';
+
         const branding = quotation.branding || {
             headerText: 'NEXPRISM IT SOLUTIONS',
             footerText: 'This is a computer-generated document. Digital signatures are legally binding as per the IT Act.',
@@ -324,7 +328,7 @@ exports.generatePDF = async (req, res) => {
         doc.rect(50, currentY, 500, 20).fill(PRIMARY_COLOR);
         doc.fillColor('#FFFFFF').fontSize(9).font('Helvetica-Bold');
         doc.text('MODULE NAME', 60, currentY + 6);
-        doc.text('ESTIMATED COST (INR)', 400, currentY + 6);
+        doc.text(`ESTIMATED COST (${currency})`, 400, currentY + 6);
 
         currentY += 25;
         quotation.modules.forEach(m => {
@@ -332,7 +336,7 @@ exports.generatePDF = async (req, res) => {
                 if (currentY > 720) { doc.addPage(); currentY = 50; }
                 doc.fillColor(SECONDARY_COLOR).fontSize(9).font('Helvetica-Bold').text(m.name, 60, currentY);
                 doc.fillColor('#64748B').fontSize(8).font('Helvetica').text(m.description || '', 60, currentY + 11, { width: 300 });
-                doc.fillColor(SECONDARY_COLOR).fontSize(9).font('Helvetica-Bold').text(`₹${m.cost.toLocaleString()}`, 400, currentY, { align: 'right', width: 140 });
+                doc.fillColor(SECONDARY_COLOR).fontSize(9).font('Helvetica-Bold').text(`${formatCurrencyBackend(m.cost, currency)}`, 400, currentY, { align: 'right', width: 140 });
                 currentY += 35;
                 doc.moveTo(50, currentY - 5).lineTo(550, currentY - 5).strokeColor('#F1F5F9').stroke();
             }
@@ -343,11 +347,11 @@ exports.generatePDF = async (req, res) => {
         currentY += 10;
         doc.rect(300, currentY, 250, 80).fill(LIGHT_BG);
         doc.fillColor(SECONDARY_COLOR).fontSize(9).font('Helvetica').text('Subtotal:', 315, currentY + 12);
-        doc.text(`₹${quotation.totalAmount.toLocaleString()}`, 480, currentY + 12, { align: 'right', width: 60 });
+        doc.text(`${formatCurrencyBackend(quotation.totalAmount, currency)}`, 440, currentY + 12, { align: 'right', width: 100 });
         doc.text(`GST (${quotation.gstPercentage}%):`, 315, currentY + 30);
-        doc.text(`₹${quotation.gstAmount.toLocaleString()}`, 480, currentY + 30, { align: 'right', width: 60 });
+        doc.text(`${formatCurrencyBackend(quotation.gstAmount, currency)}`, 440, currentY + 30, { align: 'right', width: 100 });
         doc.font('Helvetica-Bold').fillColor(PRIMARY_COLOR).fontSize(11).text('Grand Total:', 315, currentY + 55);
-        doc.text(`₹${quotation.grandTotal.toLocaleString()}`, 450, currentY + 55, { align: 'right', width: 90 });
+        doc.text(`${formatCurrencyBackend(quotation.grandTotal, currency)}`, 440, currentY + 55, { align: 'right', width: 100 });
         currentY += 100;
 
         // --- MILESTONES & DELIVERABLES ---
@@ -357,7 +361,7 @@ exports.generatePDF = async (req, res) => {
 
         quotation.milestones.forEach((m, i) => {
             doc.fillColor(SECONDARY_COLOR).fontSize(9).font('Helvetica-Bold').text(`${i + 1}. ${m.name} (${m.percentage}%)`, 50);
-            doc.fillColor(SECONDARY_COLOR).font('Helvetica-Bold').text(`₹${m.amount.toLocaleString()}`, 450, doc.y - 11, { align: 'right', width: 100 });
+            doc.fillColor(SECONDARY_COLOR).font('Helvetica-Bold').text(`${formatCurrencyBackend(m.amount, currency)}`, 440, doc.y - 11, { align: 'right', width: 110 });
             doc.moveDown(0.2);
         });
 
@@ -425,9 +429,17 @@ exports.getQuotationPublic = async (req, res) => {
     try {
         const quotation = await Quotation.findById(req.params.id).populate('clientId', 'name email');
         if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
-        res.json(quotation);
+        
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const currency = settings?.companyProfile?.currency || 'INR';
+
+        const data = quotation.toObject();
+        data.currency = currency;
+        
+        res.json(data);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching quotation' });
+        res.status(500).json({ message: 'Error fetching quotation', error: error.message });
     }
 };
 
@@ -447,5 +459,34 @@ exports.publicApprove = async (req, res) => {
         res.status(400).json({ message: 'Approval failed' });
     }
 };
+
+function formatCurrencyBackend(amount, currency = 'INR') {
+    let locale = 'en-US';
+    if (currency === 'INR') {
+        locale = 'en-IN';
+    } else if (currency === 'EUR') {
+        locale = 'de-DE';
+    } else if (currency === 'GBP') {
+        locale = 'en-GB';
+    } else if (currency === 'JPY') {
+        locale = 'ja-JP';
+    } else if (currency === 'CNY') {
+        locale = 'zh-CN';
+    } else if (currency === 'CAD') {
+        locale = 'en-CA';
+    } else if (currency === 'AUD') {
+        locale = 'en-AU';
+    } else if (currency === 'SGD') {
+        locale = 'en-SG';
+    } else if (currency === 'NZD') {
+        locale = 'en-NZ';
+    }
+
+    return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: currency,
+        maximumFractionDigits: 0,
+    }).format(amount || 0);
+}
 
 module.exports = exports;

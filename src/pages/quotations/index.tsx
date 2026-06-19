@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, FileText, Download, Mail, Eye, Edit, Trash2 } from 'lucide-react';
-import api from '@/lib/api-client';
 import { useNavigate } from 'react-router-dom';
+import { formatCurrency } from '@/lib/utils';
+import api from '@/lib/api-client';
 
 interface Quotation {
     _id: string;
@@ -191,7 +192,7 @@ export default function QuotationsPage() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-semibold text-gray-900">
-                                                ₹{quotation.totalAmount.toLocaleString('en-IN')}
+                                                {formatCurrency(quotation.totalAmount)}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">

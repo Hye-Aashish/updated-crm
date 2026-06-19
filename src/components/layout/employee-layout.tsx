@@ -11,7 +11,7 @@ import api from '@/lib/api-client'
 
 export function EmployeeLayout() {
     const navigate = useNavigate()
-    const { currentUser, setCurrentUser } = useAppStore()
+    const { currentUser, setCurrentUser, settings, fetchSettings } = useAppStore()
     const [authLoading, setAuthLoading] = useState(true)
     const [collapsed, setCollapsed] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
@@ -39,6 +39,13 @@ export function EmployeeLayout() {
         }
         checkAuth()
     }, [currentUser, navigate, setCurrentUser])
+
+    // Load Settings
+    useEffect(() => {
+        if (currentUser && !settings) {
+            fetchSettings()
+        }
+    }, [currentUser, settings, fetchSettings])
 
     if (authLoading) {
         return <div className="h-screen w-full flex items-center justify-center bg-background">

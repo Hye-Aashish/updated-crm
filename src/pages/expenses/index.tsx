@@ -10,7 +10,7 @@ import {
     DollarSign, TrendingUp, Receipt, Zap, Wifi, Home, Code,
     Megaphone, Globe, Car, Coffee, MoreHorizontal, Trash2
 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getCurrencySymbol } from '@/lib/utils'
 import api from '@/lib/api-client'
 import { mapExpense } from '@/lib/mappers'
 import { useToast } from '@/hooks/use-toast'
@@ -283,7 +283,7 @@ export function ExpensesPage() {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="amount">Amount (₹) *</Label>
+                                            <Label htmlFor="amount">Amount ({getCurrencySymbol()}) *</Label>
                                             <Input
                                                 id="amount"
                                                 type="number"

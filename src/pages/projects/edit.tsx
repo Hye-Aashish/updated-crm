@@ -24,6 +24,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { mapProject, mapClient } from '@/lib/mappers'
+import { getCurrencySymbol } from '@/lib/utils'
 
 export function EditProjectPage() {
     const { id } = useParams()
@@ -217,7 +218,7 @@ export function EditProjectPage() {
                         <div className="grid gap-4 md:grid-cols-2">
                             {['owner', 'admin'].includes(currentUser?.role) && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="budget">Budget (₹)</Label>
+                                    <Label htmlFor="budget">Budget ({getCurrencySymbol()})</Label>
                                     <Input
                                         id="budget"
                                         name="budget"

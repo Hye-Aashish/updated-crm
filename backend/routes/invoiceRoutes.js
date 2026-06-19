@@ -92,7 +92,28 @@ router.post('/', protect, async (req, res) => {
                     const Setting = require('../models/Setting');
                     const settings = await Setting.findOne({ type: 'general' });
                     const companyProfile = settings?.companyProfile || {};
-                    const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+                    const currency = companyProfile.currency || 'INR';
+                    let locale = 'en-US';
+                    if (currency === 'INR') {
+                        locale = 'en-IN';
+                    } else if (currency === 'EUR') {
+                        locale = 'de-DE';
+                    } else if (currency === 'GBP') {
+                        locale = 'en-GB';
+                    } else if (currency === 'JPY') {
+                        locale = 'ja-JP';
+                    } else if (currency === 'CNY') {
+                        locale = 'zh-CN';
+                    } else if (currency === 'CAD') {
+                        locale = 'en-CA';
+                    } else if (currency === 'AUD') {
+                        locale = 'en-AU';
+                    } else if (currency === 'SGD') {
+                        locale = 'en-SG';
+                    } else if (currency === 'NZD') {
+                        locale = 'en-NZ';
+                    }
+                    const formatting = new Intl.NumberFormat(locale, { style: 'currency', currency: currency });
 
                     let pdfBuffer = null;
                     try {
@@ -230,8 +251,28 @@ router.post('/:id/send', protect, async (req, res) => {
         const Setting = require('../models/Setting');
         const settings = await Setting.findOne({ type: 'general' });
         const companyProfile = settings?.companyProfile || {};
-
-        const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+        const currency = companyProfile.currency || 'INR';
+        let locale = 'en-US';
+        if (currency === 'INR') {
+            locale = 'en-IN';
+        } else if (currency === 'EUR') {
+            locale = 'de-DE';
+        } else if (currency === 'GBP') {
+            locale = 'en-GB';
+        } else if (currency === 'JPY') {
+            locale = 'ja-JP';
+        } else if (currency === 'CNY') {
+            locale = 'zh-CN';
+        } else if (currency === 'CAD') {
+            locale = 'en-CA';
+        } else if (currency === 'AUD') {
+            locale = 'en-AU';
+        } else if (currency === 'SGD') {
+            locale = 'en-SG';
+        } else if (currency === 'NZD') {
+            locale = 'en-NZ';
+        }
+        const formatting = new Intl.NumberFormat(locale, { style: 'currency', currency: currency });
 
         const targetEmail = req.body.customEmail || client.email;
         if (process.env.NODE_ENV === 'development') {
@@ -353,7 +394,7 @@ router.post('/:id/payment-session', protect, async (req, res) => {
 
         const orderData = {
             order_amount: invoice.total,
-            order_currency: 'INR',
+            order_currency: billing.currency || companyProfile.currency || 'INR',
             order_id: orderId,
             customer_details: {
                 customer_id: client._id.toString(),

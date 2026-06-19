@@ -40,7 +40,31 @@ const generateAutoInvoice = async (project) => {
 
         // Send Email Automatically if client has email
         if (client.email) {
-            const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+            const Setting = require('../models/Setting');
+            const settings = await Setting.findOne({ type: 'general' });
+            const companyProfile = settings?.companyProfile || {};
+            const currency = companyProfile.currency || 'INR';
+            let locale = 'en-US';
+            if (currency === 'INR') {
+                locale = 'en-IN';
+            } else if (currency === 'EUR') {
+                locale = 'de-DE';
+            } else if (currency === 'GBP') {
+                locale = 'en-GB';
+            } else if (currency === 'JPY') {
+                locale = 'ja-JP';
+            } else if (currency === 'CNY') {
+                locale = 'zh-CN';
+            } else if (currency === 'CAD') {
+                locale = 'en-CA';
+            } else if (currency === 'AUD') {
+                locale = 'en-AU';
+            } else if (currency === 'SGD') {
+                locale = 'en-SG';
+            } else if (currency === 'NZD') {
+                locale = 'en-NZ';
+            }
+            const formatting = new Intl.NumberFormat(locale, { style: 'currency', currency: currency });
 
             const message = `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 12px;">

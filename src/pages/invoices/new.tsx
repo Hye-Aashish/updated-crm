@@ -31,7 +31,8 @@ export function NewInvoicePage() {
     const navigate = useNavigate()
     const { toast } = useToast()
     const addInvoice = useAppStore((state) => state.addInvoice)
-    const { clients, projects, setClients, setProjects } = useAppStore()
+    const { clients, projects, setClients, setProjects, settings } = useAppStore()
+    const currency = settings?.companyProfile?.currency || 'INR'
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
@@ -320,7 +321,7 @@ export function NewInvoicePage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Currency</Label>
-                                    <Input value="INR (₹)" disabled />
+                                    <Input value={currency} disabled />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="autoSend">Auto Send Email</Label>

@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
-import { getInitials, formatDate } from '@/lib/utils'
+import { getInitials, formatDate, formatCurrency } from '@/lib/utils'
 
 export function TeamMemberPage() {
     const { id } = useParams()
@@ -227,7 +227,7 @@ export function TeamMemberPage() {
                             </div>
                             <div>
                                 <Label className="text-muted-foreground text-xs">Monthly Salary</Label>
-                                <div className="font-medium">₹{user.salary || 'N/A'}</div>
+                                <div className="font-medium">{user.salary ? formatCurrency(Number(user.salary)) : 'N/A'}</div>
                             </div>
                         </CardContent>
                     </Card>

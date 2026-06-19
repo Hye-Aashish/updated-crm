@@ -5,6 +5,7 @@ import {
     Calculator, ChevronRight, Calendar, Sparkles, ShieldCheck
 } from 'lucide-react';
 import api from '@/lib/api-client';
+import { formatCurrency, getCurrencySymbol } from '@/lib/utils';
 
 const PROJECT_TYPES = [
     'Multivendor Ecommerce',
@@ -344,7 +345,7 @@ export default function QuotationBuilder() {
                                     <input type="text" value={formData.warrantyPeriod} onChange={e => setFormData({ ...formData, warrantyPeriod: e.target.value })} className="w-full h-10 px-3 bg-gray-50 border-none rounded-lg text-sm font-semibold" placeholder="3 Months" />
                                 </div>
                                 <div>
-                                    <label className="text-[11px] font-bold text-gray-400 uppercase mb-1.5 block">Discount (₹)</label>
+                                    <label className="text-[11px] font-bold text-gray-400 uppercase mb-1.5 block">Discount ({getCurrencySymbol()})</label>
                                     <input type="number" value={formData.discount} onChange={e => setFormData({ ...formData, discount: e.target.value })} className="w-full h-10 px-3 bg-red-50 border-none rounded-lg text-sm font-bold text-red-600" />
                                 </div>
                                 <div>
@@ -450,7 +451,7 @@ export default function QuotationBuilder() {
                                         <tr>
                                             <th className="w-16 px-8 py-5"></th>
                                             <th className="px-4 py-5 font-black text-[10px] text-gray-400 uppercase tracking-widest">Module Name</th>
-                                            <th className="w-40 px-4 py-5 font-black text-[10px] text-gray-400 uppercase tracking-widest">Pricing (₹)</th>
+                                            <th className="w-40 px-4 py-5 font-black text-[10px] text-gray-400 uppercase tracking-widest">Pricing ({getCurrencySymbol()})</th>
                                             <th className="w-16 px-4 py-5"></th>
                                         </tr>
                                     </thead>
@@ -482,7 +483,7 @@ export default function QuotationBuilder() {
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <div className="h-10 px-3 flex items-center bg-gray-50 rounded-lg group focus-within:ring-2 focus-within:ring-blue-100">
-                                                        <span className="text-gray-300 font-bold mr-2 text-xs">₹</span>
+                                                        <span className="text-gray-300 font-bold mr-2 text-xs">{getCurrencySymbol()}</span>
                                                         <input
                                                             type="number"
                                                             value={m.cost}
@@ -581,7 +582,7 @@ export default function QuotationBuilder() {
                                                 <div className="w-32">
                                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Cost (Auto)</label>
                                                     <div className="h-10 bg-gray-100/50 rounded-xl flex items-center px-4 font-bold text-gray-700 text-sm">
-                                                        ₹{((grandTotal * (Number(ms.percentage) || 0)) / 100).toLocaleString()}
+                                                        {formatCurrency((grandTotal * (Number(ms.percentage) || 0)) / 100)}
                                                     </div>
                                                 </div>
                                                 <div className="pt-5">
@@ -658,17 +659,17 @@ export default function QuotationBuilder() {
                 <div className="flex items-center gap-10">
                     <div className="flex flex-col">
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Subtotal</span>
-                        <span className="text-2xl font-black text-gray-900 tracking-tight">₹{totalAmount.toLocaleString()}</span>
+                        <span className="text-2xl font-black text-gray-900 tracking-tight">{formatCurrency(totalAmount)}</span>
                     </div>
                     <div className="flex flex-col">
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Tax ({formData.gstPercentage}%)</span>
-                        <span className="text-2xl font-black text-gray-900 tracking-tight">₹{gstAmount.toLocaleString()}</span>
+                        <span className="text-2xl font-black text-gray-900 tracking-tight">{formatCurrency(gstAmount)}</span>
                     </div>
                     <ChevronRight className="w-6 h-6 text-gray-200" />
                     <div className="flex flex-col">
                         <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none mb-1">Grand Project Total</span>
                         <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-black text-blue-600 tracking-tighter">₹{grandTotal.toLocaleString()}</span>
+                            <span className="text-4xl font-black text-blue-600 tracking-tighter">{formatCurrency(grandTotal)}</span>
                         </div>
                     </div>
                 </div>

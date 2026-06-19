@@ -10,7 +10,28 @@ const generateInvoicePDF = (invoice, client, companyProfile, settings = {}) => {
             doc.on('end', () => resolve(Buffer.concat(buffers)));
             doc.on('error', reject);
 
-            const formatting = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+            const currency = companyProfile?.currency || 'INR';
+            let locale = 'en-US';
+            if (currency === 'INR') {
+                locale = 'en-IN';
+            } else if (currency === 'EUR') {
+                locale = 'de-DE';
+            } else if (currency === 'GBP') {
+                locale = 'en-GB';
+            } else if (currency === 'JPY') {
+                locale = 'ja-JP';
+            } else if (currency === 'CNY') {
+                locale = 'zh-CN';
+            } else if (currency === 'CAD') {
+                locale = 'en-CA';
+            } else if (currency === 'AUD') {
+                locale = 'en-AU';
+            } else if (currency === 'SGD') {
+                locale = 'en-SG';
+            } else if (currency === 'NZD') {
+                locale = 'en-NZ';
+            }
+            const formatting = new Intl.NumberFormat(locale, { style: 'currency', currency: currency });
 
             // --------- HEADER SECTION ---------
             const startY = 50;

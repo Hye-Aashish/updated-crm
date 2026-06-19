@@ -7,6 +7,7 @@ import { User, Bell, Lock, Save, Camera, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
+import { formatCurrency } from '@/lib/utils'
 
 export function EmployeeSettingsPage() {
     const { currentUser, setCurrentUser } = useAppStore()
@@ -173,8 +174,8 @@ export function EmployeeSettingsPage() {
                                         <Input id="designation" defaultValue={currentUser?.designation || ''} disabled />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="salary">Monthly Salary (INR)</Label>
-                                        <Input id="salary" defaultValue={currentUser?.salary || '0'} disabled className="font-bold text-emerald-600" />
+                                        <Label htmlFor="salary">Monthly Salary</Label>
+                                        <Input id="salary" value={currentUser?.salary ? formatCurrency(Number(currentUser.salary)) : 'N/A'} disabled className="font-bold text-emerald-600" />
                                     </div>
                                 </div>
 

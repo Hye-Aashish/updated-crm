@@ -18,6 +18,7 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
+import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import {
     Globe, Plus, AlertTriangle, CheckCircle2, XCircle,
     IndianRupee, Eye, Trash2, Server, FileText
@@ -230,7 +231,7 @@ export default function DomainsPage() {
                     { label: 'Active', value: stats?.active ?? domains.filter(a => a.status === 'active').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                     { label: 'Expiring Soon', value: stats?.expiringSoon ?? domains.filter(a => a.status === 'expiring-soon').length, icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50' },
                     { label: 'Expired', value: stats?.expired ?? domains.filter(a => a.status === 'expired').length, icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
-                    { label: 'Total Cost', value: `₹${((stats?.totalCost ?? domains.reduce((s, a) => s + a.amount, 0)) / 1000).toFixed(0)}K`, icon: IndianRupee, color: 'text-violet-600', bg: 'bg-violet-50' },
+                    { label: 'Total Cost', value: formatCurrency(stats?.totalCost ?? domains.reduce((s, a) => s + a.amount, 0)), icon: IndianRupee, color: 'text-violet-600', bg: 'bg-violet-50' },
                 ].map(({ label, value, icon: Icon, color, bg }) => (
                     <Card key={label} className="border-0 shadow-sm">
                         <CardContent className="p-4 flex items-center gap-3">
@@ -311,7 +312,7 @@ export default function DomainsPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell className="font-semibold">
-                                            ₹{item.amount?.toLocaleString('en-IN')}
+                                            {formatCurrency(item.amount)}
                                         </TableCell>
                                         <TableCell>
                                             <div className="text-sm">{format(new Date(item.expiryDate), 'dd MMM yyyy')}</div>
@@ -442,7 +443,7 @@ export default function DomainsPage() {
                                     <Input type="date" value={form.expiryDate} onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} className="mt-1" />
                                 </div>
                                 <div>
-                                    <Label>Cost (₹) *</Label>
+                                    <Label>Cost ({getCurrencySymbol()}) *</Label>
                                     <Input type="number" placeholder="e.g. 5000" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" />
                                 </div>
                             </div>
@@ -475,7 +476,7 @@ export default function DomainsPage() {
                                 <div className="space-y-2">
                                     <div><span className="text-gray-500">Client:</span> <span className="font-medium ml-1">{showDetail.clientId?.name}</span></div>
                                     <div><span className="text-gray-500">Provider:</span> <span className="ml-1">{showDetail.provider}</span></div>
-                                    <div><span className="text-gray-500">Amount:</span> <span className="font-semibold ml-1">₹{showDetail.amount?.toLocaleString('en-IN')}</span></div>
+                                    <div><span className="text-gray-500">Amount:</span> <span className="font-semibold ml-1">{formatCurrency(showDetail.amount)}</span></div>
                                     <div><span className="text-gray-500">Type:</span> <span className="ml-1">{typeLabel[showDetail.type] || showDetail.type}</span></div>
                                 </div>
                                 <div className="space-y-2">
@@ -506,7 +507,7 @@ export default function DomainsPage() {
                                                     <span className="text-gray-500">{format(new Date(inv.date), 'dd MMM yyyy')}</span>
                                                 </div>
                                                 <div className="flex items-center gap-3">
-                                                    <span className="font-semibold">₹{inv.total?.toLocaleString('en-IN')}</span>
+                                                    <span className="font-semibold">{formatCurrency(inv.total)}</span>
                                                     <Badge className={`text-xs ${inv.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : inv.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{inv.status}</Badge>
                                                     <Link to={`/invoices/${inv._id}`} className="text-indigo-600 hover:text-indigo-700">
                                                         <Eye className="h-4 w-4" />
@@ -531,7 +532,7 @@ export default function DomainsPage() {
                                                     <span className="font-medium">New Expiry: {format(new Date(r.newExpiryDate), 'dd MMM yyyy')}</span>
                                                     {r.note && <span className="text-xs text-gray-400 italic mt-0.5">{r.note}</span>}
                                                 </div>
-                                                <div className="font-semibold">₹{r.amount?.toLocaleString('en-IN')}</div>
+                                                <div className="font-semibold">{formatCurrency(r.amount)}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -559,7 +560,7 @@ export default function DomainsPage() {
                     <div className="space-y-4 py-2">
                         <div className="bg-indigo-50 rounded-lg p-3 text-sm">
                             <div className="font-medium text-indigo-900">{showInvoice?.domainName}</div>
-                            <div className="text-indigo-700 mt-1 text-base font-bold">₹{showInvoice?.amount?.toLocaleString('en-IN')}</div>
+                            <div className="text-indigo-700 mt-1 text-base font-bold">{formatCurrency(showInvoice?.amount || 0)}</div>
                         </div>
                         <div>
                             <Label>Due Date (optional)</Label>
@@ -602,7 +603,7 @@ export default function DomainsPage() {
                                 <Input type="date" value={renewForm.newExpiryDate} onChange={e => setRenewForm(f => ({ ...f, newExpiryDate: e.target.value }))} className="mt-1" />
                             </div>
                             <div>
-                                <Label>Renewal Cost (₹)</Label>
+                                <Label>Renewal Cost ({getCurrencySymbol()})</Label>
                                 <Input type="number" placeholder="Defaults to previous" value={renewForm.amount} onChange={e => setRenewForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" />
                             </div>
                         </div>

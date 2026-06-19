@@ -11,7 +11,7 @@ export function DashboardLayout() {
     const [collapsed, setCollapsed] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
     const navigate = useNavigate()
-    const { currentUser, setCurrentUser, leads, setLeads } = useAppStore()
+    const { currentUser, setCurrentUser, leads, setLeads, settings, fetchSettings } = useAppStore()
     const [authLoading, setAuthLoading] = useState(true)
 
     // 0. Auth / Session Check
@@ -37,6 +37,13 @@ export function DashboardLayout() {
         }
         checkAuth()
     }, [currentUser, navigate, setCurrentUser])
+
+    // Load Settings
+    useEffect(() => {
+        if (currentUser && !settings) {
+            fetchSettings()
+        }
+    }, [currentUser, settings, fetchSettings])
 
     // 1. Load Leads if empty (Global Check)
     useEffect(() => {

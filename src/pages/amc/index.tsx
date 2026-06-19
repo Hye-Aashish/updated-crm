@@ -18,6 +18,7 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
+import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import {
     Shield, Plus, RefreshCw, FileText, AlertTriangle,
     CheckCircle2, Clock, XCircle,
@@ -240,7 +241,7 @@ export default function AmcPage() {
                     { label: 'Active', value: stats?.active ?? amcs.filter(a => a.status === 'active').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                     { label: 'Expiring Soon', value: stats?.expiringSoon ?? amcs.filter(a => a.status === 'expiring-soon').length, icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50' },
                     { label: 'Expired', value: stats?.expired ?? amcs.filter(a => a.status === 'expired').length, icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
-                    { label: 'Total Revenue', value: `₹${((stats?.totalRevenue ?? amcs.reduce((s, a) => s + a.amount, 0)) / 1000).toFixed(0)}K`, icon: IndianRupee, color: 'text-violet-600', bg: 'bg-violet-50' },
+                    { label: 'Total Revenue', value: formatCurrency(stats?.totalRevenue ?? amcs.reduce((s, a) => s + a.amount, 0)), icon: IndianRupee, color: 'text-violet-600', bg: 'bg-violet-50' },
                 ].map(({ label, value, icon: Icon, color, bg }) => (
                     <Card key={label} className="border-0 shadow-sm">
                         <CardContent className="p-4 flex items-center gap-3">
@@ -333,7 +334,7 @@ export default function AmcPage() {
                                             </Link>
                                         </TableCell>
                                         <TableCell className="font-semibold">
-                                            ₹{amc.amount?.toLocaleString('en-IN')}
+                                            {formatCurrency(amc.amount)}
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline" className="text-xs capitalize">
@@ -448,7 +449,7 @@ export default function AmcPage() {
                                     <Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="mt-1" />
                                 </div>
                                 <div>
-                                    <Label>Amount (₹) *</Label>
+                                    <Label>Amount ({getCurrencySymbol()}) *</Label>
                                     <Input type="number" placeholder="e.g. 24000" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" />
                                 </div>
                             </div>
@@ -501,8 +502,8 @@ export default function AmcPage() {
                             <Input type="date" value={renewForm.newEndDate} onChange={e => setRenewForm(f => ({ ...f, newEndDate: e.target.value }))} className="mt-1" />
                         </div>
                         <div>
-                            <Label>New Amount (₹) — leave blank to keep current</Label>
-                            <Input type="number" placeholder={`Current: ₹${showRenew?.amount}`} value={renewForm.amount} onChange={e => setRenewForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" />
+                            <Label>New Amount — leave blank to keep current</Label>
+                            <Input type="number" placeholder={`Current: ${formatCurrency(showRenew?.amount || 0)}`} value={renewForm.amount} onChange={e => setRenewForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" />
                         </div>
                         <div>
                             <Label>Note</Label>
@@ -539,7 +540,7 @@ export default function AmcPage() {
                     <div className="space-y-4 py-2">
                         <div className="bg-blue-50 rounded-lg p-3 text-sm">
                             <div className="font-medium text-blue-900">{showInvoice?.name}</div>
-                            <div className="text-blue-700 mt-1 text-base font-bold">₹{showInvoice?.amount?.toLocaleString('en-IN')}</div>
+                            <div className="text-blue-700 mt-1 text-base font-bold">{formatCurrency(showInvoice?.amount || 0)}</div>
                         </div>
                         <div>
                             <Label>Due Date (optional)</Label>
@@ -578,7 +579,7 @@ export default function AmcPage() {
                                 <div className="space-y-2">
                                     <div><span className="text-gray-500">Client:</span> <span className="font-medium ml-1">{showDetail.clientId?.name}</span></div>
                                     <div><span className="text-gray-500">Project:</span> <Link to={`/projects/${showDetail.projectId?._id}`} className="text-blue-600 hover:underline ml-1">{showDetail.projectId?.name}</Link></div>
-                                    <div><span className="text-gray-500">Amount:</span> <span className="font-semibold ml-1">₹{showDetail.amount?.toLocaleString('en-IN')}</span></div>
+                                    <div><span className="text-gray-500">Amount:</span> <span className="font-semibold ml-1">{formatCurrency(showDetail.amount)}</span></div>
                                     <div><span className="text-gray-500">Frequency:</span> <span className="ml-1">{freqLabel[showDetail.frequency]}</span></div>
                                 </div>
                                 <div className="space-y-2">
@@ -614,7 +615,7 @@ export default function AmcPage() {
                                                     <span className="text-gray-500">{format(new Date(inv.date), 'dd MMM yyyy')}</span>
                                                 </div>
                                                 <div className="flex items-center gap-3">
-                                                    <span className="font-semibold">₹{inv.total?.toLocaleString('en-IN')}</span>
+                                                    <span className="font-semibold">{formatCurrency(inv.total)}</span>
                                                     <Badge className={`text-xs ${inv.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : inv.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{inv.status}</Badge>
                                                     <Link to={`/invoices/${inv._id}`} className="text-blue-600 hover:text-blue-700">
                                                         <Eye className="h-4 w-4" />
@@ -638,7 +639,7 @@ export default function AmcPage() {
                                                     <span className="text-gray-600">Renewed on {format(new Date(r.renewedAt), 'dd MMM yyyy')}</span>
                                                     <span className="font-medium text-emerald-700">→ {format(new Date(r.newEndDate), 'dd MMM yyyy')}</span>
                                                 </div>
-                                                {r.amount && <div className="text-gray-500 mt-1">₹{r.amount?.toLocaleString('en-IN')}{r.note ? ` — ${r.note}` : ''}</div>}
+                                                {r.amount && <div className="text-gray-500 mt-1">{formatCurrency(r.amount)}{r.note ? ` — ${r.note}` : ''}</div>}
                                             </div>
                                         ))}
                                     </div>

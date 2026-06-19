@@ -7,6 +7,7 @@ import {
     Box, Milestone, Info
 } from 'lucide-react';
 import api from '@/lib/api-client';
+import { formatCurrency } from '@/lib/utils';
 
 export default function QuotationDetailPage() {
     const { id } = useParams();
@@ -201,7 +202,7 @@ export default function QuotationDetailPage() {
                         <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-sm">
                             <div className="flex items-center justify-between mb-8">
                                 <h3 className="text-xl font-black text-gray-900 tracking-tight">Requirement Breakdown</h3>
-                                <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-xs font-black">₹{quotation.grandTotal.toLocaleString()} TOTAL</span>
+                                <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-xs font-black">{formatCurrency(quotation.grandTotal)} TOTAL</span>
                             </div>
 
                             <div className="space-y-6">
@@ -213,7 +214,7 @@ export default function QuotationDetailPage() {
                                         <div className="flex-1">
                                             <div className="flex justify-between items-center mb-1.5">
                                                 <h4 className="font-bold text-gray-900">{m.name}</h4>
-                                                <span className="font-black text-gray-900 group-hover:text-blue-600 transition-colors">₹{m.cost.toLocaleString()}</span>
+                                                <span className="font-black text-gray-900 group-hover:text-blue-600 transition-colors">{formatCurrency(m.cost)}</span>
                                             </div>
                                             <p className="text-xs text-gray-500 leading-relaxed font-medium">{m.description || 'Deliverable details locked into this module specification.'}</p>
                                         </div>
@@ -237,7 +238,7 @@ export default function QuotationDetailPage() {
                                         </div>
                                         <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">{m.name}</p>
                                         <h4 className="text-2xl font-black text-gray-900 mb-1">{m.percentage}%</h4>
-                                        <p className="text-sm font-bold text-blue-600 tracking-tight">₹{m.amount.toLocaleString()}</p>
+                                        <p className="text-sm font-bold text-blue-600 tracking-tight">{formatCurrency(m.amount)}</p>
                                     </div>
                                 ))}
                             </div>
@@ -317,7 +318,7 @@ export default function QuotationDetailPage() {
                                                     <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded tracking-widest">{cr.status}</span>
                                                 </div>
                                                 <p className="text-[10px] text-gray-500 font-medium mb-3 line-clamp-2">{cr.description}</p>
-                                                <p className="text-xs font-black text-gray-900">₹{cr.estimatedCost.toLocaleString()}</p>
+                                                <p className="text-xs font-black text-gray-900">{formatCurrency(cr.estimatedCost)}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -371,7 +372,7 @@ export default function QuotationDetailPage() {
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Estimated Cost (₹)</label>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Estimated Cost</label>
                                 <input
                                     type="number"
                                     value={crData.estimatedCost}
