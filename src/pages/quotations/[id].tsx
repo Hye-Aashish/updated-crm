@@ -112,7 +112,7 @@ export default function QuotationDetailPage() {
                         </div>
                         <button
                             onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/q/${id}`);
+                                navigator.clipboard.writeText(`${window.location.origin}/#/q/${id}`);
                                 alert('Proposal link copied to clipboard!');
                             }}
                             className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs tracking-widest uppercase hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all flex items-center gap-2"

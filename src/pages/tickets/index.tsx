@@ -15,7 +15,7 @@ type Ticket = {
     subject: string
     description: string
     priority: 'low' | 'medium' | 'high' | 'critical'
-    status: 'open' | 'in-progress' | 'resolved' | 'closed'
+    status: 'open' | 'in-progress' | 'resolved' | 'closed' | 'declined' | 'live'
     clientName: string
     assignedTo: string
     createdAt: string
@@ -155,6 +155,8 @@ export function TicketsPage() {
             case 'in-progress': return 'text-orange-600 bg-orange-50'
             case 'resolved': return 'text-green-600 bg-green-50'
             case 'closed': return 'text-gray-600 bg-gray-50'
+            case 'declined': return 'text-rose-600 bg-rose-50'
+            case 'live': return 'text-emerald-600 bg-emerald-50'
             default: return 'text-gray-600 bg-gray-50'
         }
     }
@@ -183,7 +185,7 @@ export function TicketsPage() {
     })
 
     const openCount = filteredTickets.filter(t => t.status === 'open').length
-    const resolvedCount = filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length
+    const resolvedCount = filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed' || t.status === 'live').length
     const criticalCount = filteredTickets.filter(t => t.priority === 'critical' || t.priority === 'high').length
 
     return (
@@ -370,6 +372,8 @@ export function TicketsPage() {
                     <option value="in-progress">In Progress</option>
                     <option value="resolved">Resolved</option>
                     <option value="closed">Closed</option>
+                    <option value="declined">Declined</option>
+                    <option value="live">Live</option>
                 </select>
             </div>
 
@@ -437,6 +441,8 @@ export function TicketsPage() {
                                             <option value="in-progress">In Progress</option>
                                             <option value="resolved">Resolved</option>
                                             <option value="closed">Closed</option>
+                                            <option value="declined">Declined</option>
+                                            <option value="live">Live</option>
                                         </select>
 
                                         {currentUser?.role !== 'client' && (
@@ -508,6 +514,8 @@ export function TicketsPage() {
                                         <option value="in-progress">In Progress</option>
                                         <option value="resolved">Resolved</option>
                                         <option value="closed">Closed</option>
+                                        <option value="declined">Declined</option>
+                                        <option value="live">Live</option>
                                     </select>
                                 </div>
                                 <div>

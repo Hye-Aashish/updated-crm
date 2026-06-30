@@ -4,7 +4,7 @@ const ticketSchema = new mongoose.Schema({
     subject: { type: String, required: true },
     description: { type: String },
     priority: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
-    status: { type: String, enum: ['open', 'in-progress', 'resolved', 'closed'], default: 'open' },
+    status: { type: String, enum: ['open', 'in-progress', 'resolved', 'closed', 'declined', 'live'], default: 'open' },
     clientName: { type: String },
     clientId: { type: String }, // Linked to Client model
     projectId: { type: String }, // Linked to Project model

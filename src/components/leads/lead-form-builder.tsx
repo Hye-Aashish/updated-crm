@@ -249,13 +249,13 @@ export function LeadFormBuilder({ isOpen, onClose, leadForms, setLeadForms }: Le
                                     <p className="text-xs text-muted-foreground line-clamp-2 mb-6 h-8">{form.description || 'Standard lead capture form.'}</p>
 
                                     <div className="grid grid-cols-5 gap-2 mt-4">
-                                        <Button variant="outline" size="icon" title="View Public Link" onClick={() => window.open(`${window.location.origin}/f/${form._id}`, '_blank')} className="h-8 w-full border-border/40 hover:bg-primary/5 hover:text-primary transition-all">
+                                        <Button variant="outline" size="icon" title="View Public Link" onClick={() => window.open(`${window.location.origin}/#/f/${form._id}`, '_blank')} className="h-8 w-full border-border/40 hover:bg-primary/5 hover:text-primary transition-all">
                                             <ExternalLink className="h-3.5 w-3.5" />
                                         </Button>
-                                        <Button variant="outline" size="icon" title="Copy URL" onClick={() => copyToClipboard(`${window.location.origin}/f/${form._id}`, 'Link copied!')} className="h-8 w-full border-border/40 hover:bg-primary/5 hover:text-primary transition-all">
+                                        <Button variant="outline" size="icon" title="Copy URL" onClick={() => copyToClipboard(`${window.location.origin}/#/f/${form._id}`, 'Link copied!')} className="h-8 w-full border-border/40 hover:bg-primary/5 hover:text-primary transition-all">
                                             <Copy className="h-3.5 w-3.5" />
                                         </Button>
-                                        <Button variant="outline" size="icon" title="Get Embed Code" onClick={() => copyToClipboard(`<iframe src="${window.location.origin}/f/${form._id}" width="100%" height="800px" frameborder="0"></iframe>`, 'Embed code copied!')} className="h-8 w-full border-border/40 hover:bg-primary/5 hover:text-primary transition-all">
+                                        <Button variant="outline" size="icon" title="Get Embed Code" onClick={() => copyToClipboard(`<iframe src="${window.location.origin}/#/f/${form._id}" width="100%" height="800px" frameborder="0"></iframe>`, 'Embed code copied!')} className="h-8 w-full border-border/40 hover:bg-primary/5 hover:text-primary transition-all">
                                             <Code className="h-3.5 w-3.5" />
                                         </Button>
                                         <Button variant="outline" size="icon" title="Edit Form" onClick={() => { setCurrentForm(form); setIsBuildingForm(true); }} className="h-8 w-full border-border/40 hover:bg-amber-500/10 hover:text-amber-600 transition-all">
