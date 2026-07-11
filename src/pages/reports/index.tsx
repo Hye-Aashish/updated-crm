@@ -795,6 +795,21 @@ function TeamSection({ data }: { data: any }) {
     const { users = [], tasks = [], projects = [], timeEntries = [] } = data
 
     const teamReport = useMemo(() => {
+        // Precompute total actual cost for each project across all users
+        const projectActualCosts: Record<string, number> = {}
+        projects.forEach((proj: any) => {
+            const pid = proj._id || proj.id
+            const projEntries = timeEntries.filter((te: any) => (te.projectId?._id || te.projectId) === pid)
+            const totalProjCost = projEntries.reduce((sum: number, te: any) => {
+                const entryUserId = te.userId?._id || te.userId
+                const u = users.find((usr: any) => (usr._id || usr.id) === entryUserId)
+                if (!u) return sum
+                const hourlyRate = (Number(u.salary) || 0) / 208
+                return sum + ((te.duration || 0) / 60) * hourlyRate
+            }, 0)
+            projectActualCosts[pid] = totalProjCost
+        })
+
         return users.map((user: any) => {
             const userId = user._id || user.id
             const userTasks = tasks.filter((t: any) => t.assigneeId === userId)
@@ -802,7 +817,7 @@ function TeamSection({ data }: { data: any }) {
 
             // Total time worked by this user (in hours)
             const totalMinutes = timeEntries
-                .filter((te: any) => te.userId === userId)
+                .filter((te: any) => (te.userId?._id || te.userId) === userId)
                 .reduce((sum: number, te: any) => sum + (te.duration || 0), 0)
             const totalHours = totalMinutes / 60
 
@@ -812,21 +827,28 @@ function TeamSection({ data }: { data: any }) {
 
             // Projects this user worked on
             const userProjectIds = [...new Set(userTasks.map((t: any) => t.projectId))]
-            const projectDetails = userProjectIds.map(pid => {
+            const projectDetails = userProjectIds.map((pid: any) => {
                 const proj = projects.find((p: any) => p._id === pid || p.id === pid)
                 if (!proj) return null
 
                 const projTasks = userTasks.filter((t: any) => t.projectId === pid)
                 const projMinutes = timeEntries
-                    .filter((te: any) => te.userId === userId && te.projectId === pid)
+                    .filter((te: any) => (te.userId?._id || te.userId) === userId && (te.projectId?._id || te.projectId) === pid)
                     .reduce((sum: number, te: any) => sum + (te.duration || 0), 0)
+
+                const totalActualCost = projectActualCosts[pid] || 0
+                const budget = Number(proj.budget) || 0
+                const margin = budget - totalActualCost
 
                 return {
                     name: proj.name || proj.title,
                     tasks: projTasks.length,
                     completed: projTasks.filter((t: any) => t.status === 'done').length,
                     hours: (projMinutes / 60).toFixed(1),
-                    cost: ((projMinutes / 60) * hourlyRate).toFixed(2)
+                    cost: ((projMinutes / 60) * hourlyRate).toFixed(2),
+                    budget,
+                    totalProjectCost: totalActualCost.toFixed(2),
+                    margin: margin.toFixed(2)
                 }
             }).filter(Boolean)
 
@@ -963,18 +985,37 @@ function TeamSection({ data }: { data: any }) {
                                         </td>
                                         <td className="px-8 py-6">
                                             <div className="space-y-3">
-                                                {emp.projects.map((p: any, j: number) => (
-                                                    <div key={j} className="bg-muted/30 p-3 rounded-xl border border-border/40">
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <span className="text-xs font-bold leading-none">{p.name}</span>
-                                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-primary/10 text-primary rounded-full">{p.hours}h</span>
+                                                {emp.projects.map((p: any, j: number) => {
+                                                    const isProfitable = Number(p.margin) >= 0;
+                                                    return (
+                                                        <div key={j} className="bg-muted/30 p-3 rounded-xl border border-border/40 space-y-2">
+                                                            <div className="flex justify-between items-start">
+                                                                <span className="text-xs font-bold leading-none">{p.name}</span>
+                                                                <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-primary/10 text-primary rounded-full">{p.hours}h logged</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-[10px] text-muted-foreground border-b border-border/20 pb-1.5">
+                                                                <span>{p.completed}/{p.tasks} Tasks Done</span>
+                                                                <span className="font-bold text-rose-500">My Cost: {formatCurrency(Number(p.cost) || 0)}</span>
+                                                            </div>
+                                                            <div className="grid grid-cols-3 gap-1 pt-0.5 text-[9px] font-semibold text-muted-foreground leading-normal">
+                                                                <div>
+                                                                    <div className="text-muted-foreground uppercase text-[8px] font-black">Budget</div>
+                                                                    <div className="font-bold text-foreground">{formatCurrency(Number(p.budget) || 0)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-muted-foreground uppercase text-[8px] font-black">Actual</div>
+                                                                    <div className="font-bold text-rose-500">{formatCurrency(Number(p.totalProjectCost) || 0)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-muted-foreground uppercase text-[8px] font-black">Margin</div>
+                                                                    <div className={`font-bold ${isProfitable ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                        {isProfitable ? '+' : ''}{formatCurrency(Number(p.margin) || 0)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex justify-between text-[10px] text-muted-foreground">
-                                                            <span>{p.completed}/{p.tasks} Tasks</span>
-                                                            <span className="font-bold text-rose-500">{formatCurrency(Number(p.cost) || 0)} cost</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                                 {emp.projects.length === 0 && <span className="text-[10px] text-muted-foreground italic">No project data available</span>}
                                             </div>
                                         </td>
@@ -998,9 +1039,10 @@ function TeamSection({ data }: { data: any }) {
                     {projects.slice(0, 6).map((prog: any, k: number) => {
                         const pid = prog._id || prog.id
                         const projMinutes = timeEntries
-                            .filter((te: any) => te.projectId === pid)
+                            .filter((te: any) => (te.projectId?._id || te.projectId) === pid)
                             .reduce((sum: number, te: any) => {
-                                const user = users.find((u: any) => (u._id || u.id) === te.userId)
+                                const entryUserId = te.userId?._id || te.userId
+                                const user = users.find((u: any) => (u._id || u.id) === entryUserId)
                                 const hourlyRate = (Number(user?.salary) || 0) / 208
                                 return sum + ((te.duration || 0) / 60) * hourlyRate
                             }, 0)

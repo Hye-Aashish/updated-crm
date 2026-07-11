@@ -146,17 +146,17 @@ export function AttendanceSheet({ users, externalDate, onDateChange }: Attendanc
             const finalStatus = status === 'leave' ? 'absent' : status
             
             // Optimistically update the UI state immediately
-            const targetDay = new Date(dateStr).getDate()
-            const targetMonth = new Date(dateStr).getMonth()
-            const targetYear = new Date(dateStr).getFullYear()
+            const targetDay = new Date(dateStr).getUTCDate()
+            const targetMonth = new Date(dateStr).getUTCMonth()
+            const targetYear = new Date(dateStr).getUTCFullYear()
 
             setAttendanceData(prev => {
                 const idx = prev.findIndex(a => {
                     const d = new Date(a.date)
                     return a.userId === userId && 
-                        d.getDate() === targetDay &&
-                        d.getMonth() === targetMonth &&
-                        d.getFullYear() === targetYear
+                        d.getUTCDate() === targetDay &&
+                        d.getUTCMonth() === targetMonth &&
+                        d.getUTCFullYear() === targetYear
                 })
                 if (idx > -1) {
                     const newArr = [...prev]
@@ -183,7 +183,7 @@ export function AttendanceSheet({ users, externalDate, onDateChange }: Attendanc
     const getStatusForDay = (userId: string, day: number): AttendanceStatus => {
         const record = attendanceData.find(a =>
             (a.userId === userId) &&
-            (new Date(a.date).getDate() === day)
+            (new Date(a.date).getUTCDate() === day)
         )
 
         if (record) return record.status as AttendanceStatus

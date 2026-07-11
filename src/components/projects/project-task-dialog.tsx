@@ -19,7 +19,7 @@ interface ProjectTaskDialogProps {
 
 export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: ProjectTaskDialogProps) {
     const { toast } = useToast()
-    const { users, addTask, updateTask: updateStoreTask } = useAppStore()
+    const { currentUser, users, addTask, updateTask: updateStoreTask } = useAppStore()
     const [loading, setLoading] = useState(false)
 
     const [formData, setFormData] = useState({
@@ -42,16 +42,17 @@ export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: Proje
                 attachments: task.attachments || []
             })
         } else {
+            const defaultAssignee = currentUser?.id || users[0]?.id || ''
             setFormData({
                 title: '',
                 description: '',
                 priority: 'medium',
-                assigneeId: users[0]?.id || '',
+                assigneeId: defaultAssignee,
                 dueDate: new Date().toISOString().split('T')[0],
                 attachments: []
             })
         }
-    }, [task, open, users])
+    }, [task, open, users, currentUser])
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -175,9 +176,10 @@ export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: Proje
                         <Label htmlFor="task-assignee">Assignee</Label>
                         <select
                             id="task-assignee"
-                            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-75 disabled:cursor-not-allowed"
                             value={formData.assigneeId}
                             onChange={(e) => setFormData({ ...formData, assigneeId: e.target.value })}
+                            disabled={!['admin', 'owner'].includes(currentUser?.role || '')}
                         >
                             <option value="">Select Assignee</option>
                             {users.map(u => (

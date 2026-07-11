@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import {
-    CheckSquare, Clock, Briefcase, Banknote, TrendingUp, TrendingDown, AlertCircle, PlayCircle,
+    CheckSquare, Clock, Briefcase, Banknote, TrendingUp, AlertCircle, PlayCircle,
     StopCircle, Target, Layers, Wallet, CreditCard, Coffee, ArrowUpRight, Zap, LayoutDashboard,
     CheckCircle, MessageSquare, Rocket, FileText, Users, Shield, Globe, Server, XCircle, BellRing
 } from 'lucide-react'
@@ -48,12 +48,15 @@ export function DashboardPage() {
         completedProjects, inProgressProjects, onHoldProjects, planningProjects,
         todoTasks, inProgressTasks, reviewTasks, doneTasks,
         totalProjectCost,
+        projectRevenueReceived,
         currentLayout, sectionOrder, customLabels, hiddenSubItems,
         myPerformanceScore,
         openTickets, resolvedTickets, criticalTickets,
         relevantProjects,
         relevantInvoices
     } = useDashboardMetrics(settings)
+
+    const isAdmin = ['admin', 'owner'].includes(currentUser.role)
 
     // Data Fetching
     useEffect(() => {
@@ -287,11 +290,33 @@ export function DashboardPage() {
                     <div className="flex items-center justify-between px-2">
                         <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{customLabels.financials || 'Financial Overview'}</h3>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className={isAdmin ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"}>
                         {!hiddenSubItems.includes('revenue') && <StatCard label={currentUser.role === 'client' ? 'Total Paid' : 'Total Revenue'} value={formatCurrency(totalRevenue)} trend={revenueTrend} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/invoices')} />}
                         {!hiddenSubItems.includes('expenses') && currentUser.role !== 'client' && <StatCard label="Total Expenses" value={formatCurrency(totalExpenses)} trend={expenseTrend} icon={Wallet} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/expenses')} />}
                         {!hiddenSubItems.includes('profit') && currentUser.role !== 'client' && <StatCard label="Net Profit" value={formatCurrency(netProfit)} trend={revenueTrend} icon={TrendingUp} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/invoices')} />}
                         {!hiddenSubItems.includes('outstanding') && <StatCard label={currentUser.role === 'client' ? 'Pending Payment' : 'Outstanding'} value={formatCurrency(outstandingInvoices)} trend={`${(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').length} Invoices`} icon={CreditCard} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/invoices')} />}
+                        {isAdmin && (
+                            <>
+                                <StatCard 
+                                    label="Project Costing" 
+                                    value={formatCurrency(totalProjectCost || 0)} 
+                                    trend={`${(relevantProjects || []).length} Projects`} 
+                                    icon={Briefcase} 
+                                    color="text-indigo-600" 
+                                    bg="bg-indigo-100" 
+                                    onClick={() => navigate('/projects')} 
+                                />
+                                <StatCard 
+                                    label="Amount Received" 
+                                    value={formatCurrency(projectRevenueReceived || 0)} 
+                                    trend={`${(totalProjectCost || 0) > 0 ? Math.round(((projectRevenueReceived || 0) / (totalProjectCost || 1)) * 100) : 0}% Collected`} 
+                                    icon={CheckCircle} 
+                                    color="text-purple-600" 
+                                    bg="bg-purple-100" 
+                                    onClick={() => navigate('/invoices?status=paid')} 
+                                />
+                            </>
+                        )}
                     </div>
                 </div>
             )}

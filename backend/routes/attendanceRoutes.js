@@ -2,6 +2,22 @@ const express = require('express');
 const router = express.Router();
 const Attendance = require('../models/Attendance');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const timeEntryRouter = require('./timeEntryRoutes');
+
+// Helper to normalize any date input to UTC midnight (in IST context)
+function getMidnightUTC(dateInput) {
+    if (!dateInput) {
+        const now = new Date();
+        const localTime = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+        return new Date(Date.UTC(localTime.getUTCFullYear(), localTime.getUTCMonth(), localTime.getUTCDate()));
+    }
+    if (typeof dateInput === 'string' && dateInput.length === 10) {
+        return new Date(dateInput); // YYYY-MM-DD parses directly to UTC midnight
+    }
+    const d = new Date(dateInput);
+    const localTime = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+    return new Date(Date.UTC(localTime.getUTCFullYear(), localTime.getUTCMonth(), localTime.getUTCDate()));
+}
 
 // Get today's attendance for a user
 router.get('/today/:userId', protect, async (req, res) => {
@@ -12,13 +28,7 @@ router.get('/today/:userId', protect, async (req, res) => {
         }
 
         const { date } = req.query;
-        let today;
-        if (date) {
-            today = new Date(date);
-        } else {
-            today = new Date();
-        }
-        today.setHours(0, 0, 0, 0);
+        const today = getMidnightUTC(date);
 
         const attendance = await Attendance.findOne({
             userId: req.params.userId,
@@ -37,13 +47,7 @@ router.post('/check-in', protect, async (req, res) => {
         const userId = req.user._id.toString(); // Use authenticated user ID for security
         const { localDate } = req.body;
         
-        let today;
-        if (localDate) {
-            today = new Date(localDate);
-        } else {
-            today = new Date();
-        }
-        today.setHours(0, 0, 0, 0);
+        const today = getMidnightUTC(localDate);
 
         let attendance = await Attendance.findOne({ userId, date: today });
 
@@ -72,13 +76,7 @@ router.post('/break-start', protect, async (req, res) => {
     try {
         const userId = req.user._id.toString();
         const { localDate } = req.body;
-        let today;
-        if (localDate) {
-            today = new Date(localDate);
-        } else {
-            today = new Date();
-        }
-        today.setHours(0, 0, 0, 0);
+        const today = getMidnightUTC(localDate);
 
         const attendance = await Attendance.findOne({ userId, date: today });
 
@@ -96,29 +94,7 @@ router.post('/break-start', protect, async (req, res) => {
 
         // --- AUTOMATIC TIMER PAUSE ON BREAK START ---
         try {
-            const Task = require('../models/Task');
-            const TimeEntry = require('../models/TimeEntry');
-            const runningTasks = await Task.find({ assigneeId: userId, isTimerRunning: true });
-            for (const task of runningTasks) {
-                const now = Date.now();
-                const elapsed = now - (task.lastStartTime || now);
-                task.isTimerRunning = false;
-                task.totalTimeSpent = (task.totalTimeSpent || 0) + elapsed;
-                task.lastStartTime = null;
-                task.wasPausedByBreak = true; // Set flag to auto-resume later
-
-                if (task.timeEntryId) {
-                    const timeEntry = await TimeEntry.findById(task.timeEntryId);
-                    if (timeEntry && timeEntry.isRunning) {
-                        timeEntry.endTime = new Date();
-                        timeEntry.isRunning = false;
-                        const start = new Date(timeEntry.startTime);
-                        timeEntry.duration = Math.max(0, Math.floor((timeEntry.endTime - start) / 1000 / 60)); // minutes
-                        await timeEntry.save();
-                    }
-                }
-                await task.save();
-            }
+            await timeEntryRouter.stopAllRunningTimers(userId, 'stopped timer automatically on break start');
         } catch (timerErr) {
             console.error('Failed to auto-pause timers on break start:', timerErr);
         }
@@ -134,13 +110,7 @@ router.post('/break-end', protect, async (req, res) => {
     try {
         const userId = req.user._id.toString();
         const { localDate } = req.body;
-        let today;
-        if (localDate) {
-            today = new Date(localDate);
-        } else {
-            today = new Date();
-        }
-        today.setHours(0, 0, 0, 0);
+        const today = getMidnightUTC(localDate);
 
         const attendance = await Attendance.findOne({ userId, date: today });
 
@@ -161,7 +131,7 @@ router.post('/break-end', protect, async (req, res) => {
         try {
             const Task = require('../models/Task');
             const TimeEntry = require('../models/TimeEntry');
-            const pausedTasks = await Task.find({ assigneeId: userId, wasPausedByBreak: true });
+            const pausedTasks = await Task.find({ pausedByUserId: userId, wasPausedByBreak: true });
             
             for (const task of pausedTasks) {
                 // Create a new TimeEntry in the database
@@ -179,6 +149,7 @@ router.post('/break-end', protect, async (req, res) => {
                 task.lastStartTime = Date.now();
                 task.timeEntryId = timeEntry._id.toString();
                 task.wasPausedByBreak = false; // Reset the flag
+                task.pausedByUserId = undefined; // Reset who paused
                 await task.save();
             }
         } catch (timerErr) {
@@ -196,13 +167,7 @@ router.post('/check-out', protect, async (req, res) => {
     try {
         const userId = req.user._id.toString();
         const { localDate } = req.body;
-        let today;
-        if (localDate) {
-            today = new Date(localDate);
-        } else {
-            today = new Date();
-        }
-        today.setHours(0, 0, 0, 0);
+        const today = getMidnightUTC(localDate);
 
         const attendance = await Attendance.findOne({ userId, date: today });
 
@@ -235,33 +200,10 @@ router.post('/check-out', protect, async (req, res) => {
 
         // --- AUTOMATIC TIMER STOP ON CHECK-OUT ---
         try {
-            const Task = require('../models/Task');
-            const TimeEntry = require('../models/TimeEntry');
-            const runningTasks = await Task.find({ assigneeId: userId, isTimerRunning: true });
-            for (const task of runningTasks) {
-                const now = Date.now();
-                const elapsed = now - (task.lastStartTime || now);
-                task.isTimerRunning = false;
-                task.totalTimeSpent = (task.totalTimeSpent || 0) + elapsed;
-                task.lastStartTime = null;
-
-                if (task.timeEntryId) {
-                    const timeEntry = await TimeEntry.findById(task.timeEntryId);
-                    if (timeEntry && timeEntry.isRunning) {
-                        timeEntry.endTime = new Date();
-                        timeEntry.isRunning = false;
-                        const start = new Date(timeEntry.startTime);
-                        timeEntry.duration = Math.max(0, Math.floor((timeEntry.endTime - start) / 1000 / 60)); // minutes
-                        await timeEntry.save();
-                    }
-                }
-                task.timeEntryId = null;
-                await task.save();
-            }
+            await timeEntryRouter.stopAllRunningTimers(userId, 'stopped timer automatically on checkout');
         } catch (timerErr) {
             console.error('Failed to auto-stop timers on check-out:', timerErr);
         }
-        // ------------------------------------------
 
         res.json(attendance);
     } catch (error) {
@@ -276,8 +218,8 @@ router.get('/monthly', protect, async (req, res) => {
         const targetMonth = month ? parseInt(month) : new Date().getMonth();
         const targetYear = year ? parseInt(year) : new Date().getFullYear();
 
-        const startDate = new Date(targetYear, targetMonth, 1);
-        const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+        const startDate = new Date(Date.UTC(targetYear, targetMonth, 1));
+        const endDate = new Date(Date.UTC(targetYear, targetMonth + 1, 0, 23, 59, 59));
 
         const filter = {
             date: { $gte: startDate, $lte: endDate }
@@ -301,8 +243,7 @@ router.get('/monthly', protect, async (req, res) => {
 router.post('/manual', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const { userId, date, status } = req.body;
-        const targetDate = new Date(date);
-        targetDate.setHours(0, 0, 0, 0);
+        const targetDate = getMidnightUTC(date);
 
         let attendance = await Attendance.findOne({ userId, date: targetDate });
 

@@ -91,6 +91,7 @@ router.post('/', protect, async (req, res) => {
         if (req.body.taskId && (req.body.isRunning !== false)) {
             const task = await Task.findById(req.body.taskId);
             if (task) {
+                const oldStatus = task.status;
                 task.isTimerRunning = true;
                 task.lastStartTime = new Date(newTimeEntry.startTime).getTime();
                 task.timeEntryId = newTimeEntry._id.toString();
@@ -98,6 +99,32 @@ router.post('/', protect, async (req, res) => {
                     task.status = 'in-progress';
                 }
                 await task.save();
+
+                // Log task activity
+                try {
+                    const TaskActivity = require('../models/TaskActivity');
+                    const User = require('../models/User');
+                    let assigneeName = '';
+                    if (task.assigneeId) {
+                        const assignee = await User.findById(task.assigneeId);
+                        if (assignee) assigneeName = assignee.name;
+                    }
+                    await TaskActivity.create({
+                        taskId: task._id.toString(),
+                        taskTitle: task.title,
+                        userId: req.user._id.toString(),
+                        userName: req.user.name,
+                        taskAssigneeId: task.assigneeId ? task.assigneeId.toString() : '',
+                        taskAssigneeName: assigneeName,
+                        taskStatus: task.status,
+                        actionType: 'timer_start',
+                        oldStatus,
+                        newStatus: task.status,
+                        details: `started timer (status changed from "${oldStatus}" to "${task.status}")`
+                    });
+                } catch (actErr) {
+                    console.error('Task activity timer_start error:', actErr);
+                }
             }
         }
 
@@ -145,6 +172,7 @@ router.put('/:id', protect, async (req, res) => {
         if (req.body.isRunning === false && timeEntry.taskId) {
             const task = await Task.findById(timeEntry.taskId);
             if (task) {
+                const oldStatus = task.status;
                 const now = Date.now();
                 const start = new Date(timeEntry.startTime).getTime();
                 const elapsed = now - (task.lastStartTime || start);
@@ -157,6 +185,32 @@ router.put('/:id', protect, async (req, res) => {
                     task.status = 'todo';
                 }
                 await task.save();
+
+                // Log task activity
+                try {
+                    const TaskActivity = require('../models/TaskActivity');
+                    const User = require('../models/User');
+                    let assigneeName = '';
+                    if (task.assigneeId) {
+                        const assignee = await User.findById(task.assigneeId);
+                        if (assignee) assigneeName = assignee.name;
+                    }
+                    await TaskActivity.create({
+                        taskId: task._id.toString(),
+                        taskTitle: task.title,
+                        userId: req.user._id.toString(),
+                        userName: req.user.name,
+                        taskAssigneeId: task.assigneeId ? task.assigneeId.toString() : '',
+                        taskAssigneeName: assigneeName,
+                        taskStatus: task.status,
+                        actionType: 'timer_stop',
+                        oldStatus,
+                        newStatus: task.status,
+                        details: `stopped timer (status changed from "${oldStatus}" to "${task.status}")`
+                    });
+                } catch (actErr) {
+                    console.error('Task activity timer_stop error:', actErr);
+                }
             }
         }
 
@@ -188,6 +242,7 @@ router.delete('/:id', protect, async (req, res) => {
         if (timeEntry.isRunning && timeEntry.taskId) {
             const task = await Task.findById(timeEntry.taskId);
             if (task) {
+                const oldStatus = task.status;
                 task.isTimerRunning = false;
                 task.lastStartTime = null;
                 task.timeEntryId = null;
@@ -195,6 +250,32 @@ router.delete('/:id', protect, async (req, res) => {
                     task.status = 'todo';
                 }
                 await task.save();
+
+                // Log task activity
+                try {
+                    const TaskActivity = require('../models/TaskActivity');
+                    const User = require('../models/User');
+                    let assigneeName = '';
+                    if (task.assigneeId) {
+                        const assignee = await User.findById(task.assigneeId);
+                        if (assignee) assigneeName = assignee.name;
+                    }
+                    await TaskActivity.create({
+                        taskId: task._id.toString(),
+                        taskTitle: task.title,
+                        userId: req.user._id.toString(),
+                        userName: req.user.name,
+                        taskAssigneeId: task.assigneeId ? task.assigneeId.toString() : '',
+                        taskAssigneeName: assigneeName,
+                        taskStatus: task.status,
+                        actionType: 'timer_stop',
+                        oldStatus,
+                        newStatus: task.status,
+                        details: `stopped timer due to entry deletion (status changed from "${oldStatus}" to "${task.status}")`
+                    });
+                } catch (actErr) {
+                    console.error('Task activity timer_stop (delete) error:', actErr);
+                }
             }
         }
 
@@ -270,5 +351,80 @@ router.get('/stats/summary', protect, async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+
+const stopAllRunningTimers = async (userId, details) => {
+    const TimeEntry = require('../models/TimeEntry');
+    const Task = require('../models/Task');
+    const TaskActivity = require('../models/TaskActivity');
+    const User = require('../models/User');
+
+    const runningEntries = await TimeEntry.find({ userId, isRunning: true });
+    for (const entry of runningEntries) {
+        entry.endTime = new Date();
+        entry.isRunning = false;
+        const start = new Date(entry.startTime);
+        entry.duration = Math.max(0, Math.floor((entry.endTime - start) / 1000 / 60)); // minutes
+        await entry.save();
+
+        if (entry.taskId) {
+            const task = await Task.findById(entry.taskId);
+            if (task) {
+                const oldStatus = task.status;
+                const now = Date.now();
+                const elapsed = now - (task.lastStartTime || start.getTime());
+
+                task.isTimerRunning = false;
+                task.totalTimeSpent = (task.totalTimeSpent || 0) + elapsed;
+                task.lastStartTime = null;
+                task.timeEntryId = null;
+                if (task.status === 'in-progress') {
+                    task.status = 'todo';
+                }
+                if (details.includes('break')) {
+                    task.wasPausedByBreak = true;
+                    task.pausedByUserId = userId.toString();
+                }
+                await task.save();
+
+                // Log task activity
+                try {
+                    let assigneeName = '';
+                    if (task.assigneeId) {
+                        const assignee = await User.findById(task.assigneeId);
+                        if (assignee) assigneeName = assignee.name;
+                    }
+                    const user = await User.findById(userId);
+                    await TaskActivity.create({
+                        taskId: task._id.toString(),
+                        taskTitle: task.title,
+                        userId: userId.toString(),
+                        userName: user ? user.name : 'System',
+                        taskAssigneeId: task.assigneeId ? task.assigneeId.toString() : '',
+                        taskAssigneeName: assigneeName,
+                        taskStatus: task.status,
+                        actionType: 'timer_stop',
+                        oldStatus,
+                        newStatus: task.status,
+                        details
+                    });
+                } catch (actErr) {
+                    console.error('Task activity timer_stop error:', actErr);
+                }
+            }
+        }
+    }
+};
+
+// Stop all running timers for current user (e.g. on logout)
+router.post('/stop-running', protect, async (req, res) => {
+    try {
+        await stopAllRunningTimers(req.user._id, 'stopped timer automatically on logout');
+        res.json({ message: 'Stopped all running timers successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+router.stopAllRunningTimers = stopAllRunningTimers;
 
 module.exports = router;

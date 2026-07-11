@@ -15,7 +15,8 @@ type Ticket = {
     subject: string
     description: string
     priority: 'low' | 'medium' | 'high' | 'critical'
-    status: 'open' | 'in-progress' | 'resolved' | 'closed' | 'declined' | 'live'
+    status: 'open' | 'in-progress' | 'resolved' | 'closed' | 'declined' | 'live' | 'need-discussion'
+    discussionNote?: string
     clientName: string
     assignedTo: string
     createdAt: string
@@ -157,6 +158,7 @@ export function TicketsPage() {
             case 'closed': return 'text-gray-600 bg-gray-50'
             case 'declined': return 'text-rose-600 bg-rose-50'
             case 'live': return 'text-emerald-600 bg-emerald-50'
+            case 'need-discussion': return 'text-purple-600 bg-purple-50'
             default: return 'text-gray-600 bg-gray-50'
         }
     }
@@ -374,6 +376,7 @@ export function TicketsPage() {
                     <option value="closed">Closed</option>
                     <option value="declined">Declined</option>
                     <option value="live">Live</option>
+                    <option value="need-discussion">Need Discussion</option>
                 </select>
             </div>
 
@@ -443,6 +446,7 @@ export function TicketsPage() {
                                             <option value="closed">Closed</option>
                                             <option value="declined">Declined</option>
                                             <option value="live">Live</option>
+                                            <option value="need-discussion">Need Discussion</option>
                                         </select>
 
                                         {currentUser?.role !== 'client' && (
@@ -460,6 +464,31 @@ export function TicketsPage() {
                                         )}
                                     </div>
                                 </div>
+                                {ticket.status === 'need-discussion' && (
+                                    <div className="mt-4 pt-3 border-t space-y-2" onClick={(e) => e.stopPropagation()}>
+                                        <Label className="text-xs font-semibold text-purple-600 flex justify-between items-center">
+                                            <span>Discussion Notes (Optional)</span>
+                                            <span className="text-[10px] text-muted-foreground font-normal">Saves automatically on blur</span>
+                                        </Label>
+                                        <Textarea
+                                            placeholder="What needs to be discussed? Enter discussion points..."
+                                            defaultValue={ticket.discussionNote || ''}
+                                            className="text-sm min-h-[60px]"
+                                            onBlur={async (e) => {
+                                                const value = e.target.value;
+                                                if (value !== (ticket.discussionNote || '')) {
+                                                    try {
+                                                        await api.put(`/tickets/${ticket._id}`, { discussionNote: value });
+                                                        setTickets(tickets.map(t => t._id === ticket._id ? { ...t, discussionNote: value } : t));
+                                                        toast({ description: "Discussion note updated successfully" });
+                                                    } catch (err) {
+                                                        toast({ title: "Error", description: "Failed to save note", variant: "destructive" });
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     ))
@@ -516,6 +545,7 @@ export function TicketsPage() {
                                         <option value="closed">Closed</option>
                                         <option value="declined">Declined</option>
                                         <option value="live">Live</option>
+                                        <option value="need-discussion">Need Discussion</option>
                                     </select>
                                 </div>
                                 <div>
@@ -549,6 +579,30 @@ export function TicketsPage() {
                                     {selectedTicket.description || 'No description provided.'}
                                 </div>
                             </div>
+
+                            {selectedTicket.status === 'need-discussion' && (
+                                <div className="pt-2">
+                                    <p className="text-sm font-medium mb-2 text-purple-600">Discussion Notes (Optional)</p>
+                                    <Textarea
+                                        placeholder="What needs to be discussed? Enter discussion points..."
+                                        defaultValue={selectedTicket.discussionNote || ''}
+                                        className="text-sm min-h-[80px]"
+                                        onBlur={async (e) => {
+                                            const value = e.target.value;
+                                            if (value !== (selectedTicket.discussionNote || '')) {
+                                                try {
+                                                    await api.put(`/tickets/${selectedTicket._id}`, { discussionNote: value });
+                                                    setTickets(tickets.map(t => t._id === selectedTicket._id ? { ...t, discussionNote: value } : t));
+                                                    setSelectedTicket({ ...selectedTicket, discussionNote: value });
+                                                    toast({ description: "Discussion note updated successfully" });
+                                                } catch (err) {
+                                                    toast({ title: "Error", description: "Failed to save note", variant: "destructive" });
+                                                }
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            )}
 
                             {selectedTicket.screenshot && (
                                 <div className="pt-2">

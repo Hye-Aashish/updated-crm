@@ -33,7 +33,7 @@ router.get('/', protect, async (req, res) => {
                 ]
             };
         }
-        const tickets = await Ticket.find(filter).sort({ createdAt: -1 });
+        const tickets = await Ticket.find(filter).select('-screenshot').sort({ createdAt: -1 });
         res.json(tickets);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -126,6 +126,7 @@ router.put('/:id', protect, async (req, res) => {
         if (req.body.priority) ticket.priority = req.body.priority;
         if (req.body.assignedTo) ticket.assignedTo = req.body.assignedTo;
         if (req.body.description) ticket.description = req.body.description;
+        if (req.body.discussionNote !== undefined) ticket.discussionNote = req.body.discussionNote;
 
         ticket.updatedAt = Date.now();
         const updatedTicket = await ticket.save();

@@ -14,7 +14,7 @@ export function useDashboardMetrics(settings: any) {
             onHoldProjects: 0, planningProjects: 0, teamPerformance: [], winRate: 0,
             totalBillableHours: 0, revenueData: [], leadStatusData: [], healthMetrics: [],
             recentActivities: [], revenueTrend: '0%', expenseTrend: '0%', currentLayout: ['operational'],
-            relevantInvoices: []
+            relevantInvoices: [], totalProjectCost: 0, projectRevenueReceived: 0
         }
     }
 
@@ -331,6 +331,14 @@ export function useDashboardMetrics(settings: any) {
 
     const totalProjectCost = (relevantProjects || []).reduce((sum: number, p) => sum + (p?.budget || 0), 0)
 
+    const projectRevenueReceived = useMemo(() => {
+        if (!relevantInvoices || !relevantProjects) return 0
+        const projectIds = new Set(relevantProjects.map(p => p.id || (p as any)._id).filter(Boolean))
+        return relevantInvoices
+            .filter(i => i?.status === 'paid' && i?.projectId && (projectIds.has(i.projectId) || projectIds.has(i.projectId?.toString())))
+            .reduce((sum, i) => sum + (i?.total || 0), 0)
+    }, [relevantInvoices, relevantProjects])
+
     return {
         totalRevenue,
         totalExpenses,
@@ -347,6 +355,7 @@ export function useDashboardMetrics(settings: any) {
         reviewTasks,
         doneTasks,
         totalProjectCost,
+        projectRevenueReceived,
         teamPerformance,
         winRate,
         totalBillableHours,

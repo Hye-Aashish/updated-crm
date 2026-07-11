@@ -346,7 +346,16 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
                                     <p className="text-sm font-medium truncate">{currentUser?.name}</p>
                                     <p className="text-xs text-muted-foreground truncate capitalize">{currentUser?.role}</p>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }} title="Logout">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={async () => {
+                                    try {
+                                        await api.post('/time-entries/stop-running')
+                                    } catch (err) {
+                                        console.error('Logout timer stop failed', err)
+                                    } finally {
+                                        localStorage.removeItem('token');
+                                        navigate('/login');
+                                    }
+                                }} title="Logout">
                                     <LogOut className="h-4 w-4" />
                                 </Button>
                             </>
@@ -355,7 +364,16 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
                                 <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-2 ring-background">
                                     {currentUser?.name?.charAt(0) || 'U'}
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }} title="Logout">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={async () => {
+                                    try {
+                                        await api.post('/time-entries/stop-running')
+                                    } catch (err) {
+                                        console.error('Logout timer stop failed', err)
+                                    } finally {
+                                        localStorage.removeItem('token');
+                                        navigate('/login');
+                                    }
+                                }} title="Logout">
                                     <LogOut className="h-4 w-4" />
                                 </Button>
                             </div>

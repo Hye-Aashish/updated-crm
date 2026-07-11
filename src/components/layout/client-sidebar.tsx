@@ -171,12 +171,30 @@ export function ClientSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOp
                                     <p className="text-sm font-bold truncate">{currentUser?.name}</p>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Customer</p>
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}>
+                                <Button variant="ghost" size="icon" onClick={async () => {
+                                    try {
+                                        await api.post('/time-entries/stop-running')
+                                    } catch (err) {
+                                        console.error('Logout timer stop failed', err)
+                                    } finally {
+                                        localStorage.removeItem('token');
+                                        navigate('/login');
+                                    }
+                                }}>
                                     <LogOut className="h-4 w-4 text-rose-500" />
                                 </Button>
                             </>
                         ) : (
-                            <Button variant="ghost" size="icon" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}>
+                            <Button variant="ghost" size="icon" onClick={async () => {
+                                try {
+                                    await api.post('/time-entries/stop-running')
+                                } catch (err) {
+                                    console.error('Logout timer stop failed', err)
+                                } finally {
+                                    localStorage.removeItem('token');
+                                    navigate('/login');
+                                }
+                            }}>
                                 <LogOut className="h-4 w-4 text-rose-500" />
                             </Button>
                         )}

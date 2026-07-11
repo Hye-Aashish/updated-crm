@@ -318,7 +318,8 @@ export interface Ticket {
     subject: string
     description: string
     priority: 'low' | 'medium' | 'high' | 'critical'
-    status: 'open' | 'in-progress' | 'resolved' | 'closed'
+    status: 'open' | 'in-progress' | 'resolved' | 'closed' | 'declined' | 'live' | 'need-discussion'
+    discussionNote?: string
     clientName: string
     clientId?: string
     projectId?: string

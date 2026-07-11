@@ -68,6 +68,8 @@ export function TasksPage() {
     const [filterPriority, setFilterPriority] = useState<string>(initialPriority)
     const [filterProject, setFilterProject] = useState<string>('all')
     const [filterType, setFilterType] = useState<string>(initialFilter)
+    const [filterEmployee, setFilterEmployee] = useState<string>('all')
+    const [filterDate, setFilterDate] = useState<string>('')
 
     // Client Approval State
     const [isClientApprovalDialogOpen, setIsClientApprovalDialogOpen] = useState(false)
@@ -81,10 +83,16 @@ export function TasksPage() {
         description: '',
         priority: 'medium',
         dueDate: '',
-        assigneeId: '',
+        assigneeId: (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') ? (currentUser.id || (currentUser as any)._id) : '',
         projectId: '',
         attachments: [] as { name: string, fileType: string, data: string }[]
     })
+
+    useEffect(() => {
+        if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') {
+            setNewTask(prev => ({ ...prev, assigneeId: currentUser.id || (currentUser as any)._id }))
+        }
+    }, [currentUser])
     const [newStatus, setNewStatus] = useState({
         label: '',
         color: 'bg-blue-500'
@@ -111,6 +119,31 @@ export function TasksPage() {
             filtered = filtered.filter((t: any) => t.projectId === filterProject)
         }
 
+        if (filterEmployee !== 'all') {
+            filtered = filtered.filter((t: any) => t.assigneeId === filterEmployee)
+        }
+
+        if (filterDate) {
+            const [year, month, day] = filterDate.split('-').map(Number)
+            const targetDate = new Date(year, month - 1, day, 0, 0, 0, 0)
+            
+            filtered = filtered.filter((t: any) => {
+                // 1. Task must be created on or before the selected date
+                const createdDate = new Date(t.createdAt)
+                createdDate.setHours(0, 0, 0, 0)
+                if (createdDate > targetDate) return false
+
+                // 2. If task has a due date, the selected date must be on or before the due date
+                if (t.dueDate) {
+                    const due = new Date(t.dueDate)
+                    due.setHours(0, 0, 0, 0)
+                    if (due < targetDate) return false
+                }
+
+                return true
+            })
+        }
+
         // Advanced Filter Type
         if (filterType === 'overdue') {
             filtered = filtered.filter(t => t.status !== 'done' && new Date(t.dueDate) < now)
@@ -128,7 +161,7 @@ export function TasksPage() {
         if (searchParams.get('filter') !== filterType) {
             // setSearchParams({ filter: filterType, priority: filterPriority }, { replace: true })
         }
-    }, [storeTasks, searchQuery, filterPriority, filterProject, filterType])
+    }, [storeTasks, searchQuery, filterPriority, filterProject, filterType, filterEmployee, filterDate])
 
     // Fetch Data
     useEffect(() => {
@@ -516,6 +549,23 @@ export function TasksPage() {
     const handleAddTask = async () => {
         if (!newTask.title) return
 
+        // Restrict employee task creation without running timer
+        if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') {
+            try {
+                const runningTimer = await timeEntryService.getRunningTimer(currentUser.id || (currentUser as any)._id)
+                if (!runningTimer) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'CREATION FAILED',
+                        description: 'You have to start the timer first or you have to like log in'
+                    })
+                    return
+                }
+            } catch (err) {
+                console.error("Failed to check running timer:", err)
+            }
+        }
+
         try {
             const taskData = {
                 title: newTask.title,
@@ -554,7 +604,15 @@ export function TasksPage() {
             }
 
             addStoreTask(frontendTask)
-            setNewTask({ title: '', description: '', priority: 'medium', dueDate: '', assigneeId: '', projectId: '', attachments: [] })
+            setNewTask({
+                title: '',
+                description: '',
+                priority: 'medium',
+                dueDate: '',
+                assigneeId: (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') ? (currentUser.id || (currentUser as any)._id) : '',
+                projectId: '',
+                attachments: []
+            })
             setIsTaskDialogOpen(false)
             toast({
                 title: 'CREATION SUCCESS',
@@ -700,7 +758,32 @@ export function TasksPage() {
                         ))}
                     </select>
 
-                    {(filterType !== 'all' || filterPriority !== 'all' || filterProject !== 'all' || searchQuery) && (
+                    {/* Employee Selector & Date Picker (Admin/Owner only) */}
+                    {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
+                        <>
+                            {/* Employee Selector */}
+                            <select
+                                className={`h-9 px-3 rounded-md border text-sm flex-1 min-w-[140px] md:flex-none md:w-38 ${filterEmployee !== 'all' ? 'border-primary bg-primary/5 font-bold text-primary' : 'border-input bg-background text-muted-foreground'}`}
+                                value={filterEmployee}
+                                onChange={(e) => setFilterEmployee(e.target.value)}
+                            >
+                                <option value="all">All Employees</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </select>
+
+                            {/* Calendar Date Picker */}
+                            <input
+                                type="date"
+                                className={`h-9 px-3 rounded-md border text-sm flex-1 min-w-[140px] md:flex-none md:w-36 font-semibold ${filterDate ? 'border-primary bg-primary/5 text-primary' : 'border-input bg-background text-muted-foreground'}`}
+                                value={filterDate}
+                                onChange={(e) => setFilterDate(e.target.value)}
+                            />
+                        </>
+                    )}
+
+                    {(filterType !== 'all' || filterPriority !== 'all' || filterProject !== 'all' || filterEmployee !== 'all' || filterDate || searchQuery) && (
                         <Button
                             variant="ghost"
                             size="sm"
@@ -709,6 +792,8 @@ export function TasksPage() {
                                 setFilterType('all')
                                 setFilterPriority('all')
                                 setFilterProject('all')
+                                setFilterEmployee('all')
+                                setFilterDate('')
                                 setSearchQuery('')
                                 setSearchParams({})
                             }}
@@ -881,7 +966,8 @@ export function TasksPage() {
                                                 id="assignee"
                                                 value={newTask.assigneeId}
                                                 onChange={(e) => setNewTask({ ...newTask, assigneeId: e.target.value })}
-                                                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                className="w-full h-10 px-3 rounded-md border border-input bg-background disabled:opacity-70 disabled:cursor-not-allowed"
+                                                disabled={currentUser?.role !== 'admin' && currentUser?.role !== 'owner'}
                                             >
                                                 {users.map(u => (
                                                     <option key={u.id} value={u.id}>{u.name}</option>

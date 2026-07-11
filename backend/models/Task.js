@@ -33,12 +33,15 @@ const taskSchema = new mongoose.Schema({
     totalTimeSpent: { type: Number, default: 0 },
     timeEntryId: { type: String }, // Reference to current time entry
     wasPausedByBreak: { type: Boolean, default: false }, // Remember if timer was auto-paused during break
+    pausedByUserId: { type: String }, // Remember who paused the task on break
+    creatorId: { type: String }, // User who created the task
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
 
 taskSchema.index({ projectId: 1 });
 taskSchema.index({ assigneeId: 1 });
+taskSchema.index({ creatorId: 1 });
 taskSchema.index({ status: 1 });
 taskSchema.index({ createdAt: -1 });
 

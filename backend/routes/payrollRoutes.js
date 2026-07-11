@@ -71,7 +71,7 @@ router.get('/all', protect, authorize('admin', 'owner'), async (req, res) => {
 
                 // For 26-day rule, we typically only add holidays that fall on working days
                 if (isHoliday && !isOff) {
-                    const hasAttendance = attendance.some(a => new Date(a.date).getDate() === d);
+                    const hasAttendance = attendance.some(a => new Date(a.date).getUTCDate() === d);
                     if (!hasAttendance) {
                         stats.paidDays += 1;
                     }
@@ -156,7 +156,7 @@ router.get('/my/:userId', protect, async (req, res) => {
             const isHoliday = payrollSettings.holidays.some(h => h.date === dateStr);
 
             if (isHoliday && !isOff) {
-                const hasAttendance = attendance.some(a => new Date(a.date).getDate() === d);
+                const hasAttendance = attendance.some(a => new Date(a.date).getUTCDate() === d);
                 if (!hasAttendance) {
                     stats.paidDays += 1;
                 }

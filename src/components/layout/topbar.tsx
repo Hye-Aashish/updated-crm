@@ -474,7 +474,16 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                             <p className="text-xs leading-none text-muted-foreground">{currentUser?.email}</p>
                         </div>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}>
+                        <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg" onClick={async () => {
+                            try {
+                                await api.post('/time-entries/stop-running')
+                            } catch (err) {
+                                console.error('Logout timer stop failed', err)
+                            } finally {
+                                localStorage.removeItem('token');
+                                navigate('/login');
+                            }
+                        }}>
                             <LogOut className="mr-2 h-4 w-4" /> Log out
                         </DropdownMenuItem>
                     </DropdownMenuContent>
