@@ -31,19 +31,33 @@ async function gatherCRMData() {
         timeEntries,
         amcs,
         domains,
+        attendanceRecords,
     ] = await Promise.all([
-        Project.find().lean(),
-        Client.find().lean(),
-        Task.find().lean(),
-        Invoice.find().lean(),
-        Expense.find().lean(),
-        Lead.find().lean(),
-        User.find().select('-password').lean(),
-        Ticket.find().lean(),
-        TimeEntry.find().lean(),
-        Amc.find().lean().catch(() => []),
-        Domain.find().lean().catch(() => []),
+        Project.find({}, 'name status budget client startDate endDate progress').lean(),
+        Client.find({}, 'name company email status').lean(),
+        Task.find({}, 'title status priority assigneeId dueDate createdAt updatedAt').sort({ updatedAt: -1 }).limit(100).lean(),
+        Invoice.find({}, 'invoiceNumber total amount dueDate client status').lean(),
+        Expense.find({}, 'description amount category date').sort({ date: -1 }).limit(50).lean(),
+        Lead.find({}, 'name email status source').lean(),
+        User.find({}, 'name email role designation department').lean(),
+        Ticket.find({}, 'status').lean(),
+        TimeEntry.find().sort({ startTime: -1 }).limit(150).lean(),
+        Amc.find({}, 'clientName name amount startDate endDate status').lean().catch(() => []),
+        Domain.find({}, 'name domain expiryDate status').lean().catch(() => []),
+        Attendance.find().sort({ date: -1 }).limit(100).lean().catch(() => []),
     ]);
+
+    // Map user IDs to names for quick reference in tasks/time entries
+    const userMap = {};
+    users.forEach(u => {
+        userMap[u._id.toString()] = {
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            designation: u.designation,
+            department: u.department
+        };
+    });
 
     // Calculate summary stats
     const totalRevenue = invoices
@@ -84,6 +98,64 @@ async function gatherCRMData() {
     // Time tracking stats
     const totalHoursTracked = timeEntries.reduce((sum, t) => sum + (t.duration || 0), 0) / 60;
 
+    // Build lists with user mappings
+    const taskList = tasks.map(t => ({
+        id: t._id,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        assigneeName: t.assigneeId && userMap[t.assigneeId.toString()] ? userMap[t.assigneeId.toString()].name : 'Unassigned',
+        dueDate: t.dueDate,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt
+    }));
+
+    const tasksByAssignee = {};
+    taskList.forEach(t => {
+        const name = t.assigneeName;
+        if (!tasksByAssignee[name]) {
+            tasksByAssignee[name] = [];
+        }
+        tasksByAssignee[name].push({
+            title: t.title,
+            status: t.status,
+            priority: t.priority,
+            dueDate: t.dueDate
+        });
+    });
+
+    const timeTrackingList = timeEntries.map(te => ({
+        userName: te.userId && userMap[te.userId.toString()] ? userMap[te.userId.toString()].name : 'Unknown',
+        projectName: te.projectId ? (projects.find(p => p._id.toString() === te.projectId.toString())?.name || 'Unknown Project') : 'Unknown Project',
+        taskTitle: te.taskId ? (tasks.find(t => t._id.toString() === te.taskId.toString())?.title || 'Unknown Task') : 'No Task',
+        startTime: te.startTime,
+        endTime: te.endTime,
+        duration: te.duration,
+        note: te.note,
+        isRunning: te.isRunning
+    }));
+
+    const teamList = users.map(u => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        designation: u.designation || 'None',
+        department: u.department || 'None',
+        joiningDate: u.joiningDate,
+    }));
+
+    const attendanceList = attendanceRecords.map(att => ({
+        userName: att.userId && userMap[att.userId.toString()] ? userMap[att.userId.toString()].name : 'Unknown',
+        date: att.date,
+        checkIn: att.checkIn,
+        checkOut: att.checkOut,
+        status: att.status,
+        totalWorkTime: att.totalWorkTime,
+        totalBreakTime: att.totalBreakTime,
+        note: att.note
+    }));
+
     return {
         summary: {
             totalRevenue,
@@ -120,12 +192,7 @@ async function gatherCRMData() {
             total: tasks.length,
             open: openTasks.length,
             overdue: overdueTasks.length,
-            overdueList: overdueTasks.map(t => ({
-                title: t.title,
-                dueDate: t.dueDate,
-                priority: t.priority,
-                assignee: t.assignee || t.assignedTo,
-            })),
+            groupedByAssignee: tasksByAssignee,
         },
         invoices: {
             total: invoices.length,
@@ -166,6 +233,7 @@ async function gatherCRMData() {
             totalUsers: users.length,
             employees: employees.length,
             admins: admins.length,
+            list: teamList,
         },
         tickets: {
             total: tickets.length,
@@ -174,6 +242,10 @@ async function gatherCRMData() {
         timeTracking: {
             totalHoursTracked: totalHoursTracked.toFixed(1),
             totalEntries: timeEntries.length,
+            recentEntries: timeTrackingList,
+        },
+        attendance: {
+            recentLogs: attendanceList,
         },
         amcs: {
             total: amcs.length,
@@ -199,6 +271,8 @@ async function gatherCRMData() {
 // ── Build AI Prompt ──────────────────────────────────────────────────────────
 function buildSystemPrompt(crmData) {
     return `You are "Nexprism AI" — an intelligent CRM business advisor embedded inside the Nexprism Agency Management System.
+
+Current Date and Time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })} (IST)
 
 You have COMPLETE access to the following real-time CRM data:
 
@@ -228,7 +302,7 @@ You have COMPLETE access to the following real-time CRM data:
 ✅ TASKS
 ═══════════════════════════════════════════════════
 • Total: ${crmData.tasks.total} | Open: ${crmData.tasks.open} | Overdue: ${crmData.tasks.overdue}
-• Overdue Tasks: ${JSON.stringify(crmData.tasks.overdueList)}
+• Tasks Grouped strictly by Assignee Name (DO NOT mix or conflate tasks across different employees): ${JSON.stringify(crmData.tasks.groupedByAssignee)}
 
 ═══════════════════════════════════════════════════
 🧾 INVOICES
@@ -253,6 +327,7 @@ You have COMPLETE access to the following real-time CRM data:
 👨‍💻 TEAM
 ═══════════════════════════════════════════════════
 • Total Users: ${crmData.team.totalUsers} | Employees: ${crmData.team.employees} | Admins: ${crmData.team.admins}
+• Team Members details (names, roles, designations, departments): ${JSON.stringify(crmData.team.list)}
 
 ═══════════════════════════════════════════════════
 🎫 SUPPORT TICKETS
@@ -263,6 +338,12 @@ You have COMPLETE access to the following real-time CRM data:
 ⏱️ TIME TRACKING
 ═══════════════════════════════════════════════════
 • Total Hours: ${crmData.timeTracking.totalHoursTracked} hrs | Entries: ${crmData.timeTracking.totalEntries}
+• Recent Time Logs: ${JSON.stringify(crmData.timeTracking.recentEntries)}
+
+═══════════════════════════════════════════════════
+📅 ATTENDANCE
+═══════════════════════════════════════════════════
+• Recent Attendance Records: ${JSON.stringify(crmData.attendance.recentLogs)}
 
 ═══════════════════════════════════════════════════
 🔒 AMC (Annual Maintenance Contracts)
@@ -277,6 +358,12 @@ You have COMPLETE access to the following real-time CRM data:
 • Details: ${JSON.stringify(crmData.domains.list)}
 
 ═══════════════════════════════════════════════════
+
+CRITICAL DATA ACCURACY RULES:
+- **Strict Name Matching**: "Anshul Sharma" (Frontend Developer) and "Anshul Jha" (Backend Developer) are two DIFFERENT employees. You MUST NEVER conflate them. Do not map tasks belonging to "Anshul Jha" to "Anshul Sharma" or vice versa. 
+- **Exact Assignee Filter**: To calculate stats or list tasks for any employee, you must filter the 'tasks.list' array where 'assigneeName' matches their full name EXACTLY. 
+- **No Hallucinated Assignments**: If an employee has 0 tasks in 'todo' or 'in-progress' status, report 0. Never grab tasks belonging to other employees (like Prasad Hol's pending tasks) to pad an employee's task list.
+- **Accurate Count Math**: Count the task statuses ('todo', 'in-progress', 'done', etc.) strictly by parsing the task objects. Do not guess or assume.
 
 YOUR ROLE:
 1. Answer ALL questions about the CRM data accurately using the data above
@@ -309,23 +396,34 @@ router.post('/chat', protect, authorize('owner', 'admin'), async (req, res) => {
 
         // Get API key — first from Settings DB, then from .env
         let apiKey = null;
+        let provider = 'gemini';
 
         // 1. Try to get from Settings (UI configured)
         try {
             const settings = await Setting.findOne();
-            if (settings?.apiKeys?.gemini) {
+            if (settings?.apiKeys?.openai) {
+                apiKey = settings.apiKeys.openai;
+                provider = 'openai';
+            } else if (settings?.apiKeys?.gemini) {
                 apiKey = settings.apiKeys.gemini;
+                provider = 'gemini';
             }
         } catch (e) { }
 
         // 2. Fall back to .env
         if (!apiKey) {
-            apiKey = process.env.GEMINI_API_KEY;
+            if (process.env.OPENAI_API_KEY) {
+                apiKey = process.env.OPENAI_API_KEY;
+                provider = 'openai';
+            } else {
+                apiKey = process.env.GEMINI_API_KEY;
+                provider = 'gemini';
+            }
         }
 
         if (!apiKey) {
             return res.status(400).json({
-                message: 'Gemini API key not configured. Please add GEMINI_API_KEY to your backend .env file or configure it in Settings.',
+                message: 'AI API key not configured. Please add GEMINI_API_KEY or OPENAI_API_KEY to your backend .env file or configure it in Settings.',
                 needsApiKey: true
             });
         }
@@ -334,76 +432,174 @@ router.post('/chat', protect, authorize('owner', 'admin'), async (req, res) => {
         const crmData = await gatherCRMData();
         const systemPrompt = buildSystemPrompt(crmData);
 
-        // Build conversation for Gemini
-        const contents = [];
+        // Set SSE Headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
 
-        // Add conversation history
-        if (conversationHistory.length > 0) {
-            for (const msg of conversationHistory.slice(-10)) { // Keep last 10 messages
-                contents.push({
-                    role: msg.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: msg.content }]
-                });
+        const snapshot = {
+            revenue: crmData.summary.totalRevenue,
+            expenses: crmData.summary.totalExpenses,
+            profit: crmData.summary.netProfit,
+            activeProjects: crmData.projects.active,
+            openTasks: crmData.tasks.open,
+            overdueTasks: crmData.tasks.overdue,
+            pendingInvoices: crmData.invoices.pending,
+            leads: crmData.leads.total,
+            conversionRate: crmData.leads.conversionRate,
+        };
+
+        if (provider === 'openai') {
+            const messagesList = [{ role: 'system', content: systemPrompt }];
+
+            if (conversationHistory.length > 0) {
+                for (const msg of conversationHistory.slice(-10)) {
+                    messagesList.push({
+                        role: msg.role === 'assistant' ? 'assistant' : 'user',
+                        content: msg.content
+                    });
+                }
             }
-        }
 
-        // Add current message
-        contents.push({
-            role: 'user',
-            parts: [{ text: message }]
-        });
-
-        // Call Gemini API
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    system_instruction: {
-                        parts: [{ text: systemPrompt }]
-                    },
-                    contents,
-                    generationConfig: {
-                        temperature: 0.7,
-                        topP: 0.95,
-                        topK: 40,
-                        maxOutputTokens: 4096,
-                    }
-                })
-            }
-        );
-
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            console.error('Gemini API Error:', error);
-            return res.status(500).json({
-                message: 'AI service error. Please check your API key.',
-                error: error?.error?.message || 'Unknown error'
+            messagesList.push({
+                role: 'user',
+                content: message
             });
+
+            const response = await fetch(
+                'https://api.openai.com/v1/chat/completions',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: messagesList,
+                        temperature: 0.7,
+                        max_tokens: 4096,
+                        stream: true
+                    })
+                }
+            );
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                console.error('OpenAI API Error:', error);
+                res.write(`data: ${JSON.stringify({ error: error?.error?.message || 'OpenAI streaming error' })}\n\n`);
+                res.end();
+                return;
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+            for await (const chunk of response.body) {
+                buffer += decoder.decode(chunk, { stream: true });
+                let lineIndex;
+                while ((lineIndex = buffer.indexOf('\n')) !== -1) {
+                    const line = buffer.slice(0, lineIndex).trim();
+                    buffer = buffer.slice(lineIndex + 1);
+                    if (line.startsWith('data: ')) {
+                        const jsonStr = line.slice(6).trim();
+                        if (jsonStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(jsonStr);
+                            const delta = data?.choices?.[0]?.delta?.content || '';
+                            if (delta) {
+                                res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing OpenAI SSE line:', e.message, 'Line:', line);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Build conversation for Gemini
+            const contents = [];
+
+            // Add conversation history
+            if (conversationHistory.length > 0) {
+                for (const msg of conversationHistory.slice(-10)) { // Keep last 10 messages
+                    contents.push({
+                        role: msg.role === 'assistant' ? 'model' : 'user',
+                        parts: [{ text: msg.content }]
+                    });
+                }
+            }
+
+            // Add current message
+            contents.push({
+                role: 'user',
+                parts: [{ text: message }]
+            });
+
+            // Call Gemini API Stream
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: {
+                            parts: [{ text: systemPrompt }]
+                        },
+                        contents,
+                        generationConfig: {
+                            temperature: 0.7,
+                            topP: 0.95,
+                            topK: 40,
+                            maxOutputTokens: 4096,
+                        }
+                    })
+                }
+            );
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                console.error('Gemini API Error:', error);
+                res.write(`data: ${JSON.stringify({ error: error?.error?.message || 'Gemini streaming error' })}\n\n`);
+                res.end();
+                return;
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+            for await (const chunk of response.body) {
+                buffer += decoder.decode(chunk, { stream: true });
+                let lineIndex;
+                while ((lineIndex = buffer.indexOf('\n')) !== -1) {
+                    const line = buffer.slice(0, lineIndex).trim();
+                    buffer = buffer.slice(lineIndex + 1);
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            const delta = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                            if (delta) {
+                                res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing Gemini SSE line:', e.message, 'Line:', line);
+                        }
+                    }
+                }
+            }
         }
 
-        const data = await response.json();
-        const aiResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
-
-        res.json({
-            response: aiResponse,
-            dataSnapshot: {
-                revenue: crmData.summary.totalRevenue,
-                expenses: crmData.summary.totalExpenses,
-                profit: crmData.summary.netProfit,
-                activeProjects: crmData.projects.active,
-                openTasks: crmData.tasks.open,
-                overdueTasks: crmData.tasks.overdue,
-                pendingInvoices: crmData.invoices.pending,
-                leads: crmData.leads.total,
-                conversionRate: crmData.leads.conversionRate,
-            }
-        });
+        // Send final chunk with snapshot and done signal
+        res.write(`data: ${JSON.stringify({ done: true, dataSnapshot: snapshot })}\n\n`);
+        res.end();
 
     } catch (error) {
         console.error('AI Assistant Error:', error);
-        res.status(500).json({ message: 'Failed to process AI request', error: error.message });
+        // If headers are already sent, we write SSE error message, otherwise send 500
+        if (res.headersSent) {
+            res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+            res.end();
+        } else {
+            res.status(500).json({ message: 'Failed to process AI request', error: error.message });
+        }
     }
 });
 

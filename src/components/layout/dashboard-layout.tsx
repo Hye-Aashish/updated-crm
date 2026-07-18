@@ -103,7 +103,7 @@ export function DashboardLayout() {
 
                 {/* Page Content */}
                 <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-8 w-full scroll-smooth">
-                    <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 md:pb-20">
+                    <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <Outlet />
                     </div>
                 </main>

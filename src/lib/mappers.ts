@@ -60,6 +60,7 @@ export const mapTask = (t: any): Task => {
         totalTimeSpent: t.totalTimeSpent,
         lastStartTime: t.lastStartTime,
         isTimerRunning: t.isTimerRunning,
+        timeEntryId: t.timeEntryId,
         createdAt: t.createdAt ? new Date(t.createdAt) : new Date(),
         updatedAt: t.updatedAt || t.createdAt ? new Date(t.updatedAt || t.createdAt) : new Date(),
     }

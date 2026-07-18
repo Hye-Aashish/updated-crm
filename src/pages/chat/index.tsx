@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, MoreVertical, Phone, Video, ChevronLeft } from 'lucide-react';
+import { Search, Send, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '@/lib/api-client';
 import { useAppStore } from '@/store'; // Assuming you have a store for user info
@@ -216,11 +216,7 @@ export const ChatPage = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1 md:gap-2">
-                                <Button variant="ghost" size="icon" className="h-8 w-8"><Phone className="h-4 w-4 text-gray-500" /></Button>
-                                <Button variant="ghost" size="icon" className="hidden sm:flex h-8 w-8"><Video className="h-4 w-4 text-gray-500" /></Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4 text-gray-500" /></Button>
-                            </div>
+
                         </div>
 
                         {/* Messages */}

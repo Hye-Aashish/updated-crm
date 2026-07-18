@@ -277,30 +277,40 @@ router.put('/:id', protect, async (req, res) => {
             }
         }
 
-        // If status is updated to done or completed, automatically stop any running timer
-        if ((req.body.status === 'done' || req.body.status === 'completed' || req.body.status === 'client-approval') && task.isTimerRunning) {
-            const now = Date.now();
-            const elapsed = now - (task.lastStartTime || now);
-            req.body.isTimerRunning = false;
-            req.body.totalTimeSpent = (task.totalTimeSpent || 0) + elapsed;
-            req.body.lastStartTime = null;
+        // If status is updated to anything other than 'in-progress', automatically stop any running timer
+        if (req.body.status && req.body.status !== 'in-progress') {
+            try {
+                const TimeEntry = require('../models/TimeEntry');
+                const runningEntries = await TimeEntry.find({ taskId: req.params.id, isRunning: true });
 
-            if (task.timeEntryId) {
-                try {
-                    const TimeEntry = require('../models/TimeEntry');
-                    const timeEntry = await TimeEntry.findById(task.timeEntryId);
-                    if (timeEntry && timeEntry.isRunning) {
-                        timeEntry.endTime = new Date();
-                        timeEntry.isRunning = false;
-                        const start = new Date(timeEntry.startTime);
-                        timeEntry.duration = Math.max(0, Math.floor((timeEntry.endTime - start) / 1000 / 60)); // minutes
-                        await timeEntry.save();
+                if (runningEntries.length > 0 || task.isTimerRunning) {
+                    const now = Date.now();
+                    let extraTime = 0;
+
+                    if (task.lastStartTime) {
+                        extraTime = Math.max(0, now - task.lastStartTime);
+                    } else if (runningEntries.length > 0) {
+                        const startTimes = runningEntries.map(e => new Date(e.startTime).getTime());
+                        const minStart = Math.min(...startTimes);
+                        extraTime = Math.max(0, now - minStart);
                     }
-                } catch (timerErr) {
-                    console.error('Failed to auto-stop time entry for task:', timerErr);
+
+                    req.body.isTimerRunning = false;
+                    req.body.totalTimeSpent = (task.totalTimeSpent || 0) + extraTime;
+                    req.body.lastStartTime = null;
+                    req.body.timeEntryId = null;
+
+                    for (const entry of runningEntries) {
+                        entry.endTime = new Date();
+                        entry.isRunning = false;
+                        const start = new Date(entry.startTime);
+                        entry.duration = Math.max(0, Math.floor((entry.endTime - start) / 1000 / 60)); // minutes
+                        await entry.save();
+                    }
                 }
+            } catch (timerErr) {
+                console.error('Failed to auto-stop time entries for task:', timerErr);
             }
-            req.body.timeEntryId = null;
         }
 
         // Log task activity

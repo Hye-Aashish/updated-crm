@@ -14,7 +14,6 @@ import {
 } from 'recharts'
 
 import { useNavigate } from 'react-router-dom'
-import { subDays } from 'date-fns'
 
 type ReportTab = 'finance' | 'projects' | 'tasks' | 'clients' | 'sales' | 'team'
 
@@ -32,11 +31,6 @@ export function ReportsPage() {
         timeEntries: [],
         loading: true
     })
-
-    const dateRange = {
-        start: subDays(new Date(), 90),
-        end: new Date()
-    }
 
     useEffect(() => {
         const fetchAllData = async () => {

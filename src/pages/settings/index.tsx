@@ -1412,7 +1412,6 @@ function AIConfigTab({ data, onSave, saving }: any) {
     const [showOpenAI, setShowOpenAI] = useState(false)
     const [testingAI, setTestingAI] = useState(false)
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
-    const { toast } = useToast()
 
     useEffect(() => { if (data) setFormData(data) }, [data])
 
@@ -1447,6 +1446,30 @@ function AIConfigTab({ data, onSave, saving }: any) {
             }
         } catch (err: any) {
             setTestResult({ success: false, message: `❌ Connection failed: ${err.message}` })
+        } finally {
+            setTestingAI(false)
+        }
+    }
+
+    const testOpenAIKey = async () => {
+        if (!formData.openai) {
+            setTestResult({ success: false, message: 'Please enter an OpenAI API key first.' })
+            return
+        }
+        setTestingAI(true)
+        setTestResult(null)
+        try {
+            const res = await api.post('/settings/test-openai', { apiKey: formData.openai })
+            if (res.data.success) {
+                setTestResult({ success: true, message: res.data.message })
+            } else {
+                setTestResult({ success: false, message: res.data.message })
+            }
+        } catch (err: any) {
+            setTestResult({
+                success: false,
+                message: `❌ Connection failed: ${err.response?.data?.message || err.message}`
+            })
         } finally {
             setTestingAI(false)
         }
@@ -1524,13 +1547,21 @@ function AIConfigTab({ data, onSave, saving }: any) {
                     </Button>
                 </div>
 
-                {/* OpenAI API Key (Future) */}
-                <div className="space-y-4 p-4 rounded-xl border opacity-60">
+                {/* OpenAI API Key */}
+                <div className="space-y-4 p-4 rounded-xl border bg-gradient-to-br from-violet-50/50 to-indigo-50/50 dark:from-violet-950/20 dark:to-indigo-950/20">
                     <div className="flex items-center justify-between">
                         <h3 className="font-semibold flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-violet-500" />
                             OpenAI API
-                            <span className="text-[10px] font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Coming Soon</span>
                         </h3>
+                        <a
+                            href="https://platform.openai.com/api-keys"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                            Get API Key <ExternalLink className="h-3 w-3" />
+                        </a>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="openai">API Key</Label>
@@ -1544,14 +1575,23 @@ function AIConfigTab({ data, onSave, saving }: any) {
                                     type={showOpenAI ? 'text' : 'password'}
                                     placeholder="sk-..."
                                     className="pl-10"
-                                    disabled
                                 />
                             </div>
-                            <Button variant="outline" size="icon" onClick={() => setShowOpenAI(!showOpenAI)} disabled>
+                            <Button variant="outline" size="icon" onClick={() => setShowOpenAI(!showOpenAI)}>
                                 {showOpenAI ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </Button>
                         </div>
+                        <p className="text-[11px] text-muted-foreground">
+                            Alternative engine for AI Assistant. Get a key from{' '}
+                            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                                OpenAI Platform
+                            </a>
+                        </p>
                     </div>
+                    <Button variant="outline" size="sm" onClick={testOpenAIKey} disabled={testingAI || !formData.openai}>
+                        {testingAI ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
+                        {testingAI ? 'Testing...' : 'Test Connection'}
+                    </Button>
                 </div>
 
                 {/* How it works */}

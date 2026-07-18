@@ -60,7 +60,6 @@ const RolesPermissionsPage = lazy(() => import('./pages/settings/roles-permissio
 const AIAssistantPage = lazy(() => import('./pages/ai-assistant'))
 
 const QuotationsPage = lazy(() => import('./pages/quotations'))
-const QuotationTemplates = lazy(() => import('./pages/quotations/templates'))
 const QuotationEditor = lazy(() => import('./pages/quotations/create'))
 const QuotationDetailPage = lazy(() => import('./pages/quotations/[id]'))
 const EmployeeDashboardPage = lazy(() => import('./pages/employee-dashboard').then(m => ({ default: m.EmployeeDashboardPage })))
@@ -156,7 +155,6 @@ export function AppRoutes() {
 
                     {/* Quotations */}
                     <Route path="quotations" element={<PermissionGuard module="quotations"><QuotationsPage /></PermissionGuard>} />
-                    <Route path="quotations/templates" element={<PermissionGuard module="quotations"><QuotationTemplates /></PermissionGuard>} />
                     <Route path="quotations/create" element={<PermissionGuard module="quotations"><QuotationEditor /></PermissionGuard>} />
                     <Route path="quotations/:id" element={<PermissionGuard module="quotations"><QuotationDetailPage /></PermissionGuard>} />
                     <Route path="quotations/:id/edit" element={<PermissionGuard module="quotations"><QuotationEditor /></PermissionGuard>} />

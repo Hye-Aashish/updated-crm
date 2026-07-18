@@ -20,6 +20,9 @@ import { Task, TaskStatus } from '@/types'
 import { useAppStore } from '@/store'
 import { TaskCard } from './task-card'
 
+import api from '@/lib/api-client'
+import { mapTask } from '@/lib/mappers'
+
 interface TaskBoardProps {
     tasks: Task[]
 }
@@ -118,13 +121,25 @@ export function TaskBoard({ tasks }: TaskBoardProps) {
                 updates.lastStartTime = undefined
             }
             // Logic for resuming if moving back to in-progress from done?
-            // The user only specified Todo -> InProgress. But generally back to InProgress should resume.
             else if (newStatus === 'in-progress' && !activeTask.isTimerRunning) {
                 updates.isTimerRunning = true
                 updates.lastStartTime = Date.now()
             }
 
+            // Optimistic update
             updateTask(activeTask.id, updates)
+
+            // Update Backend
+            api.put(`/tasks/${activeTask.id}`, updates)
+                .then((response) => {
+                    const mapped = mapTask(response.data)
+                    updateTask(activeTask.id, mapped)
+                })
+                .catch((error) => {
+                    console.error("Failed to update status in backend:", error)
+                    // Revert store state on failure
+                    updateTask(activeTask.id, activeTask)
+                })
         }
 
         setActiveId(null)

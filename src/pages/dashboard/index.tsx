@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import api from '@/lib/api-client'
 import { mapLead, mapProject, mapInvoice, mapExpense, mapTask, mapUser } from '@/lib/mappers'
 import { useNavigate } from 'react-router-dom'
@@ -34,11 +35,30 @@ export function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true)
     const userId = currentUser?.id || (currentUser as any)?._id
 
+    // Confirm modal states
+    const [showConfirmModal, setShowConfirmModal] = useState(false)
+    const [confirmAction, setConfirmAction] = useState<'break' | 'clock-out' | null>(null)
+
     // Hooks for business logic
     const {
         currentTime, attendanceStatus, elapsedTime,
         handleClockIn, handleBreakToggle, handleClockOut, formatElapsedTime
     } = useAttendance(userId)
+
+    const triggerConfirm = (action: 'break' | 'clock-out') => {
+        setConfirmAction(action)
+        setShowConfirmModal(true)
+    }
+
+    const executeConfirm = () => {
+        if (confirmAction === 'break') {
+            handleBreakToggle()
+        } else if (confirmAction === 'clock-out') {
+            handleClockOut()
+        }
+        setShowConfirmModal(false)
+        setConfirmAction(null)
+    }
 
     const {
         totalRevenue, totalExpenses, netProfit, outstandingInvoices,
@@ -267,11 +287,11 @@ export function DashboardPage() {
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-2 gap-3">
-                                            <Button variant="outline" onClick={handleBreakToggle} className={`h-16 rounded-[1.5rem] font-bold text-xs border-2 shadow-sm ${attendanceStatus === 'break' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'hover:border-primary/40'}`}>
+                                            <Button variant="outline" onClick={() => triggerConfirm('break')} className={`h-16 rounded-[1.5rem] font-bold text-xs border-2 shadow-sm ${attendanceStatus === 'break' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'hover:border-primary/40'}`}>
                                                 <Coffee className="h-4 w-4 mr-2" />
                                                 {attendanceStatus === 'break' ? 'RESUME' : 'BREAK'}
                                             </Button>
-                                            <Button variant="destructive" onClick={handleClockOut} className="h-16 rounded-[1.5rem] font-bold text-xs shadow-[0_15px_30px_-10px_rgba(244,63,94,0.3)]" disabled={attendanceStatus === 'break'}>
+                                            <Button variant="destructive" onClick={() => triggerConfirm('clock-out')} className="h-16 rounded-[1.5rem] font-bold text-xs shadow-[0_15px_30px_-10px_rgba(244,63,94,0.3)]" disabled={attendanceStatus === 'break'}>
                                                 <StopCircle className="h-4 w-4 mr-2" />
                                                 CLOCK OUT
                                             </Button>
@@ -999,6 +1019,54 @@ export function DashboardPage() {
 
 
 
+            {showConfirmModal && createPortal(
+                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-card border border-border/85 w-full max-w-sm rounded-[2rem] pt-5 pb-6 px-6 shadow-2xl relative overflow-hidden flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+                        {confirmAction === 'break' ? (
+                            <>
+                                <div className="h-16 w-16 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mb-4">
+                                    <Coffee className="h-8 w-8 animate-pulse" />
+                                </div>
+                                <h3 className="text-xl font-bold tracking-tight text-foreground mb-2">
+                                    {attendanceStatus === 'break' ? 'Resume Session?' : 'Take a Break?'}
+                                </h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed px-2 mb-6">
+                                    {attendanceStatus === 'break'
+                                        ? 'Are you ready to resume your active work session timer?'
+                                        : 'Are you sure you want to take a break? This will pause your active session timer.'}
+                                </p>
+                                <div className="flex items-center gap-3 w-full">
+                                    <Button variant="outline" className="flex-1 h-12 rounded-2xl font-bold text-xs" onClick={() => setShowConfirmModal(false)}>
+                                        Cancel
+                                    </Button>
+                                    <Button className="flex-1 h-12 rounded-2xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white" onClick={executeConfirm}>
+                                        Yes, Confirm
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="h-16 w-16 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mb-4">
+                                    <StopCircle className="h-8 w-8 animate-pulse" />
+                                </div>
+                                <h3 className="text-xl font-bold tracking-tight text-foreground mb-2">Clock Out?</h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed px-2 mb-6">
+                                    Are you sure you want to clock out? This will end your session today and submit your logged hours.
+                                </p>
+                                <div className="flex items-center gap-3 w-full">
+                                    <Button variant="outline" className="flex-1 h-12 rounded-2xl font-bold text-xs" onClick={() => setShowConfirmModal(false)}>
+                                        Cancel
+                                    </Button>
+                                    <Button className="flex-1 h-12 rounded-2xl font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-500/20" onClick={executeConfirm}>
+                                        Yes, Clock Out
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     )
 }

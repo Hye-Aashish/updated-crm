@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-    Bell, Menu, Moon, Search, Sun, User, Settings, Plus,
+    Bell, Menu, Moon, Search, Sun, Plus,
     DollarSign, Zap, Code, Megaphone, Wifi, Car, LogOut, Loader2
 } from 'lucide-react'
 import api from '@/lib/api-client'
@@ -43,6 +43,7 @@ const PAYMENT_MODES = ['UPI', 'Cash', 'Bank Transfer', 'Card']
 
 export function Topbar({ onMenuClick }: TopbarProps) {
     const { theme, setTheme } = useTheme()
+    const { toast } = useToast()
     const navigate = useNavigate()
     const { currentUser, notifications, markNotificationRead, markAllNotificationsRead, leads, projects, tasks, clients } = useAppStore()
 

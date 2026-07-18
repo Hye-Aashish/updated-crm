@@ -51,12 +51,23 @@ export default function AIAssistantPage() {
     const [insightsData, setInsightsData] = useState<any>(null)
     const [insightsLoading, setInsightsLoading] = useState(true)
     const [apiKeyMissing, setApiKeyMissing] = useState(false)
-    const messagesEndRef = useRef<HTMLDivElement>(null)
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
 
-    // Scroll to bottom on new messages
+    // Scroll to bottom on new messages with user override check
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        const container = scrollContainerRef.current
+        if (!container) return
+
+        // Check if user is scrolled near the bottom (within 120px tolerance)
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120
+
+        if (isNearBottom || messages.length === 0 || messages[messages.length - 1]?.role === 'user') {
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+            })
+        }
     }, [messages])
 
     // Fetch insights on load
@@ -93,38 +104,90 @@ export default function AIAssistantPage() {
         setLoading(true)
         setApiKeyMissing(false)
 
+        const assistantMsgId = `msg-${Date.now()}-ai`
+        const assistantMessage: Message = {
+            id: assistantMsgId,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date()
+        }
+        setMessages(prev => [...prev, assistantMessage])
+
         try {
             const conversationHistory = messages.map(m => ({
                 role: m.role,
                 content: m.content
             }))
 
-            const res = await api.post('/ai-assistant/chat', {
-                message: messageText,
-                conversationHistory
+            const token = localStorage.getItem('token')
+            const baseURL = api.defaults.baseURL || 'http://localhost:5008/api'
+
+            const response = await fetch(`${baseURL}/ai-assistant/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({
+                    message: messageText,
+                    conversationHistory
+                })
             })
 
-            const assistantMessage: Message = {
-                id: `msg-${Date.now()}-ai`,
-                role: 'assistant',
-                content: res.data.response,
-                timestamp: new Date(),
-                dataSnapshot: res.data.dataSnapshot
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}))
+                if (errData?.needsApiKey) {
+                    setApiKeyMissing(true)
+                }
+                throw new Error(errData?.message || 'Failed to connect to AI server')
             }
 
-            setMessages(prev => [...prev, assistantMessage])
+            const reader = response.body?.getReader()
+            const decoder = new TextDecoder()
+            if (!reader) throw new Error('Streaming not supported by browser.')
+
+            let accumulatedContent = ''
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = decoder.decode(value, { stream: true })
+                const lines = chunk.split('\n')
+                for (const line of lines) {
+                    const trimmed = line.trim()
+                    if (trimmed.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(trimmed.slice(6))
+                            if (data.error) {
+                                throw new Error(data.error)
+                            }
+                            if (data.text) {
+                                accumulatedContent += data.text
+                                setMessages(prev => prev.map(m =>
+                                    m.id === assistantMsgId ? { ...m, content: accumulatedContent } : m
+                                ))
+                            }
+                            if (data.done) {
+                                if (data.dataSnapshot) {
+                                    setMessages(prev => prev.map(m =>
+                                        m.id === assistantMsgId ? { ...m, dataSnapshot: data.dataSnapshot } : m
+                                    ))
+                                    fetchInsights()
+                                }
+                            }
+                        } catch (e) {
+                            // ignore partial JSON
+                        }
+                    }
+                }
+            }
         } catch (err: any) {
-            const errorData = err?.response?.data
-            if (errorData?.needsApiKey) {
-                setApiKeyMissing(true)
-            }
-            const errorMessage: Message = {
-                id: `msg-${Date.now()}-err`,
-                role: 'assistant',
-                content: errorData?.message || '❌ Something went wrong. Please try again.',
-                timestamp: new Date()
-            }
-            setMessages(prev => [...prev, errorMessage])
+            setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId
+                    ? { ...m, content: `❌ Error: ${err.message || 'Something went wrong. Please try again.'}` }
+                    : m
+            ))
         } finally {
             setLoading(false)
         }
@@ -142,27 +205,67 @@ export default function AIAssistantPage() {
     }
 
     const formatMarkdown = (text: string) => {
-        // Basic markdown rendering
-        let html = text
-            // Headers
-            .replace(/^### (.*$)/gm, '<h3 class="text-base font-bold mt-3 mb-1">$1</h3>')
-            .replace(/^## (.*$)/gm, '<h2 class="text-lg font-bold mt-4 mb-2">$1</h2>')
-            .replace(/^# (.*$)/gm, '<h1 class="text-xl font-bold mt-4 mb-2">$1</h1>')
-            // Bold
-            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
-            // Italic
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            // Bullet points
-            .replace(/^[\-\*] (.*$)/gm, '<li class="ml-4 list-disc">$1</li>')
-            // Numbered lists
-            .replace(/^\d+\.\s(.*$)/gm, '<li class="ml-4 list-decimal">$1</li>')
-            // Code blocks
-            .replace(/`(.*?)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">$1</code>')
-            // Line breaks
-            .replace(/\n\n/g, '<br/><br/>')
-            .replace(/\n/g, '<br/>')
+        if (!text) return '';
 
-        return html
+        // Extract triple-backtick code blocks first to protect them from other replaces
+        const codeBlocks: string[] = [];
+        let processedText = text.replace(/```([\s\S]*?)```/g, (_, codeContent) => {
+            const index = codeBlocks.length;
+            
+            let cleanedCode = codeContent.trim();
+            const firstLineBreak = cleanedCode.indexOf('\n');
+            let lang = '';
+            if (firstLineBreak !== -1 && firstLineBreak < 15) {
+                const possibleLang = cleanedCode.substring(0, firstLineBreak).trim();
+                if (/^[a-zA-Z0-9+#-]+$/.test(possibleLang)) {
+                    lang = possibleLang;
+                    cleanedCode = cleanedCode.substring(firstLineBreak + 1).trim();
+                }
+            }
+
+            const escapedCode = cleanedCode
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+
+            const codeBlockHtml = `
+                <div class="my-3 rounded-lg overflow-hidden border border-border bg-slate-900 dark:bg-slate-950 font-mono text-xs text-slate-200">
+                    <div class="flex items-center justify-between px-4 py-1.5 bg-slate-800 dark:bg-slate-950 border-b border-border/40 text-[10px] uppercase font-semibold text-slate-400">
+                        <span>${lang || 'code'}</span>
+                        <button onclick="navigator.clipboard.writeText(\`${escapedCode.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`); const btn = this; btn.innerText = 'Copied!'; setTimeout(() => btn.innerText = 'Copy', 2000);" class="px-2 py-0.5 rounded bg-slate-700/50 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer">Copy</button>
+                    </div>
+                    <pre class="p-4 overflow-x-auto whitespace-pre-wrap break-all select-text leading-relaxed"><code>${escapedCode}</code></pre>
+                </div>
+            `;
+            codeBlocks.push(codeBlockHtml);
+            return `__CODE_BLOCK_PLACEHOLDER_${index}__`;
+        });
+
+        processedText = processedText
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/__CODE_BLOCK_PLACEHOLDER_(\d+)__/g, '___CODE_BLOCK_PLACEHOLDER_$1___');
+
+        processedText = processedText
+            .replace(/^### (.*$)/gm, '<h3 class="text-base font-bold mt-4 mb-2 text-foreground">$1</h3>')
+            .replace(/^## (.*$)/gm, '<h2 class="text-lg font-bold mt-5 mb-2.5 text-foreground border-b pb-1">$1</h2>')
+            .replace(/^# (.*$)/gm, '<h1 class="text-xl font-bold mt-6 mb-3 text-foreground">$1</h1>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-xs font-mono font-semibold">$1</code>')
+            .replace(/^[\-\*] (.*$)/gm, '<li class="ml-4 list-disc my-1">$1</li>')
+            .replace(/^\d+\.\s(.*$)/gm, '<li class="ml-4 list-decimal my-1">$1</li>')
+            .replace(/\n\n/g, '<br/><br/>')
+            .replace(/\n/g, '<br/>');
+
+        codeBlocks.forEach((blockHtml, i) => {
+            processedText = processedText.replace(`___CODE_BLOCK_PLACEHOLDER_${i}___`, blockHtml);
+        });
+
+        return processedText;
     }
 
     const getInsightColor = (type: string) => {
@@ -176,7 +279,7 @@ export default function AIAssistantPage() {
     }
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+        <div className="flex h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)] -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-8 md:-mt-8 -mb-28 bg-background overflow-hidden">
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Header */}
@@ -219,7 +322,7 @@ export default function AIAssistantPage() {
                 </div>
 
                 {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                     {messages.length === 0 ? (
                         /* Welcome State */
                         <div className="flex flex-col items-center justify-center h-full">
@@ -337,8 +440,6 @@ export default function AIAssistantPage() {
                             </ol>
                         </motion.div>
                     )}
-
-                    <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input Area */}

@@ -379,7 +379,15 @@ export function TasksPage() {
 
         // Update Backend
         try {
-            await api.put(`/tasks/${draggedTask.id}`, updates)
+            const response = await api.put(`/tasks/${draggedTask.id}`, updates)
+            const backendTask = mapTask(response.data)
+
+            const finalTasks = originalTasks.map(task =>
+                task.id === backendTask.id ? backendTask : task
+            )
+            setTasks(finalTasks)
+            setStoreTasks(finalTasks)
+
             toast({
                 title: 'UPDATE SUCCESS',
                 description: 'Task status updated successfully.',
@@ -451,7 +459,15 @@ export function TasksPage() {
         setStoreTasks(updatedTasks)
 
         try {
-            await api.put(`/tasks/${task.id}`, updates)
+            const response = await api.put(`/tasks/${task.id}`, updates)
+            const backendTask = mapTask(response.data)
+
+            const finalTasks = tasks.map(t =>
+                t.id === backendTask.id ? backendTask : t
+            )
+            setTasks(finalTasks)
+            setStoreTasks(finalTasks)
+
             toast({
                 title: "APPROVAL SENT",
                 description: "Task moved to Client Approval.",

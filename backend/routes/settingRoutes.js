@@ -304,4 +304,42 @@ router.post('/test-smtp', protect, authorize('admin', 'owner'), async (req, res)
     }
 });
 
+// Test OpenAI Connection (Admin Only)
+router.post('/test-openai', protect, authorize('admin', 'owner'), async (req, res) => {
+    const { apiKey } = req.body;
+    if (!apiKey) {
+        return res.status(400).json({ success: false, message: 'OpenAI API key is required.' });
+    }
+
+    try {
+        const response = await fetch(
+            'https://api.openai.com/v1/chat/completions',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [{ role: 'user', content: 'Say "API Connected Successfully" in exactly those words.' }],
+                    max_tokens: 50
+                })
+            }
+        );
+
+        if (response.ok) {
+            res.json({ success: true, message: '✅ OpenAI API key is valid and working!' });
+        } else {
+            const err = await response.json().catch(() => ({}));
+            res.status(400).json({
+                success: false,
+                message: `❌ Invalid key: ${err?.error?.message || 'Unknown error'}`
+            });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: '❌ Connection failed: ' + error.message });
+    }
+});
+
 module.exports = router;

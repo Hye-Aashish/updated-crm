@@ -16,4 +16,19 @@ router.get('/check-ip', protect, authorize('admin', 'owner'), (req, res) => {
     });
 });
 
+router.get('/db-info', (req, res) => {
+    try {
+        const mongoose = require('mongoose');
+        res.json({
+            readyState: mongoose.connection.readyState,
+            name: mongoose.connection.name,
+            host: mongoose.connection.host,
+            port: mongoose.connection.port,
+            env_uri: process.env.MONGO_URI ? 'Defined' : 'Undefined'
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = router;

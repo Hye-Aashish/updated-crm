@@ -63,6 +63,7 @@ export function ClientDetailPage() {
     const clientUser = users.find(u => u.clientId === client?.id || (u.role === 'client' && u.email?.toLowerCase() === client?.email?.toLowerCase()))
 
     const handleCreatePortal = async () => {
+        if (!client) return
         if (!portalEmail || !portalPassword) {
             toast({ variant: "destructive", title: "Validation Error", description: "Email and password are required" })
             return
@@ -88,6 +89,7 @@ export function ClientDetailPage() {
     }
 
     const handleResetPassword = async () => {
+        if (!clientUser) return
         if (!portalPassword) {
             toast({ variant: "destructive", title: "Validation Error", description: "Password cannot be empty" })
             return
@@ -104,6 +106,7 @@ export function ClientDetailPage() {
     }
 
     const handleDisablePortal = async () => {
+        if (!clientUser) return
         if (!window.confirm("Are you sure you want to disable login portal access for this client? This will delete their login user account.")) {
             return
         }

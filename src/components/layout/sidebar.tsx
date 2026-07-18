@@ -111,7 +111,6 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Expiry Alerts', href: '/expiry-alerts', icon: BellRing },
         { name: 'Hosting', href: '/hosting', icon: LayoutDashboard },
         { name: 'Quotations', href: '/quotations', icon: FileText },
-        { name: 'Templates', href: '/quotations/templates', icon: LayoutDashboard },
         { name: 'Leads', href: '/leads', icon: Target },
         { name: 'Expenses', href: '/expenses', icon: Wallet },
         { name: 'Payroll', href: '/salary', icon: Wallet },
@@ -141,7 +140,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             return allowedForClient.includes(item.name)
         }
 
-        if (!permissions && currentUser?.role !== 'owner') {
+        if (!permissions && (currentUser?.role as string) !== 'owner') {
             // Safe Default: If permissions haven't loaded yet, only show Dashboard.
             return ['Dashboard'].includes(item.name)
         }
@@ -163,7 +162,6 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Expiry Alerts': return !!p.expiry_alerts?.view
             case 'Hosting': return !!p.hosting?.view
             case 'Quotations': return !!p.quotations?.view
-            case 'Templates': return !!p.templates?.view
             case 'Leads': return !!p.leads?.view
             case 'Expenses': return !!p.expenses?.view
             case 'Payroll': return !!p.payroll?.view

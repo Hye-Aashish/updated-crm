@@ -6,8 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { 
     Plus, Save, Shield, Loader2, Building2, 
-    FolderKanban, Trash2, Users, CreditCard, Globe, MessageSquare,
-    ToggleLeft
+    FolderKanban, Trash2, Users, CreditCard, Globe, MessageSquare
 } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'

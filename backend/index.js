@@ -5,7 +5,7 @@ const http = require('http');
 const helmet = require('helmet');
 const { Server } = require('socket.io');
 const path = require('path');
-if (process.env.NODE_ENV !== 'production') {
+if (!process.env.MONGO_URI || process.env.NODE_ENV !== 'production') {
     require('dotenv').config({ path: path.join(__dirname, '.env') });
     require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 }
@@ -41,7 +41,7 @@ const allowedOrigins = [
 
 const io = new Server(server, {
     cors: {
-        origin: allowedOrigins,
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
@@ -62,14 +62,7 @@ app.use(helmet({
 
 // 2. CORS — Restrict to known frontend origins
 app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, curl, etc.)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
-        return callback(new Error('Not allowed by CORS'));
-    },
+    origin: true,
     credentials: true
 }));
 
