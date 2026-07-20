@@ -565,15 +565,27 @@ export function TasksPage() {
     const handleAddTask = async () => {
         if (!newTask.title) return
 
-        // Restrict employee task creation without running timer
+        // Restrict employee task creation without running timer or active attendance session
         if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') {
             try {
                 const runningTimer = await timeEntryService.getRunningTimer(currentUser.id || (currentUser as any)._id)
-                if (!runningTimer) {
+                let isClockedIn = false
+                try {
+                    const todayStr = new Date().toISOString().split('T')[0]
+                    const attRes = await api.get(`/attendance/today/${currentUser.id || (currentUser as any)._id}?date=${todayStr}`)
+                    const attData = attRes?.data
+                    if (attData && attData.checkIn && !attData.checkOut && (attData.status === 'present' || attData.status === 'on-break')) {
+                        isClockedIn = true
+                    }
+                } catch (attErr) {
+                    console.error("Failed to fetch today attendance:", attErr)
+                }
+
+                if (!runningTimer && !isClockedIn) {
                     toast({
                         variant: 'destructive',
                         title: 'CREATION FAILED',
-                        description: 'You have to start the timer first or you have to like log in'
+                        description: 'You must clock in (start your session) or start a task timer before creating a task.'
                     })
                     return
                 }

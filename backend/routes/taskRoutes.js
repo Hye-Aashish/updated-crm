@@ -150,16 +150,36 @@ router.get('/:id', protect, async (req, res) => {
 // CREATE a new task
 router.post('/', protect, async (req, res) => {
     try {
-        // Enforce timer check for non-admin/owner roles
+        // Enforce shift (attendance) or timer check for non-admin/owner roles
         if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             const TimeEntry = require('../models/TimeEntry');
+            const Attendance = require('../models/Attendance');
+
             const runningTimer = await TimeEntry.findOne({
                 userId: req.user._id,
                 isRunning: true
             });
-            if (!runningTimer) {
+
+            let isClockedIn = false;
+            try {
+                const now = new Date();
+                const localTime = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+                const today = new Date(Date.UTC(localTime.getUTCFullYear(), localTime.getUTCMonth(), localTime.getUTCDate()));
+
+                const attendance = await Attendance.findOne({
+                    userId: req.user._id.toString(),
+                    date: today
+                });
+                if (attendance && attendance.checkIn && !attendance.checkOut && (attendance.status === 'present' || attendance.status === 'on-break')) {
+                    isClockedIn = true;
+                }
+            } catch (attErr) {
+                console.error("Attendance check error in task creation:", attErr);
+            }
+
+            if (!runningTimer && !isClockedIn) {
                 return res.status(400).json({
-                    message: 'You have to start the timer first or you have to like log in'
+                    message: 'You must clock in (start your session) or start a task timer before creating a task.'
                 });
             }
         }
