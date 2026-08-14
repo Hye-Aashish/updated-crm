@@ -12,7 +12,8 @@ export function LeadsKPI({ leads }: LeadsKPIProps) {
     const totalValue = leads.reduce((sum, l) => sum + (l.value || 0), 0)
     const wonDeals = leads.filter(l => l.stage === 'closed' || l.stage === 'won').length
     const wonRevenue = leads.filter(l => l.stage === 'closed' || l.stage === 'won').reduce((sum, l) => sum + (l.value || 0), 0)
-    const conversionRate = totalLeads > 0 ? Math.round((wonDeals / totalLeads) * 100) : 0
+    const convertedLeads = leads.filter(l => !!l.reminder?.date).length
+    const conversionRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0
 
     const stats = [
         { title: "Total Leads", value: totalLeads, icon: Users, color: "text-blue-600", bg: "bg-blue-50/50" },

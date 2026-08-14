@@ -49,8 +49,11 @@ export function ReminderManager() {
                     const reminderDate = new Date(lead.reminder.date)
                     const leadId = lead.id
                     const reminderKey = `reminder-${leadId}-${reminderDate.getTime()}`
+                    
+                    const diffMs = now.getTime() - reminderDate.getTime()
 
-                    if (reminderDate <= now && !notifiedRef.current.has(reminderKey)) {
+                    // If it just became overdue (within the last 2 minutes) and hasn't been notified yet
+                    if (diffMs >= 0 && diffMs < 120000 && !notifiedRef.current.has(reminderKey)) {
                         notifiedRef.current.add(reminderKey)
 
                         let soundUrl = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
@@ -64,8 +67,7 @@ export function ReminderManager() {
                             description: `Follow-up for ${lead.company}`,
                             variant: lead.reminder.tone === 'urgent' ? "destructive" : "default",
                         })
-
-                        markReminderCompleted(leadId)
+                        // Deliberately NOT marking as completed automatically, as requested by user.
                     }
                 }
             })
@@ -87,31 +89,9 @@ export function ReminderManager() {
             })
         }
 
-        const markReminderCompleted = async (leadId: string) => {
-            try {
-                const leadToUpdate = leads.find(l => l.id === leadId)
-                if (!leadToUpdate || !leadToUpdate.reminder) return
-
-                const updatedReminder = { ...leadToUpdate.reminder, completed: true }
-
-                // We update the lead in store immediately to stop checking
-                setLeads(leads.map(l => l.id === leadId ? {
-                    ...l,
-                    reminder: updatedReminder
-                } : l))
-
-                // Update backend - sending full reminder to preserve date/tone
-                await api.put(`/leads/${leadId}`, {
-                    reminder: updatedReminder
-                })
-            } catch (error) {
-                console.error('Failed to mark reminder as completed', error)
-            }
-        }
-
         const interval = setInterval(checkReminders, 10000) // Check every 10 seconds
         return () => clearInterval(interval)
-    }, [leads, setLeads, toast])
+    }, [leads, notifications, toast])
 
     return null
 }

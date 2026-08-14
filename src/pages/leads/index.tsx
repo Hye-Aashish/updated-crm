@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Plus, Settings, List, LayoutGrid, FileText, Trash2 } from 'lucide-react'
+import { Plus, Settings, List, LayoutGrid, FileText, Trash2, CalendarClock, Search } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -14,6 +14,7 @@ import { KanbanBoard } from '@/components/leads/kanban-board'
 import { LeadsList } from '@/components/leads/leads-list'
 import { LeadDetailsDialog } from '@/components/leads/lead-details-dialog'
 import { LeadFormBuilder } from '@/components/leads/lead-form-builder'
+import { FollowUpsView } from '@/components/leads/follow-ups-view'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import type { Lead } from '@/types'
 
@@ -31,16 +32,41 @@ export function LeadsPage() {
         updateLeadStage, deleteLead, addActivity, fetchData, loading
     } = useLeadsData()
 
-    const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
+    const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'followups'>('kanban')
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
 
-    // Tag filter states
+    // Filters state
     const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all')
+    const [searchQuery, setSearchQuery] = useState<string>('')
     const allTags = Array.from(new Set(leads.flatMap(l => l.tags || [])))
-    const filteredLeads = selectedTagFilter === 'all'
-        ? leads
-        : leads.filter(l => (l.tags || []).includes(selectedTagFilter))
+    
+    const filteredLeads = leads.filter(l => {
+        const matchesTag = selectedTagFilter === 'all' || (l.tags || []).includes(selectedTagFilter)
+        const q = searchQuery.toLowerCase()
+        
+        const phoneStr = l.phone ? String(l.phone) : ''
+        const cleanPhone = phoneStr.replace(/[\s-()+]/g, '')
+        const cleanQ = q.replace(/[\s-()+]/g, '')
+        
+        // Search inside all custom fields
+        let matchesCustomField = false
+        if (l.customFields && q) {
+            matchesCustomField = Object.values(l.customFields).some(val => {
+                const strVal = String(val)
+                const cleanVal = strVal.replace(/[\s-()+]/g, '')
+                return strVal.toLowerCase().includes(q) || (cleanVal && cleanQ && cleanVal.includes(cleanQ))
+            })
+        }
+        
+        const matchesSearch = !q || 
+                              l.name?.toLowerCase().includes(q) || 
+                              (cleanPhone && cleanQ && cleanPhone.includes(cleanQ)) || 
+                              matchesCustomField || 
+                              l.company?.toLowerCase().includes(q) ||
+                              l.email?.toLowerCase().includes(q)
+        return matchesTag && matchesSearch
+    })
 
     // Dialog States
     const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false)
@@ -114,7 +140,18 @@ export function LeadsPage() {
                     </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
+                <div className="flex items-center gap-2 sm:gap-3 w-full lg:w-auto overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
+                    {/* Search Bar */}
+                    <div className="relative w-[180px] sm:w-[220px] shrink-0">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search name or phone..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="h-9 pl-9 rounded-lg border-border/60 text-xs font-semibold bg-card w-full"
+                        />
+                    </div>
+                    
                     {/* Tag Filter Selector */}
                     <div className="w-[140px] sm:w-[160px]">
                         <Select value={selectedTagFilter} onValueChange={setSelectedTagFilter}>
@@ -148,6 +185,15 @@ export function LeadsPage() {
                         >
                             <List className="mr-2 h-4 w-4" />
                             List
+                        </Button>
+                        <Button
+                            variant={viewMode === 'followups' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setViewMode('followups')}
+                            className={`h-8 px-4 rounded-md font-semibold ${viewMode === 'followups' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
+                        >
+                            <CalendarClock className="mr-2 h-4 w-4" />
+                            Follow-ups
                         </Button>
                     </div>
 
@@ -229,7 +275,7 @@ export function LeadsPage() {
                                         <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Value</Label><Input type="number" value={newLead.value} onChange={(e) => setNewLead({ ...newLead, value: e.target.value })} placeholder="Ex: 50000" className="rounded-lg h-10" /></div>
                                         <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Source</Label><Input value={newLead.source} onChange={(e) => setNewLead({ ...newLead, source: e.target.value })} placeholder="e.g. Website" className="rounded-lg h-10" /></div>
                                     </div>
-                                    <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Email</Label><Input value={newLead.email} onChange={(e) => setNewLead({ ...newLead, email: e.target.value })} placeholder="john@example.com" className="rounded-lg h-10" /></div>
+                                    <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Phone</Label><Input value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+91 98765 43210" className="rounded-lg h-10" /></div>
                                     <Button onClick={handleAddLead} className="w-full mt-2 font-bold rounded-lg h-11 tracking-wide">Create Lead</Button>
                                 </div>
                             </DialogContent>
@@ -252,12 +298,19 @@ export function LeadsPage() {
                         onLeadClick={(l) => { setSelectedLead(l); setViewLeadDialogOpen(true); }}
                         onDeleteLead={deleteLead}
                     />
-                ) : (
+                ) : viewMode === 'list' ? (
                     <LeadsList
                         leads={filteredLeads}
                         stages={stages}
                         onLeadClick={(l) => { setSelectedLead(l); setViewLeadDialogOpen(true); }}
                         onDeleteLead={deleteLead}
+                    />
+                ) : (
+                    <FollowUpsView
+                        leads={filteredLeads}
+                        onUpdate={(updated) => setLeads(leads.map(l => l.id === updated.id ? updated : l))}
+                        onDelete={deleteLead}
+                        onAddActivity={addActivity}
                     />
                 )}
             </div>

@@ -71,11 +71,6 @@ function startReminderScheduler() {
                     // Save that this reminder alert was triggered
                     lead.reminder.sentReminders.push(tag);
                     
-                    // Mark as complete if event time reached so scheduler doesn't loop
-                    if (tag === '0m') {
-                        lead.reminder.completed = true;
-                    }
-
                     await lead.save();
                     console.log(`[Reminder Scheduler] Triggered '${tag}' notification for lead: ${lead.company}`);
                 }
