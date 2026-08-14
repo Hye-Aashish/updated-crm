@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { MessageSquare, Plus, Search, Trash2, Clock, CheckCircle, AlertCircle, User, Upload, Briefcase } from 'lucide-react'
+import { MessageSquare, Plus, Search, Trash2, Clock, CheckCircle, AlertCircle, User, Upload, Briefcase, ChevronDown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
@@ -189,6 +189,20 @@ export function TicketsPage() {
     const openCount = filteredTickets.filter(t => t.status === 'open').length
     const resolvedCount = filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed' || t.status === 'live').length
     const criticalCount = filteredTickets.filter(t => t.priority === 'critical' || t.priority === 'high').length
+
+    // Group tickets by project
+    const groupedTickets = filteredTickets.reduce((acc, ticket) => {
+        const pId = ticket.projectId || 'unassigned'
+        if (!acc[pId]) acc[pId] = []
+        acc[pId].push(ticket)
+        return acc
+    }, {} as Record<string, Ticket[]>)
+
+    const getProjectName = (pId: string) => {
+        if (pId === 'unassigned') return 'General / Unassigned'
+        const project = projects.find(p => p.id === pId || (p as any)._id === pId)
+        return project ? project.name : 'Unknown Project'
+    }
 
     return (
         <div className="space-y-6">
@@ -380,118 +394,119 @@ export function TicketsPage() {
                 </select>
             </div>
 
-            {/* Ticket List */}
-            <div className="space-y-4">
-                {filteredTickets.length === 0 ? (
-                    <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+            {/* Ticket Accordion (Project Wise) */}
+            <div className="space-y-4 mt-8">
+                {Object.keys(groupedTickets).length === 0 ? (
+                    <div className="w-full text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
                         <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground/50" />
                         <h3 className="mt-4 text-lg font-semibold">No tickets found</h3>
                     </div>
                 ) : (
-                    filteredTickets.map(ticket => (
-                        <Card
-                            key={ticket._id}
-                            className="hover:shadow-md transition-shadow cursor-pointer group"
-                            onClick={() => { setSelectedTicket(ticket); setViewTicketDialogOpen(true); }}
-                        >
-                            <CardContent className="p-4">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Badge className={`${getPriorityColor(ticket.priority)} border-none`}>
-                                                {ticket.priority}
-                                            </Badge>
-                                            <span className="text-xs text-muted-foreground">ID: {ticket._id.slice(-6).toUpperCase()}</span>
-                                            <span className="text-xs text-muted-foreground">• {formatDate(new Date(ticket.createdAt))}</span>
-                                        </div>
-                                        <h3 className="font-semibold text-lg">{ticket.subject}</h3>
-                                        <p className="text-sm text-muted-foreground line-clamp-1">{ticket.description || 'No description provided'}</p>
-
-                                        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
-                                            {ticket.clientName && (
-                                                <div className="flex items-center text-muted-foreground">
-                                                    <User className="h-3 w-3 mr-1" />
-                                                    Client: {ticket.clientName}
-                                                </div>
-                                            )}
-                                            {ticket.projectId && (
-                                                <div className="flex items-center text-muted-foreground">
-                                                    <Briefcase className="h-3 w-3 mr-1" />
-                                                    Project: {projects.find(p => p.id === ticket.projectId || (p as any)._id === ticket.projectId)?.name || 'Unknown'}
-                                                </div>
-                                            )}
-                                            {ticket.assignedTo && (
-                                                <div className="flex items-center text-primary font-bold">
-                                                    <User className="h-3 w-3 mr-1" />
-                                                    Assigned: {ticket.assignedTo}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
+                    Object.entries(groupedTickets).map(([projectId, projTickets]) => {
+                        const activeStatuses = ['open', 'in-progress', 'need-discussion'];
+                        const openCount = projTickets.filter(t => activeStatuses.includes(t.status)).length;
+                        const criticalCount = projTickets.filter(t => ['high', 'critical'].includes(t.priority) && activeStatuses.includes(t.status)).length;
+                        
+                        return (
+                            <details key={projectId} className="group bg-card rounded-2xl border shadow-sm overflow-hidden" open={openCount > 0}>
+                                <summary className="flex items-center justify-between p-4 cursor-pointer bg-muted/30 hover:bg-muted/50 transition-colors list-none select-none [&::-webkit-details-marker]:hidden">
                                     <div className="flex items-center gap-4">
-                                        <select
-                                            className={`h-8 rounded-md border text-sm px-2 font-medium ${getStatusColor(ticket.status)} disabled:opacity-70 disabled:cursor-not-allowed`}
-                                            value={ticket.status}
-                                            onClick={(e) => e.stopPropagation()}
-                                            onChange={(e) => {
-                                                e.stopPropagation(); // prevent card click
-                                                handleStatusChange(ticket._id, e.target.value);
-                                            }}
-                                            disabled={currentUser?.role === 'client'}
-                                        >
-                                            <option value="open">Open</option>
-                                            <option value="in-progress">In Progress</option>
-                                            <option value="resolved">Resolved</option>
-                                            <option value="closed">Closed</option>
-                                            <option value="declined">Declined</option>
-                                            <option value="live">Live</option>
-                                            <option value="need-discussion">Need Discussion</option>
-                                        </select>
+                                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
+                                            <Briefcase className="h-5 w-5 text-primary" />
+                                            {openCount > 0 && (
+                                                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-rose-500 border-2 border-background animate-pulse" />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-bold tracking-tight text-foreground">
+                                                {getProjectName(projectId)}
+                                            </h2>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <Badge variant="secondary" className="font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-colors border-none">
+                                                    {projTickets.length} {projTickets.length === 1 ? 'Ticket' : 'Tickets'}
+                                                </Badge>
+                                                {openCount > 0 && (
+                                                    <Badge variant="secondary" className="font-bold bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors border-none">
+                                                        {openCount} Active
+                                                    </Badge>
+                                                )}
+                                                {criticalCount > 0 && (
+                                                    <Badge variant="secondary" className="font-bold bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 transition-colors border-none flex items-center gap-1">
+                                                        <AlertCircle className="h-3 w-3" />
+                                                        {criticalCount} Critical
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="h-8 w-8 rounded-full flex items-center justify-center bg-background border shadow-sm group-open:rotate-180 transition-transform duration-300">
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                </summary>
+                            
+                            <div className="p-4 bg-background/50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 border-t">
+                                {projTickets.map(ticket => (
+                                    <Card
+                                        key={ticket._id}
+                                        className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-card flex flex-col h-full"
+                                        onClick={() => { setSelectedTicket(ticket); setViewTicketDialogOpen(true); }}
+                                    >
+                                        <CardContent className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                                            <div className="space-y-3">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <Badge className={`${getPriorityColor(ticket.priority)} border-none text-[10px] px-2 py-0 uppercase tracking-wider`}>
+                                                        {ticket.priority}
+                                                    </Badge>
+                                                    <span className="text-xs text-muted-foreground font-medium">#{ticket._id.slice(-5).toUpperCase()}</span>
+                                                </div>
+                                                
+                                                <div>
+                                                    <h3 className="font-semibold text-sm leading-snug line-clamp-2" title={ticket.subject}>{ticket.subject}</h3>
+                                                </div>
+                                            </div>
 
-                                        {currentUser?.role !== 'client' && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-muted-foreground hover:text-destructive opacity-50 group-hover:opacity-100 transition-opacity"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleDeleteTicket(ticket._id)
-                                                }}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                                {ticket.status === 'need-discussion' && (
-                                    <div className="mt-4 pt-3 border-t space-y-2" onClick={(e) => e.stopPropagation()}>
-                                        <Label className="text-xs font-semibold text-purple-600 flex justify-between items-center">
-                                            <span>Discussion Notes (Optional)</span>
-                                            <span className="text-[10px] text-muted-foreground font-normal">Saves automatically on blur</span>
-                                        </Label>
-                                        <Textarea
-                                            placeholder="What needs to be discussed? Enter discussion points..."
-                                            defaultValue={ticket.discussionNote || ''}
-                                            className="text-sm min-h-[60px]"
-                                            onBlur={async (e) => {
-                                                const value = e.target.value;
-                                                if (value !== (ticket.discussionNote || '')) {
-                                                    try {
-                                                        await api.put(`/tickets/${ticket._id}`, { discussionNote: value });
-                                                        setTickets(tickets.map(t => t._id === ticket._id ? { ...t, discussionNote: value } : t));
-                                                        toast({ description: "Discussion note updated successfully" });
-                                                    } catch (err) {
-                                                        toast({ title: "Error", description: "Failed to save note", variant: "destructive" });
-                                                    }
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    ))
+                                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
+                                                <div className="flex items-center gap-2">
+                                                    {ticket.assignedTo ? (
+                                                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs" title={`Assigned to ${ticket.assignedTo}`}>
+                                                            {ticket.assignedTo.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xs" title="Unassigned">
+                                                            <User className="h-3.5 w-3.5" />
+                                                        </div>
+                                                    )}
+                                                    <span className="text-xs text-muted-foreground font-medium truncate max-w-[90px]" title={ticket.clientName || 'No Client'}>
+                                                        {ticket.clientName || 'No Client'}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div onClick={(e) => e.stopPropagation()}>
+                                                    <select
+                                                        className={`h-7 rounded border text-[11px] px-2 font-semibold ${getStatusColor(ticket.status)} disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer outline-none ring-0`}
+                                                        value={ticket.status}
+                                                        onChange={(e) => {
+                                                            handleStatusChange(ticket._id, e.target.value);
+                                                        }}
+                                                        disabled={currentUser?.role === 'client'}
+                                                    >
+                                                        <option value="open">Open</option>
+                                                        <option value="in-progress">In Progress</option>
+                                                        <option value="resolved">Resolved</option>
+                                                        <option value="closed">Closed</option>
+                                                        <option value="declined">Declined</option>
+                                                        <option value="live">Live</option>
+                                                        <option value="need-discussion">Need Discussion</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </details>
+                    );
+                })
                 )}
             </div>
 
