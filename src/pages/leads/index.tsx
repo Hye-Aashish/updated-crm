@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Plus, Settings, List, LayoutGrid, FileText, Trash2 } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import { useLeadsData } from '@/hooks/use-leads-data'
 import { LeadsKPI } from '@/components/leads/leads-kpi'
@@ -33,6 +34,13 @@ export function LeadsPage() {
     const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+
+    // Tag filter states
+    const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all')
+    const allTags = Array.from(new Set(leads.flatMap(l => l.tags || [])))
+    const filteredLeads = selectedTagFilter === 'all'
+        ? leads
+        : leads.filter(l => (l.tags || []).includes(selectedTagFilter))
 
     // Dialog States
     const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false)
@@ -107,6 +115,21 @@ export function LeadsPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
+                    {/* Tag Filter Selector */}
+                    <div className="w-[140px] sm:w-[160px]">
+                        <Select value={selectedTagFilter} onValueChange={setSelectedTagFilter}>
+                            <SelectTrigger className="h-9 rounded-lg border-border/60 text-xs font-semibold bg-card">
+                                <SelectValue placeholder="Filter by Tag" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[250px]">
+                                <SelectItem value="all" className="text-xs font-semibold">ALL TAGS</SelectItem>
+                                {allTags.map(tag => (
+                                    <SelectItem key={tag} value={tag} className="text-xs font-semibold uppercase">{tag}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     <div className="flex bg-muted/30 rounded-lg p-1 border border-border/40">
                         <Button
                             variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
@@ -216,14 +239,14 @@ export function LeadsPage() {
             </div>
 
             {/* 2. Intelligence Metrics */}
-            <LeadsKPI leads={leads} />
+            <LeadsKPI leads={filteredLeads} />
 
             {/* 3. Operational Viewport */}
             <div className="flex-1 min-h-0">
                 {viewMode === 'kanban' ? (
                     <KanbanBoard
                         stages={stages}
-                        leads={leads}
+                        leads={filteredLeads}
                         onDragStart={setDraggedLead}
                         onDrop={async (stageId) => draggedLead && updateLeadStage(draggedLead.id, stageId)}
                         onLeadClick={(l) => { setSelectedLead(l); setViewLeadDialogOpen(true); }}
@@ -231,7 +254,7 @@ export function LeadsPage() {
                     />
                 ) : (
                     <LeadsList
-                        leads={leads}
+                        leads={filteredLeads}
                         stages={stages}
                         onLeadClick={(l) => { setSelectedLead(l); setViewLeadDialogOpen(true); }}
                         onDeleteLead={deleteLead}

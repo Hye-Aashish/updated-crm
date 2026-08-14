@@ -17,8 +17,12 @@ const leadSchema = new mongoose.Schema({
     reminder: {
         date: Date,
         tone: { type: String, default: 'default' },
-        completed: { type: Boolean, default: false }
+        completed: { type: Boolean, default: false },
+        sentReminders: [{ type: String }]
     },
+    tags: [{ type: String }],
+    aiPriority: { type: String, enum: ['red', 'yellow', 'green'], default: 'red' },
+    aiPriorityReason: { type: String, default: 'No interaction history.' },
     assignedTo: { type: String }, // User ID
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

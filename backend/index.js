@@ -171,7 +171,10 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
 }
 
 // Connect to DB in background
-connectDB().catch(err => {
+connectDB().then(() => {
+    const { startReminderScheduler } = require('./services/reminderScheduler');
+    startReminderScheduler();
+}).catch(err => {
     console.error('Initial DB connection failed:', err.message);
 });
 

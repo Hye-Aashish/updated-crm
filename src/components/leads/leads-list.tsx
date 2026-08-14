@@ -32,8 +32,23 @@ export function LeadsList({ leads, stages, onLeadClick, onDeleteLead }: LeadsLis
                             return (
                                 <tr key={lead.id} className="hover:bg-accent/5 transition-colors group cursor-pointer" onClick={() => onLeadClick(lead)}>
                                     <td className="px-6 py-4">
-                                        <div className="font-bold text-foreground group-hover:text-primary transition-colors">{lead.company}</div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                lead.aiPriority === 'green' ? 'bg-emerald-500' : lead.aiPriority === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'
+                                            }`} title={`AI Priority: ${lead.aiPriorityReason}`} />
+                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors">{lead.company}</div>
+                                        </div>
                                         <div className="text-[10px] text-muted-foreground font-medium mt-0.5">{lead.source}</div>
+
+                                        {lead.tags && lead.tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-1.5">
+                                                {lead.tags.map(tag => (
+                                                    <span key={tag} className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary/80 text-secondary-foreground border border-border/15">
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="hidden md:table-cell px-6 py-4">
                                         <div className="font-semibold text-foreground">{lead.name}</div>

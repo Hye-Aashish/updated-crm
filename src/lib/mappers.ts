@@ -126,6 +126,9 @@ export const mapLead = (l: any): Lead => {
         customFields: l.customFields || {},
         activities: l.activities || [],
         reminder: l.reminder,
+        tags: l.tags || [],
+        aiPriority: l.aiPriority || 'red',
+        aiPriorityReason: l.aiPriorityReason || 'No interaction history.',
         createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
         updatedAt: l.updatedAt || l.createdAt ? new Date(l.updatedAt || l.createdAt) : new Date(),
     }

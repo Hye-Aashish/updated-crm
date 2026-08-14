@@ -54,7 +54,13 @@ export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, o
                                         draggable
                                         onDragStart={() => onDragStart(lead)}
                                         onClick={() => onLeadClick(lead)}
-                                        className="dashboard-card border-none cursor-grab active:cursor-grabbing group"
+                                        className={`dashboard-card cursor-grab active:cursor-grabbing group border border-l-4 transition-all duration-300 ${
+                                            lead.aiPriority === 'green'
+                                                ? 'border-emerald-500/30 border-l-emerald-500 bg-emerald-500/[0.02] dark:bg-emerald-500/[0.01] hover:bg-emerald-500/[0.04]'
+                                                : lead.aiPriority === 'yellow'
+                                                ? 'border-yellow-500/30 border-l-yellow-500 bg-yellow-500/[0.02] dark:bg-yellow-500/[0.01] hover:bg-yellow-500/[0.04]'
+                                                : 'border-red-500/30 border-l-red-500 bg-red-500/[0.02] dark:bg-red-500/[0.01] hover:bg-red-500/[0.04]'
+                                        }`}
                                     >
                                         <CardContent className="p-4 relative">
                                             <div className="flex justify-between items-start mb-2">
@@ -85,6 +91,17 @@ export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, o
                                                     <Users className="h-3 w-3" />
                                                     {lead.name}
                                                 </div>
+                                                
+                                                {lead.tags && lead.tags.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {lead.tags.map(tag => (
+                                                            <span key={tag} className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary/80 text-secondary-foreground border border-border/20">
+                                                                {tag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+
                                                 <div className="flex items-center justify-between pt-3 border-t border-border/10">
                                                     <span className="text-base font-bold text-foreground">{formatCurrency(lead.value)}</span>
                                                     {lead.source && (

@@ -122,6 +122,12 @@ router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) =
             return res.status(403).json({ message: 'Not authorized' });
         }
 
+        // If reminder is manually set/updated, reset completed and sentReminders flags
+        if (req.body.reminder && req.body.reminder.date) {
+            req.body.reminder.sentReminders = [];
+            req.body.reminder.completed = false;
+        }
+
         const updatedLead = await Lead.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json(updatedLead);
     } catch (err) {
@@ -154,6 +160,29 @@ router.post('/:id/activities', protect, async (req, res) => {
             type: req.body.type || 'note',
             createdAt: new Date()
         });
+
+        // Run AI Analysis and Schedule Reminders if keywords found
+        try {
+            const { analyzeLeadPriorityAndExtractReminder } = require('../services/aiService');
+            const aiResult = await analyzeLeadPriorityAndExtractReminder(lead.activities, req.body.clientTime);
+            
+            lead.aiPriority = aiResult.priority;
+            lead.aiPriorityReason = aiResult.reason;
+
+            if (aiResult.extractedReminderDate) {
+                const nextReminderDate = new Date(aiResult.extractedReminderDate);
+                if (nextReminderDate > new Date()) {
+                    lead.reminder = {
+                        date: nextReminderDate,
+                        tone: 'default',
+                        completed: false,
+                        sentReminders: []
+                    };
+                }
+            }
+        } catch (aiErr) {
+            console.error('Lead Activity AI Processing Error:', aiErr);
+        }
 
         const updatedLead = await lead.save();
         res.json(updatedLead);

@@ -259,6 +259,9 @@ export interface Lead {
         tone?: string
         completed?: boolean
     }
+    tags?: string[]
+    aiPriority?: 'red' | 'yellow' | 'green'
+    aiPriorityReason?: string
     createdAt?: Date
     updatedAt?: Date
 }

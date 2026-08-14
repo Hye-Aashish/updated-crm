@@ -829,6 +829,59 @@ export function DashboardPage() {
                             </div>
                         </div>
                     )}
+
+                    {/* Admin Upcoming Lead Follow-ups */}
+                    {['admin', 'owner'].includes(currentUser.role) && (
+                        <div className="bg-card border border-border/40 rounded-3xl p-5 shadow-sm space-y-4">
+                            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 text-primary">
+                                <Clock className="h-3.5 w-3.5" />
+                                Upcoming Follow-ups
+                            </h3>
+                            
+                            <div className="space-y-3">
+                                {leads
+                                    .filter(l => l.reminder && l.reminder.date && !l.reminder.completed && new Date(l.reminder.date) > new Date())
+                                    .sort((a, b) => new Date(a.reminder.date).getTime() - new Date(b.reminder.date).getTime())
+                                    .slice(0, 5)
+                                    .map(lead => {
+                                        const date = new Date(lead.reminder.date);
+                                        const diffMs = date.getTime() - Date.now();
+                                        const diffMins = Math.round(diffMs / 60000);
+                                        let countdownText = '';
+                                        if (diffMins < 60) countdownText = `in ${diffMins}m`;
+                                        else if (diffMins < 1440) countdownText = `in ${Math.round(diffMins/60)}h`;
+                                        else countdownText = `in ${Math.round(diffMins/1440)}d`;
+
+                                        return (
+                                            <div 
+                                                key={lead.id} 
+                                                onClick={() => navigate('/leads')} 
+                                                className="flex items-center justify-between p-3 rounded-2xl bg-muted/20 border border-border/30 hover:border-primary/20 cursor-pointer group transition-all"
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                        lead.aiPriority === 'green' ? 'bg-emerald-500' : lead.aiPriority === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'
+                                                    }`} />
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-xs text-foreground truncate group-hover:text-primary transition-colors">{lead.company}</p>
+                                                        <p className="text-[9px] text-muted-foreground truncate">{lead.name}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <p className="text-[10px] font-bold text-foreground">{countdownText}</p>
+                                                    <p className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground">{date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                }
+                                {leads.filter(l => l.reminder && l.reminder.date && !l.reminder.completed && new Date(l.reminder.date) > new Date()).length === 0 && (
+                                    <p className="text-xs text-muted-foreground italic text-center py-6">No upcoming follow-ups scheduled.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                      {/* 4. Smart Sidebar HUD */}
                     {currentUser.role !== 'client' && (
                         <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden group/hud">
