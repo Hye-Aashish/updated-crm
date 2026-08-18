@@ -92,6 +92,8 @@ export const mapInvoice = (i: any): Invoice => {
         subtotal: i.subtotal || 0,
         tax: i.tax || 0,
         total: i.total || 0,
+        billingInfo: i.billingInfo,
+        currency: i.currency || 'INR',
         date: i.date ? new Date(i.date) : new Date(),
         dueDate: i.dueDate ? new Date(i.dueDate) : new Date(),
         paidDate: i.paidDate ? new Date(i.paidDate) : undefined,

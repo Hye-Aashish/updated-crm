@@ -32,6 +32,7 @@ export function NewInvoicePage() {
     const { toast } = useToast()
     const addInvoice = useAppStore((state) => state.addInvoice)
     const { clients, projects, setClients, setProjects, settings } = useAppStore()
+    const [clientProducts, setClientProducts] = useState<any[]>([])
     const currency = settings?.companyProfile?.currency || 'INR'
     const [loading, setLoading] = useState(false)
 
@@ -46,6 +47,8 @@ export function NewInvoicePage() {
                         company: c.company,
                         email: c.email,
                         phone: c.phone,
+                        address: c.address,
+                        gstNumber: c.gstNumber || c.gstin,
                         type: c.type || 'one-time',
                         status: c.status || 'active',
                         createdAt: new Date(c.createdAt),
@@ -84,6 +87,13 @@ export function NewInvoicePage() {
             }
 
             try {
+                const cpRes = await api.get('/client-products');
+                setClientProducts(cpRes.data.map((cp: any) => ({ ...cp, id: cp._id || cp.id })));
+            } catch (e) {
+                console.error("Failed to load client products", e);
+            }
+
+            try {
                 const res = await api.get('/settings');
                 if (res.data?.billing?.termsAndConditions) {
                     setFormData(prev => ({ ...prev, termsAndConditions: res.data.billing.termsAndConditions }));
@@ -97,23 +107,33 @@ export function NewInvoicePage() {
 
     const [formData, setFormData] = useState({
         clientId: '',
-        projectId: '',
+        referenceId: '',
         dueDate: '',
         taxRate: 18,
         frequency: 'once',
         autoSend: false,
-        termsAndConditions: 'Thank you for your business. Payment is expected within due date. Late payments may incur fees.'
+        termsAndConditions: 'Thank you for your business. Payment is expected within due date. Late payments may incur fees.',
+        billingInfo: {
+            name: '',
+            address: '',
+            gstNumber: ''
+        },
+        currency: settings?.companyProfile?.currency || 'INR',
+        status: 'draft'
     })
 
     const [items, setItems] = useState<InvoiceFormItem[]>([
         { id: '1', description: 'Development Services', quantity: 1, rate: 0, amount: 0 }
     ])
 
+    const [applyGST, setApplyGST] = useState(true)
+
     // Generate Invoice Number (Mock)
     const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`
 
     // Filter projects based on selected client
     const clientProjects = projects.filter(p => p.clientId === formData.clientId)
+    const clientProductsList = clientProducts.filter(cp => (typeof cp.client === 'object' ? cp.client?._id : cp.client) === formData.clientId)
 
     const handleItemChange = (id: string, field: keyof InvoiceFormItem, value: string | number) => {
         setItems(items.map(item => {
@@ -146,7 +166,7 @@ export function NewInvoicePage() {
     }
 
     const subtotal = items.reduce((sum, item) => sum + item.amount, 0)
-    const taxAmount = (subtotal * formData.taxRate) / 100
+    const taxAmount = applyGST ? (subtotal * formData.taxRate) / 100 : 0
     const total = subtotal + taxAmount
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -156,8 +176,8 @@ export function NewInvoicePage() {
             toast({ title: "Validation Error", description: "Please select a client.", variant: "destructive" })
             return
         }
-        if (!formData.projectId) {
-            toast({ title: "Validation Error", description: "Please select a project.", variant: "destructive" })
+        if (!formData.referenceId) {
+            toast({ title: "Validation Error", description: "Please select a project or digital product.", variant: "destructive" })
             return
         }
         if (!formData.dueDate) {
@@ -172,14 +192,19 @@ export function NewInvoicePage() {
         setLoading(true)
 
         try {
+            const isProject = formData.referenceId.startsWith('project_');
+            const refId = formData.referenceId.replace(/^(project_|cp_)/, '');
+
             const payload = {
                 invoiceNumber,
                 clientId: formData.clientId,
-                projectId: formData.projectId,
+                projectId: isProject ? refId : undefined,
+                clientProductId: !isProject ? refId : undefined,
                 type: 'milestone', // Defaulting for now
-                status: 'draft',
+                status: formData.status,
                 date: new Date(),
                 dueDate: new Date(formData.dueDate),
+                paidDate: formData.status === 'paid' ? new Date() : undefined,
                 lineItems: items.map(item => ({
                     name: item.description,
                     quantity: item.quantity,
@@ -191,7 +216,9 @@ export function NewInvoicePage() {
                 total,
                 frequency: formData.frequency,
                 autoSend: formData.autoSend,
-                termsAndConditions: formData.termsAndConditions
+                termsAndConditions: formData.termsAndConditions,
+                billingInfo: formData.billingInfo,
+                currency: formData.currency
             }
 
             const response = await api.post('/invoices', payload)
@@ -203,6 +230,7 @@ export function NewInvoicePage() {
                 number: saved.invoiceNumber, // Alias
                 clientId: saved.clientId,
                 projectId: saved.projectId,
+                clientProductId: saved.clientProductId,
                 status: saved.status,
                 type: saved.type,
                 date: new Date(saved.date),
@@ -217,6 +245,8 @@ export function NewInvoicePage() {
                 subtotal: saved.subtotal,
                 tax: saved.tax,
                 total: saved.total,
+                billingInfo: saved.billingInfo,
+                currency: saved.currency,
                 createdAt: new Date(saved.createdAt),
                 updatedAt: new Date(saved.updatedAt),
             }
@@ -265,7 +295,19 @@ export function NewInvoicePage() {
                                     <Label>Company</Label>
                                     <Select
                                         value={formData.clientId}
-                                        onValueChange={(value) => setFormData(prev => ({ ...prev, clientId: value, projectId: '' }))}
+                                        onValueChange={(value) => {
+                                            const selectedClient = clients.find(c => c.id === value);
+                                            setFormData(prev => ({ 
+                                                ...prev, 
+                                                clientId: value, 
+                                                referenceId: '',
+                                                billingInfo: {
+                                                    name: selectedClient?.company || selectedClient?.name || '',
+                                                    address: selectedClient?.address || '',
+                                                    gstNumber: selectedClient?.gstNumber || ''
+                                                }
+                                            }))
+                                        }}
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select Client" />
@@ -278,18 +320,21 @@ export function NewInvoicePage() {
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Project</Label>
+                                    <Label>Project / Digital Product</Label>
                                     <Select
-                                        value={formData.projectId}
-                                        onValueChange={(value) => setFormData(prev => ({ ...prev, projectId: value }))}
+                                        value={formData.referenceId}
+                                        onValueChange={(value) => setFormData(prev => ({ ...prev, referenceId: value }))}
                                         disabled={!formData.clientId}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Select Project" />
+                                            <SelectValue placeholder="Select Project/Product" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {clientProjects.map(p => (
-                                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                <SelectItem key={`project_${p.id}`} value={`project_${p.id}`}>{p.name} (Project)</SelectItem>
+                                            ))}
+                                            {clientProductsList.map(cp => (
+                                                <SelectItem key={`cp_${cp.id}`} value={`cp_${cp.id}`}>{cp.product?.name || 'Digital Product'} (Service)</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -321,8 +366,59 @@ export function NewInvoicePage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Currency</Label>
-                                    <Input value={currency} disabled />
+                                    <Select
+                                        value={formData.currency}
+                                        onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Currency" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="INR">INR (₹)</SelectItem>
+                                            <SelectItem value="USD">USD ($)</SelectItem>
+                                            <SelectItem value="EUR">EUR (€)</SelectItem>
+                                            <SelectItem value="GBP">GBP (£)</SelectItem>
+                                            <SelectItem value="AUD">AUD (A$)</SelectItem>
+                                            <SelectItem value="CAD">CAD (C$)</SelectItem>
+                                            <SelectItem value="SGD">SGD (S$)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
+                            </div>
+
+                            {/* Prominent Status Selection */}
+                            <div className="space-y-3 pt-4 pb-2">
+                                <Label className="text-base font-semibold text-slate-800">Invoice Status</Label>
+                                <div className="flex gap-4">
+                                    <Button
+                                        type="button"
+                                        variant={formData.status === 'draft' ? 'default' : 'outline'}
+                                        onClick={() => setFormData(prev => ({ ...prev, status: 'draft' }))}
+                                        className={`flex-1 h-12 text-base font-bold ${formData.status === 'draft' ? 'bg-slate-800' : 'text-slate-600 hover:text-slate-800'}`}
+                                    >
+                                        Draft
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={formData.status === 'pending' ? 'default' : 'outline'}
+                                        onClick={() => setFormData(prev => ({ ...prev, status: 'pending' }))}
+                                        className={`flex-1 h-12 text-base font-bold ${formData.status === 'pending' ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'text-slate-600 hover:text-slate-800'}`}
+                                    >
+                                        Unpaid
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={formData.status === 'paid' ? 'default' : 'outline'}
+                                        onClick={() => setFormData(prev => ({ ...prev, status: 'paid' }))}
+                                        className={`flex-1 h-12 text-base font-bold ${formData.status === 'paid' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-slate-600 hover:text-slate-800'}`}
+                                    >
+                                        Paid
+                                    </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">Select the initial status of the invoice you are creating.</p>
+                            </div>
+
+                            <div className="grid sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="autoSend">Auto Send Email</Label>
                                     <div className="flex items-center space-x-2 h-10">
@@ -337,6 +433,35 @@ export function NewInvoicePage() {
                                     </div>
                                 </div>
                             </div>
+                            
+                            {formData.clientId && (
+                                <div className="mt-6 pt-6 border-t">
+                                    <h3 className="text-sm font-semibold mb-4 text-muted-foreground">Bill To Details (Override)</h3>
+                                    <div className="grid sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Client Name</Label>
+                                            <Input 
+                                                value={formData.billingInfo.name} 
+                                                onChange={(e) => setFormData(prev => ({ ...prev, billingInfo: { ...prev.billingInfo, name: e.target.value } }))} 
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>GST Number</Label>
+                                            <Input 
+                                                value={formData.billingInfo.gstNumber} 
+                                                onChange={(e) => setFormData(prev => ({ ...prev, billingInfo: { ...prev.billingInfo, gstNumber: e.target.value } }))} 
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-2 space-y-2">
+                                            <Label>Address</Label>
+                                            <Input 
+                                                value={formData.billingInfo.address} 
+                                                onChange={(e) => setFormData(prev => ({ ...prev, billingInfo: { ...prev.billingInfo, address: e.target.value } }))} 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -409,22 +534,33 @@ export function NewInvoicePage() {
                         <CardContent className="space-y-4">
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Subtotal</span>
-                                <span>{formatCurrency(subtotal)}</span>
+                                <span>{formatCurrency(subtotal, formData.currency)}</span>
                             </div>
-                            <div className="flex justify-between text-sm items-center">
-                                <span className="text-muted-foreground">GST ({formData.taxRate}%)</span>
-                                <div className="w-20">
-                                    <Input
-                                        type="number"
-                                        className="h-8 text-right"
-                                        value={formData.taxRate}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, taxRate: Number(e.target.value) }))}
-                                    />
+                            <div className="flex items-center justify-between text-sm py-2">
+                                <Label htmlFor="apply-gst" className="text-muted-foreground font-normal">Apply GST</Label>
+                                <Switch
+                                    id="apply-gst"
+                                    checked={applyGST}
+                                    onCheckedChange={setApplyGST}
+                                />
+                            </div>
+                            
+                            {applyGST && (
+                                <div className="flex justify-between text-sm items-center">
+                                    <span className="text-muted-foreground">GST ({formData.taxRate}%)</span>
+                                    <div className="w-20">
+                                        <Input
+                                            type="number"
+                                            className="h-8 text-right"
+                                            value={formData.taxRate}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, taxRate: Number(e.target.value) }))}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                             <div className="flex justify-between text-lg font-bold pt-4 border-t">
                                 <span>Total</span>
-                                <span>{formatCurrency(total)}</span>
+                                <span>{formatCurrency(total, formData.currency)}</span>
                             </div>
                             <Button className="w-full mt-4" onClick={handleSubmit} disabled={loading}>
                                 {loading ? 'Creating...' : 'Create Invoice'}

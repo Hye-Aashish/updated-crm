@@ -3,6 +3,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const http = require('http');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { Server } = require('socket.io');
 const path = require('path');
 if (!process.env.MONGO_URI || process.env.NODE_ENV !== 'production') {
@@ -41,8 +42,9 @@ const allowedOrigins = [
 
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
@@ -62,9 +64,45 @@ app.use(helmet({
 
 // 2. CORS — Restrict to known frontend origins
 app.use(cors({
-    origin: true,
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
+
+// 2.5 Rate Limiting — Prevent brute-force and abuse
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 500, // 500 requests per window per IP
+    message: { message: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+app.use('/api', globalLimiter);
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10, // Only 10 login attempts per 15 min
+    message: { message: 'Too many login attempts. Please try again after 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+app.use('/api/auth/login', authLimiter);
+
+const publicEndpointLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 60, // 60 requests per minute
+    message: { message: 'Rate limit exceeded.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+app.use('/api/tracking', publicEndpointLimiter);
+app.use('/api/lead-forms/public', publicEndpointLimiter);
 
 // 3. Body parser with limits
 app.use(express.json({ limit: '10mb' }));
@@ -88,6 +126,7 @@ const sanitizeObject = (obj) => {
 app.use((req, res, next) => {
     if (req.body) sanitizeObject(req.body);
     if (req.params) sanitizeObject(req.params);
+    if (req.query) sanitizeObject(req.query);
     next();
 });
 
@@ -143,7 +182,9 @@ const routes = {
     domains: require('./routes/domainRoutes'),
     'expiry-alerts': require('./routes/expiryAlertRoutes'),
     test: require('./routes/testRoutes'),
-    'ai-assistant': require('./routes/aiAssistantRoutes')
+    'ai-assistant': require('./routes/aiAssistantRoutes'),
+    products: require('./routes/productRoutes'),
+    'client-products': require('./routes/clientProductRoutes')
 };
 
 Object.entries(routes).forEach(([path, handler]) => {
@@ -166,7 +207,7 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
         console.log(`📡 Network: ${process.env.BACKEND_URL || `http://localhost:${PORT}`}`);
         console.log(`📡 Local: http://localhost:${PORT}`);
         console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-        console.log(`🔒 Security: Helmet ✓ | Rate Limit ✓ | CORS ✓ | Mongo Sanitize ✓\n`);
+        console.log(`🔒 Security: Helmet ✓ | Rate Limit ✓ | CORS (Whitelist) ✓ | Mongo Sanitize ✓\n`);
     });
 }
 

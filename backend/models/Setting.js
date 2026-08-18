@@ -31,6 +31,7 @@ const settingSchema = new mongoose.Schema({
         paymentTerms: { type: String, default: '15' },
         termsAndConditions: { type: String, default: 'Thank you for your business. Payment is expected within due date. Late payments may incur fees.' },
         bankDetails: { type: String, default: '' },
+        invoiceLogo: { type: String },
         lateFee: Number
     },
     notifications: {

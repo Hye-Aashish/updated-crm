@@ -23,6 +23,7 @@ import { WelcomeAnimation } from '@/components/welcome-animation'
 import { useAttendance } from '@/hooks/use-attendance'
 import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
+import { LivePresenceBoard } from '@/components/attendance/live-presence-board'
 
 export function DashboardPage() {
     const navigate = useNavigate()
@@ -416,92 +417,13 @@ export function DashboardPage() {
                         }
 
                         if (sectionId === 'team_live' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
-                            const today = new Date().setHours(0, 0, 0, 0);
-                            const staffRoles = ['admin', 'owner', 'employee', 'developer']
-                            const activeUsers = users.filter(usr =>
-                                usr.id !== userId &&
-                                staffRoles.includes(usr.role)
-                            );
-                            const teamStatus = (activeUsers || []).map(user => {
-                                const record = todayAttendance.find(a =>
-                                    a.userId === (user.id || (user as any)._id) &&
-                                    new Date(a.date).setHours(0, 0, 0, 0) === today
-                                );
-                                return { ...user, attendance: record };
-                            });
-
-                            const online = teamStatus.filter(u => u.attendance?.status === 'present');
-                            const onBreak = teamStatus.filter(u => u.attendance?.status === 'on-break');
-                            const completed = teamStatus.filter(u => u.attendance?.status === 'checked-out' || u.attendance?.status === 'half-day');
-                            const notJoined = teamStatus.filter(u => !u.attendance || u.attendance.status === 'absent');
-
                             return (
-                                <div key={sectionId} className="space-y-6">
-                                    <div className="flex items-center justify-between px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                                                <Users className="h-5 w-5 text-primary" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold tracking-tight">Team Live Presence</h3>
-                                                <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-0.5">Real-time member activity</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                                        {[
-                                            { label: 'Online', count: online.length, users: online, color: 'text-emerald-600', bg: 'bg-emerald-500/10', dot: 'bg-emerald-500' },
-                                            { label: 'On Break', count: onBreak.length, users: onBreak, color: 'text-amber-600', bg: 'bg-amber-500/10', dot: 'bg-amber-500' },
-                                            { label: 'Completed', count: completed.length, users: completed, color: 'text-blue-600', bg: 'bg-blue-500/10', dot: 'bg-blue-500' },
-                                            { label: 'Not Joined', count: notJoined.length, users: notJoined, color: 'text-slate-400', bg: 'bg-slate-500/10', dot: 'bg-slate-300' },
-                                        ].map((group, idx) => (
-                                            <Card key={idx} className="p-4 sm:p-6 rounded-2xl border border-border/40 shadow-xl shadow-black/[0.02] bg-card/50 backdrop-blur-xl group/card hover:border-primary/30 transition-all duration-500">
-                                                 <div className="flex items-center justify-between mb-6">
-                                                    <div className="space-y-1 text-left">
-                                                        <span className={`text-[11px] font-bold uppercase tracking-[0.2em] ${group.color}`}>{group.label}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`h-2 w-2 rounded-full ${group.dot} ${group.label !== 'Not Joined' ? 'animate-pulse' : ''}`} />
-                                                            <span className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-widest leading-none">
-                                                                {group.label === 'Online' ? 'Active' : group.label === 'On Break' ? 'Away' : group.label === 'Completed' ? 'Done' : 'Away'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-xl md:text-xl font-bold tracking-tight tabular-nums text-right">
-                                                        {group.count}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between pt-4 border-t border-border/30">
-                                                    <div className="flex -space-x-3 overflow-hidden">
-                                                        {(group.users || []).length > 0 ? (
-                                                            <>
-                                                                {group.users.slice(0, 4).map((u, i) => (
-                                                                    <Avatar key={i} className="h-9 w-9 border-2 border-background ring-2 ring-primary/5 transition-all hover:scale-110 hover:z-10">
-                                                                        <AvatarImage src={u.avatar} />
-                                                                        <AvatarFallback className="text-[10px] font-bold bg-muted">{getInitials(u.name)}</AvatarFallback>
-                                                                    </Avatar>
-                                                                ))}
-                                                                {group.users.length > 4 && (
-                                                                    <div className="h-9 w-9 rounded-full bg-primary/5 flex items-center justify-center text-[10px] font-bold border-2 border-background text-primary">
-                                                                        +{group.users.length - 4}
-                                                                    </div>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <div className="h-9 flex items-center">
-                                                                <span className="text-[9px] font-bold text-muted-foreground/30 uppercase tracking-[0.2em]">Queue Empty</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className={`h-8 w-8 rounded-xl ${group.bg} flex items-center justify-center ${group.color} opacity-40 group-hover/card:opacity-100 transition-opacity`}>
-                                                        <ArrowUpRight className="h-4 w-4" />
-                                                    </div>
-                                                </div>
-                                            </Card>
-                                        ))}
-                                    </div>
-                                </div>
+                                <LivePresenceBoard
+                                    key={sectionId}
+                                    title="Team Live Presence & Real-Time Activity"
+                                    description="Real-time monitoring: who has joined, active working durations, who is on break, and live break timers."
+                                    defaultView="cards"
+                                />
                             );
                         }
 

@@ -49,7 +49,16 @@ router.get('/:id', protect, async (req, res) => {
 
         // Get Client & Project details to return with invoice
         const client = await Client.findById(invoice.clientId);
-        const project = invoice.projectId ? await Project.findById(invoice.projectId) : null;
+        let project = null;
+        if (invoice.projectId) {
+            project = await Project.findById(invoice.projectId);
+        } else if (invoice.clientProductId) {
+            const ClientProduct = require('../models/ClientProduct');
+            project = await ClientProduct.findById(invoice.clientProductId).populate('product', 'name');
+            if (project) {
+                project = { _id: project._id, name: project.product?.name || 'Digital Product', isDigitalProduct: true };
+            }
+        }
 
         res.json({
             ...invoice._doc,
@@ -62,13 +71,15 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // CREATE a new invoice
-// CREATE a new invoice
 router.post('/', protect, async (req, res) => {
     const invoice = new Invoice({
         invoiceNumber: req.body.invoiceNumber,
         clientId: req.body.clientId,
         projectId: req.body.projectId,
+        clientProductId: req.body.clientProductId,
         type: req.body.type,
+        billingInfo: req.body.billingInfo,
+        currency: req.body.currency,
         status: req.body.status,
         lineItems: req.body.lineItems,
         subtotal: req.body.subtotal,
@@ -216,7 +227,7 @@ router.put('/:id', protect, async (req, res) => {
         }
 
         // Whitelist allowed update fields
-        const allowed = ['invoiceNumber', 'clientId', 'projectId', 'type', 'status', 'lineItems', 'subtotal', 'tax', 'total', 'date', 'dueDate', 'paidDate', 'termsAndConditions', 'autoSend', 'frequency'];
+        const allowed = ['invoiceNumber', 'clientId', 'projectId', 'clientProductId', 'type', 'billingInfo', 'currency', 'status', 'lineItems', 'subtotal', 'tax', 'total', 'date', 'dueDate', 'paidDate', 'termsAndConditions', 'autoSend', 'frequency'];
         const updateData = {};
         allowed.forEach(key => { if (req.body[key] !== undefined) updateData[key] = req.body[key]; });
         const updatedInvoice = await Invoice.findByIdAndUpdate(req.params.id, updateData, { new: true });
@@ -512,18 +523,21 @@ router.post('/payment/webhook', async (req, res) => {
             console.log("Cashfree Webhook Received:", JSON.stringify(req.body));
         }
 
-        // Verify webhook signature
+        // Verify webhook signature (REQUIRED for security)
         const signature = req.headers['x-webhook-signature'];
-        if (signature) {
-            const Setting = require('../models/Setting');
-            const settings = await Setting.findOne({ type: 'general' });
-            const secret = settings?.billing?.cashfreeClientSecret || process.env.CASHFREE_CLIENT_SECRET;
-            if (secret) {
-                const expectedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('base64');
-                if (signature !== expectedSignature) {
-                    console.warn('[SECURITY] Invalid webhook signature rejected');
-                    return res.status(401).send('Invalid signature');
-                }
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const secret = settings?.billing?.cashfreeClientSecret || process.env.CASHFREE_CLIENT_SECRET;
+
+        if (secret) {
+            if (!signature) {
+                console.warn('[SECURITY] Webhook rejected: missing signature header');
+                return res.status(401).send('Missing webhook signature');
+            }
+            const expectedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('base64');
+            if (signature !== expectedSignature) {
+                console.warn('[SECURITY] Invalid webhook signature rejected');
+                return res.status(401).send('Invalid signature');
             }
         }
 

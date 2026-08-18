@@ -29,7 +29,8 @@ import { format, differenceInDays } from 'date-fns'
 interface AmcRecord {
     _id: string
     name: string
-    projectId: { _id: string; name: string; status: string }
+    projectId?: { _id: string; name: string; status: string }
+    clientProductId?: { _id: string; product: { name: string } }
     clientId: { _id: string; name: string; email: string; company: string }
     startDate: string
     endDate: string
@@ -61,6 +62,7 @@ export default function AmcPage() {
     const { toast } = useToast()
     const [amcs, setAmcs] = useState<AmcRecord[]>([])
     const [projects, setProjects] = useState<any[]>([])
+    const [clientProducts, setClientProducts] = useState<any[]>([])
     const [clients, setClients] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -76,7 +78,7 @@ export default function AmcPage() {
 
     // Form states
     const [form, setForm] = useState({
-        name: '', projectId: '', clientId: '', startDate: '',
+        name: '', referenceId: '', clientId: '', startDate: '',
         endDate: '', amount: '', frequency: 'annually',
         services: '', description: '', notes: '', autoInvoice: false
     })
@@ -93,15 +95,17 @@ export default function AmcPage() {
     const fetchAll = async () => {
         setLoading(true)
         try {
-            const [amcRes, projRes, clientRes] = await Promise.all([
+            const [amcRes, projRes, clientRes, cpRes] = await Promise.all([
                 api.get('/amc'),
                 api.get('/projects'),
-                api.get('/clients')
+                api.get('/clients'),
+                api.get('/client-products')
             ])
             setAmcs(amcRes.data)
             // Normalize: ensure both _id fields are present
             setProjects(projRes.data.map((p: any) => ({ ...p, _id: p._id || p.id })))
             setClients(clientRes.data.map((c: any) => ({ ...c, _id: c._id || c.id })))
+            setClientProducts(cpRes.data.map((cp: any) => ({ ...cp, _id: cp._id || cp.id })))
             // stats
             try {
                 const statsRes = await api.get('/amc/stats/summary')
@@ -115,16 +119,20 @@ export default function AmcPage() {
     }
 
     const handleCreate = async () => {
-        if (!form.name || !form.projectId || !form.clientId || !form.startDate || !form.endDate || !form.amount) {
+        if (!form.name || !form.referenceId || !form.clientId || !form.startDate || !form.endDate || !form.amount) {
             toast({ title: 'Validation Error', description: 'Please fill all required fields', variant: 'destructive' })
             return
         }
         setSaving(true)
         try {
+            const isProject = form.referenceId.startsWith('project_');
+            const refId = form.referenceId.replace(/^(project_|cp_)/, '');
+
             await api.post('/amc', {
                 name: form.name,
                 clientId: form.clientId,
-                projectId: form.projectId,
+                projectId: isProject ? refId : undefined,
+                clientProductId: !isProject ? refId : undefined,
                 startDate: form.startDate,
                 endDate: form.endDate,
                 amount: parseFloat(form.amount),
@@ -198,7 +206,7 @@ export default function AmcPage() {
     }
 
     const resetForm = () => {
-        setForm({ name: '', projectId: '', clientId: '', startDate: '', endDate: '', amount: '', frequency: 'annually', services: '', description: '', notes: '', autoInvoice: false })
+        setForm({ name: '', referenceId: '', clientId: '', startDate: '', endDate: '', amount: '', frequency: 'annually', services: '', description: '', notes: '', autoInvoice: false })
     }
 
     const filtered = amcs.filter(a => {
@@ -329,9 +337,15 @@ export default function AmcPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Link to={`/projects/${amc.projectId?._id}`} className="text-sm text-blue-600 hover:underline font-medium">
-                                                {amc.projectId?.name}
-                                            </Link>
+                                            {amc.projectId ? (
+                                                <Link to={`/projects/${amc.projectId?._id}`} className="text-sm text-blue-600 hover:underline font-medium">
+                                                    {amc.projectId?.name}
+                                                </Link>
+                                            ) : (
+                                                <Link to={`/clients/${amc.clientId?._id}`} className="text-sm text-violet-600 hover:underline font-medium">
+                                                    {amc.clientProductId?.product?.name || 'Digital Product'}
+                                                </Link>
+                                            )}
                                         </TableCell>
                                         <TableCell className="font-semibold">
                                             {formatCurrency(amc.amount)}
@@ -408,7 +422,7 @@ export default function AmcPage() {
                                     <Label>Client *</Label>
                                     <Select
                                         value={form.clientId}
-                                        onValueChange={v => setForm(f => ({ ...f, clientId: v, projectId: '' }))}
+                                        onValueChange={v => setForm(f => ({ ...f, clientId: v, referenceId: '' }))}
                                     >
                                         <SelectTrigger className="mt-1"><SelectValue placeholder="Select client" /></SelectTrigger>
                                         <SelectContent>
@@ -417,23 +431,33 @@ export default function AmcPage() {
                                     </Select>
                                 </div>
                                 <div>
-                                    <Label>Project *</Label>
+                                    <Label>Project / Digital Product *</Label>
                                     <Select
-                                        value={form.projectId}
+                                        value={form.referenceId}
                                         onValueChange={v => {
-                                            const selectedProject = projects.find(p => p._id === v);
-                                            const pClientId = typeof selectedProject?.clientId === 'object' ? selectedProject?.clientId?._id : selectedProject?.clientId;
-                                            setForm(f => ({ ...f, projectId: v, ...(pClientId && !f.clientId ? { clientId: pClientId } : {}) }));
+                                            let pClientId;
+                                            if (v.startsWith('project_')) {
+                                                const selectedProject = projects.find(p => p._id === v.replace('project_', ''));
+                                                pClientId = typeof selectedProject?.clientId === 'object' ? selectedProject?.clientId?._id : selectedProject?.clientId;
+                                            } else if (v.startsWith('cp_')) {
+                                                const cp = clientProducts.find(p => p._id === v.replace('cp_', ''));
+                                                pClientId = typeof cp?.client === 'object' ? cp?.client?._id : cp?.client;
+                                            }
+                                            setForm(f => ({ ...f, referenceId: v, ...(pClientId && !f.clientId ? { clientId: pClientId } : {}) }));
                                         }}
-                                        disabled={!form.clientId && clients.length > 0 && projects.length > 0}
+                                        disabled={!form.clientId && clients.length > 0 && projects.length === 0 && clientProducts.length === 0}
                                     >
                                         <SelectTrigger className="mt-1">
-                                            <SelectValue placeholder={!form.clientId ? "Select client first" : "Select project"} />
+                                            <SelectValue placeholder={!form.clientId ? "Select client first" : "Select project/product"} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {projects
                                                 .filter(p => !form.clientId || (typeof p.clientId === 'object' ? p.clientId?._id : p.clientId) === form.clientId)
-                                                .map(p => <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>)
+                                                .map(p => <SelectItem key={`project_${p._id}`} value={`project_${p._id}`}>{p.name} (Project)</SelectItem>)
+                                            }
+                                            {clientProducts
+                                                .filter(cp => !form.clientId || (typeof cp.client === 'object' ? cp.client?._id : cp.client) === form.clientId)
+                                                .map(cp => <SelectItem key={`cp_${cp._id}`} value={`cp_${cp._id}`}>{cp.product?.name || 'Digital Product'} (Service)</SelectItem>)
                                             }
                                         </SelectContent>
                                     </Select>
@@ -578,7 +602,13 @@ export default function AmcPage() {
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div className="space-y-2">
                                     <div><span className="text-gray-500">Client:</span> <span className="font-medium ml-1">{showDetail.clientId?.name}</span></div>
-                                    <div><span className="text-gray-500">Project:</span> <Link to={`/projects/${showDetail.projectId?._id}`} className="text-blue-600 hover:underline ml-1">{showDetail.projectId?.name}</Link></div>
+                                    <div><span className="text-gray-500">Linked:</span> 
+                                        {showDetail.projectId ? (
+                                            <Link to={`/projects/${showDetail.projectId?._id}`} className="text-blue-600 hover:underline ml-1">{showDetail.projectId?.name}</Link>
+                                        ) : (
+                                            <Link to={`/clients/${showDetail.clientId?._id}`} className="text-violet-600 hover:underline ml-1">{showDetail.clientProductId?.product?.name || 'Digital Product'}</Link>
+                                        )}
+                                    </div>
                                     <div><span className="text-gray-500">Amount:</span> <span className="font-semibold ml-1">{formatCurrency(showDetail.amount)}</span></div>
                                     <div><span className="text-gray-500">Frequency:</span> <span className="ml-1">{freqLabel[showDetail.frequency]}</span></div>
                                 </div>

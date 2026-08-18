@@ -10,7 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote } from 'lucide-react'
+import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote, Phone, Globe, CheckCircle } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import api from '@/lib/api-client'
 import type { Invoice, Client } from '@/types'
@@ -41,7 +41,7 @@ export function InvoiceDetailPage() {
 
 
     // Customization State
-    const [template, setTemplate] = useState<InvoiceTemplate>('corporate')
+    const [template, setTemplate] = useState<InvoiceTemplate>('modern')
     const [themeColor, setThemeColor] = useState('#0047AB')
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [sending, setSending] = useState(false)
@@ -77,6 +77,8 @@ export function InvoiceDetailPage() {
                     tax: invData.tax,
                     total: invData.total,
                     termsAndConditions: invData.termsAndConditions,
+                    billingInfo: invData.billingInfo,
+                    currency: invData.currency || 'INR',
                     createdAt: new Date(invData.createdAt),
                     updatedAt: new Date(invData.updatedAt),
                 }
@@ -143,6 +145,19 @@ export function InvoiceDetailPage() {
             verifyPayment();
         }
     }, [id])
+    const handleMarkPaid = async () => {
+        if (!window.confirm('Mark this invoice as Paid manually?')) return;
+        setPaying(true);
+        try {
+            await api.post(`/invoices/${id}/manual-payment`);
+            toast({ title: 'Invoice Paid', description: 'Invoice marked as paid.', variant: 'success' as any });
+            setInvoice(prev => prev ? { ...prev, status: 'paid' } : prev);
+        } catch (error) {
+            toast({ title: 'Failed to mark as paid', variant: 'destructive' });
+        } finally {
+            setPaying(false);
+        }
+    };
 
     const handlePrint = () => window.print()
 
@@ -170,46 +185,78 @@ export function InvoiceDetailPage() {
                 </div>
             )}
             <div className="p-4 sm:p-12 relative z-10">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b-2 pb-8 mb-8" style={{ borderColor: themeColor }}>
-                    <div className="flex items-center gap-4">
-                        <div className="p-4 rounded-xl text-white shadow-md" style={{ backgroundColor: themeColor }}>
-                            <Building2 className="h-8 w-8" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-black text-slate-800 tracking-tight">{settings?.companyProfile?.name || 'AGENCY PRO'}</h1>
-                            <p className="text-slate-500 font-medium tracking-wide">{settings?.companyProfile?.subtitle || 'Digital Solutions'}</p>
+                {/* Header Top: Logo & Invoice details */}
+                <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-8">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                            {settings?.billing?.invoiceLogo || settings?.companyProfile?.logo ? (
+                                <img 
+                                    src={settings.billing?.invoiceLogo || settings.companyProfile?.logo} 
+                                    alt="Company Logo" 
+                                    style={{ 
+                                        width: settings.companyProfile.logoWidth !== 'auto' ? settings.companyProfile.logoWidth : undefined,
+                                        height: settings.companyProfile.logoHeight || '32px',
+                                        maxWidth: '250px'
+                                    }} 
+                                    className="object-contain"
+                                />
+                            ) : (
+                                <h1 className="text-3xl font-black text-slate-800 tracking-tight" style={{ color: themeColor }}>
+                                    {settings?.companyProfile?.name || 'NEXPRISM'}
+                                </h1>
+                            )}
                         </div>
                     </div>
-                    <div className="text-right">
-                        <h2 className="text-5xl font-black mb-2 opacity-15" style={{ color: themeColor }}>INVOICE</h2>
-                        <div className="text-2xl font-bold text-slate-700">#{invoice.invoiceNumber}</div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-12 bg-slate-50 p-6 sm:p-8 rounded-2xl">
-                    <div>
-                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Invoice To</p>
-                        {client ? (
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-800">{client.company || client.name}</h3>
-                                <p className="text-slate-600 mt-1">{client.email}</p>
-                                <p className="text-slate-600">{client.address}</p>
-                            </div>
-                        ) : <p className="text-slate-600">Client Details</p>}
-                    </div>
-                    <div className="grid grid-cols-2 gap-6">
-                        <div>
-                            <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Issue Date</p>
-                            <p className="font-bold text-slate-700">{formatDate(invoice.date)}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Due Date</p>
-                            <p className="font-bold text-slate-700">{formatDate(invoice.dueDate)}</p>
+                    
+                    <div className="flex-1 flex flex-col items-start sm:items-end">
+                        <h2 className="text-5xl font-black mb-4 text-slate-800 tracking-wider">INVOICE</h2>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm w-full sm:w-auto text-left">
+                            <span className="text-slate-600">Invoice No:</span>
+                            <span className="font-medium text-slate-900 text-right">#{invoice.invoiceNumber}</span>
+                            <span className="text-slate-600">Invoice Date:</span>
+                            <span className="font-medium text-slate-900 text-right">{formatDate(invoice.date)}</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="mb-8 border border-slate-100 rounded-2xl overflow-x-auto shadow-sm">
+                {/* Header Bottom: BILL FROM & BILL TO aligned */}
+                <div className="flex flex-col sm:flex-row justify-between items-start mb-12 gap-8">
+                    {/* BILL FROM */}
+                    <div className="flex-1 space-y-1">
+                        <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">BILL FROM:</p>
+                        <h3 className="text-lg font-bold text-slate-900">{settings?.companyProfile?.name || 'NEXPRISM'}</h3>
+                        <p className="text-slate-600 text-sm whitespace-pre-wrap max-w-[280px] break-words">
+                            {settings?.companyProfile?.address || '13th Floor, IT Park Digital Valley\nB-1307-1308 Mota Varachha Surat,\nGujarat 394105 India'}
+                        </p>
+                        {settings?.companyProfile?.gst && (
+                            <p className="text-slate-600 text-sm font-medium mt-1 break-words">
+                                GSTIN: {settings.companyProfile.gst}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* BILL TO */}
+                    <div className="flex-1 flex flex-col items-start sm:items-end">
+                        <div className="w-full sm:w-auto text-left sm:max-w-[320px] space-y-1">
+                            <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">BILL TO:</p>
+                            <h3 className="text-lg font-bold text-slate-900 uppercase break-words">
+                                {invoice.billingInfo?.name || client?.company || client?.name || 'Client Name'}
+                            </h3>
+                            {(invoice.billingInfo?.address || client?.address) && (
+                                <p className="text-slate-600 text-sm mt-1 whitespace-pre-wrap break-words">
+                                    Address: {invoice.billingInfo?.address || client?.address}
+                                </p>
+                            )}
+                            {(invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin) && (
+                                <p className="text-slate-600 text-sm mt-1 font-medium break-words">
+                                    GSTIN: {invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mb-8 border-t-2 border-slate-100 pt-8 overflow-x-auto shadow-sm">
                     <table className="w-full min-w-[600px]">
                         <thead className="text-white" style={{ backgroundColor: themeColor }}>
                             <tr>
@@ -224,47 +271,86 @@ export function InvoiceDetailPage() {
                                 <tr key={i} className="hover:bg-slate-50 transition-colors">
                                     <td className="py-5 px-6 font-medium text-slate-800">{item.name}</td>
                                     <td className="py-5 px-6 text-center text-slate-600">{item.quantity}</td>
-                                    <td className="py-5 px-6 text-right text-slate-600">{formatCurrency(item.rate)}</td>
-                                    <td className="py-5 px-6 text-right font-bold text-slate-800">{formatCurrency(item.quantity * item.rate)}</td>
+                                    <td className="py-5 px-6 text-right text-slate-600">{formatCurrency(item.rate, invoice.currency)}</td>
+                                    <td className="py-5 px-6 text-right font-bold text-slate-800">{formatCurrency(item.quantity * item.rate, invoice.currency)}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-8">
-                    <div className="flex flex-col gap-4 max-w-sm">
-                        <div className="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl">
-                            <p className="font-bold text-slate-700 mb-1">Notes / Terms</p>
-                            <p className="whitespace-pre-wrap">{invoice.termsAndConditions || 'Thank you for your business. Payment is expected within due date.'}</p>
-                        </div>
-                        {settings?.billing?.bankDetails && (
-                            <div className="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl">
-                                <p className="font-bold text-slate-700 mb-1">Payment Details</p>
-                                <p className="whitespace-pre-wrap">{settings.billing.bankDetails}</p>
-                            </div>
-                        )}
-                    </div>
+                {/* Totals Section */}
+                <div className="flex justify-end mb-12">
                     <div className="w-72 space-y-4">
                         <div className="flex justify-between text-slate-600 font-medium">
                             <span>Subtotal</span>
-                            <span>{formatCurrency(invoice.subtotal)}</span>
+                            <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                         </div>
-                        <div className="flex justify-between text-slate-600 font-medium pb-4 border-b border-slate-200">
-                            <span>Tax (18%)</span>
-                            <span>{formatCurrency(invoice.tax)}</span>
-                        </div>
+                        {invoice.tax > 0 && (
+                            <div className="flex justify-between text-slate-600 font-medium pb-4 border-b border-slate-200">
+                                <span>Tax (18%)</span>
+                                <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-2xl font-black" style={{ color: themeColor }}>
                             <span>Total</span>
-                            <span>{formatCurrency(invoice.total)}</span>
+                            <span>{formatCurrency(invoice.total, invoice.currency)}</span>
                         </div>
                     </div>
                 </div>
 
-                {invoice.status !== 'paid' && (
-                    <div className="flex justify-end mt-8 no-print">
+                {/* Footer Section */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-8 mt-8 pt-8 relative before:absolute before:top-0 before:left-[-3rem] before:right-[-3rem] before:h-2 before:bg-slate-100 before:content-[''] overflow-visible">
+                    {/* Contact Details & Terms (Left) */}
+                    <div className="flex flex-col gap-6 max-w-sm relative z-10">
+                        <div className="space-y-2">
+                            <h4 className="font-black text-slate-900 text-lg uppercase tracking-wider">Thank you for your business</h4>
+                            <div className="text-xs text-slate-500">
+                                <p className="whitespace-pre-wrap">{invoice.termsAndConditions}</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-3 mt-2">
+                            {settings?.companyProfile?.phone && (
+                                <div className="flex items-center gap-3 text-slate-800">
+                                    <div className="p-2 rounded-md text-white shadow-sm" style={{ backgroundColor: themeColor }}><Phone className="h-4 w-4" /></div>
+                                    <span className="font-semibold">{settings.companyProfile.phone}</span>
+                                </div>
+                            )}
+                            {settings?.companyProfile?.email && (
+                                <div className="flex items-center gap-3 text-slate-800">
+                                    <div className="p-2 rounded-md text-white shadow-sm" style={{ backgroundColor: themeColor }}><Mail className="h-4 w-4" /></div>
+                                    <span className="font-semibold">{settings.companyProfile.email}</span>
+                                </div>
+                            )}
+                            {settings?.companyProfile?.website && (
+                                <div className="flex items-center gap-3 text-slate-800">
+                                    <div className="p-2 rounded-md text-white shadow-sm" style={{ backgroundColor: themeColor }}><Globe className="h-4 w-4" /></div>
+                                    <span className="font-semibold">{settings.companyProfile.website}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Bank Details (Right) */}
+                    {settings?.billing?.bankDetails && (
+                        <div className="flex flex-col gap-3 w-full sm:max-w-xs relative z-10">
+                             <h4 className="font-black text-slate-900 text-lg uppercase tracking-wider mb-2">Payment Method</h4>
+                             <div className="whitespace-pre-wrap text-slate-700 text-sm font-medium leading-relaxed grid grid-cols-1 gap-1">
+                                 {settings.billing.bankDetails}
+                             </div>
+                        </div>
+                    )}
+                </div>
+
+                {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+                    <div className="flex justify-end mt-8 no-print gap-4">
+                        {['owner', 'admin'].includes(currentUser?.role || '') && (
+                            <Button onClick={handleMarkPaid} disabled={paying} variant="outline" className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 w-48 h-12 text-lg shadow-sm font-bold">
+                                <CheckCircle className="mr-2 h-5 w-5" /> MARK PAID
+                            </Button>
+                        )}
                         <Button onClick={handlePayOnline} disabled={paying} className="bg-emerald-600 hover:bg-emerald-700 w-72 h-12 text-lg shadow-md font-bold">
-                            {paying ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2" />} PAY NOW
+                            {paying ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <CreditCard className="mr-2 h-5 w-5" />} PAY ONLINE
                         </Button>
                     </div>
                 )}
@@ -293,26 +379,46 @@ export function InvoiceDetailPage() {
             )}
             <div className="relative z-10">
                 <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 border-black pb-12 mb-12 gap-8">
-                    <div>
-                        <h1 className="text-xl font-bold uppercase tracking-widest text-black mb-1">{settings?.companyProfile?.name || 'YOUR COMPANY'}</h1>
-                        <p className="text-sm text-gray-500 uppercase tracking-wider">{settings?.companyProfile?.subtitle || 'Professional Services'}</p>
+                    <div className="flex-1 space-y-1 sm:max-w-[50%]">
+                        <p className="text-xs font-bold text-black uppercase tracking-widest mb-2">BILL FROM:</p>
+                        <h1 className="text-xl font-bold uppercase tracking-widest text-black break-words">{settings?.companyProfile?.name || 'YOUR COMPANY'}</h1>
+                        <p className="text-sm text-gray-500 uppercase tracking-wider whitespace-pre-wrap break-words">
+                            {settings?.companyProfile?.address || 'Your Company Address'}
+                        </p>
+                        {settings?.companyProfile?.gst && (
+                            <p className="text-sm text-gray-500 uppercase tracking-wider font-bold break-words">
+                                GSTIN: {settings.companyProfile.gst}
+                            </p>
+                        )}
                     </div>
-                    <div className="text-right">
+                    <div className="flex-1 text-right">
                         <h2 className="text-4xl font-light tracking-widest mb-4">INVOICE</h2>
-                        <p className="font-bold"># {invoice.invoiceNumber}</p>
-                        <p className="text-sm mt-1">{formatDate(invoice.date)}</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm justify-end text-right ml-auto w-48">
+                            <span className="text-gray-500">Invoice No:</span>
+                            <span className="font-bold">#{invoice.invoiceNumber}</span>
+                            <span className="text-gray-500">Date:</span>
+                            <span className="font-bold">{formatDate(invoice.date)}</span>
+                        </div>
                     </div>
                 </div>
 
                 <div className="mb-16">
-                    <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Billed To</p>
-                    {client ? (
-                        <div>
-                            <p className="font-bold text-xl uppercase tracking-wider">{client.company || client.name}</p>
-                            <p className="mt-2 text-sm uppercase tracking-wider text-gray-600">{client.address}</p>
-                            <p className="text-sm uppercase tracking-wider text-gray-600">{client.email}</p>
-                        </div>
-                    ) : <p className="text-sm uppercase tracking-wider text-gray-600">Client Info</p>}
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">BILL TO:</p>
+                    <div className="space-y-1 sm:max-w-[50%]">
+                        <p className="font-bold text-xl uppercase tracking-wider break-words">
+                            {invoice.billingInfo?.name || client?.company || client?.name || 'Client Name'}
+                        </p>
+                        {(invoice.billingInfo?.address || client?.address) && (
+                            <p className="text-sm uppercase tracking-wider text-gray-600 whitespace-pre-wrap break-words">
+                                Address: {invoice.billingInfo?.address || client?.address}
+                            </p>
+                        )}
+                        {(invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin) && (
+                            <p className="text-sm uppercase tracking-wider text-gray-600 break-words">
+                                GSTIN: {invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin}
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 <div className="mb-16 border-t border-b border-gray-200 py-4 overflow-x-auto">
@@ -327,8 +433,8 @@ export function InvoiceDetailPage() {
                         <div key={i} className="grid grid-cols-12 gap-4 py-3 border-b border-gray-50 last:border-0">
                             <div className="col-span-6 font-medium uppercase tracking-wider text-sm">{item.name}</div>
                             <div className="col-span-2 text-center text-gray-500">{item.quantity}</div>
-                            <div className="col-span-2 text-right text-gray-500">{formatCurrency(item.rate)}</div>
-                            <div className="col-span-2 text-right font-bold">{formatCurrency(item.quantity * item.rate)}</div>
+                            <div className="col-span-2 text-right text-gray-500">{formatCurrency(item.rate, invoice.currency)}</div>
+                            <div className="col-span-2 text-right font-bold">{formatCurrency(item.quantity * item.rate, invoice.currency)}</div>
                         </div>
                     ))}
                     </div>
@@ -350,15 +456,17 @@ export function InvoiceDetailPage() {
                     <div className="text-right w-64 text-sm uppercase tracking-wider">
                         <div className="flex justify-between mb-2">
                             <span className="text-gray-500">Subtotal</span>
-                            <span>{formatCurrency(invoice.subtotal)}</span>
+                            <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                         </div>
-                        <div className="flex justify-between mb-4 pb-4 border-b border-gray-200">
-                            <span className="text-gray-500">Tax</span>
-                            <span>{formatCurrency(invoice.tax)}</span>
-                        </div>
+                        {invoice.tax > 0 && (
+                            <div className="flex justify-between mb-4 pb-4 border-b border-gray-200">
+                                <span className="text-gray-500">Tax</span>
+                                <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-2xl font-bold">
                             <span>Total</span>
-                            <span>{formatCurrency(invoice.total)}</span>
+                            <span>{formatCurrency(invoice.total, invoice.currency)}</span>
                         </div>
                     </div>
                 </div>
@@ -396,33 +504,42 @@ export function InvoiceDetailPage() {
             <div className="relative z-10">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-8">
                     <h1 className="text-4xl font-bold text-gray-700 tracking-wide">INVOICE</h1>
-                    <div className="text-right">
-                        <h2 className="text-2xl font-bold" style={{ color: themeColor }}>{settings?.companyProfile?.name || 'Business Co.'}</h2>
-                        <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{settings?.companyProfile?.address || '123 Business Road, Corporate District'}</p>
+                    <div className="grid grid-cols-2 gap-x-4 text-sm text-right font-medium">
+                        <span className="text-gray-500">Invoice No:</span>
+                        <span>#{invoice.invoiceNumber}</span>
+                        <span className="text-gray-500">Date Issued:</span>
+                        <span>{formatDate(invoice.date)}</span>
                     </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row justify-between border-y border-gray-200 py-8 mb-10 gap-8">
-                    <div className="w-full sm:w-1/2">
-                        <h3 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Bill To</h3>
-                        {client ? (
-                            <div>
-                                <p className="font-bold text-xl">{client.company || client.name}</p>
-                                <p className="text-sm mt-1 text-gray-600">{client.address}</p>
-                            </div>
-                        ) : <p className="text-gray-500 italic">Client details empty</p>}
+                    <div className="w-full sm:w-1/2 pr-4">
+                        <h3 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">BILL FROM:</h3>
+                        <h2 className="text-xl font-bold text-gray-800 break-words" style={{ color: themeColor }}>
+                            {settings?.companyProfile?.name || 'Business Co.'}
+                        </h2>
+                        <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap break-words">
+                            {settings?.companyProfile?.address || '123 Business Road, Corporate District'}
+                        </p>
+                        {settings?.companyProfile?.gst && (
+                            <p className="text-sm text-gray-600 mt-1 font-medium break-words">
+                                GSTIN: {settings.companyProfile.gst}
+                            </p>
+                        )}
                     </div>
-                    <div className="w-full sm:w-1/2 flex justify-start sm:justify-end gap-16 text-sm">
-                        <div>
-                            <p className="font-bold text-gray-500 uppercase tracking-widest mb-2">Invoice #</p>
-                            <p className="font-medium text-lg">{invoice.invoiceNumber}</p>
-                        </div>
-                        <div>
-                            <p className="font-bold text-gray-500 uppercase tracking-widest mb-2">Date</p>
-                            <p className="font-medium">{formatDate(invoice.date)}</p>
-                            <p className="font-bold text-gray-500 uppercase tracking-widest mt-5 mb-2">Due Date</p>
-                            <p className="font-medium">{formatDate(invoice.dueDate)}</p>
-                        </div>
+                    <div className="w-full sm:w-1/2 pl-0 sm:pl-4">
+                        <h3 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">BILL TO:</h3>
+                        <p className="font-bold text-xl text-gray-800 break-words">
+                            {invoice.billingInfo?.name || client?.company || client?.name || 'Client Name'}
+                        </p>
+                        <p className="text-sm mt-1 text-gray-600 whitespace-pre-wrap break-words">
+                            Address: {invoice.billingInfo?.address || client?.address || ''}
+                        </p>
+                        {(invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin) && (
+                            <p className="text-sm mt-1 font-medium text-gray-600 break-words">
+                                GSTIN: {invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin}
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -441,8 +558,8 @@ export function InvoiceDetailPage() {
                             <tr key={i} className="border-b border-gray-200">
                                 <td className="py-4 px-4 font-medium text-gray-800">{item.name}</td>
                                 <td className="py-4 px-4 text-center text-gray-600">{item.quantity}</td>
-                                <td className="py-4 px-4 text-right text-gray-600">{formatCurrency(item.rate)}</td>
-                                <td className="py-4 px-4 text-right font-bold text-gray-900">{formatCurrency(item.quantity * item.rate)}</td>
+                                <td className="py-4 px-4 text-right text-gray-600">{formatCurrency(item.rate, invoice.currency)}</td>
+                                <td className="py-4 px-4 text-right font-bold text-gray-900">{formatCurrency(item.quantity * item.rate, invoice.currency)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -465,15 +582,17 @@ export function InvoiceDetailPage() {
                     <div className="w-1/3 min-w-[280px] space-y-3">
                         <div className="flex justify-between text-gray-600">
                             <span>Subtotal</span>
-                            <span>{formatCurrency(invoice.subtotal)}</span>
+                            <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                         </div>
-                        <div className="flex justify-between text-gray-600 border-b border-gray-300 pb-4">
-                            <span>Tax</span>
-                            <span>{formatCurrency(invoice.tax)}</span>
-                        </div>
+                        {invoice.tax > 0 && (
+                            <div className="flex justify-between text-gray-600 border-b border-gray-300 pb-4">
+                                <span>Tax</span>
+                                <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-xl font-bold pt-3 text-gray-900">
                             <span>Balance Due</span>
-                            <span style={{ color: themeColor }}>{formatCurrency(invoice.total)}</span>
+                            <span style={{ color: themeColor }}>{formatCurrency(invoice.total, invoice.currency)}</span>
                         </div>
                     </div>
                 </div>
@@ -511,43 +630,49 @@ export function InvoiceDetailPage() {
             <div className="h-4 w-full relative z-10" style={{ backgroundColor: themeColor }}></div>
             <CardContent className="p-4 sm:p-10 relative z-10">
                 <div className="flex flex-col sm:flex-row justify-between items-start mb-12 gap-8">
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-lg text-white" style={{ backgroundColor: themeColor }}>
-                            <Building2 className="h-6 w-6" />
+                    <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-3 rounded-lg text-white" style={{ backgroundColor: themeColor }}>
+                                <Building2 className="h-6 w-6" />
+                            </div>
+                            <h1 className="text-2xl font-bold tracking-tight text-slate-800">{settings?.companyProfile?.name || 'Agency Name'}</h1>
                         </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">{settings?.companyProfile?.name || 'Agency Name'}</h1>
-                            <p className="text-muted-foreground text-sm">{settings?.companyProfile?.subtitle || 'Professional Digital Services'}</p>
-                        </div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 text-slate-400">BILL FROM:</h3>
+                        <p className="font-bold text-slate-800 break-words">{settings?.companyProfile?.name || 'Agency Name'}</p>
+                        <p className="text-muted-foreground text-sm whitespace-pre-wrap max-w-sm break-words">
+                            {settings?.companyProfile?.address || '123 Agency St.\nDigital District, 10001'}
+                        </p>
+                        {settings?.companyProfile?.gst && (
+                            <p className="text-muted-foreground text-sm font-medium mt-1 break-words">
+                                GSTIN: {settings.companyProfile.gst}
+                            </p>
+                        )}
                     </div>
                     <div className="text-right">
-                        <h2 className="text-4xl font-bold text-slate-200 tracking-tighter">INVOICE</h2>
-                        <div className="font-medium mt-1 text-lg" style={{ color: themeColor }}>#{invoice.invoiceNumber}</div>
+                        <h2 className="text-4xl font-bold text-slate-200 tracking-tighter mb-4">INVOICE</h2>
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                            <span className="text-slate-400">Invoice No:</span>
+                            <span className="font-medium text-slate-700">#{invoice.invoiceNumber}</span>
+                            <span className="text-slate-400">Date Issued:</span>
+                            <span className="font-medium text-slate-700">{formatDate(invoice.date)}</span>
+                        </div>
                     </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-12 mb-12">
                     <div>
-                        <h3 className="text-xs font-semibold uppercase tracking-wider mb-4 text-slate-400">Bill To</h3>
-                        {client ? (
-                            <div className="space-y-1">
-                                <p className="font-bold text-xl text-slate-800">{client.company || client.name}</p>
-                                <p className="text-slate-500">{client.email}</p>
-                                <p className="text-slate-500">{client.address}</p>
-                            </div>
-                        ) : <p className="text-muted-foreground">Client Info</p>}
-                    </div>
-                    <div className="grid grid-cols-2 gap-6">
-                        <div>
-                            <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 text-slate-400">Date Issued</h3>
-                            <p className="font-medium text-slate-700">{formatDate(invoice.date)}</p>
-                        </div>
-                        <div>
-                            <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 text-slate-400">Due Date</h3>
-                            <p className="font-medium text-slate-700">{formatDate(invoice.dueDate)}</p>
-                        </div>
-                        <div>
-                            <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 text-slate-400">Total Amount</h3>
-                            <p className="font-bold text-xl" style={{ color: themeColor }}>{formatCurrency(invoice.total)}</p>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 text-slate-400">BILL TO:</h3>
+                        <div className="space-y-1 sm:max-w-[80%]">
+                            <p className="font-bold text-xl text-slate-800 break-words">
+                                {invoice.billingInfo?.name || client?.company || client?.name || 'Client Name'}
+                            </p>
+                            <p className="text-slate-500 whitespace-pre-wrap break-words">
+                                Address: {invoice.billingInfo?.address || client?.address || ''}
+                            </p>
+                            {(invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin) && (
+                                <p className="text-slate-500 font-medium break-words">
+                                    GSTIN: {invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -566,8 +691,8 @@ export function InvoiceDetailPage() {
                                 <tr key={i}>
                                     <td className="py-4 px-6 font-medium text-slate-700">{item.name}</td>
                                     <td className="py-4 px-6 text-center text-slate-500">{item.quantity}</td>
-                                    <td className="py-4 px-6 text-right text-slate-500">{formatCurrency(item.rate)}</td>
-                                    <td className="py-4 px-6 text-right font-bold text-slate-700">{formatCurrency(item.quantity * item.rate)}</td>
+                                    <td className="py-4 px-6 text-right text-slate-500">{formatCurrency(item.rate, invoice.currency)}</td>
+                                    <td className="py-4 px-6 text-right font-bold text-slate-700">{formatCurrency(item.quantity * item.rate, invoice.currency)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -577,15 +702,17 @@ export function InvoiceDetailPage() {
                     <div className="w-full sm:w-1/3 space-y-3">
                         <div className="flex justify-between text-sm text-slate-500">
                             <span>Subtotal</span>
-                            <span>{formatCurrency(invoice.subtotal)}</span>
+                            <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                         </div>
-                        <div className="flex justify-between text-sm text-slate-500">
-                            <span>Tax (18%)</span>
-                            <span>{formatCurrency(invoice.tax)}</span>
-                        </div>
+                        {invoice.tax > 0 && (
+                            <div className="flex justify-between text-sm text-slate-500">
+                                <span>Tax (18%)</span>
+                                <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between items-center pt-4 border-t border-slate-100">
                             <span className="font-bold text-slate-700">Total Due</span>
-                            <span className="text-2xl font-bold" style={{ color: themeColor }}>{formatCurrency(invoice.total)}</span>
+                            <span className="text-2xl font-bold" style={{ color: themeColor }}>{formatCurrency(invoice.total, invoice.currency)}</span>
                         </div>
 
                         {invoice.status !== 'paid' && (
@@ -618,15 +745,31 @@ export function InvoiceDetailPage() {
                         <span>{settings?.companyProfile?.name || 'AGENCY.'}</span>
                     </div>
                     <div>
-                        <div className="opacity-60 text-xs font-bold uppercase tracking-widest mb-4">Billed To</div>
-                        {client ? (
-                            <div className="space-y-1">
-                                <p className="font-bold text-2xl">{client.company || client.name}</p>
-                                <p className="opacity-80">{client.email}</p>
-                                <p className="opacity-80">{client.phone}</p>
-                                <p className="opacity-80 mt-2 text-sm">{client.address}</p>
-                            </div>
-                        ) : <p>Client Name</p>}
+                        <div className="opacity-60 text-xs font-bold uppercase tracking-widest mb-4">BILL FROM:</div>
+                        <div className="space-y-1 mb-8 pr-4">
+                            <p className="font-bold text-2xl break-words">{settings?.companyProfile?.name || 'AGENCY.'}</p>
+                            <p className="opacity-80 mt-2 text-sm whitespace-pre-wrap break-words">{settings?.companyProfile?.address || 'Your Company Address'}</p>
+                            {settings?.companyProfile?.gst && (
+                                <p className="opacity-80 mt-1 text-sm break-words">
+                                    GSTIN: {settings.companyProfile.gst}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="opacity-60 text-xs font-bold uppercase tracking-widest mb-4">BILL TO:</div>
+                        <div className="space-y-1 pr-4">
+                            <p className="font-bold text-xl break-words">
+                                {invoice.billingInfo?.name || client?.company || client?.name || 'Client Name'}
+                            </p>
+                            <p className="opacity-80 mt-2 text-sm whitespace-pre-wrap break-words">
+                                Address: {invoice.billingInfo?.address || client?.address || ''}
+                            </p>
+                            {(invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin) && (
+                                <p className="opacity-80 mt-1 text-sm break-words">
+                                    GSTIN: {invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin}
+                                </p>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <div className="opacity-60 text-xs font-bold uppercase tracking-widest mb-4">Payment Details</div>
@@ -637,7 +780,7 @@ export function InvoiceDetailPage() {
                 </div>
                 <div className="mt-12">
                     <div className="opacity-60 text-xs font-bold uppercase tracking-widest mb-2">Total</div>
-                    <div className="text-4xl font-bold">{formatCurrency(invoice.total)}</div>
+                    <div className="text-4xl font-bold">{formatCurrency(invoice.total, invoice.currency)}</div>
                 </div>
             </div>
             <div className="md:col-span-8 p-6 sm:p-10 bg-white relative">
@@ -683,8 +826,8 @@ export function InvoiceDetailPage() {
                                     <tr key={i}>
                                         <td className="py-4 font-bold text-slate-700">{item.name}</td>
                                         <td className="py-4 text-center text-slate-500">{item.quantity}</td>
-                                        <td className="py-4 text-right text-slate-500">{formatCurrency(item.rate)}</td>
-                                        <td className="py-4 text-right font-bold text-slate-900">{formatCurrency(item.quantity * item.rate)}</td>
+                                        <td className="py-4 text-right text-slate-500">{formatCurrency(item.rate, invoice.currency)}</td>
+                                        <td className="py-4 text-right font-bold text-slate-900">{formatCurrency(item.quantity * item.rate, invoice.currency)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -706,15 +849,17 @@ export function InvoiceDetailPage() {
                         <div className="w-1/2 space-y-3 text-right">
                             <div className="flex justify-between text-slate-500">
                                 <span>Subtotal</span>
-                                <span>{formatCurrency(invoice.subtotal)}</span>
+                                <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                             </div>
-                            <div className="flex justify-between text-slate-500">
-                                <span>Tax</span>
-                                <span>{formatCurrency(invoice.tax)}</span>
-                            </div>
+                            {invoice.tax > 0 && (
+                                <div className="flex justify-between text-slate-500">
+                                    <span>Tax</span>
+                                    <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-2xl font-black text-slate-900 pt-4">
                                 <span>Total</span>
-                                <span style={{ color: themeColor }}>{formatCurrency(invoice.total)}</span>
+                                <span style={{ color: themeColor }}>{formatCurrency(invoice.total, invoice.currency)}</span>
                             </div>
 
                             {invoice.status !== 'paid' && (
@@ -762,19 +907,37 @@ export function InvoiceDetailPage() {
                     <p className="text-slate-500 text-sm tracking-widest uppercase">{settings?.companyProfile?.subtitle || 'Premium Invoice'}</p>
                 </div>
                 <div className="flex justify-center gap-12 mb-12 border-y border-slate-100 py-8">
-                    <div className="text-left">
-                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2">Billed To</p>
-                        <p className="font-serif text-lg font-medium text-slate-800">{client ? (client.company || client.name) : 'Valued Client'}</p>
+                    <div className="text-left w-1/3 pr-4">
+                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2 font-bold">BILL FROM:</p>
+                        <p className="font-serif text-lg font-bold text-slate-800 break-words">{settings?.companyProfile?.name || 'AGENCY NAME'}</p>
+                        <p className="text-sm text-slate-500 whitespace-pre-wrap break-words">{settings?.companyProfile?.address || 'Your Address'}</p>
+                        {settings?.companyProfile?.gst && (
+                            <p className="text-sm text-slate-500 mt-1 break-words">
+                                GSTIN: {settings.companyProfile.gst}
+                            </p>
+                        )}
                     </div>
-                    <div className="h-12 w-px bg-slate-100"></div>
-                    <div className="text-left">
-                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2">Invoice No</p>
-                        <p className="font-serif text-lg font-medium text-slate-800">{invoice.invoiceNumber}</p>
+                    <div className="h-16 w-px bg-slate-100"></div>
+                    <div className="text-left w-1/3 pr-4">
+                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2 font-bold">BILL TO:</p>
+                        <p className="font-serif text-lg font-bold text-slate-800 break-words">
+                            {invoice.billingInfo?.name || client?.company || client?.name || 'Valued Client'}
+                        </p>
+                        <p className="text-sm text-slate-500 whitespace-pre-wrap break-words">
+                            Address: {invoice.billingInfo?.address || client?.address || ''}
+                        </p>
+                        {(invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin) && (
+                            <p className="text-sm text-slate-500 mt-1 break-words">
+                                GSTIN: {invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin}
+                            </p>
+                        )}
                     </div>
-                    <div className="h-12 w-px bg-slate-100"></div>
-                    <div className="text-left">
-                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2">Total Due</p>
-                        <p className="font-serif text-lg font-bold" style={{ color: themeColor }}>{formatCurrency(invoice.total)}</p>
+                    <div className="h-16 w-px bg-slate-100"></div>
+                    <div className="text-left flex flex-col justify-center">
+                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2 font-bold">Invoice No</p>
+                        <p className="font-serif text-lg font-medium text-slate-800 mb-4">#{invoice.invoiceNumber}</p>
+                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2 font-bold">Total Due</p>
+                        <p className="font-serif text-lg font-bold" style={{ color: themeColor }}>{formatCurrency(invoice.total, invoice.currency)}</p>
                     </div>
                 </div>
                 <div className="max-w-2xl mx-auto mb-12">
@@ -783,10 +946,10 @@ export function InvoiceDetailPage() {
                             <div key={i} className="flex justify-between items-center text-left group">
                                 <div className="flex-1">
                                     <p className="font-medium text-slate-800 text-lg">{item.name}</p>
-                                    <p className="text-sm text-slate-400">{item.quantity} x {formatCurrency(item.rate)}</p>
+                                    <p className="text-sm text-slate-400">{item.quantity} x {formatCurrency(item.rate, invoice.currency)}</p>
                                 </div>
                                 <div className="w-full border-b border-dotted border-slate-300 mx-4 mt-2"></div>
-                                <div className="font-serif font-bold text-lg text-slate-700">{formatCurrency(item.quantity * item.rate)}</div>
+                                <div className="font-serif font-bold text-lg text-slate-700">{formatCurrency(item.quantity * item.rate, invoice.currency)}</div>
                             </div>
                         ))}
                     </div>
@@ -794,15 +957,17 @@ export function InvoiceDetailPage() {
                 <div className="max-w-xs mx-auto space-y-2 border-t border-slate-200 pt-6">
                     <div className="flex justify-between text-sm text-slate-500">
                         <span>Subtotal</span>
-                        <span>{formatCurrency(invoice.subtotal)}</span>
+                        <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-slate-500">
-                        <span>Tax</span>
-                        <span>{formatCurrency(invoice.tax)}</span>
-                    </div>
+                    {invoice.tax > 0 && (
+                        <div className="flex justify-between text-sm text-slate-500">
+                            <span>Tax</span>
+                            <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between text-xl font-serif font-bold text-slate-900 pt-2 pb-6">
                         <span>Total</span>
-                        <span>{formatCurrency(invoice.total)}</span>
+                        <span>{formatCurrency(invoice.total, invoice.currency)}</span>
                     </div>
 
                     {invoice.status !== 'paid' && (

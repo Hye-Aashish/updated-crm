@@ -4,7 +4,7 @@ import {
     ArrowLeft, Download, Edit,
     History, CheckCircle, Clock, Plus, AlertCircle,
     ShieldCheck, User, Calendar, ExternalLink,
-    Box, Milestone, Info
+    Box, Milestone, Info, FileText, FolderOpen
 } from 'lucide-react';
 import api from '@/lib/api-client';
 import { formatCurrency } from '@/lib/utils';
@@ -64,6 +64,20 @@ export default function QuotationDetailPage() {
             fetchQuotation();
         } catch (e) { alert('Failed to submit change request'); }
         finally { setActionLoading(false); }
+    };
+
+    const handleConvertToProject = async () => {
+        if (!confirm('Convert this approved quotation into a live project?')) return;
+        setActionLoading(true);
+        try {
+            const res = await api.post(`/quotations/${id}/convert-to-project`);
+            setQuotation({ ...quotation, linkedProjectId: res.data.project._id });
+            alert('Successfully converted to project!');
+        } catch (e: any) {
+            alert(e.response?.data?.message || 'Failed to convert to project');
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     if (loading) return (
@@ -139,6 +153,7 @@ export default function QuotationDetailPage() {
                                 <div>
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Client</p>
                                     <p className="text-sm font-bold text-gray-900 truncate">{quotation.clientName || quotation.clientId?.company || quotation.clientId?.name || 'Unknown Client'}</p>
+                                    {quotation.clientPhone && <p className="text-xs text-gray-500">{quotation.clientPhone}</p>}
                                 </div>
                             </div>
                             <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
@@ -159,6 +174,23 @@ export default function QuotationDetailPage() {
 
                         {/* Objective & Scope Group */}
                         <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-sm space-y-10">
+                            {quotation.attachmentUrl && (
+                                <section className="mb-8 p-6 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-blue-600 rounded-xl text-white shadow-md">
+                                            <FileText className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-gray-900 tracking-tight">External Quotation Document</h3>
+                                            <p className="text-xs text-gray-500 font-medium">An attachment was uploaded for this quotation.</p>
+                                        </div>
+                                    </div>
+                                    <a href={quotation.attachmentUrl} target="_blank" rel="noreferrer" className="px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                                        <ExternalLink className="w-4 h-4" /> View File
+                                    </a>
+                                </section>
+                            )}
+
                             <section>
                                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Project Objective</h3>
                                 <p className="text-gray-600 text-sm leading-relaxed">{quotation.objective || 'Objective details not provided in this revision.'}</p>
@@ -188,7 +220,7 @@ export default function QuotationDetailPage() {
                             <section>
                                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Core Deliverables & Scope</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                                    {quotation.deliverables.map((d: any, i: number) => d.included && (
+                                    {(quotation.deliverables || []).map((d: any, i: number) => d.included && (
                                         <div key={i} className="flex items-center gap-3 text-sm text-gray-600">
                                             <div className="p-1 bg-green-50 rounded-full"><CheckCircle className="w-3 h-3 text-green-500" /></div>
                                             <span className="font-medium">{d.name}</span>
@@ -206,7 +238,7 @@ export default function QuotationDetailPage() {
                             </div>
 
                             <div className="space-y-6">
-                                {quotation.modules.map((m: any, idx: number) => m.included && (
+                                {(quotation.modules || []).map((m: any, idx: number) => m.included && (
                                     <div key={idx} className="group flex items-start gap-6 p-6 rounded-3xl border border-gray-50 hover:border-blue-100 hover:bg-blue-50/20 transition-all">
                                         <div className="w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center text-gray-400 font-black text-xs shadow-sm group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors">
                                             {String(idx + 1).padStart(2, '0')}
@@ -231,7 +263,7 @@ export default function QuotationDetailPage() {
                                 Financial Road Map
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-                                {quotation.milestones.map((m: any, idx: number) => (
+                                {(quotation.milestones || []).map((m: any, idx: number) => (
                                     <div key={idx} className="p-8 bg-gray-50/50 rounded-[2rem] border border-gray-50 flex flex-col items-center text-center">
                                         <div className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest mb-6 ${m.status === 'paid' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
                                             {m.status}
@@ -289,6 +321,28 @@ export default function QuotationDetailPage() {
                                     {actionLoading ? 'Approving...' : <><ShieldCheck className="w-5 h-5" /> Lock & Approve</>}
                                 </button>
                             )}
+                            
+                            {quotation.status === 'approved' && !quotation.linkedProjectId && (
+                                <button
+                                    onClick={handleConvertToProject}
+                                    disabled={actionLoading}
+                                    className="w-full mt-4 h-14 bg-green-600 hover:bg-green-700 rounded-2xl font-black text-sm tracking-widest uppercase transition-all shadow-xl shadow-green-500/20 flex items-center justify-center gap-3"
+                                >
+                                    {actionLoading ? 'Converting...' : <><FolderOpen className="w-5 h-5" /> Convert to Project</>}
+                                </button>
+                            )}
+
+                            {quotation.linkedProjectId && (
+                                <div className="mt-6 p-4 bg-white/10 rounded-2xl border border-green-500/30 text-center">
+                                    <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <FolderOpen className="w-5 h-5 text-green-400" />
+                                    </div>
+                                    <p className="text-xs font-bold text-gray-300 uppercase tracking-widest mb-2">Finalized As</p>
+                                    <button onClick={() => navigate(`/projects/${quotation.linkedProjectId}`)} className="text-sm font-black text-white hover:text-green-400 flex items-center justify-center gap-2 mx-auto">
+                                        View Project <ExternalLink className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Change Requests Section */}
@@ -311,7 +365,7 @@ export default function QuotationDetailPage() {
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
-                                        {quotation.changeRequests.map((cr: any, idx: number) => (
+                                        {(quotation.changeRequests || []).map((cr: any, idx: number) => (
                                             <div key={idx} className="p-5 bg-gray-50 rounded-2xl border border-gray-50">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <h4 className="text-xs font-black text-gray-900 uppercase tracking-tight">{cr.title}</h4>

@@ -11,7 +11,7 @@ import {
     ChevronLeft, Calendar, DollarSign, Clock, CheckSquare,
     MoreHorizontal, Edit, Trash2, Plus, FileText, Paperclip,
     Download, ExternalLink, Users, AlertCircle, TrendingUp,
-    MessageCircle, MessageSquare
+    MessageCircle, MessageSquare, Eye
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
 import {
@@ -20,6 +20,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
 import api from '@/lib/api-client'
 import { TaskBoard } from '@/components/tasks/task-board'
 
@@ -38,6 +44,7 @@ export function ProjectDetailPage() {
     const [fileDialogOpen, setFileDialogOpen] = useState(false)
     const [taskDialogOpen, setTaskDialogOpen] = useState(false)
     const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<any>(null)
+    const [previewFile, setPreviewFile] = useState<{url: string, name: string, type: string} | null>(null)
     const {
         projects, setProjects,
         tasks, setTasks,
@@ -533,8 +540,11 @@ export function ProjectDetailPage() {
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
-                                                <Button variant="ghost" size="sm" asChild>
-                                                    <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                                <Button variant="ghost" size="sm" onClick={() => setPreviewFile(file)} title="View Live">
+                                                    <Eye className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" asChild title="Download">
+                                                    <a href={file.url} download target="_blank" rel="noopener noreferrer">
                                                         <Download className="h-4 w-4" />
                                                     </a>
                                                 </Button>
@@ -611,6 +621,42 @@ export function ProjectDetailPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+            {/* File Preview Modal */}
+            <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
+                <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="truncate pr-8">{previewFile?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 w-full bg-muted/30 rounded-md overflow-hidden relative flex items-center justify-center">
+                        {previewFile && (
+                            previewFile.type?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(previewFile.name.split('.').pop()?.toLowerCase() || '') ? (
+                                <img 
+                                    src={previewFile.url} 
+                                    alt={previewFile.name} 
+                                    className="max-w-full max-h-full object-contain" 
+                                />
+                            ) : previewFile.type === 'pdf' || previewFile.name.toLowerCase().endsWith('.pdf') ? (
+                                <iframe 
+                                    src={previewFile.url} 
+                                    className="w-full h-full border-0"
+                                    title={previewFile.name}
+                                />
+                            ) : (
+                                <div className="text-center p-8">
+                                    <FileText className="h-16 w-16 mx-auto text-muted-foreground opacity-50 mb-4" />
+                                    <h3 className="text-lg font-medium">No Live Preview Available</h3>
+                                    <p className="text-muted-foreground mb-4">This file type cannot be previewed in the browser.</p>
+                                    <Button asChild>
+                                        <a href={previewFile.url} target="_blank" rel="noopener noreferrer">
+                                            Download to View
+                                        </a>
+                                    </Button>
+                                </div>
+                            )
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

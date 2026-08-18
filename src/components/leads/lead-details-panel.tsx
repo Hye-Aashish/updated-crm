@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Bell, Trash2, Edit2, Check, X } from 'lucide-react'
+import { Bell, Trash2, Edit2, Check, X, Star } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Lead } from '@/types'
 import api from '@/lib/api-client'
@@ -17,6 +17,31 @@ interface LeadDetailsPanelProps {
     onUpdate: (updatedLead: Lead) => void
     onDelete: (leadId: string) => void
     onAddActivity: (leadId: string, content: string) => Promise<any>
+}
+
+function ActivityItem({ activity }: { activity: any }) {
+    const [expanded, setExpanded] = useState(false)
+    const isLong = activity.content?.length > 150 || (activity.content?.match(/\n/g) || []).length >= 3
+    
+    return (
+        <div className="bg-muted/30 p-3 rounded-lg text-sm border border-border/40 transition-colors flex flex-col">
+            <p className={`font-medium text-foreground break-words whitespace-pre-wrap ${!expanded && isLong ? 'line-clamp-3' : ''}`}>
+                {activity.content}
+            </p>
+            {isLong && (
+                <button 
+                    onClick={() => setExpanded(!expanded)} 
+                    className="text-[10px] text-primary mt-1.5 font-bold hover:underline uppercase tracking-wider self-start"
+                >
+                    {expanded ? 'Show Less' : 'Read More'}
+                </button>
+            )}
+            <div className="flex justify-between items-center mt-2 pt-2 border-t border-border/30">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase">{new Date(activity.createdAt).toLocaleString()}</span>
+                <Badge variant="outline" className="text-[9px] font-semibold">{activity.type}</Badge>
+            </div>
+        </div>
+    )
 }
 
 export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: LeadDetailsPanelProps) {
@@ -97,18 +122,19 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
         const targetId = lead?.id || lead?._id
         if (!targetId || !newActivityContent.trim()) return
         try {
-            const res = await api.post(`/leads/${targetId}/activities`, {
-                content: newActivityContent,
-                type: 'note',
-                clientTime: new Date().toISOString()
-            })
-            const mapped = mapLead(res.data)
-            onUpdate(mapped)
-            setNewActivityContent('')
-            toast({ description: "Note added and analyzed by AI" })
+            const updatedLead = await onAddActivity(targetId, newActivityContent)
+            if (updatedLead) {
+                onUpdate({
+                    ...lead,
+                    activities: updatedLead.activities,
+                    aiPriority: updatedLead.aiPriority,
+                    aiPriorityReason: updatedLead.aiPriorityReason,
+                    reminder: updatedLead.reminder
+                })
+                setNewActivityContent('')
+            }
         } catch (error) {
             console.error("Add Note Error:", error)
-            toast({ title: "Error", description: "Failed to save note", variant: "destructive" })
         }
     }
 
@@ -146,10 +172,39 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
         }
     }
 
+    const handleSetRating = async (newRating: number) => {
+        const targetId = lead?.id || lead?._id
+        if (!targetId) return
+        try {
+            const res = await api.put(`/leads/${targetId}`, { rating: newRating })
+            onUpdate(mapLead(res.data))
+            toast({ description: "Rating updated successfully" })
+        } catch (error) {
+            console.error("Update Rating Error:", error)
+            toast({ title: "Error", description: "Failed to update rating", variant: "destructive" })
+        }
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-row items-center justify-between border-b pb-4">
-                <h2 className="text-xl font-bold">Lead: {lead.company}</h2>
+                <div className="flex flex-col">
+                    <h2 className="text-xl font-bold flex items-center gap-3">
+                        Lead: {lead.company}
+                    </h2>
+                    <div className="flex items-center gap-1 mt-1.5" title="Auto-Calculated Lead Rating">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                                key={star}
+                                className={`h-4 w-4 transition-colors ${
+                                    star <= (lead.rating || 0) 
+                                    ? 'fill-yellow-400 text-yellow-500' 
+                                    : 'text-muted-foreground/30'
+                                }`}
+                            />
+                        ))}
+                    </div>
+                </div>
                 <div className="flex items-center gap-2">
                     {isEditing ? (
                         <>
@@ -305,13 +360,7 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
                 <h4 className="font-bold text-sm text-muted-foreground uppercase tracking-wider">Interaction History</h4>
                 <div className="space-y-3 max-h-[250px] overflow-y-auto mb-4 pr-2 custom-scrollbar">
                     {lead.activities?.slice().reverse().map((activity: any) => (
-                        <div key={activity._id} className="bg-muted/30 p-3 rounded-lg text-sm border border-border/40 transition-colors">
-                            <p className="font-medium text-foreground break-words whitespace-pre-wrap overflow-hidden">{activity.content}</p>
-                            <div className="flex justify-between items-center mt-2">
-                                <span className="text-[10px] font-medium text-muted-foreground uppercase">{new Date(activity.createdAt).toLocaleString()}</span>
-                                <Badge variant="outline" className="text-[9px] font-semibold">{activity.type}</Badge>
-                            </div>
-                        </div>
+                        <ActivityItem key={activity._id} activity={activity} />
                     ))}
                     {(!lead.activities || lead.activities.length === 0) && (
                         <p className="text-xs text-muted-foreground italic text-center py-4">No records found.</p>

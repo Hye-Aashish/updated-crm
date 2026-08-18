@@ -8,11 +8,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
     ChevronLeft, Mail, Phone, MapPin, FileText,
-    DollarSign, Clock, Edit, Trash2, ExternalLink, Shield, Key, UserCheck, UserX, Lock
+    DollarSign, Clock, Edit, Trash2, ExternalLink, Shield, Key, UserCheck, UserX, Lock,
+    ListTodo, CreditCard, TrendingUp, Check, AlertTriangle, Sparkles, Calendar
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
 import api from '@/lib/api-client'
 import { VisitorSessionsTimeline } from '@/components/contacts/visitor-sessions-timeline'
+import { ClientProductForm } from '@/components/clients/client-product-dialog'
+import { ClientProductManagerDialog } from '@/components/clients/client-product-manager-dialog'
+import { usePermissions } from '@/hooks/use-permissions'
+import { Progress } from '@/components/ui/progress'
+import { Package, Plus } from 'lucide-react'
+import type { ClientProduct } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import {
     Dialog,
@@ -29,7 +36,9 @@ export function ClientDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { toast } = useToast()
-    const { clients, projects, invoices, setClients, deleteClient, users, setUsers } = useAppStore()
+    const { clients, projects, invoices, setClients, deleteClient, users, setUsers, currentUser } = useAppStore()
+    const { canView, canCreate } = usePermissions()
+    const canViewFinances = currentUser?.role === 'owner' || currentUser?.role === 'admin' || canView('invoices')
 
     const client = clients.find((c) => c.id === id)
 
@@ -38,6 +47,13 @@ export function ClientDetailPage() {
     const [isCreatePortalDialogOpen, setIsCreatePortalDialogOpen] = useState(false)
     const [portalPassword, setPortalPassword] = useState('')
     const [portalEmail, setPortalEmail] = useState('')
+
+    // Client Products State
+    const [clientProducts, setClientProducts] = useState<ClientProduct[]>([])
+    const [isProductDialogOpen, setIsProductDialogOpen] = useState(false)
+    const [editingClientProduct, setEditingClientProduct] = useState<ClientProduct | undefined>(undefined)
+    const [selectedManagerCP, setSelectedManagerCP] = useState<ClientProduct | null>(null)
+    const [isManagerOpen, setIsManagerOpen] = useState(false)
 
     // Fetch users if store is empty
     useEffect(() => {
@@ -173,6 +189,64 @@ export function ClientDetailPage() {
         }
     }, [client, clients.length, setClients])
 
+    // Fetch Client Products
+    useEffect(() => {
+        if (client) {
+            fetchClientProducts()
+        }
+    }, [client])
+
+    const fetchClientProducts = async () => {
+        if (!client) return
+        try {
+            const res = await api.get(`/client-products/client/${client.id}`)
+            setClientProducts(res.data.map((cp: any) => ({ ...cp, id: cp._id })))
+        } catch (error) {
+            console.error("Failed to fetch client products", error)
+        }
+    }
+
+    const handleDeleteProduct = async (cpId: string) => {
+        if (!window.confirm("Are you sure you want to remove this product from the client?")) return
+        try {
+            await api.delete(`/client-products/${cpId}`)
+            setClientProducts(clientProducts.filter(cp => cp.id !== cpId))
+            toast({ title: 'Success', description: 'Assigned product removed' })
+        } catch (error) {
+            console.error("Failed to delete client product", error)
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to remove product' })
+        }
+    }
+
+    const handleQuickToggleTask = async (cpId: string, task: any) => {
+        const taskId = task.id || task._id
+        if (!taskId) return
+        const newStatus = task.status === 'completed' ? 'pending' : 'completed'
+        try {
+            const res = await api.patch(`/client-products/${cpId}/tasks/${taskId}`, { status: newStatus })
+            const updated = { ...res.data, id: res.data._id }
+            setClientProducts(clientProducts.map(cp => (cp.id === cpId || (cp as any)._id === cpId) ? updated : cp))
+            if (selectedManagerCP && (selectedManagerCP.id === cpId || selectedManagerCP._id === cpId)) {
+                setSelectedManagerCP(updated)
+            }
+            toast({ title: newStatus === 'completed' ? 'Task Completed' : 'Task Pending' })
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to update task' })
+        }
+    }
+
+    const handleManagerUpdate = (updated: ClientProduct) => {
+        const cpId = updated.id || updated._id
+        const mapped = { ...updated, id: updated._id || updated.id }
+        setClientProducts(clientProducts.map(cp => (cp.id === cpId || (cp as any)._id === cpId) ? mapped : cp))
+        setSelectedManagerCP(mapped)
+    }
+
+    const openManager = (cp: ClientProduct) => {
+        setSelectedManagerCP(cp)
+        setIsManagerOpen(true)
+    }
+
     if (!client && clients.length > 0) {
         return (
             <div className="flex flex-col items-center justify-center h-[50vh]">
@@ -289,6 +363,7 @@ export function ClientDetailPage() {
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="projects">Projects ({clientProjects.length})</TabsTrigger>
                     <TabsTrigger value="invoices">Invoices ({clientInvoices.length})</TabsTrigger>
+                    <TabsTrigger value="products">Products</TabsTrigger>
                     <TabsTrigger value="activity">Web Activity</TabsTrigger>
                     <TabsTrigger value="notes">Notes</TabsTrigger>
                 </TabsList>
@@ -462,6 +537,352 @@ export function ClientDetailPage() {
                     </Card>
                 </TabsContent>
 
+                <TabsContent value="products" className="space-y-6">
+                    {/* Header Controls */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h3 className="text-lg font-bold tracking-tight">Assigned Digital Products</h3>
+                            <p className="text-xs text-muted-foreground">
+                                {canViewFinances 
+                                    ? "Track progress, milestones, pending tasks, and payment collections for this client."
+                                    : "Track progress, deliverables, milestones, and pending tasks for this client."}
+                            </p>
+                        </div>
+                        {canCreate('projects') && (
+                            <Button onClick={() => { setEditingClientProduct(undefined); setIsProductDialogOpen(true); }} size="sm" className="shadow-xs">
+                                <Plus className="h-4 w-4 mr-1.5" /> Assign Digital Product
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Summary Cards */}
+                    {clientProducts.length > 0 && (() => {
+                        const totalValue = clientProducts.reduce((sum, cp) => sum + (Number(cp.customPrice) || 0), 0)
+                        const totalPaid = clientProducts.reduce((sum, cp) => sum + (Number(cp.paidAmount) || 0), 0)
+                        const totalPending = Math.max(0, totalValue - totalPaid)
+                        const totalTasks = clientProducts.reduce((sum, cp) => sum + (cp.tasks?.length || 0), 0)
+                        const pendingTasksCount = clientProducts.reduce((sum, cp) => sum + (cp.tasks?.filter(t => t.status !== 'completed').length || 0), 0)
+                        const activeDeliveries = clientProducts.filter(cp => cp.workStatus === 'in_progress' || cp.workStatus === 'review').length
+
+                        if (!canViewFinances) {
+                            return (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    <div className="p-3.5 rounded-xl border bg-card shadow-xs">
+                                        <div className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1.5">
+                                            <Package className="h-3.5 w-3.5 text-blue-500" /> Products
+                                        </div>
+                                        <div className="text-xl font-bold text-foreground mt-1">{clientProducts.length} Assigned</div>
+                                        <span className="text-[11px] text-muted-foreground block mt-0.5">Assigned to client</span>
+                                    </div>
+                                    <div className="p-3.5 rounded-xl border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/40">
+                                        <div className="text-xs font-medium text-blue-700 dark:text-blue-300 uppercase flex items-center gap-1.5">
+                                            <TrendingUp className="h-3.5 w-3.5 text-blue-600" /> Active Work
+                                        </div>
+                                        <div className="text-xl font-bold text-blue-700 dark:text-blue-400 mt-1">{activeDeliveries} In Progress</div>
+                                        <span className="text-[11px] text-muted-foreground block mt-0.5">Currently active</span>
+                                    </div>
+                                    <div className="p-3.5 rounded-xl border bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900/40">
+                                        <div className="text-xs font-medium text-purple-700 dark:text-purple-300 uppercase flex items-center gap-1.5">
+                                            <ListTodo className="h-3.5 w-3.5 text-purple-600" /> Total Tasks
+                                        </div>
+                                        <div className="text-xl font-bold text-purple-700 dark:text-purple-400 mt-1">{totalTasks} Deliverables</div>
+                                        <span className="text-[11px] text-muted-foreground block mt-0.5">Milestone items</span>
+                                    </div>
+                                    <div className="p-3.5 rounded-xl border bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40">
+                                        <div className="text-xs font-medium text-amber-700 dark:text-amber-300 uppercase flex items-center gap-1.5">
+                                            <Clock className="h-3.5 w-3.5 text-amber-600" /> Pending Tasks
+                                        </div>
+                                        <div className="text-xl font-bold text-amber-700 dark:text-amber-400 mt-1">{pendingTasksCount} Pending</div>
+                                        <span className="text-[11px] text-muted-foreground block mt-0.5">Awaiting completion</span>
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        return (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="p-3.5 rounded-xl border bg-card shadow-xs">
+                                    <div className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1.5">
+                                        <Package className="h-3.5 w-3.5 text-blue-500" /> Products
+                                    </div>
+                                    <div className="text-xl font-bold text-foreground mt-1">{clientProducts.length} Assigned</div>
+                                    <span className="text-[11px] text-muted-foreground block mt-0.5">
+                                        {totalTasks > 0 ? `${pendingTasksCount} of ${totalTasks} tasks pending` : 'No tasks created'}
+                                    </span>
+                                </div>
+                                <div className="p-3.5 rounded-xl border bg-card shadow-xs">
+                                    <div className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1.5">
+                                        <DollarSign className="h-3.5 w-3.5 text-foreground" /> Total Value
+                                    </div>
+                                    <div className="text-xl font-bold text-foreground mt-1">{formatCurrency(totalValue)}</div>
+                                </div>
+                                <div className="p-3.5 rounded-xl border bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40">
+                                    <div className="text-xs font-medium text-emerald-700 dark:text-emerald-300 uppercase flex items-center gap-1.5">
+                                        <CreditCard className="h-3.5 w-3.5 text-emerald-600" /> Collected
+                                    </div>
+                                    <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totalPaid)}</div>
+                                </div>
+                                <div className={`p-3.5 rounded-xl border shadow-xs ${
+                                    totalPending === 0
+                                        ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-200'
+                                        : 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40'
+                                }`}>
+                                    <div className={`text-xs font-medium uppercase flex items-center gap-1.5 ${
+                                        totalPending === 0 ? 'text-emerald-700' : 'text-rose-700 dark:text-rose-400'
+                                    }`}>
+                                        <AlertTriangle className="h-3.5 w-3.5" /> Pending Balance
+                                    </div>
+                                    <div className={`text-xl font-bold mt-1 ${
+                                        totalPending === 0 ? 'text-emerald-700' : 'text-rose-700 dark:text-rose-400'
+                                    }`}>
+                                        {formatCurrency(totalPending)}
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })()}
+
+                    {/* Products Grid */}
+                    {clientProducts.length === 0 ? (
+                        <Card className="border-dashed">
+                            <CardContent className="p-12 text-center text-muted-foreground">
+                                <Package className="h-12 w-12 mx-auto mb-3 opacity-40 text-primary" />
+                                <h4 className="text-base font-semibold text-foreground">No digital products assigned</h4>
+                                <p className="text-sm mt-1 max-w-sm mx-auto">
+                                    {canViewFinances
+                                        ? 'Assign a digital product from your catalog to track deliverables, start/due dates, tasks, and payment installments.'
+                                        : 'No digital products currently assigned to this client.'}
+                                </p>
+                                {canCreate('projects') && (
+                                    <Button onClick={() => { setEditingClientProduct(undefined); setIsProductDialogOpen(true); }} size="sm" className="mt-4">
+                                        <Plus className="h-4 w-4 mr-1.5" /> Assign First Product
+                                    </Button>
+                                )}
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {clientProducts.map(cp => {
+                                const prod: any = cp.product
+                                const cpId = cp.id || (cp as any)._id
+                                const customPrice = Number(cp.customPrice) || 0
+                                const paidAmount = Number(cp.paidAmount) || 0
+                                const pendingAmount = Math.max(0, customPrice - paidAmount)
+                                const tasks = cp.tasks || []
+                                const completedTasks = tasks.filter(t => t.status === 'completed')
+                                const pendingTasks = tasks.filter(t => t.status !== 'completed')
+                                const progressPercent = cp.progress !== undefined ? cp.progress : (
+                                    tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0
+                                )
+
+                                // Countdown status
+                                let dueBadge = null
+                                if (cp.dueDate) {
+                                    const due = new Date(cp.dueDate)
+                                    const now = new Date()
+                                    const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                                    if (cp.workStatus === 'completed') {
+                                        dueBadge = <span className="text-[11px] text-emerald-600 font-medium">Delivered</span>
+                                    } else if (diffDays < 0) {
+                                        dueBadge = <span className="text-[11px] text-red-600 font-bold bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded-full">Overdue {Math.abs(diffDays)}d</span>
+                                    } else if (diffDays === 0) {
+                                        dueBadge = <span className="text-[11px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-full">Due Today</span>
+                                    } else {
+                                        dueBadge = <span className="text-[11px] text-blue-600 font-medium bg-blue-50 dark:bg-blue-950/30 px-2 py-0.5 rounded-full">{diffDays}d left</span>
+                                    }
+                                }
+
+                                return (
+                                    <Card key={cpId} className="hover:shadow-md transition-all flex flex-col justify-between border">
+                                        <CardHeader className="pb-3 border-b bg-muted/20">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div>
+                                                    <CardTitle className="text-base font-bold text-foreground">
+                                                        {prod?.name || 'Digital Product'}
+                                                    </CardTitle>
+                                                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                                                        {cp.startDate && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Calendar className="h-3 w-3 text-blue-500" />
+                                                                Start: {new Date(cp.startDate).toLocaleDateString()}
+                                                            </span>
+                                                        )}
+                                                        {cp.dueDate && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Clock className="h-3 w-3 text-amber-500" />
+                                                                Due: {new Date(cp.dueDate).toLocaleDateString()}
+                                                            </span>
+                                                        )}
+                                                        {dueBadge}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    {/* Work status */}
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className={`text-[10px] ${
+                                                            cp.workStatus === 'completed'
+                                                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                                                : cp.workStatus === 'in_progress'
+                                                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                                                                : cp.workStatus === 'review'
+                                                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                                                                : cp.workStatus === 'on_hold'
+                                                                ? 'bg-amber-100 text-amber-800'
+                                                                : 'bg-muted'
+                                                        }`}
+                                                    >
+                                                        {cp.workStatus === 'completed' && '✅ Completed'}
+                                                        {cp.workStatus === 'in_progress' && '⚙️ In Progress'}
+                                                        {cp.workStatus === 'review' && '🔍 Review'}
+                                                        {cp.workStatus === 'on_hold' && '⏸️ On Hold'}
+                                                        {(!cp.workStatus || cp.workStatus === 'not_started') && '⏳ Not Started'}
+                                                    </Badge>
+                                                    {/* Payment status (Only for managers) */}
+                                                    {canViewFinances && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`text-[10px] ${
+                                                                cp.paymentStatus === 'paid'
+                                                                    ? 'text-emerald-700 border-emerald-300'
+                                                                    : cp.paymentStatus === 'partial'
+                                                                    ? 'text-amber-700 border-amber-300'
+                                                                    : 'text-rose-700 border-rose-300'
+                                                            }`}
+                                                        >
+                                                            {cp.paymentStatus === 'paid' && 'Paid'}
+                                                            {cp.paymentStatus === 'partial' && 'Partial'}
+                                                            {(!cp.paymentStatus || cp.paymentStatus === 'unpaid') && 'Unpaid'}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </CardHeader>
+
+                                        <CardContent className="pt-4 space-y-4 flex-1">
+                                            {/* Progress Section */}
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="font-semibold text-foreground flex items-center gap-1">
+                                                        <TrendingUp className="h-3.5 w-3.5 text-primary" /> Work Progress ({progressPercent}%)
+                                                    </span>
+                                                    <span className="text-muted-foreground text-[11px]">
+                                                        {completedTasks.length}/{tasks.length} tasks done
+                                                    </span>
+                                                </div>
+                                                <Progress value={progressPercent} className="h-2" />
+                                            </div>
+
+                                            {/* Financials Row (Only for users with financial permissions) */}
+                                            {canViewFinances && (
+                                                <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-muted/40 text-center border">
+                                                    <div>
+                                                        <span className="text-[10px] text-muted-foreground uppercase block">Price</span>
+                                                        <span className="text-xs font-bold text-foreground">{formatCurrency(customPrice)}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase block">Paid</span>
+                                                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(paidAmount)}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-rose-700 dark:text-rose-400 uppercase block">Pending</span>
+                                                        <span className={`text-xs font-bold ${pendingAmount === 0 ? 'text-emerald-600' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                            {formatCurrency(pendingAmount)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Deliverables / Tasks Preview */}
+                                            <div className="space-y-1.5">
+                                                <div className="text-xs font-semibold text-foreground flex items-center justify-between">
+                                                    <span className="flex items-center gap-1.5">
+                                                        <ListTodo className="h-3.5 w-3.5 text-purple-500" />
+                                                        Pending Deliverables ({pendingTasks.length})
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openManager(cp)}
+                                                        className="text-[11px] text-primary hover:underline"
+                                                    >
+                                                        View all ({tasks.length})
+                                                    </button>
+                                                </div>
+
+                                                {tasks.length === 0 ? (
+                                                    <div className="text-[11px] text-muted-foreground italic py-1">
+                                                        No tasks defined. Click "Manage & Track" to add tasks.
+                                                    </div>
+                                                ) : pendingTasks.length === 0 ? (
+                                                    <div className="text-[11px] text-emerald-600 font-medium py-1 flex items-center gap-1">
+                                                        <Check className="h-3.5 w-3.5" /> All {tasks.length} tasks completed!
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-1 max-h-24 overflow-y-auto">
+                                                        {pendingTasks.slice(0, 3).map((t, idx) => {
+                                                            const taskId = t.id || (t as any)._id
+                                                            return (
+                                                                <div key={taskId || idx} className="flex items-center gap-2 text-xs p-1.5 rounded-md bg-background border hover:bg-muted/50 transition-colors">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleQuickToggleTask(cpId, t)}
+                                                                        className="h-4 w-4 rounded border flex items-center justify-center hover:border-primary shrink-0"
+                                                                        title="Mark complete"
+                                                                    />
+                                                                    <span className="truncate flex-1 font-medium">{t.title}</span>
+                                                                    {t.dueDate && (
+                                                                        <span className="text-[10px] text-muted-foreground shrink-0">
+                                                                            {new Date(t.dueDate).toLocaleDateString()}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        })}
+                                                        {pendingTasks.length > 3 && (
+                                                            <div className="text-[10px] text-muted-foreground text-center pt-0.5">
+                                                                +{pendingTasks.length - 3} more pending tasks
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="flex items-center gap-2 pt-3 border-t">
+                                                <Button
+                                                    size="sm"
+                                                    className="flex-1 text-xs gap-1.5 shadow-xs"
+                                                    onClick={() => openManager(cp)}
+                                                >
+                                                    <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Manage & Track
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs px-2.5"
+                                                    onClick={() => { setEditingClientProduct(cp); setIsProductDialogOpen(true); }}
+                                                    title="Edit configuration"
+                                                >
+                                                    <Edit className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-xs px-2.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                    onClick={() => handleDeleteProduct(cpId)}
+                                                    title="Delete product"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )
+                            })}
+                        </div>
+                    )}
+                </TabsContent>
+
                 <TabsContent value="activity">
                     <VisitorSessionsTimeline email={client.email} />
                 </TabsContent>
@@ -545,6 +966,38 @@ export function ClientDetailPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Product Assignment Form Dialog */}
+            <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                        <DialogTitle>{editingClientProduct ? 'Edit Assigned Product' : 'Assign Product to Client'}</DialogTitle>
+                        <DialogDescription>
+                            Configure pricing, delivery timeline, work status, and initial deliverables.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <ClientProductForm 
+                        clientId={client.id}
+                        initialData={editingClientProduct}
+                        onSuccess={() => { setIsProductDialogOpen(false); fetchClientProducts(); }}
+                        onCancel={() => setIsProductDialogOpen(false)}
+                    />
+                </DialogContent>
+            </Dialog>
+
+            {/* Comprehensive Product Manager Dialog */}
+            <Dialog open={isManagerOpen} onOpenChange={setIsManagerOpen}>
+                <DialogContent className="sm:max-w-[750px] p-6">
+                    {selectedManagerCP && (
+                        <ClientProductManagerDialog
+                            clientProduct={selectedManagerCP}
+                            onUpdate={handleManagerUpdate}
+                            onClose={() => setIsManagerOpen(false)}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
+

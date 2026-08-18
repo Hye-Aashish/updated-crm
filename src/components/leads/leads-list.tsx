@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, Trash2, ExternalLink } from 'lucide-react'
+import { MoreHorizontal, Trash2, ExternalLink, Star } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatCurrency } from '@/lib/utils'
 import type { Lead, PipelineStage } from '@/types'
@@ -20,6 +20,7 @@ export function LeadsList({ leads, stages, onLeadClick, onDeleteLead }: LeadsLis
                     <thead className="bg-muted/40 text-[11px] uppercase font-bold tracking-wider text-muted-foreground border-b border-border/40">
                         <tr>
                             <th className="px-6 py-4">Company</th>
+                            <th className="hidden md:table-cell px-6 py-4">Rating</th>
                             <th className="hidden md:table-cell px-6 py-4">Contact</th>
                             <th className="hidden sm:table-cell px-6 py-4">Value</th>
                             <th className="px-6 py-4">Stage</th>
@@ -49,6 +50,13 @@ export function LeadsList({ leads, stages, onLeadClick, onDeleteLead }: LeadsLis
                                                 ))}
                                             </div>
                                         )}
+                                    </td>
+                                    <td className="hidden md:table-cell px-6 py-4">
+                                        <div className="flex items-center gap-0.5" title={`${lead.rating || 0} Stars`}>
+                                            {[1, 2, 3, 4, 5].map(star => (
+                                                <Star key={star} className={`h-3 w-3 ${star <= (lead.rating || 0) ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground/30'}`} />
+                                            ))}
+                                        </div>
                                     </td>
                                     <td className="hidden md:table-cell px-6 py-4">
                                         <div className="font-semibold text-foreground">{lead.name}</div>

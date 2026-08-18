@@ -156,7 +156,7 @@ export interface TimeEntry {
 }
 
 // Invoice Types
-export type InvoiceStatus = 'draft' | 'pending' | 'paid' | 'overdue'
+export type InvoiceStatus = 'draft' | 'pending' | 'paid' | 'overdue' | 'cancelled'
 export type InvoiceType = 'advance' | 'milestone' | 'final' | 'amc'
 
 export interface InvoiceLineItem {
@@ -172,7 +172,8 @@ export interface Invoice {
     invoiceNumber: string
     number: string // Alias for invoiceNumber
     clientId: string
-    projectId: string
+    projectId?: string
+    clientProductId?: string
     type: InvoiceType
     status: InvoiceStatus
     lineItems: InvoiceLineItem[]
@@ -180,6 +181,12 @@ export interface Invoice {
     tax: number
     total: number
     date: Date // Invoice date
+    billingInfo?: {
+        name?: string
+        address?: string
+        gstNumber?: string
+    }
+    currency?: string
     dueDate: Date
     paidDate?: Date
     termsAndConditions?: string
@@ -252,6 +259,7 @@ export interface Lead {
     stage: string
     email?: string
     phone?: string
+    rating?: number
     customFields?: Record<string, string>
     activities?: LeadActivity[]
     reminder?: {
@@ -330,3 +338,5 @@ export interface Ticket {
     screenshot?: string
     createdAt: Date
 }
+
+export * from './product'

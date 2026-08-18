@@ -6,6 +6,7 @@ import {
     FolderOpen,
     Settings,
     LifeBuoy,
+    Package,
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react'
@@ -40,6 +41,7 @@ export function EmployeeSidebar({ collapsed, setCollapsed, mobileOpen, setMobile
     const navItems = [
         { name: 'Dashboard', href: '/employee/dashboard', icon: LayoutDashboard },
         { name: 'My Projects', href: '/employee/projects', icon: Briefcase },
+        { name: 'Digital Products', href: '/employee/products', icon: Package },
         { name: 'My Tasks', href: '/employee/tasks', icon: CheckSquare },
         { name: 'Attendance', href: '/employee/attendance', icon: Clock },
         { name: 'Time Tracking', href: '/employee/time', icon: Clock },
@@ -57,6 +59,7 @@ export function EmployeeSidebar({ collapsed, setCollapsed, mobileOpen, setMobile
         switch (item.name) {
             case 'Dashboard': return !!p.dashboard?.view
             case 'My Projects': return !!p.projects?.view
+            case 'Digital Products': return !!p.projects?.view
             case 'My Tasks': return !!p.tasks?.view
             case 'Attendance': return !!p.attendance?.view
             case 'Time Tracking': return !!p.time_tracking?.view

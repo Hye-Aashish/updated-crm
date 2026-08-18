@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const amcSchema = new mongoose.Schema({
     name: { type: String, required: true },                          // AMC contract name
-    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
+    clientProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'ClientProduct' },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
 
     // Contract Details
@@ -52,6 +53,10 @@ const amcSchema = new mongoose.Schema({
 
 // Auto-update status based on dates
 amcSchema.pre('save', function () {
+    if (!this.projectId && !this.clientProductId) {
+        throw new Error('AMC must be associated with either a Project or a Digital Product (ClientProduct)');
+    }
+
     const now = new Date();
     const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 

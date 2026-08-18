@@ -3,15 +3,22 @@ const mongoose = require('mongoose');
 const invoiceSchema = new mongoose.Schema({
     invoiceNumber: { type: String, required: true },
     clientId: { type: String, required: true },
-    projectId: { type: String, required: true },
+    projectId: { type: String },
+    clientProductId: { type: String },
     type: {
         type: String,
         enum: ['advance', 'milestone', 'final', 'amc', 'domain'],
         default: 'milestone'
     },
+    billingInfo: {
+        name: { type: String },
+        address: { type: String },
+        gstNumber: { type: String }
+    },
+    currency: { type: String, default: 'INR' },
     status: {
         type: String,
-        enum: ['draft', 'pending', 'paid', 'overdue'],
+        enum: ['draft', 'pending', 'paid', 'overdue', 'cancelled'],
         default: 'draft'
     },
     lineItems: [{

@@ -1,6 +1,19 @@
 const ChatConversation = require('../models/ChatConversation');
 const ChatMessage = require('../models/ChatMessage');
 const ChatWidget = require('../models/ChatWidget');
+const jwt = require('jsonwebtoken');
+
+// Helper to verify JWT token from socket
+const verifySocketToken = (socket) => {
+    try {
+        const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+        if (!token) return null;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        return decoded;
+    } catch (e) {
+        return null;
+    }
+};
 
 module.exports = (io) => {
     io.on('connection', (socket) => {
@@ -73,19 +86,39 @@ module.exports = (io) => {
             }
         });
 
-        // ADMIN: Join Dashboard
+        // ADMIN: Join Dashboard (requires authentication)
         socket.on('admin_join', (userId) => {
+            const user = verifySocketToken(socket);
+            if (!user) {
+                socket.emit('auth_error', { message: 'Authentication required' });
+                return;
+            }
+            // Only allow joining your own admin room
+            if (user.id !== userId) {
+                socket.emit('auth_error', { message: 'Unauthorized' });
+                return;
+            }
             socket.join(`admin_${userId}`);
         });
 
-        // ADMIN: View Conversation
+        // ADMIN: View Conversation (requires authentication)
         socket.on('join_conversation', (conversationId) => {
+            const user = verifySocketToken(socket);
+            if (!user) {
+                socket.emit('auth_error', { message: 'Authentication required' });
+                return;
+            }
             socket.join(conversationId);
-            // Reset unread count?
         });
 
-        // ADMIN: Send Message
+        // ADMIN: Send Message (requires authentication)
         socket.on('admin_message', async ({ conversationId, message, userId }) => {
+            const user = verifySocketToken(socket);
+            if (!user) {
+                socket.emit('auth_error', { message: 'Authentication required' });
+                return;
+            }
+
             try {
                 const newMessage = new ChatMessage({
                     conversation_id: conversationId,

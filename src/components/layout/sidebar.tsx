@@ -101,6 +101,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Screen Monitoring', href: '/screen-monitoring', icon: Monitor },
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Projects', href: '/projects', icon: Briefcase },
+        { name: 'Digital Products', href: '/products', icon: Briefcase }, // Can use a better icon like Package later
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
         { name: 'Team', href: '/team?tab=members', icon: Users },
         { name: 'Attendance', href: '/attendance', icon: Clock }, // Updated link
@@ -152,6 +153,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Screen Monitoring': return !!p.screen_monitoring?.view
             case 'Clients': return !!p.clients?.view
             case 'Projects': return !!p.projects?.view
+            case 'Digital Products': return !!p.projects?.view // Fallback to projects permission for now, or true for owner
             case 'Tasks': return !!p.tasks?.view
             case 'Team': return !!p.team?.view
             case 'Attendance': return !!p.attendance?.view

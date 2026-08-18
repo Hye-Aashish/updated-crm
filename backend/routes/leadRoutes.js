@@ -78,7 +78,13 @@ router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
 // POST new lead
 router.post('/', protect, checkPermission('leads', 'create'), async (req, res) => {
     try {
-        const lead = new Lead(req.body);
+        // Whitelist allowed fields to prevent mass assignment
+        const allowedFields = ['name', 'company', 'email', 'phone', 'value', 'source', 'stage',
+            'assignedTo', 'notes', 'customFields', 'reminder', 'tags', 'website', 'address',
+            'industry', 'designation', 'description'];
+        const safeData = {};
+        allowedFields.forEach(f => { if (req.body[f] !== undefined) safeData[f] = req.body[f]; });
+        const lead = new Lead(safeData);
         const newLead = await lead.save();
 
         // Trigger Notification
@@ -122,13 +128,14 @@ router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) =
             return res.status(403).json({ message: 'Not authorized' });
         }
 
-        // If reminder is manually set/updated, reset completed and sentReminders flags
-        if (req.body.reminder && req.body.reminder.date) {
-            req.body.reminder.sentReminders = [];
-            req.body.reminder.completed = false;
-        }
+        // Whitelist allowed update fields
+        const allowedFields = ['name', 'company', 'email', 'phone', 'value', 'source', 'stage',
+            'assignedTo', 'notes', 'customFields', 'reminder', 'tags', 'website', 'address',
+            'industry', 'designation', 'description', 'lostReason'];
+        const safeData = {};
+        allowedFields.forEach(f => { if (req.body[f] !== undefined) safeData[f] = req.body[f]; });
 
-        const updatedLead = await Lead.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedLead = await Lead.findByIdAndUpdate(req.params.id, safeData, { new: true });
         res.json(updatedLead);
     } catch (err) {
         res.status(400).json({ message: err.message });

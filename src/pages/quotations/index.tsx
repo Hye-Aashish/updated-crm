@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, FileText, Download, Mail, Eye, Edit, Trash2 } from 'lucide-react';
+import { Plus, FileText, Download, Mail, Eye, Edit, Trash2, Paperclip, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
 import api from '@/lib/api-client';
@@ -10,10 +10,14 @@ interface Quotation {
     version: number;
     clientName: string;
     clientEmail: string;
+    clientPhone?: string;
     totalAmount: number;
+    grandTotal?: number;
     status: 'draft' | 'sent' | 'approved' | 'rejected' | 'revision' | 'expired';
     createdAt: string;
     validUntil?: string;
+    attachmentUrl?: string;
+    linkedProjectId?: string;
     createdBy: {
         name: string;
     };
@@ -179,20 +183,22 @@ export default function QuotationsPage() {
                                             <div className="flex items-center">
                                                 <FileText className="w-5 h-5 text-blue-600 mr-2" />
                                                 <div>
-                                                    <div className="text-sm font-medium text-gray-900">
+                                                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                                                         {quotation.quotationNumber}
+                                                        {quotation.attachmentUrl && <Paperclip className="w-3 h-3 text-gray-400" title="Has Attachment" />}
+                                                        {quotation.linkedProjectId && <FolderOpen className="w-3 h-3 text-green-500" title="Converted to Project" />}
                                                     </div>
                                                     <div className="text-xs text-gray-500">v{quotation.version}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm font-medium text-gray-900">{quotation.clientName}</div>
-                                            <div className="text-xs text-gray-500">{quotation.clientEmail}</div>
+                                            <div className="text-sm font-medium text-gray-900">{quotation.clientName || 'Unknown Lead'}</div>
+                                            <div className="text-xs text-gray-500">{quotation.clientEmail || quotation.clientPhone || ''}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-semibold text-gray-900">
-                                                {formatCurrency(quotation.totalAmount)}
+                                                {formatCurrency(quotation.grandTotal || quotation.totalAmount || 0)}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">

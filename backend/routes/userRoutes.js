@@ -95,15 +95,26 @@ router.put('/:id', protect, async (req, res) => {
             delete updateData.role;
         }
 
+        // Whitelist fields based on user role
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'owner';
+        const selfEditFields = ['name', 'phone', 'avatar', 'language', 'address', 'about',
+            'country', 'gender', 'dateOfBirth'];
+        const adminEditFields = [...selfEditFields, 'email', 'role', 'department', 'designation',
+            'salary', 'employeeId', 'salutation', 'joiningDate', 'reportingTo',
+            'aadharNumber', 'panNumber', 'documentAadhar', 'documentPan',
+            'documentOfferLetter', 'clientId'];
+
+        const allowedFields = isAdmin ? adminEditFields : selfEditFields;
+
         // Apply updates
-        Object.keys(updateData).forEach(key => {
-            if (key !== '_id' && key !== 'password') {
+        allowedFields.forEach(key => {
+            if (updateData[key] !== undefined) {
                 user[key] = updateData[key];
             }
         });
 
         // Handle password update separately to ensure hashing
-        if (updateData.password) {
+        if (updateData.password && (isAdmin || userId === req.user._id.toString())) {
             user.password = updateData.password;
         }
 

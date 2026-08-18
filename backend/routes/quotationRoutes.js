@@ -24,6 +24,7 @@ router.put('/:id', quotationController.updateQuotation);
 // Approvals & Workflow
 router.patch('/:id/approve', quotationController.approveQuotation);
 router.post('/:id/change-request', quotationController.addChangeRequest);
+router.post('/:id/convert-to-project', quotationController.convertToProject);
 
 // PDF Generation
 router.get('/:id/pdf', quotationController.generatePDF);

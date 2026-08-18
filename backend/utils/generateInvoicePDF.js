@@ -10,7 +10,7 @@ const generateInvoicePDF = (invoice, client, companyProfile, settings = {}) => {
             doc.on('end', () => resolve(Buffer.concat(buffers)));
             doc.on('error', reject);
 
-            const currency = companyProfile?.currency || 'INR';
+            const currency = invoice.currency || companyProfile?.currency || 'INR';
             let locale = 'en-US';
             if (currency === 'INR') {
                 locale = 'en-IN';
@@ -90,17 +90,21 @@ const generateInvoicePDF = (invoice, client, companyProfile, settings = {}) => {
             doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text('BILL TO:', 350, currentRightY);
             currentRightY += 15;
 
-            doc.fontSize(10).font('Helvetica-Bold').fillColor('#000').text(client.company || client.name || 'Client Name', 350, currentRightY);
+            const billToName = invoice.billingInfo?.name || client.company || client.name || 'Client Name';
+            const billToAddress = invoice.billingInfo?.address || client.address || '';
+            const billToGst = invoice.billingInfo?.gstNumber || client.gst || client.gstin || '';
+
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#000').text(billToName, 350, currentRightY);
             currentRightY += 15;
 
             // Allow wrapping for address
             doc.fontSize(9).font('Helvetica-Bold').text('Address: ', 350, currentRightY, { continued: true })
-                .font('Helvetica').fillColor('#333').text(client.address || '', { width: 195, align: 'left' });
+                .font('Helvetica').fillColor('#333').text(billToAddress, { width: 195, align: 'left' });
 
             currentRightY = doc.y + 5;
-            if (client.gst || client.gstin) {
+            if (billToGst) {
                 currentRightY += 5;
-                doc.font('Helvetica-Bold').fillColor('#000').text(`GSTIN: ${client.gst || client.gstin}`, 350, currentRightY);
+                doc.font('Helvetica-Bold').fillColor('#000').text(`GSTIN: ${billToGst}`, 350, currentRightY);
                 currentRightY += 15;
             }
 

@@ -76,12 +76,19 @@ export function useLeadsData() {
                 content,
                 type: 'note'
             })
-            const updatedLeads = leads.map(l => l.id === leadId ? { ...l, activities: res.data.activities } : l)
+            const updatedLead = res.data
+            const updatedLeads = leads.map(l => l.id === leadId ? {
+                ...l,
+                activities: updatedLead.activities,
+                aiPriority: updatedLead.aiPriority,
+                aiPriorityReason: updatedLead.aiPriorityReason,
+                reminder: updatedLead.reminder
+            } : l)
             setLeads(updatedLeads)
             toast({ description: "Note added" })
-            return res.data.activities
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to add note", variant: "destructive" })
+            return updatedLead
+        } catch (error: any) {
+            toast({ title: "Error", description: error?.response?.data?.stack || error?.response?.data?.message || error.message || "Failed to add note", variant: "destructive" })
             return null
         }
     }

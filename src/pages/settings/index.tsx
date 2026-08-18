@@ -605,6 +605,19 @@ function BillingTab({ data, onSave, saving }: any) {
         setFormData({ ...formData, [e.target.id]: e.target.value })
     }
 
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const handleFileChange = (e: any) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setFormData({ ...formData, invoiceLogo: reader.result })
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -657,6 +670,33 @@ function BillingTab({ data, onSave, saving }: any) {
                     <div className="space-y-2">
                         <Label htmlFor="cashfreeClientSecret">Secret Key</Label>
                         <Input id="cashfreeClientSecret" value={formData.cashfreeClientSecret || ''} onChange={handleChange} type="password" />
+                    </div>
+                </div>
+
+                <div className="border-t pt-6 space-y-4">
+                    <div className="space-y-2">
+                        <Label>Invoice Logo</Label>
+                        <p className="text-xs text-muted-foreground mb-2">Upload a specific logo to be used only for invoices (overrides the Company Profile logo).</p>
+                        <div className="flex items-center gap-4">
+                            <div className="h-20 w-20 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted overflow-hidden relative">
+                                {formData.invoiceLogo ? (
+                                    <img src={formData.invoiceLogo} alt="Invoice Logo" className="w-full h-full object-contain" />
+                                ) : (
+                                    <Upload className="h-6 w-6 text-muted-foreground" />
+                                )}
+                            </div>
+                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                                    {formData.invoiceLogo ? 'Change Logo' : 'Upload Logo'}
+                                </Button>
+                                {formData.invoiceLogo && (
+                                    <Button variant="destructive" size="icon" onClick={() => setFormData({ ...formData, invoiceLogo: "" })}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 

@@ -38,3 +38,7 @@ build/
 # Temp files
 vite-error*.txt
 push-error.txt
+
+# Uploads
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep

@@ -39,13 +39,13 @@ const quotationSchema = new mongoose.Schema({
     version: { type: Number, default: 1 },
     parentQuotation: { type: mongoose.Schema.Types.ObjectId, ref: 'Quotation' },
 
-    clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
+    clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' },
     clientName: String,
     clientEmail: String,
     clientPhone: String,
     clientAddress: String,
 
-    projectTitle: { type: String, required: true },
+    projectTitle: { type: String },
     projectType: { type: String },
 
     // Proposal Sections
@@ -101,6 +101,8 @@ const quotationSchema = new mongoose.Schema({
         coverPageTitle: String,
         coverPageSubtitle: String
     },
+    attachmentUrl: String,
+    linkedProjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
     approvedAt: Date,
     rejectedReason: String
 }, {

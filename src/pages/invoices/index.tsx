@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, FileText, AlertCircle, Banknote, Loader2, Mail, Send, CreditCard, MessageSquare } from 'lucide-react'
+import { Plus, Search, FileText, AlertCircle, Banknote, Loader2, Mail, Send, CreditCard, MessageSquare, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -134,6 +134,8 @@ export function InvoicesPage() {
                                 company: c.company,
                                 email: c.email,
                                 phone: c.phone,
+                                address: c.address,
+                                gstNumber: c.gstNumber || c.gstin,
                                 type: c.type || 'one-time',
                                 status: c.status || 'active',
                                 createdAt: new Date(c.createdAt),
@@ -167,6 +169,8 @@ export function InvoicesPage() {
                         subtotal: i.subtotal,
                         tax: i.tax,
                         total: i.total,
+                        billingInfo: i.billingInfo,
+                        currency: i.currency || 'INR',
                         date: new Date(i.date),
                         dueDate: new Date(i.dueDate),
                         paidDate: i.paidDate ? new Date(i.paidDate) : undefined,
@@ -186,7 +190,7 @@ export function InvoicesPage() {
     }, [])
 
     // --- KPI Calculations ---
-    const totalInvoiced = invoices.reduce((sum, i) => sum + i.total, 0)
+    const totalInvoiced = invoices.filter(i => i.status !== 'cancelled').reduce((sum, i) => sum + i.total, 0)
     const totalPaid = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total, 0)
     const totalDue = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((sum, i) => sum + i.total, 0)
 
@@ -251,6 +255,7 @@ export function InvoicesPage() {
                         <option value="paid">Paid</option>
                         <option value="overdue">Overdue</option>
                         <option value="draft">Draft</option>
+                        <option value="cancelled">Cancelled</option>
                     </select>
                     {(searchQuery || statusFilter !== 'all') && (
                         <Button 
@@ -307,12 +312,15 @@ export function InvoicesPage() {
                                         <TableCell className="text-muted-foreground font-medium">{client?.name || 'Unknown'}</TableCell>
                                         <TableCell className="text-muted-foreground/80">{formatDate(invoice.date)}</TableCell>
                                         <TableCell className="text-muted-foreground/80">{formatDate(invoice.dueDate)}</TableCell>
-                                        <TableCell className="font-bold text-foreground">{formatCurrency(invoice.total)}</TableCell>
+                                        <TableCell className="font-bold text-foreground">
+                                            {invoice.status === 'cancelled' ? '-' : formatCurrency(invoice.total)}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge
                                                 variant="outline"
                                                 className={`capitalize px-2.5 py-0.5 rounded-full font-bold text-[10px] tracking-wider border-0 ${invoice.status === 'paid' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' :
                                                     invoice.status === 'overdue' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400' :
+                                                    invoice.status === 'cancelled' ? 'bg-slate-800/20 text-slate-800 dark:text-slate-300' :
                                                         'bg-slate-500/20 text-slate-600 dark:text-slate-400'
                                                     }`}
                                             >
@@ -321,7 +329,7 @@ export function InvoicesPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                {invoice.status !== 'paid' && (
+                                                {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
@@ -335,8 +343,30 @@ export function InvoicesPage() {
                                                         Pay
                                                     </Button>
                                                 )}
-                                                {['owner', 'admin'].includes(currentUser?.role || '') && (
+                                                {['owner', 'admin'].includes(currentUser?.role || '') && invoice.status !== 'cancelled' && (
                                                     <>
+                                                        {invoice.status !== 'paid' && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    if (window.confirm('Mark this invoice as Paid?')) {
+                                                                        try {
+                                                                            await api.post(`/invoices/${invoice.id}/manual-payment`);
+                                                                            toast({ title: 'Invoice Paid', description: 'Invoice marked as paid.', variant: 'success' as any });
+                                                                            setInvoices(invoices.map(i => i.id === invoice.id ? { ...i, status: 'paid' } : i));
+                                                                        } catch (err) {
+                                                                            toast({ title: 'Failed to mark as paid', variant: 'destructive' });
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                title="Mark as Paid"
+                                                            >
+                                                                <CheckCircle className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
@@ -354,6 +384,26 @@ export function InvoicesPage() {
                                                             title="Send WhatsApp"
                                                         >
                                                             <MessageSquare className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                if (window.confirm('Are you sure you want to cancel this invoice?')) {
+                                                                    try {
+                                                                        await api.put(`/invoices/${invoice.id}`, { status: 'cancelled' });
+                                                                        toast({ title: 'Invoice Cancelled', description: 'The invoice has been cancelled.', variant: 'default' });
+                                                                        setInvoices(invoices.map(i => i.id === invoice.id ? { ...i, status: 'cancelled' } : i));
+                                                                    } catch (err) {
+                                                                        toast({ title: 'Failed to cancel', variant: 'destructive' });
+                                                                    }
+                                                                }
+                                                            }}
+                                                            title="Cancel Invoice"
+                                                        >
+                                                            <AlertCircle className="h-4 w-4" />
                                                         </Button>
                                                     </>
                                                 )}

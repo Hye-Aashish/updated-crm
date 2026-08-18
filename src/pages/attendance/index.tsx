@@ -22,6 +22,7 @@ import { format } from 'date-fns'
 import { useAppStore } from '@/store'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { AttendanceSheet } from '@/components/attendance/attendance-sheet'
+import { LivePresenceBoard } from '@/components/attendance/live-presence-board'
 
 export function AttendancePage() {
     const { toast } = useToast()
@@ -171,6 +172,15 @@ export function AttendancePage() {
                     </div>
                 </div>
             </div>
+
+            {/* Live Presence Board for Admins/Owners */}
+            {isAdmin && (
+                <LivePresenceBoard
+                    title="Live Team Presence & Break Monitoring"
+                    description="Real-time employee status: active work, who is on break, live break timers, and join times."
+                    defaultView="cards"
+                />
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Action Card */}

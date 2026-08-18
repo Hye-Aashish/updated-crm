@@ -14,6 +14,8 @@ import type {
     Lead,
     Expense,
     Ticket,
+    Product,
+    ClientProduct,
 } from '@/types'
 
 interface AppState {
@@ -34,6 +36,8 @@ interface AppState {
     leads: Lead[]
     expenses: Expense[]
     tickets: Ticket[]
+    products: Product[]
+    clientProducts: ClientProduct[]
 
 
     // Running timer
@@ -108,6 +112,18 @@ interface AppState {
     settings: any | null
     setSettings: (settings: any) => void
     fetchSettings: () => Promise<void>
+
+    // Product actions
+    setProducts: (products: Product[]) => void
+    addProduct: (product: Product) => void
+    updateProduct: (id: string, product: Partial<Product>) => void
+    deleteProduct: (id: string) => void
+
+    // Client Product actions
+    setClientProducts: (clientProducts: ClientProduct[]) => void
+    addClientProduct: (clientProduct: ClientProduct) => void
+    updateClientProduct: (id: string, clientProduct: Partial<ClientProduct>) => void
+    deleteClientProduct: (id: string) => void
 }
 
 
@@ -127,6 +143,8 @@ export const useAppStore = create<AppState>((set) => ({
     leads: [],
     expenses: [],
     tickets: [],
+    products: [],
+    clientProducts: [],
     runningTimer: null,
     settings: null,
 
@@ -402,4 +420,24 @@ export const useAppStore = create<AppState>((set) => ({
             console.error("Failed to fetch settings in store", error)
         }
     },
+
+    // Product actions
+    setProducts: (products) => set({ products }),
+    addProduct: (product) => set((state) => ({ products: [...state.products, product] })),
+    updateProduct: (id, updates) => set((state) => ({
+        products: state.products.map((p) => p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p)
+    })),
+    deleteProduct: (id) => set((state) => ({
+        products: state.products.filter((p) => p.id !== id)
+    })),
+
+    // Client Product actions
+    setClientProducts: (clientProducts) => set({ clientProducts }),
+    addClientProduct: (clientProduct) => set((state) => ({ clientProducts: [...state.clientProducts, clientProduct] })),
+    updateClientProduct: (id, updates) => set((state) => ({
+        clientProducts: state.clientProducts.map((cp) => cp.id === id ? { ...cp, ...updates, updatedAt: new Date() } : cp)
+    })),
+    deleteClientProduct: (id) => set((state) => ({
+        clientProducts: state.clientProducts.filter((cp) => cp.id !== id)
+    })),
 }))

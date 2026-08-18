@@ -16,6 +16,7 @@ import {
     Trash2
 } from 'lucide-react'
 import api from '@/lib/api-client'
+import DOMPurify from 'dompurify'
 
 interface Message {
     id: string
@@ -382,7 +383,7 @@ export default function AIAssistantPage() {
                                         {msg.role === 'assistant' ? (
                                             <div
                                                 className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm"
-                                                dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMarkdown(msg.content)) }}
                                             />
                                         ) : (
                                             <p className="text-sm">{msg.content}</p>

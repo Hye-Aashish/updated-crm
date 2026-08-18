@@ -112,6 +112,11 @@ exports.createQuotation = async (req, res) => {
             }
         }
 
+        // If no project title provided, generate a default one
+        if (!data.projectTitle) {
+            data.projectTitle = `Quotation for ${data.clientName || 'Prospect'}`;
+        }
+
         // Auto-load modules if projectType is specified and no modules provided
         if (data.projectType && (!data.modules || data.modules.length === 0)) {
             data.modules = PROJECT_TYPE_MODULES[data.projectType] || [];
@@ -165,6 +170,10 @@ exports.updateQuotation = async (req, res) => {
                 data.clientAddress = client.address;
             }
         }
+        
+        if (!data.projectTitle) {
+            data.projectTitle = existing.projectTitle || `Quotation for ${data.clientName || existing.clientName || 'Prospect'}`;
+        }
 
         // If status is 'sent', 'revision', create a new version instead of simple update
         if (['sent', 'revision'].includes(existing.status)) {
@@ -203,6 +212,50 @@ exports.approveQuotation = async (req, res) => {
         res.json({ message: 'Quotation approved and scope locked!', quotation });
     } catch (error) {
         res.status(500).json({ message: 'Approval failed', error: error.message });
+    }
+};
+
+// Convert to Project
+exports.convertToProject = async (req, res) => {
+    try {
+        const quotation = await Quotation.findById(req.params.id);
+        if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
+        
+        if (quotation.status !== 'approved') {
+            return res.status(400).json({ message: 'Only approved quotations can be converted to projects.' });
+        }
+
+        if (quotation.linkedProjectId) {
+            return res.status(400).json({ message: 'This quotation is already linked to a project.' });
+        }
+
+        const Project = require('../models/Project');
+        
+        // Map quotation data to new project
+        const project = new Project({
+            name: quotation.projectTitle || 'Project from Quotation',
+            description: quotation.objective || '',
+            status: 'planning',
+            clientId: quotation.clientId,
+            budget: quotation.grandTotal,
+            startDate: new Date(),
+            dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)), // Default 1 month
+            milestones: quotation.milestones.map(m => ({
+                name: m.name,
+                dueDate: m.dueDate,
+                amount: m.amount,
+                completed: false
+            }))
+        });
+
+        await project.save();
+
+        quotation.linkedProjectId = project._id;
+        await quotation.save();
+
+        res.status(201).json({ message: 'Successfully converted to project', project });
+    } catch (error) {
+        res.status(500).json({ message: 'Conversion failed', error: error.message });
     }
 };
 

@@ -2,7 +2,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Trash2, ExternalLink, Users } from 'lucide-react'
+import { MoreHorizontal, Trash2, ExternalLink, Users, Star } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Lead, PipelineStage } from '@/types'
 
@@ -66,6 +66,11 @@ export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, o
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="font-bold text-sm text-foreground tracking-tight group-hover:text-primary transition-colors pr-6">
                                                     {lead.company}
+                                                </div>
+                                                <div className="flex items-center gap-0.5 mt-1" title={`${lead.rating || 0} Stars`}>
+                                                    {[1, 2, 3, 4, 5].map(star => (
+                                                        <Star key={star} className={`h-3 w-3 ${star <= (lead.rating || 0) ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground/30'}`} />
+                                                    ))}
                                                 </div>
                                                 <div className="absolute top-3 right-3">
                                                     <DropdownMenu modal={false}>

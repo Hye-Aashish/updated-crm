@@ -16,7 +16,7 @@ router.get('/check-ip', protect, authorize('admin', 'owner'), (req, res) => {
     });
 });
 
-router.get('/db-info', (req, res) => {
+router.get('/db-info', protect, authorize('admin', 'owner'), (req, res) => {
     try {
         const mongoose = require('mongoose');
         res.json({

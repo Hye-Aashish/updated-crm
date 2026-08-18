@@ -51,6 +51,7 @@ router.get('/', protect, async (req, res, next) => {
         }
         const amcs = await Amc.find(filter)
             .populate('projectId', 'name status')
+            .populate({ path: 'clientProductId', populate: { path: 'product', select: 'name' } })
             .populate('clientId', 'name email company')
             .populate('invoices', 'invoiceNumber total status date')
             .sort({ createdAt: -1 });
@@ -68,12 +69,12 @@ router.post('/', protect, async (req, res) => {
             return res.status(403).json({ message: 'Clients cannot create AMC contracts' });
         }
 
-        const { name, projectId, clientId, startDate, endDate, amount, frequency, services, description, notes, autoInvoice } = req.body;
+        const { name, projectId, clientProductId, clientId, startDate, endDate, amount, frequency, services, description, notes, autoInvoice } = req.body;
 
         // Field-level validation
         if (!name) return res.status(400).json({ message: 'AMC Name is required' });
         if (!clientId) return res.status(400).json({ message: 'Client is required' });
-        if (!projectId) return res.status(400).json({ message: 'Project is required' });
+        if (!projectId && !clientProductId) return res.status(400).json({ message: 'Project or Digital Product is required' });
         if (!startDate) return res.status(400).json({ message: 'Start Date is required' });
         if (!endDate) return res.status(400).json({ message: 'End Date is required' });
         if (!amount) return res.status(400).json({ message: 'Amount is required' });
@@ -89,7 +90,8 @@ router.post('/', protect, async (req, res) => {
 
         const amc = new Amc({
             name: name.trim(),
-            projectId,
+            projectId: projectId || undefined,
+            clientProductId: clientProductId || undefined,
             clientId,
             startDate: new Date(startDate),
             endDate: new Date(endDate),
@@ -106,6 +108,7 @@ router.post('/', protect, async (req, res) => {
 
         const populated = await Amc.findById(saved._id)
             .populate('projectId', 'name status')
+            .populate({ path: 'clientProductId', populate: { path: 'product', select: 'name' } })
             .populate('clientId', 'name email company');
 
         return res.status(201).json(populated);
@@ -128,6 +131,7 @@ router.get('/:id', protect, async (req, res, next) => {
     try {
         const amc = await Amc.findById(req.params.id)
             .populate('projectId', 'name status type')
+            .populate({ path: 'clientProductId', populate: { path: 'product', select: 'name' } })
             .populate('clientId', 'name email phone company')
             .populate('invoices', 'invoiceNumber total status date dueDate type')
             .populate('renewalHistory.invoiceId', 'invoiceNumber total status');
@@ -146,6 +150,7 @@ router.put('/:id', protect, async (req, res, next) => {
         }
         const updated = await Amc.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
             .populate('projectId', 'name status')
+            .populate({ path: 'clientProductId', populate: { path: 'product', select: 'name' } })
             .populate('clientId', 'name email company')
             .populate('invoices', 'invoiceNumber total status date');
         if (!updated) return res.status(404).json({ message: 'AMC not found' });
@@ -176,15 +181,17 @@ router.post('/:id/generate-invoice', protect, async (req, res, next) => {
         }
         const amc = await Amc.findById(req.params.id)
             .populate('clientId', 'name email')
-            .populate('projectId', 'name');
+            .populate('projectId', 'name')
+            .populate({ path: 'clientProductId', populate: { path: 'product', select: 'name' } });
         if (!amc) return res.status(404).json({ message: 'AMC not found' });
 
         const { dueDate, note, taxPercentage = 0 } = req.body;
         const invoiceNumber = await getNextInvoiceNumber();
         const today = new Date();
 
+        const projName = amc.projectId?.name || amc.clientProductId?.product?.name || 'Service';
         const lineItems = [{
-            name: `AMC - ${amc.name} (${amc.projectId?.name || 'Project'})`,
+            name: `AMC - ${amc.name} (${projName})`,
             quantity: 1,
             rate: amc.amount,
             taxPercentage: parseFloat(taxPercentage) || 0
@@ -199,7 +206,7 @@ router.post('/:id/generate-invoice', protect, async (req, res, next) => {
         const invoice = new Invoice({
             invoiceNumber,
             clientId: amc.clientId._id,
-            projectId: amc.projectId._id,
+            projectId: amc.projectId ? amc.projectId._id : undefined,
             type: 'amc',
             status: 'pending',
             lineItems,
@@ -249,7 +256,7 @@ router.post('/:id/renew', protect, async (req, res, next) => {
             const invoice = new Invoice({
                 invoiceNumber,
                 clientId: amc.clientId,
-                projectId: amc.projectId,
+                projectId: amc.projectId || undefined,
                 type: 'amc',
                 status: 'pending',
                 lineItems: [{
@@ -276,6 +283,7 @@ router.post('/:id/renew', protect, async (req, res, next) => {
 
         const populated = await Amc.findById(amc._id)
             .populate('projectId', 'name status')
+            .populate({ path: 'clientProductId', populate: { path: 'product', select: 'name' } })
             .populate('clientId', 'name email company')
             .populate('invoices', 'invoiceNumber total status date');
 

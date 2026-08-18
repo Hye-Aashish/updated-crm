@@ -7,8 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 
 import { useAppStore } from '@/store'
 
-export function formatCurrency(amount: number): string {
-    const currency = useAppStore.getState().settings?.companyProfile?.currency || 'INR'
+export function formatCurrency(amount: number, overrideCurrency?: string): string {
+    const currency = overrideCurrency || useAppStore.getState().settings?.companyProfile?.currency || 'INR'
     
     let locale = 'en-US'
     if (currency === 'INR') {
@@ -38,8 +38,8 @@ export function formatCurrency(amount: number): string {
     }).format(amount)
 }
 
-export function getCurrencySymbol(): string {
-    const currency = useAppStore.getState().settings?.companyProfile?.currency || 'INR'
+export function getCurrencySymbol(overrideCurrency?: string): string {
+    const currency = overrideCurrency || useAppStore.getState().settings?.companyProfile?.currency || 'INR'
     const symbols: Record<string, string> = {
         INR: '₹',
         USD: '$',

@@ -26,6 +26,7 @@ const ProjectsPage = lazy(() => import('./pages/projects').then(m => ({ default:
 const NewProjectPage = lazy(() => import('./pages/projects/new').then(m => ({ default: m.NewProjectPage })))
 const ProjectDetailPage = lazy(() => import('./pages/projects/[id]').then(m => ({ default: m.ProjectDetailPage })))
 const EditProjectPage = lazy(() => import('./pages/projects/edit').then(m => ({ default: m.EditProjectPage })))
+const ProductsPage = lazy(() => import('./pages/products').then(m => ({ default: m.ProductsPage })))
 
 const TasksPage = lazy(() => import('./pages/tasks').then(m => ({ default: m.TasksPage })))
 const TaskDetailPage = lazy(() => import('./pages/tasks/[id]').then(m => ({ default: m.TaskDetailPage })))
@@ -118,6 +119,8 @@ export function AppRoutes() {
                     <Route path="projects/:id" element={<PermissionGuard module="projects"><ProjectDetailPage /></PermissionGuard>} />
                     <Route path="projects/:id/edit" element={<PermissionGuard module="projects"><EditProjectPage /></PermissionGuard>} />
 
+                    <Route path="products" element={<PermissionGuard module="projects"><ProductsPage /></PermissionGuard>} />
+
                     <Route path="tasks" element={<PermissionGuard module="tasks"><TasksPage /></PermissionGuard>} />
                     <Route path="tasks/:id" element={<PermissionGuard module="tasks"><TaskDetailPage /></PermissionGuard>} />
 
@@ -167,7 +170,7 @@ export function AppRoutes() {
 
                     <Route path="projects" element={<PermissionGuard module="projects"><ProjectsPage /></PermissionGuard>} />
                     <Route path="projects/:id" element={<PermissionGuard module="projects"><ProjectDetailPage /></PermissionGuard>} />
-
+                    <Route path="products" element={<PermissionGuard module="projects"><ProductsPage /></PermissionGuard>} />
                     <Route path="tasks" element={<PermissionGuard module="tasks"><TasksPage /></PermissionGuard>} />
                     <Route path="tasks/:id" element={<PermissionGuard module="tasks"><TaskDetailPage /></PermissionGuard>} />
 
