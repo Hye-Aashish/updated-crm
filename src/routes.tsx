@@ -94,11 +94,13 @@ export function AppRoutes() {
     return (
         <Suspense fallback={<PageSkeleton />}>
             <Routes>
-                {/* Auth Routes */}
+                {/* Auth & Public Routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/f/:id" element={<PublicLeadForm />} />
                 <Route path="/q/:id" element={<PublicQuotationView />} />
+                <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
+                <Route path="/i/:id" element={<InvoiceDetailPage />} />
 
 
                 {/* Dashboard Routes */}

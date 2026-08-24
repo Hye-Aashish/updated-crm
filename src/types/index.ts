@@ -73,13 +73,23 @@ export type ProjectStatus = 'planning' | 'in-progress' | 'review' | 'completed' 
 export type PaymentModel = 'advance' | 'milestone' | 'retainer'
 
 export interface Milestone {
-    id: string
+    id?: string
+    _id?: string
     name: string
-    dueDate: Date
+    description?: string
+    dueDate?: Date | string
     amount: number
-    percentage: number
+    percentage?: number
     completed: boolean
-    completedAt?: Date
+    status?: 'pending' | 'in-progress' | 'completed'
+    paidAmount?: number
+    paymentStatus?: 'unpaid' | 'partial' | 'paid'
+    paidDate?: Date | string
+    paymentMethod?: string
+    paymentReference?: string
+    paymentNotes?: string
+    invoiceId?: string
+    completedAt?: Date | string
 }
 
 export interface Project {

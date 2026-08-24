@@ -83,11 +83,23 @@ exports.updateProject = async (req, res, next) => {
         const oldProject = await Project.findById(req.params.id);
         if (!oldProject) return res.status(404).json({ message: 'Project not found' });
 
-        // RBAC Check: PMs can only update THEIR own projects
-        if (req.user.role === 'pm') {
-            if (oldProject.pmId !== req.user._id.toString()) {
-                return res.status(403).json({ message: 'Not authorized to update this project' });
-            }
+        // RBAC Check: Clients cannot update projects directly
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Not authorized to update this project' });
+        }
+
+        if (req.body.milestones && Array.isArray(req.body.milestones)) {
+            const mongoose = require('mongoose');
+            req.body.milestones = req.body.milestones.map(m => {
+                const clean = { ...m };
+                if (clean._id && !mongoose.Types.ObjectId.isValid(clean._id)) {
+                    delete clean._id;
+                }
+                if (clean.id && !mongoose.Types.ObjectId.isValid(clean.id)) {
+                    delete clean.id;
+                }
+                return clean;
+            });
         }
 
         const updatedProject = await Project.findByIdAndUpdate(req.params.id, req.body, { new: true });

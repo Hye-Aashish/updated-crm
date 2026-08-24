@@ -22,6 +22,31 @@ const paymentRecordSchema = new mongoose.Schema({
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+const milestoneSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    description: { type: String },
+    dueDate: { type: Date },
+    amount: { type: Number, default: 0 },
+    completed: { type: Boolean, default: false },
+    status: {
+        type: String,
+        enum: ['pending', 'in-progress', 'completed'],
+        default: 'pending'
+    },
+    paidAmount: { type: Number, default: 0 },
+    paymentStatus: {
+        type: String,
+        enum: ['unpaid', 'partial', 'paid'],
+        default: 'unpaid'
+    },
+    paidDate: { type: Date },
+    paymentMethod: { type: String, default: 'Bank Transfer' },
+    paymentReference: { type: String }, // Transaction / UTR ID
+    paymentNotes: { type: String },
+    invoiceId: { type: String },
+    completedAt: { type: Date }
+}, { timestamps: true });
+
 const clientProductSchema = new mongoose.Schema({
     client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -43,6 +68,7 @@ const clientProductSchema = new mongoose.Schema({
     assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     customizations: { type: String },
     tasks: [taskItemSchema],
+    milestones: [milestoneSchema],
     paymentHistory: [paymentRecordSchema],
     status: {
         type: String,

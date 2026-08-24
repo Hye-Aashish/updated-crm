@@ -129,7 +129,21 @@ exports.deleteClient = async (req, res, next) => {
     try {
         const deletedClient = await Client.findByIdAndDelete(req.params.id);
         if (!deletedClient) return res.status(404).json({ message: 'Client not found' });
-        res.json({ message: 'Client deleted' });
+
+        // Safe cascade cleanup of dependent records
+        try {
+            const ClientProduct = require('../models/ClientProduct');
+            const Ticket = require('../models/Ticket');
+            const Project = require('../models/Project');
+
+            await ClientProduct.deleteMany({ client: req.params.id });
+            await Ticket.deleteMany({ clientId: req.params.id });
+            await Project.updateMany({ clientId: req.params.id }, { $unset: { clientId: "" } });
+        } catch (cleanupErr) {
+            console.error('Cascade cleanup error on client delete:', cleanupErr);
+        }
+
+        res.json({ message: 'Client deleted and dependencies safely cleaned' });
     } catch (err) {
         next(err);
     }

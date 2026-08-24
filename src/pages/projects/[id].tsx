@@ -33,6 +33,8 @@ import { TaskBoard } from '@/components/tasks/task-board'
 import { ProjectTeamDialog } from '@/components/projects/project-team-dialog'
 import { ProjectFileDialog } from '@/components/projects/project-file-dialog'
 import { ProjectTaskDialog } from '@/components/projects/project-task-dialog'
+import { ProjectMilestonesTab } from '@/components/projects/project-milestones-tab'
+import { Flag } from 'lucide-react'
 import { useState } from 'react'
 
 import { mapProject, mapClient, mapUser, mapInvoice, mapTask } from '@/lib/mappers'
@@ -329,6 +331,10 @@ export function ProjectDetailPage() {
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="milestones" className="gap-1.5">
+                        <Flag className="h-3.5 w-3.5" />
+                        Milestones ({project.milestones?.length || 0})
+                    </TabsTrigger>
                     <TabsTrigger value="tasks">Tasks ({projectTasks.length})</TabsTrigger>
                     {isVisible('team') && <TabsTrigger value="team">Team ({displayTeam.length})</TabsTrigger>}
                     <TabsTrigger value="files">Files ({projectFiles.length})</TabsTrigger>
@@ -434,6 +440,13 @@ export function ProjectDetailPage() {
                             </Card>
                         </div>
                     </div>
+                </TabsContent>
+
+                <TabsContent value="milestones" className="space-y-4">
+                    <ProjectMilestonesTab
+                        project={project}
+                        onProjectUpdate={(updated) => updateProject(project.id, updated)}
+                    />
                 </TabsContent>
 
                 <TabsContent value="tasks" className="space-y-4">

@@ -171,6 +171,31 @@ const defaultRoles = [
     }
 ];
 
+// Get Public Branding Settings (No auth required)
+router.get('/public', async (req, res) => {
+    try {
+        const settings = await Setting.findOne({ type: 'general' });
+        if (!settings) return res.json({ companyProfile: {}, billing: {} });
+
+        const safeObj = {
+            companyProfile: settings.companyProfile || {},
+            billing: {
+                invoicePhone: settings.billing?.invoicePhone,
+                invoiceEmail: settings.billing?.invoiceEmail,
+                invoiceWebsite: settings.billing?.invoiceWebsite,
+                invoiceFooterHeading: settings.billing?.invoiceFooterHeading,
+                termsAndConditions: settings.billing?.termsAndConditions,
+                bankDetails: settings.billing?.bankDetails,
+                taxRate: settings.billing?.taxRate,
+                invoiceLogo: settings.billing?.invoiceLogo,
+            }
+        };
+        res.json(safeObj);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // Get Settings (Create if not exists)
 router.get('/', protect, async (req, res) => {
     try {

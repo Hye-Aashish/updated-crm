@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,8 @@ interface InvoiceFormItem {
 
 export function NewInvoicePage() {
     const navigate = useNavigate()
+    const location = useLocation()
+    const stateData = location.state as { clientId?: string; projectId?: string; clientProductId?: string; amount?: number; title?: string; dueDate?: any; type?: string } | null
     const { toast } = useToast()
     const addInvoice = useAppStore((state) => state.addInvoice)
     const { clients, projects, setClients, setProjects, settings } = useAppStore()
@@ -106,9 +108,11 @@ export function NewInvoicePage() {
     }, [])
 
     const [formData, setFormData] = useState({
-        clientId: '',
-        referenceId: '',
-        dueDate: '',
+        clientId: stateData?.clientId || '',
+        referenceId: stateData?.projectId ? `project_${stateData.projectId}` : stateData?.clientProductId ? `product_${stateData.clientProductId}` : '',
+        dueDate: stateData?.dueDate && !isNaN(new Date(stateData.dueDate).getTime())
+            ? new Date(stateData.dueDate).toISOString().split('T')[0]
+            : '',
         taxRate: 18,
         frequency: 'once',
         autoSend: false,
@@ -123,7 +127,13 @@ export function NewInvoicePage() {
     })
 
     const [items, setItems] = useState<InvoiceFormItem[]>([
-        { id: '1', description: 'Development Services', quantity: 1, rate: 0, amount: 0 }
+        {
+            id: '1',
+            description: stateData?.title || 'Milestone Deliverables & Services',
+            quantity: 1,
+            rate: stateData?.amount || 0,
+            amount: stateData?.amount || 0
+        }
     ])
 
     const [applyGST, setApplyGST] = useState(true)

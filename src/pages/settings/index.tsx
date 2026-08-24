@@ -714,6 +714,51 @@ function BillingTab({ data, onSave, saving }: any) {
                 </div>
 
                 <div className="border-t pt-6 space-y-4">
+                    <div className="space-y-1">
+                        <Label className="text-base font-bold">Invoice Footer & Contact Details</Label>
+                        <p className="text-xs text-muted-foreground">Customize the contact badges and thank you banner displayed on invoices.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="invoiceFooterHeading">Footer Heading</Label>
+                        <Input 
+                            id="invoiceFooterHeading" 
+                            value={formData.invoiceFooterHeading ?? 'THANK YOU FOR YOUR BUSINESS'} 
+                            onChange={handleChange} 
+                            placeholder="e.g. THANK YOU FOR YOUR BUSINESS" 
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="invoicePhone">Invoice Phone Number</Label>
+                            <Input 
+                                id="invoicePhone" 
+                                value={formData.invoicePhone || ''} 
+                                onChange={handleChange} 
+                                placeholder="e.g. +91 7505974545" 
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="invoiceEmail">Invoice Email</Label>
+                            <Input 
+                                id="invoiceEmail" 
+                                value={formData.invoiceEmail || ''} 
+                                onChange={handleChange} 
+                                placeholder="e.g. Info@nexprism.com" 
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="invoiceWebsite">Invoice Website</Label>
+                            <Input 
+                                id="invoiceWebsite" 
+                                value={formData.invoiceWebsite || ''} 
+                                onChange={handleChange} 
+                                placeholder="e.g. nexprism.com" 
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="border-t pt-6 space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="termsAndConditions">Default Invoice Terms & Conditions</Label>
                         <textarea

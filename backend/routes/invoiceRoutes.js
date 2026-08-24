@@ -41,6 +41,35 @@ router.get('/', protect, async (req, res) => {
     }
 });
 
+// GET single invoice (Public View for Clients without CRM login)
+router.get('/public/:id', async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+        const client = await Client.findById(invoice.clientId).select('name email company phone address');
+        let project = null;
+        if (invoice.projectId) {
+            project = await Project.findById(invoice.projectId).select('name');
+        } else if (invoice.clientProductId) {
+            const ClientProduct = require('../models/ClientProduct');
+            project = await ClientProduct.findById(invoice.clientProductId).populate('product', 'name');
+            if (project) {
+                project = { _id: project._id, name: project.product?.name || 'Digital Product', isDigitalProduct: true };
+            }
+        }
+
+        res.json({
+            ...invoice._doc,
+            client,
+            project,
+            isPublicView: true
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // GET single invoice (Authenticated)
 router.get('/:id', protect, async (req, res) => {
     try {
@@ -134,7 +163,8 @@ router.post('/', protect, async (req, res) => {
                         console.error('PDF generation failed:', pdfErr.message);
                     }
 
-                    const invoicePageUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/invoices/${newInvoice._id}`;
+                    const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+                    const invoicePageUrl = `${frontendBase}/#/invoices/${newInvoice._id}`;
 
                     const message = `
                         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
@@ -301,7 +331,8 @@ router.post('/:id/send', protect, async (req, res) => {
             console.error('PDF generation failed:', pdfErr.message);
         }
 
-        const invoicePageUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/invoices/${invoice._id}`;
+        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+        const invoicePageUrl = `${frontendBase}/#/invoices/${invoice._id}`;
 
         const message = `
             <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
@@ -374,11 +405,12 @@ router.post('/:id/send', protect, async (req, res) => {
 });
 
 
-// Create Cashfree Payment Session (Authenticated — client or admin)
-router.post('/:id/payment-session', protect, async (req, res) => {
+// Create Cashfree Payment Session (Allows public clients to pay their invoice)
+router.post('/:id/payment-session', async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+        if (invoice.status === 'paid') return res.status(400).json({ message: 'Invoice is already paid' });
 
         const client = await Client.findById(invoice.clientId);
         if (!client) return res.status(404).json({ message: 'Client not found' });
@@ -387,6 +419,7 @@ router.post('/:id/payment-session', protect, async (req, res) => {
         const Setting = require('../models/Setting');
         const settings = await Setting.findOne({ type: 'general' });
         const billing = settings?.billing || {};
+        const companyProfile = settings?.companyProfile || {};
 
         const cashfreeClientId = billing.cashfreeClientId || process.env.CASHFREE_CLIENT_ID;
         const cashfreeClientSecret = billing.cashfreeClientSecret || process.env.CASHFREE_CLIENT_SECRET;
@@ -402,6 +435,7 @@ router.post('/:id/payment-session', protect, async (req, res) => {
             : 'https://api.cashfree.com/pg';
 
         const orderId = `INV_${invoice.invoiceNumber}_${Date.now()}`;
+        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 
         const orderData = {
             order_amount: invoice.total,
@@ -414,7 +448,7 @@ router.post('/:id/payment-session', protect, async (req, res) => {
                 customer_name: client.name
             },
             order_meta: {
-                return_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/invoices/${invoice._id}?status=success&order_id={order_id}`,
+                return_url: `${frontendBase}/#/invoices/${invoice._id}?status=success&order_id={order_id}`,
                 notify_url: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/invoices/payment/webhook`
             }
         };

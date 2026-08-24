@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     CheckCircle2, Clock, Calendar, DollarSign, Plus, Trash2,
-    Check, User as UserIcon, FileText,
-    TrendingUp, CreditCard
+    Check, User as UserIcon, FileText, Edit2,
+    TrendingUp, CreditCard, Flag, AlertTriangle, CheckCheck
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,14 +11,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
 import { usePermissions } from '@/hooks/use-permissions'
-import type { ClientProduct, ClientProductTask } from '@/types'
+import { ProjectMilestoneDialog } from '../projects/project-milestone-dialog'
+import { ProjectMilestonePaymentDialog } from '../projects/project-milestone-payment-dialog'
+import type { ClientProduct, ClientProductTask, Milestone } from '@/types'
 
 interface ClientProductManagerDialogProps {
     clientProduct: ClientProduct
@@ -31,7 +34,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
     const { toast } = useToast()
     const { users, currentUser } = useAppStore()
     const { canView } = usePermissions()
-    const [activeTab, setActiveTab] = useState('tasks')
+    const [activeTab, setActiveTab] = useState('milestones')
     const [cp, setCp] = useState<ClientProduct>(clientProduct)
     const [isLoading, setIsLoading] = useState(false)
 
@@ -44,6 +47,12 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
     const [newTaskDueDate, setNewTaskDueDate] = useState('')
     const [newTaskAssignee, setNewTaskAssignee] = useState('')
     const [isAddingTask, setIsAddingTask] = useState(false)
+
+    // Milestone dialog states
+    const [isMilestoneDialogOpen, setIsMilestoneDialogOpen] = useState(false)
+    const [isMilestonePaymentDialogOpen, setIsMilestonePaymentDialogOpen] = useState(false)
+    const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null)
+    const [selectedMilestoneIdx, setSelectedMilestoneIdx] = useState<number | null>(null)
 
     // Payment recording state
     const [isRecordingPayment, setIsRecordingPayment] = useState(false)
@@ -74,8 +83,19 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
     const completedTasks = tasks.filter(t => t.status === 'completed')
     const pendingTasks = tasks.filter(t => t.status !== 'completed')
     const totalTasksCount = tasks.length
+
+    // Milestones calculations
+    const milestones = cp.milestones || []
+    const totalMilestones = milestones.length
+    const completedMilestones = milestones.filter(m => m.completed || m.status === 'completed').length
+    const totalMilestonesAmount = milestones.reduce((sum, m) => sum + (Number(m.amount) || 0), 0)
+
     const progressPercent = cp.progress !== undefined ? cp.progress : (
-        totalTasksCount > 0 ? Math.round((completedTasks.length / totalTasksCount) * 100) : 0
+        totalMilestones > 0
+            ? Math.round((completedMilestones / totalMilestones) * 100)
+            : totalTasksCount > 0
+            ? Math.round((completedTasks.length / totalTasksCount) * 100)
+            : 0
     )
 
     // Due date countdown calculation
@@ -100,21 +120,201 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
 
     const dueDateStatus = getDueDateStatus()
 
-    // ── Task Actions ─────────────────────────────────────────────────────────────
-    const handleToggleTask = async (task: ClientProductTask) => {
-        const taskId = task.id || (task as any)._id
-        if (!taskId) return
-        const newStatus = task.status === 'completed' ? 'pending' : 'completed'
+    // ── Milestone Handlers ───────────────────────────────────────────────────────
+    const handleSaveMilestone = async (milestoneData: Partial<Milestone>) => {
         try {
-            const res = await api.patch(`/client-products/${id}/tasks/${taskId}`, { status: newStatus })
+            let updatedMilestones: Milestone[] = [...milestones]
+            if (selectedMilestoneIdx !== null && selectedMilestoneIdx >= 0) {
+                updatedMilestones[selectedMilestoneIdx] = {
+                    ...updatedMilestones[selectedMilestoneIdx],
+                    ...milestoneData
+                } as Milestone
+            } else {
+                updatedMilestones.push({
+                    id: 'm_' + Date.now(),
+                    paymentStatus: 'unpaid',
+                    paidAmount: 0,
+                    ...milestoneData
+                } as Milestone)
+            }
+
+            const completedCount = updatedMilestones.filter(m => m.completed || m.status === 'completed').length
+            const newProgress = Math.round((completedCount / updatedMilestones.length) * 100)
+
+            const updatedCp = {
+                ...cp,
+                milestones: updatedMilestones,
+                progress: newProgress,
+                workStatus: (newProgress === 100 ? 'completed' : newProgress > 0 ? 'in_progress' : cp.workStatus) as any
+            }
+
+            setCp(updatedCp)
+            onUpdate(updatedCp)
+
+            const res = await api.put(`/client-products/${id}`, {
+                milestones: updatedMilestones,
+                progress: newProgress
+            })
+
+            if (res.data) {
+                setCp(res.data)
+                onUpdate(res.data)
+            }
+
+            toast({ title: 'Success', description: 'Digital product milestone saved successfully!' })
+        } catch (error: any) {
+            console.error('Failed to save milestone', error)
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to save milestone' })
+        }
+    }
+
+    const handleSaveMilestonePayment = async (paymentData: {
+        paymentStatus: 'unpaid' | 'partial' | 'paid'
+        paidAmount: number
+        paidDate?: Date
+        paymentMethod?: string
+        paymentReference?: string
+        paymentNotes?: string
+    }) => {
+        let targetIndex = selectedMilestoneIdx
+        if (targetIndex === null || targetIndex < 0) {
+            if (selectedMilestone) {
+                targetIndex = milestones.findIndex(m =>
+                    (m.id && selectedMilestone.id && m.id === selectedMilestone.id) ||
+                    (m._id && selectedMilestone._id && m._id === selectedMilestone._id) ||
+                    m.name === selectedMilestone.name
+                )
+            }
+        }
+        if (targetIndex === null || targetIndex < 0) targetIndex = 0
+
+        const updatedMilestones = milestones.map((m, idx) => {
+            if (idx === targetIndex) {
+                return { ...m, ...paymentData }
+            }
+            return m
+        })
+
+        const totalPaid = updatedMilestones.reduce((sum, m) => {
+            if (m.paidAmount !== undefined && m.paidAmount > 0) return sum + m.paidAmount
+            if (m.paymentStatus === 'paid') return sum + (m.amount || 0)
+            return sum
+        }, 0)
+
+        const updatedCp = {
+            ...cp,
+            milestones: updatedMilestones,
+            paidAmount: totalPaid > 0 ? totalPaid : cp.paidAmount
+        }
+
+        setCp(updatedCp)
+        onUpdate(updatedCp)
+
+        try {
+            const res = await api.put(`/client-products/${id}`, {
+                milestones: updatedMilestones,
+                paidAmount: totalPaid > 0 ? totalPaid : cp.paidAmount
+            })
+
+            if (res.data) {
+                setCp(res.data)
+                onUpdate(res.data)
+            }
+
+            toast({
+                title: 'Payment Status Updated! 💳',
+                description: `Payment recorded as ${paymentData.paymentStatus.toUpperCase()} (${formatCurrency(paymentData.paidAmount)}).`
+            })
+        } catch (error) {
+            console.error('Milestone payment save note:', error)
+            toast({ title: 'Payment Recorded! 💳' })
+        }
+    }
+
+    const handleToggleMilestoneComplete = async (index: number, completed: boolean) => {
+        try {
+            const updatedMilestones = [...milestones]
+            updatedMilestones[index] = {
+                ...updatedMilestones[index],
+                completed,
+                status: completed ? 'completed' : 'in-progress',
+                completedAt: completed ? new Date() : undefined
+            }
+
+            const completedCount = updatedMilestones.filter(m => m.completed).length
+            const newProgress = Math.round((completedCount / updatedMilestones.length) * 100)
+
+            const updatedCp = {
+                ...cp,
+                milestones: updatedMilestones,
+                progress: newProgress,
+                workStatus: (newProgress === 100 ? 'completed' : 'in_progress') as any
+            }
+
+            setCp(updatedCp)
+            onUpdate(updatedCp)
+
+            const res = await api.put(`/client-products/${id}`, {
+                milestones: updatedMilestones,
+                progress: newProgress
+            })
+
+            if (res.data) {
+                setCp(res.data)
+                onUpdate(res.data)
+            }
+
+            toast({
+                title: completed ? 'Milestone Completed! 🎉' : 'Status Updated',
+                description: `"${updatedMilestones[index].name}" marked as ${completed ? 'completed' : 'in-progress'}.`
+            })
+        } catch (error) {
+            console.error('Failed to toggle milestone', error)
+        }
+    }
+
+    const handleDeleteMilestone = async (index: number) => {
+        if (!window.confirm('Remove this milestone?')) return
+        try {
+            const updatedMilestones = milestones.filter((_, i) => i !== index)
+            const completedCount = updatedMilestones.filter(m => m.completed).length
+            const newProgress = updatedMilestones.length > 0 ? Math.round((completedCount / updatedMilestones.length) * 100) : 0
+
+            const updatedCp = {
+                ...cp,
+                milestones: updatedMilestones,
+                progress: newProgress
+            }
+
+            setCp(updatedCp)
+            onUpdate(updatedCp)
+
+            await api.put(`/client-products/${id}`, {
+                milestones: updatedMilestones,
+                progress: newProgress
+            })
+
+            toast({ title: 'Milestone removed' })
+        } catch (error) {
+            console.error('Failed to remove milestone', error)
+        }
+    }
+
+    // ── Task Actions ─────────────────────────────────────────────────────────────
+    const handleToggleTask = async (taskId: string, currentStatus: string) => {
+        const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
+        try {
+            const res = await api.put(`/client-products/${id}/tasks/${taskId}`, {
+                status: newStatus
+            })
             setCp(res.data)
             onUpdate(res.data)
             toast({
-                title: newStatus === 'completed' ? 'Task Completed' : 'Task Marked Pending',
-                description: `"${task.title}" updated`
+                title: newStatus === 'completed' ? 'Task Completed 🎉' : 'Task Status Updated',
+                description: `Status changed to ${newStatus}`
             })
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to update task' })
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to update task status' })
         }
     }
 
@@ -136,7 +336,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
             setNewTaskTitle('')
             setNewTaskDueDate('')
             setNewTaskAssignee('')
-            toast({ title: 'Task Added', description: 'New deliverable task created' })
+            toast({ title: 'Task Added', description: 'Deliverable task added to project' })
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to add task' })
         } finally {
@@ -219,17 +419,34 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
         }
     }
 
-    const filteredTasks = tasks.filter(t => {
-        if (taskFilter === 'pending') return t.status !== 'completed'
-        if (taskFilter === 'completed') return t.status === 'completed'
-        return true
-    })
-
     const prodName = typeof cp.product === 'object' ? (cp.product as any)?.name : 'Digital Product'
     const clientName = typeof cp.client === 'object' ? (cp.client as any)?.name : 'Client'
+    const clientId = typeof cp.client === 'object' ? (cp.client as any)?._id || (cp.client as any)?.id : cp.client
+
+    // Count for alert: Work Done but Payment Pending
+    const workDonePaymentPendingCount = milestones.filter(m => {
+        const isDone = m.completed || m.status === 'completed'
+        const isPaid = m.paymentStatus === 'paid' || (m.paidAmount !== undefined && m.paidAmount >= m.amount && m.amount > 0)
+        return isDone && !isPaid
+    }).length
 
     return (
         <div className="space-y-6 max-h-[82vh] overflow-y-auto pr-1">
+            {/* Warning Alert if Work Done but Payment is Pending */}
+            {workDonePaymentPendingCount > 0 && canViewFinances && (
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs">
+                    <div className="flex items-center gap-2.5">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <div>
+                            <span className="font-bold">{workDonePaymentPendingCount} Milestone(s) Deliver Ho Gaye Par Payment Aana Baki Hai!</span>
+                            <p className="text-[11px] text-amber-700/80 dark:text-amber-300/80">
+                                Client se payment lene ke liye neeche "Record Payment" ya "Create Invoice" par click karein.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Top Banner & Quick Metrics */}
             <div className="rounded-2xl p-5 bg-gradient-to-br from-card via-card to-muted/50 border shadow-xs space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -277,7 +494,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                             {(!cp.workStatus || cp.workStatus === 'not_started') && '⏳ Not Started'}
                         </Badge>
 
-                        {/* Payment Status Badge (Only for users with financial permissions) */}
+                        {/* Payment Status Badge */}
                         {canViewFinances && (
                             <Badge
                                 className={`text-xs px-2.5 py-1 ${
@@ -304,7 +521,10 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                             Work Progress ({progressPercent}%)
                         </span>
                         <span className="text-muted-foreground">
-                            {completedTasks.length} of {totalTasksCount} tasks completed ({pendingTasks.length} pending)
+                            {milestones.length > 0
+                                ? `${completedMilestones} of ${totalMilestones} Milestones Completed`
+                                : `${completedTasks.length} of ${totalTasksCount} tasks completed`
+                            }
                         </span>
                     </div>
                     <Progress value={progressPercent} className="h-2.5" />
@@ -313,34 +533,302 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
 
             {/* Main Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className={`grid ${canViewFinances ? 'grid-cols-3' : 'grid-cols-2'} mb-4 h-11 bg-muted/60 p-1 rounded-xl`}>
+                <TabsList className={`grid ${canViewFinances ? 'grid-cols-4' : 'grid-cols-3'} mb-4 h-11 bg-muted/60 p-1 rounded-xl`}>
+                    <TabsTrigger value="milestones" className="rounded-lg font-medium text-xs sm:text-sm flex items-center gap-1.5">
+                        <Flag className="h-4 w-4 text-primary" />
+                        Milestones ({milestones.length})
+                    </TabsTrigger>
                     <TabsTrigger value="tasks" className="rounded-lg font-medium text-xs sm:text-sm flex items-center gap-1.5">
                         <CheckCircle2 className="h-4 w-4 text-purple-500" />
-                        Tasks & Deliverables ({tasks.length})
+                        Tasks ({tasks.length})
                     </TabsTrigger>
                     {canViewFinances && (
                         <TabsTrigger value="payments" className="rounded-lg font-medium text-xs sm:text-sm flex items-center gap-1.5">
                             <CreditCard className="h-4 w-4 text-emerald-500" />
-                            Payments & Balance
+                            Payments
                         </TabsTrigger>
                     )}
                     <TabsTrigger value="timeline" className="rounded-lg font-medium text-xs sm:text-sm flex items-center gap-1.5">
                         <Calendar className="h-4 w-4 text-blue-500" />
-                        Status & Timeline
+                        Timeline
                     </TabsTrigger>
                 </TabsList>
 
-                {/* ── TAB 1: TASKS & DELIVERABLES ────────────────────────────────────────── */}
+                {/* ── TAB 1: MILESTONES ────────────────────────────────────────── */}
+                <TabsContent value="milestones" className="space-y-4">
+                    {/* Financial KPI Summary Cards */}
+                    {canViewFinances && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="p-3.5 rounded-xl border bg-card/60">
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase">Deal Price / Milestones Sum</span>
+                                <div className="text-lg font-bold text-foreground mt-0.5">{formatCurrency(customPrice)}</div>
+                                <div className="text-[10px] text-muted-foreground">Milestones: {formatCurrency(totalMilestonesAmount)}</div>
+                            </div>
+                            <div className="p-3.5 rounded-xl border bg-card/60">
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase">Received Payment</span>
+                                <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{formatCurrency(paidAmount)}</div>
+                                <div className="text-[10px] text-muted-foreground">{customPrice > 0 ? Math.round((paidAmount / customPrice) * 100) : 0}% Paid</div>
+                            </div>
+                            <div className="p-3.5 rounded-xl border bg-card/60">
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase">Outstanding Due</span>
+                                <div className={`text-lg font-bold mt-0.5 ${pendingAmount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600'}`}>
+                                    {formatCurrency(pendingAmount)}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">{pendingAmount === 0 ? '✓ Fully Cleared' : 'Pending from client'}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Milestone Header */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h4 className="text-sm font-bold text-foreground">Product Deliverable Milestones & Stages</h4>
+                            <p className="text-xs text-muted-foreground">Track deliverable completion & stage-wise client payments.</p>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={() => {
+                                setSelectedMilestone(null)
+                                setSelectedMilestoneIdx(null)
+                                setIsMilestoneDialogOpen(true)
+                            }}
+                            className="h-8 text-xs font-semibold"
+                        >
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Add Milestone
+                        </Button>
+                    </div>
+
+                    {/* Milestones List */}
+                    {milestones.length === 0 ? (
+                        <div className="p-8 text-center border-2 border-dashed rounded-xl bg-muted/20 space-y-2">
+                            <Flag className="h-8 w-8 text-primary mx-auto opacity-70" />
+                            <h5 className="text-sm font-semibold">No Milestones Configured Yet</h5>
+                            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                                Configure milestones (e.g. Stage 1: Setup & Configuration, Stage 2: Testing & Handover) with target dates and payment amounts.
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                    setSelectedMilestone(null)
+                                    setSelectedMilestoneIdx(null)
+                                    setIsMilestoneDialogOpen(true)
+                                }}
+                                className="mt-2 text-xs"
+                            >
+                                <Plus className="h-3.5 w-3.5 mr-1" /> Setup First Milestone
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {milestones.map((m, idx) => {
+                                const isWorkDone = m.completed || m.status === 'completed'
+                                const isPaid = m.paymentStatus === 'paid' || (m.paidAmount !== undefined && m.paidAmount >= m.amount && m.amount > 0)
+                                const isPartial = m.paymentStatus === 'partial'
+                                const mPaid = m.paidAmount !== undefined ? m.paidAmount : (isPaid ? m.amount : 0)
+                                const mDue = Math.max(0, (m.amount || 0) - mPaid)
+                                const dueDateObj = m.dueDate ? new Date(m.dueDate) : null
+                                const isOverdue = dueDateObj && dueDateObj < new Date() && !isWorkDone
+
+                                return (
+                                    <div
+                                        key={m.id || m._id || idx}
+                                        className={`p-3.5 rounded-xl border transition-all ${
+                                            isWorkDone && isPaid
+                                                ? 'bg-emerald-50/40 dark:bg-emerald-950/10 border-emerald-200 dark:border-emerald-900/40'
+                                                : isWorkDone && !isPaid
+                                                ? 'bg-amber-50/40 dark:bg-amber-950/10 border-amber-300 dark:border-amber-800'
+                                                : isOverdue
+                                                ? 'bg-rose-50/30 dark:bg-rose-950/10 border-rose-200'
+                                                : 'bg-card border-border'
+                                        }`}
+                                    >
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            {/* Left: Checkbox & Info */}
+                                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                <div className="pt-0.5">
+                                                    <Checkbox
+                                                        checked={isWorkDone}
+                                                        onCheckedChange={(checked) => handleToggleMilestoneComplete(idx, !!checked)}
+                                                        className="h-4.5 w-4.5 rounded data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1 min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <h5 className={`text-sm font-bold truncate ${isWorkDone ? 'text-muted-foreground' : 'text-foreground'}`}>
+                                                            {m.name}
+                                                        </h5>
+
+                                                        {/* Work Badge */}
+                                                        {isWorkDone ? (
+                                                            <Badge className="bg-emerald-600 text-white text-[10px] py-0 gap-1">
+                                                                <CheckCircle2 className="h-3 w-3" /> Work Delivered
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge variant="outline" className="text-[10px] py-0 text-muted-foreground">
+                                                                Work In-Progress
+                                                            </Badge>
+                                                        )}
+
+                                                        {/* Payment Badge */}
+                                                        {canViewFinances && (
+                                                            <>
+                                                                {isPaid ? (
+                                                                    <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 text-[10px] py-0 gap-1 font-semibold">
+                                                                        <CheckCheck className="h-3 w-3 text-emerald-600" />
+                                                                        Payment Received ({formatCurrency(mPaid)})
+                                                                    </Badge>
+                                                                ) : isPartial ? (
+                                                                    <Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] py-0 font-semibold">
+                                                                        Partial ({formatCurrency(mPaid)} Paid / {formatCurrency(mDue)} Due)
+                                                                    </Badge>
+                                                                ) : isWorkDone ? (
+                                                                    <Badge className="bg-amber-500 text-white text-[10px] py-0 font-bold gap-1 animate-pulse">
+                                                                        <AlertTriangle className="h-3 w-3" />
+                                                                        Work Done • Payment Due ({formatCurrency(mDue || m.amount)})
+                                                                    </Badge>
+                                                                ) : (
+                                                                    <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px] py-0">
+                                                                        Payment Due ({formatCurrency(m.amount)})
+                                                                    </Badge>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+
+                                                    {m.description && (
+                                                        <p className="text-xs text-muted-foreground line-clamp-1">{m.description}</p>
+                                                    )}
+
+                                                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground pt-0.5">
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="h-3 w-3 text-blue-500" />
+                                                            Target Date: {dueDateObj ? dueDateObj.toLocaleDateString() : 'No date'}
+                                                        </span>
+                                                        {isOverdue && (
+                                                            <span className="text-red-600 bg-red-100 dark:bg-red-950 px-1.5 py-0.2 rounded font-bold text-[10px]">
+                                                                OVERDUE
+                                                            </span>
+                                                        )}
+                                                        {isPaid && m.paidDate && (
+                                                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">
+                                                                Paid on {new Date(m.paidDate).toLocaleDateString()} {m.paymentMethod ? `via ${m.paymentMethod}` : ''}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Right: Milestone Amount & Actions */}
+                                            <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0">
+                                                {canViewFinances && (
+                                                    <div className="text-right">
+                                                        <div className="text-sm font-bold text-foreground">
+                                                            {formatCurrency(m.amount || 0)}
+                                                        </div>
+                                                        {customPrice > 0 && m.amount > 0 && (
+                                                            <div className="text-[10px] text-muted-foreground">
+                                                                {Math.round((m.amount / customPrice) * 100)}% of price
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center gap-1">
+                                                    {/* Record Payment Button */}
+                                                    {canViewFinances && (
+                                                        <Button
+                                                            variant={isPaid ? 'outline' : 'default'}
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setSelectedMilestone(m)
+                                                                setSelectedMilestoneIdx(idx)
+                                                                setIsMilestonePaymentDialogOpen(true)
+                                                            }}
+                                                            className={`h-7.5 text-xs font-semibold px-2.5 gap-1 ${
+                                                                isPaid
+                                                                    ? 'text-emerald-600 border-emerald-300 hover:bg-emerald-50'
+                                                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                            }`}
+                                                        >
+                                                            <CreditCard className="h-3 w-3" />
+                                                            {isPaid ? 'Payment Done ✓' : isPartial ? 'Update Payment' : 'Record Payment'}
+                                                        </Button>
+                                                    )}
+
+                                                    {/* Create Invoice Button */}
+                                                    {canViewFinances && !isPaid && m.amount > 0 && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                onClose()
+                                                                navigate('/invoices/new', {
+                                                                    state: {
+                                                                        clientId: clientId,
+                                                                        clientProductId: id,
+                                                                        type: 'product_milestone',
+                                                                        amount: mDue || m.amount,
+                                                                        title: `${prodName} - ${m.name}`,
+                                                                        dueDate: m.dueDate
+                                                                    }
+                                                                })
+                                                            }}
+                                                            className="h-7.5 text-xs px-2 font-medium border-primary/30 text-primary hover:bg-primary/10"
+                                                            title="Generate invoice for this milestone"
+                                                        >
+                                                            <FileText className="h-3 w-3 mr-1" />
+                                                            Invoice
+                                                        </Button>
+                                                    )}
+
+                                                    {/* Edit Button */}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            setSelectedMilestone(m)
+                                                            setSelectedMilestoneIdx(idx)
+                                                            setIsMilestoneDialogOpen(true)
+                                                        }}
+                                                        className="h-7.5 w-7.5 text-muted-foreground hover:text-foreground"
+                                                        title="Edit Milestone"
+                                                    >
+                                                        <Edit2 className="h-3 w-3" />
+                                                    </Button>
+
+                                                    {/* Delete Button */}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleDeleteMilestone(idx)}
+                                                        className="h-7.5 w-7.5 text-muted-foreground hover:text-destructive"
+                                                        title="Delete Milestone"
+                                                    >
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </TabsContent>
+
+                {/* ── TAB 2: TASKS ────────────────────────────────────────── */}
                 <TabsContent value="tasks" className="space-y-4">
                     {/* Add New Task Form */}
                     <form onSubmit={handleAddTask} className="p-3.5 bg-muted/30 rounded-xl border space-y-3">
                         <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                            <Plus className="h-3.5 w-3.5 text-primary" /> Add Task / Milestone for this Product
+                            <Plus className="h-3.5 w-3.5 text-primary" /> Add Task for this Product
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                             <div className="sm:col-span-6">
                                 <Input
-                                    placeholder="Task title (e.g., Setup database, Integrate payment gateway, QA testing)..."
+                                    placeholder="Task title (e.g. Setup domain, configure branding, QA testing)..."
                                     value={newTaskTitle}
                                     onChange={e => setNewTaskTitle(e.target.value)}
                                     className="text-xs h-9 bg-background"
@@ -380,8 +868,8 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                             <button
                                 type="button"
                                 onClick={() => setTaskFilter('all')}
-                                className={`text-xs px-3 py-1 rounded-full border transition-all ${
-                                    taskFilter === 'all' ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted/50 text-muted-foreground'
+                                className={`text-xs px-3 py-1 rounded-lg transition-colors ${
+                                    taskFilter === 'all' ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted hover:bg-muted/80 text-muted-foreground'
                                 }`}
                             >
                                 All ({tasks.length})
@@ -389,8 +877,8 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                             <button
                                 type="button"
                                 onClick={() => setTaskFilter('pending')}
-                                className={`text-xs px-3 py-1 rounded-full border transition-all ${
-                                    taskFilter === 'pending' ? 'bg-amber-600 text-white font-semibold' : 'bg-muted/50 text-muted-foreground'
+                                className={`text-xs px-3 py-1 rounded-lg transition-colors ${
+                                    taskFilter === 'pending' ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted hover:bg-muted/80 text-muted-foreground'
                                 }`}
                             >
                                 Pending ({pendingTasks.length})
@@ -398,203 +886,126 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                             <button
                                 type="button"
                                 onClick={() => setTaskFilter('completed')}
-                                className={`text-xs px-3 py-1 rounded-full border transition-all ${
-                                    taskFilter === 'completed' ? 'bg-emerald-600 text-white font-semibold' : 'bg-muted/50 text-muted-foreground'
+                                className={`text-xs px-3 py-1 rounded-lg transition-colors ${
+                                    taskFilter === 'completed' ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted hover:bg-muted/80 text-muted-foreground'
                                 }`}
                             >
                                 Completed ({completedTasks.length})
                             </button>
                         </div>
-                        <span className="text-xs text-muted-foreground">Click checkbox to mark done/pending</span>
                     </div>
 
-                    {/* Tasks List */}
-                    {filteredTasks.length === 0 ? (
-                        <div className="text-center py-10 border border-dashed rounded-xl bg-muted/20 text-muted-foreground text-sm">
-                            No {taskFilter !== 'all' ? taskFilter : ''} tasks found. Add a task above to track pending work.
-                        </div>
-                    ) : (
-                        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                            {filteredTasks.map((t, idx) => {
-                                const isDone = t.status === 'completed'
-                                const taskId = t.id || (t as any)._id
-                                const assigneeName = t.assignedTo?.name || (typeof t.assignedTo === 'string' ? users.find(u => u.id === t.assignedTo)?.name : null)
+                    {/* Task List */}
+                    <div className="space-y-2">
+                        {tasks.length === 0 ? (
+                            <div className="text-center py-8 text-xs text-muted-foreground border rounded-xl bg-muted/20">
+                                No tasks added yet. Add tasks above to track technical deliverables.
+                            </div>
+                        ) : (
+                            tasks.map((task, idx) => {
+                                const taskId = task.id || (task as any)._id
+                                const isCompleted = task.status === 'completed'
                                 return (
                                     <div
                                         key={taskId || idx}
-                                        className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all group ${
-                                            isDone
-                                                ? 'bg-emerald-50/40 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-900/30'
-                                                : 'bg-card hover:bg-muted/40 border-border shadow-xs'
+                                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                            isCompleted ? 'bg-muted/30 border-muted opacity-75' : 'bg-card hover:bg-muted/20'
                                         }`}
                                     >
                                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleToggleTask(t)}
-                                                className={`h-5 w-5 rounded-md flex items-center justify-center border transition-colors cursor-pointer shrink-0 ${
-                                                    isDone
-                                                        ? 'bg-emerald-600 border-emerald-600 text-white'
-                                                        : 'border-muted-foreground/40 hover:border-primary'
-                                                }`}
-                                            >
-                                                {isDone && <Check className="h-3.5 w-3.5" />}
-                                            </button>
-                                            <div className="min-w-0 flex-1">
-                                                <p className={`text-sm font-medium leading-tight truncate ${isDone ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                                                    {t.title}
+                                            <Checkbox
+                                                checked={isCompleted}
+                                                onCheckedChange={() => handleToggleTask(taskId, task.status)}
+                                                className="h-4 w-4 rounded"
+                                            />
+                                            <div className="space-y-0.5 min-w-0 flex-1">
+                                                <p className={`text-xs font-medium truncate ${isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                                    {task.title}
                                                 </p>
-                                                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
-                                                    {t.dueDate && (
+                                                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                                                    {task.dueDate && (
                                                         <span className="flex items-center gap-1">
-                                                            <Calendar className="h-3 w-3" />
-                                                            Due: {new Date(t.dueDate).toLocaleDateString()}
+                                                            <Calendar className="h-3 w-3 text-blue-500" />
+                                                            Due: {new Date(task.dueDate).toLocaleDateString()}
                                                         </span>
                                                     )}
-                                                    {assigneeName && (
+                                                    {task.assignedTo && (
                                                         <span className="flex items-center gap-1">
-                                                            <UserIcon className="h-3 w-3 text-primary" />
-                                                            {assigneeName}
-                                                        </span>
-                                                    )}
-                                                    {isDone && t.completedAt && (
-                                                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                                                            Completed on {new Date(t.completedAt).toLocaleDateString()}
+                                                            <UserIcon className="h-3 w-3 text-purple-500" />
+                                                            {typeof task.assignedTo === 'object' ? task.assignedTo.name : 'Assigned'}
                                                         </span>
                                                     )}
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <Badge variant={isDone ? 'default' : 'secondary'} className={`text-[10px] ${isDone ? 'bg-emerald-600 text-white' : 'bg-muted'}`}>
-                                                {isDone ? 'Done' : 'Pending'}
-                                            </Badge>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteTask(taskId)}
-                                                className="text-muted-foreground hover:text-destructive p-1 rounded-md transition-colors"
-                                                title="Delete task"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteTask(taskId)}
+                                            className="text-muted-foreground hover:text-destructive p-1 rounded-md transition-colors"
+                                            title="Delete task"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
                                     </div>
                                 )
-                            })}
-                        </div>
-                    )}
+                            })
+                        )}
+                    </div>
                 </TabsContent>
 
-                {/* ── TAB 2: PAYMENTS & BALANCE (Strictly only for admin/owner/billing) ──────── */}
+                {/* ── TAB 3: PAYMENTS ────────────────────────────────────────── */}
                 {canViewFinances && (
                     <TabsContent value="payments" className="space-y-4">
-                        {/* Financial Summary Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="p-4 rounded-xl border bg-card shadow-xs">
-                                <span className="text-xs font-semibold text-muted-foreground uppercase">Total Contract Value</span>
-                                <div className="text-2xl font-bold text-foreground mt-1">{formatCurrency(customPrice)}</div>
-                                <span className="text-xs text-muted-foreground mt-0.5 block">Full product price</span>
+                        {/* Record Payment Form */}
+                        <form onSubmit={handleRecordPayment} className="p-4 bg-muted/30 rounded-xl border space-y-3">
+                            <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Record Client Payment
                             </div>
-
-                            <div className="p-4 rounded-xl border bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40">
-                                <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase">Received / Paid Amount</span>
-                                <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(paidAmount)}</div>
-                                <span className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5 block">
-                                    {customPrice > 0 ? `${Math.round((paidAmount / customPrice) * 100)}% Collected` : 'Collected'}
-                                </span>
-                            </div>
-
-                            <div className={`p-4 rounded-xl border shadow-xs ${
-                                pendingAmount === 0
-                                    ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-200'
-                                    : 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40'
-                            }`}>
-                                <span className={`text-xs font-semibold uppercase ${pendingAmount === 0 ? 'text-emerald-700' : 'text-rose-700 dark:text-rose-400'}`}>
-                                    Pending Balance / Due
-                                </span>
-                                <div className={`text-2xl font-bold mt-1 ${pendingAmount === 0 ? 'text-emerald-700' : 'text-rose-700 dark:text-rose-400'}`}>
-                                    {formatCurrency(pendingAmount)}
-                                </div>
-                                <span className="text-xs text-muted-foreground mt-0.5 block">
-                                    {pendingAmount === 0 ? 'No outstanding balance' : 'Pending payment'}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Record New Payment Form */}
-                        <form onSubmit={handleRecordPayment} className="p-4 rounded-xl bg-muted/40 border space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wide">
-                                    <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
-                                    Record Payment Installment
-                                </div>
-                                {pendingAmount > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setPaymentAmount(pendingAmount)}
-                                        className="text-xs text-primary font-medium hover:underline"
-                                    >
-                                        Pay Full Pending (₹{pendingAmount.toLocaleString('en-IN')})
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                                <div>
-                                    <Label htmlFor="pay-amount" className="text-xs text-muted-foreground">Amount (₹) *</Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                <div className="sm:col-span-4">
                                     <Input
-                                        id="pay-amount"
                                         type="number"
-                                        min="1"
-                                        placeholder="Amount"
+                                        placeholder="Amount (₹)..."
                                         value={paymentAmount}
                                         onChange={e => setPaymentAmount(e.target.value === '' ? '' : Number(e.target.value))}
                                         className="text-xs h-9 bg-background"
+                                        min="1"
+                                        required
                                     />
                                 </div>
-                                <div>
-                                    <Label htmlFor="pay-date" className="text-xs text-muted-foreground">Payment Date</Label>
-                                    <Input
-                                        id="pay-date"
-                                        type="date"
-                                        value={paymentDate}
-                                        onChange={e => setPaymentDate(e.target.value)}
-                                        className="text-xs h-9 bg-background"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="pay-method" className="text-xs text-muted-foreground">Method</Label>
+                                <div className="sm:col-span-4">
                                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                        <SelectTrigger id="pay-method" className="text-xs h-9 bg-background">
+                                        <SelectTrigger className="text-xs h-9 bg-background">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="Bank Transfer">Bank Transfer (NEFT/IMPS)</SelectItem>
-                                            <SelectItem value="UPI">UPI / GPay / PhonePe</SelectItem>
+                                            <SelectItem value="UPI">UPI (GPay/PhonePe)</SelectItem>
                                             <SelectItem value="Cash">Cash</SelectItem>
                                             <SelectItem value="Cheque">Cheque</SelectItem>
-                                            <SelectItem value="Card">Credit/Debit Card</SelectItem>
-                                            <SelectItem value="Stripe">Stripe / Online</SelectItem>
-                                            <SelectItem value="Cashfree">Cashfree</SelectItem>
+                                            <SelectItem value="Credit Card">Credit Card</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div>
-                                    <Label htmlFor="pay-ref" className="text-xs text-muted-foreground">Ref / Transaction ID</Label>
+                                <div className="sm:col-span-4">
                                     <Input
-                                        id="pay-ref"
-                                        placeholder="UTR / Transaction #"
-                                        value={paymentRef}
-                                        onChange={e => setPaymentRef(e.target.value)}
+                                        type="date"
+                                        value={paymentDate}
+                                        onChange={e => setPaymentDate(e.target.value)}
                                         className="text-xs h-9 bg-background"
+                                        required
                                     />
                                 </div>
                             </div>
-
-                            <div className="flex gap-2 items-center">
+                            <div className="flex gap-2">
                                 <Input
-                                    placeholder="Payment notes (e.g. 50% advance received, milestone 1 payment)..."
+                                    placeholder="Reference / UTR / Transaction ID..."
+                                    value={paymentRef}
+                                    onChange={e => setPaymentRef(e.target.value)}
+                                    className="text-xs h-9 bg-background flex-1"
+                                />
+                                <Input
+                                    placeholder="Payment notes / remarks..."
                                     value={paymentNotes}
                                     onChange={e => setPaymentNotes(e.target.value)}
                                     className="text-xs h-9 bg-background flex-1"
@@ -616,7 +1027,14 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                                     className="h-7 text-xs gap-1.5"
                                     onClick={() => {
                                         onClose()
-                                        navigate('/invoices/new')
+                                        navigate('/invoices/new', {
+                                            state: {
+                                                clientId: clientId,
+                                                clientProductId: id,
+                                                type: 'product',
+                                                amount: pendingAmount || customPrice
+                                            }
+                                        })
                                     }}
                                 >
                                     <FileText className="h-3.5 w-3.5 text-primary" /> Create Invoice
@@ -625,7 +1043,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
 
                             {!cp.paymentHistory || cp.paymentHistory.length === 0 ? (
                                 <div className="text-center py-6 text-xs text-muted-foreground border rounded-xl bg-muted/20">
-                                    No payment logs recorded yet. Use the form above to record payments.
+                                    No direct payment logs recorded yet. Use the form above or Milestone payments to record payments.
                                 </div>
                             ) : (
                                 <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
@@ -668,7 +1086,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                     </TabsContent>
                 )}
 
-                {/* ── TAB 3: STATUS & TIMELINE ────────────────────────────────────────────── */}
+                {/* ── TAB 4: TIMELINE ────────────────────────────────────────── */}
                 <TabsContent value="timeline" className="space-y-4">
                     <div className="p-4 rounded-xl border bg-card space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -679,11 +1097,11 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="not_started">⏳ Not Started (शुरू नहीं हुआ)</SelectItem>
-                                        <SelectItem value="in_progress">⚙️ In Progress (काम चालू है)</SelectItem>
-                                        <SelectItem value="review">🔍 Review / Testing (जांच में है)</SelectItem>
-                                        <SelectItem value="completed">✅ Completed (पूर्ण हो गया)</SelectItem>
-                                        <SelectItem value="on_hold">⏸️ On Hold (रुका हुआ)</SelectItem>
+                                        <SelectItem value="not_started">⏳ Not Started</SelectItem>
+                                        <SelectItem value="in_progress">⚙️ In Progress</SelectItem>
+                                        <SelectItem value="review">🔍 Review / Testing</SelectItem>
+                                        <SelectItem value="completed">✅ Completed</SelectItem>
+                                        <SelectItem value="on_hold">⏸️ On Hold</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -739,7 +1157,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label htmlFor="edit-custom" className="text-xs font-semibold">Customizations & Client Requirements</Label>
+                            <Label htmlFor="edit-custom" className="text-xs font-semibold">Customizations & Requirements</Label>
                             <Textarea
                                 id="edit-custom"
                                 rows={3}
@@ -762,6 +1180,23 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
             <div className="flex justify-end gap-2 pt-3 border-t">
                 <Button variant="outline" onClick={onClose}>Close</Button>
             </div>
+
+            {/* Project Milestone Create / Edit Dialog */}
+            <ProjectMilestoneDialog
+                open={isMilestoneDialogOpen}
+                onOpenChange={setIsMilestoneDialogOpen}
+                milestone={selectedMilestone}
+                projectBudget={customPrice}
+                onSave={handleSaveMilestone}
+            />
+
+            {/* Project Milestone Payment Recording Dialog */}
+            <ProjectMilestonePaymentDialog
+                open={isMilestonePaymentDialogOpen}
+                onOpenChange={setIsMilestonePaymentDialogOpen}
+                milestone={selectedMilestone}
+                onSavePayment={handleSaveMilestonePayment}
+            />
         </div>
     )
 }

@@ -32,6 +32,10 @@ const settingSchema = new mongoose.Schema({
         termsAndConditions: { type: String, default: 'Thank you for your business. Payment is expected within due date. Late payments may incur fees.' },
         bankDetails: { type: String, default: '' },
         invoiceLogo: { type: String },
+        invoicePhone: { type: String, default: '+91 7505974545' },
+        invoiceEmail: { type: String, default: 'Info@nexprism.com' },
+        invoiceWebsite: { type: String, default: 'nexprism.com' },
+        invoiceFooterHeading: { type: String, default: 'THANK YOU FOR YOUR BUSINESS' },
         lateFee: Number
     },
     notifications: {

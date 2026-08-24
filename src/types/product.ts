@@ -1,3 +1,5 @@
+import type { Milestone } from './index'
+
 // Product & Client Product Types
 
 export interface Product {
@@ -51,6 +53,7 @@ export interface ClientProduct {
     assignedTo?: any[]
     customizations?: string
     tasks?: ClientProductTask[]
+    milestones?: Milestone[]
     paymentHistory?: ClientProductPayment[]
     status: 'active' | 'cancelled' | 'suspended' | 'completed'
     assignedAt?: string | Date

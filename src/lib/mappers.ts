@@ -15,7 +15,11 @@ export const mapProject = (p: any): Project => {
         paymentModel: p.paymentModel,
         progress: p.progress || 0,
         startDate: p.startDate ? new Date(p.startDate) : new Date(),
-        milestones: p.milestones || [],
+        milestones: (p.milestones || []).map((m: any, i: number) => ({
+            ...m,
+            id: m._id ? m._id.toString() : (m.id || `m_${i}`),
+            _id: m._id ? m._id.toString() : m.id
+        })),
         pmId: p.pmId || 'u2',
         members: p.members || [],
         priority: p.priority,

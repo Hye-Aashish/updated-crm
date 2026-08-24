@@ -137,19 +137,45 @@ exports.assignProductToClient = async (req, res) => {
             assignedTo = [],
             customizations = '',
             tasks = [],
+            milestones = [],
             status = 'active',
             initialPaymentMethod = 'Bank Transfer',
             initialPaymentRef = '',
             initialPaymentNotes = ''
         } = req.body;
 
+        const mongoose = require('mongoose');
+        const sanitizedMilestones = Array.isArray(milestones) ? milestones.map(m => {
+            const clean = { ...m };
+            if (clean._id && !mongoose.Types.ObjectId.isValid(clean._id)) delete clean._id;
+            if (clean.id && !mongoose.Types.ObjectId.isValid(clean.id)) delete clean.id;
+            return clean;
+        }) : [];
+
         const numPrice = Number(customPrice) || 0;
-        const numPaid = Number(paidAmount) || 0;
+        let numPaid = Number(paidAmount) || 0;
+
+        if (sanitizedMilestones.length > 0) {
+            const milestonePaid = sanitizedMilestones.reduce((sum, m) => {
+                if (m.paidAmount !== undefined && m.paidAmount > 0) return sum + m.paidAmount;
+                if (m.paymentStatus === 'paid') return sum + (m.amount || 0);
+                return sum;
+            }, 0);
+            if (milestonePaid > numPaid) numPaid = milestonePaid;
+        }
+
         const paymentStatus = calculatePaymentStatus(numPrice, numPaid);
 
         let computedProgress = Number(progress);
         if (isNaN(computedProgress)) {
-            computedProgress = tasks.length > 0 ? calculateTaskProgress(tasks) : 0;
+            if (sanitizedMilestones.length > 0) {
+                const completedM = sanitizedMilestones.filter(m => m.completed || m.status === 'completed').length;
+                computedProgress = Math.round((completedM / sanitizedMilestones.length) * 100);
+            } else if (tasks.length > 0) {
+                computedProgress = calculateTaskProgress(tasks);
+            } else {
+                computedProgress = 0;
+            }
         }
 
         const paymentHistory = [];
@@ -177,6 +203,7 @@ exports.assignProductToClient = async (req, res) => {
             assignedTo: Array.isArray(assignedTo) ? assignedTo : [],
             customizations,
             tasks: Array.isArray(tasks) ? tasks : [],
+            milestones: sanitizedMilestones,
             paymentHistory,
             status: status || 'active'
         });
@@ -217,7 +244,8 @@ exports.updateClientProduct = async (req, res) => {
             assignedTo,
             customizations,
             status,
-            tasks
+            tasks,
+            milestones
         } = req.body;
 
         // Staff cannot modify prices or payments
@@ -236,9 +264,34 @@ exports.updateClientProduct = async (req, res) => {
             cp.tasks = tasks;
         }
 
+        if (milestones !== undefined && Array.isArray(milestones)) {
+            const mongoose = require('mongoose');
+            cp.milestones = milestones.map(m => {
+                const clean = { ...m };
+                if (clean._id && !mongoose.Types.ObjectId.isValid(clean._id)) delete clean._id;
+                if (clean.id && !mongoose.Types.ObjectId.isValid(clean.id)) delete clean.id;
+                return clean;
+            });
+
+            // Calculate milestone-based paid amount
+            if (!isStaff) {
+                const milestonePaid = cp.milestones.reduce((sum, m) => {
+                    if (m.paidAmount !== undefined && m.paidAmount > 0) return sum + m.paidAmount;
+                    if (m.paymentStatus === 'paid') return sum + (m.amount || 0);
+                    return sum;
+                }, 0);
+                if (milestonePaid > 0) {
+                    cp.paidAmount = milestonePaid;
+                }
+            }
+        }
+
         // Calculate progress
         if (progress !== undefined && !isNaN(Number(progress))) {
             cp.progress = Math.min(100, Math.max(0, Number(progress)));
+        } else if (cp.milestones && cp.milestones.length > 0) {
+            const completedM = cp.milestones.filter(m => m.completed || m.status === 'completed').length;
+            cp.progress = Math.round((completedM / cp.milestones.length) * 100);
         } else if (cp.tasks && cp.tasks.length > 0) {
             cp.progress = calculateTaskProgress(cp.tasks);
         }

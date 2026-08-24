@@ -1,12 +1,15 @@
 require('dotenv').config();
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 const mongoose = require('mongoose');
+const connectDB = require('./config/db');
 const User = require('./models/User');
 const Client = require('./models/Client');
 
 const createDemoAccounts = async () => {
     try {
         console.log('Connecting to database...');
-        await mongoose.connect(process.env.MONGO_URI);
+        await connectDB();
         console.log('Connected.');
 
         // Define credentials

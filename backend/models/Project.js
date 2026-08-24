@@ -23,10 +23,28 @@ const projectSchema = new mongoose.Schema({
         default: 'medium'
     },
     milestones: [{
-        name: String,
-        dueDate: Date,
-        amount: Number,
-        completed: { type: Boolean, default: false }
+        name: { type: String, required: true },
+        description: { type: String },
+        dueDate: { type: Date },
+        amount: { type: Number, default: 0 },
+        completed: { type: Boolean, default: false },
+        status: {
+            type: String,
+            enum: ['pending', 'in-progress', 'completed'],
+            default: 'pending'
+        },
+        paidAmount: { type: Number, default: 0 },
+        paymentStatus: {
+            type: String,
+            enum: ['unpaid', 'partial', 'paid'],
+            default: 'unpaid'
+        },
+        invoiceId: { type: String },
+        paidDate: { type: Date },
+        paymentMethod: { type: String, default: 'Bank Transfer' },
+        paymentReference: { type: String }, // Transaction / UTR ID
+        paymentNotes: { type: String },
+        completedAt: { type: Date }
     }],
     autoInvoice: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }

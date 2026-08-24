@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, Trash2, Calendar, DollarSign, User as UserIcon, ListTodo } from 'lucide-react'
+import { Plus, Trash2, Calendar, DollarSign, User as UserIcon, ListTodo, Flag } from 'lucide-react'
 import type { ClientProduct } from '@/types'
 
 interface ClientProductDialogProps {
@@ -59,6 +59,12 @@ export function ClientProductForm({ clientId, initialData, onSuccess, onCancel }
     const [initialTasks, setInitialTasks] = useState<NewTaskItem[]>([])
     const [newTaskTitle, setNewTaskTitle] = useState('')
 
+    // Initial Milestones builder
+    const [initialMilestones, setInitialMilestones] = useState<Array<{ name: string; dueDate: string; amount: string }>>([])
+    const [newMilestoneName, setNewMilestoneName] = useState('')
+    const [newMilestoneDate, setNewMilestoneDate] = useState('')
+    const [newMilestoneAmount, setNewMilestoneAmount] = useState('')
+
     useEffect(() => {
         if (products.length === 0) {
             api.get('/products').then(res => {
@@ -91,6 +97,25 @@ export function ClientProductForm({ clientId, initialData, onSuccess, onCancel }
 
     const handleRemoveInitialTask = (index: number) => {
         setInitialTasks(initialTasks.filter((_, i) => i !== index))
+    }
+
+    const handleAddInitialMilestone = () => {
+        if (!newMilestoneName.trim()) return
+        setInitialMilestones([
+            ...initialMilestones,
+            {
+                name: newMilestoneName.trim(),
+                dueDate: newMilestoneDate || dueDate || '',
+                amount: newMilestoneAmount || ''
+            }
+        ])
+        setNewMilestoneName('')
+        setNewMilestoneDate('')
+        setNewMilestoneAmount('')
+    }
+
+    const handleRemoveInitialMilestone = (index: number) => {
+        setInitialMilestones(initialMilestones.filter((_, i) => i !== index))
     }
 
     const toggleAssignedUser = (userId: string) => {
@@ -128,6 +153,18 @@ export function ClientProductForm({ clientId, initialData, onSuccess, onCancel }
                     title: t.title,
                     status: 'pending',
                     dueDate: t.dueDate || dueDate || undefined
+                }))
+            }
+
+            if (!initialData && initialMilestones.length > 0) {
+                payload.milestones = initialMilestones.map((m, i) => ({
+                    name: m.name,
+                    dueDate: m.dueDate ? new Date(m.dueDate) : undefined,
+                    amount: parseFloat(m.amount) || 0,
+                    completed: false,
+                    status: 'pending',
+                    paymentStatus: 'unpaid',
+                    paidAmount: 0
                 }))
             }
 
@@ -357,6 +394,74 @@ export function ClientProductForm({ clientId, initialData, onSuccess, onCancel }
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Initial Milestones Setup */}
+            {!initialData && (
+                <div className="p-3.5 bg-primary/5 rounded-xl border border-primary/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <Flag className="h-4 w-4 text-primary" />
+                            Milestones & Payment Stages
+                        </div>
+                        <span className="text-xs text-muted-foreground">{initialMilestones.length} milestones</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                        <div className="sm:col-span-5">
+                            <Input
+                                placeholder="Milestone Title (e.g. Stage 1: Setup)..."
+                                value={newMilestoneName}
+                                onChange={e => setNewMilestoneName(e.target.value)}
+                                className="text-xs h-9 bg-background"
+                            />
+                        </div>
+                        <div className="sm:col-span-4">
+                            <Input
+                                type="date"
+                                value={newMilestoneDate}
+                                onChange={e => setNewMilestoneDate(e.target.value)}
+                                className="text-xs h-9 bg-background"
+                            />
+                        </div>
+                        <div className="sm:col-span-3 flex gap-2">
+                            <Input
+                                type="number"
+                                placeholder="Amount (₹)"
+                                value={newMilestoneAmount}
+                                onChange={e => setNewMilestoneAmount(e.target.value)}
+                                className="text-xs h-9 bg-background"
+                            />
+                            <Button type="button" size="sm" onClick={handleAddInitialMilestone} className="h-9 px-3">
+                                <Plus className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+
+                    {initialMilestones.length > 0 && (
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto pt-1">
+                            {initialMilestones.map((m, idx) => (
+                                <div key={idx} className="flex items-center justify-between text-xs bg-background p-2 rounded-md border">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="font-semibold text-primary">Stage {idx + 1}:</span>
+                                        <span className="font-medium truncate">{m.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        {m.dueDate && <span className="text-muted-foreground text-[11px]">Due: {m.dueDate}</span>}
+                                        {m.amount && <span className="font-bold text-emerald-600">₹{Number(m.amount).toLocaleString('en-IN')}</span>}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveInitialMilestone(idx)}
+                                            className="text-muted-foreground hover:text-destructive p-0.5"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>

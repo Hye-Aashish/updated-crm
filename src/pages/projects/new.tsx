@@ -15,7 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { ChevronLeft, Info } from 'lucide-react'
+import { ChevronLeft, Info, Plus, Trash2, Flag, Calendar, DollarSign } from 'lucide-react'
 import type { ProjectStatus, ProjectType, PaymentModel } from '@/types'
 import api from '@/lib/api-client'
 import {
@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/popover"
 
 import { mapProject, mapClient } from '@/lib/mappers'
-import { getCurrencySymbol } from '@/lib/utils'
+import { getCurrencySymbol, formatCurrency } from '@/lib/utils'
 
 export function NewProjectPage() {
     const navigate = useNavigate()
@@ -57,6 +57,34 @@ export function NewProjectPage() {
         autoInvoice: false,
     })
 
+    const [milestones, setMilestones] = useState<Array<{ name: string; dueDate: string; amount: string; description?: string }>>([])
+
+    const addMilestoneRow = () => {
+        setMilestones(prev => [
+            ...prev,
+            {
+                name: `Milestone ${prev.length + 1}: `,
+                dueDate: formData.deadline || '',
+                amount: '',
+                description: ''
+            }
+        ])
+    }
+
+    const updateMilestoneRow = (index: number, field: string, value: string) => {
+        setMilestones(prev => {
+            const copy = [...prev]
+            copy[index] = { ...copy[index], [field]: value }
+            return copy
+        })
+    }
+
+    const removeMilestoneRow = (index: number) => {
+        setMilestones(prev => prev.filter((_, i) => i !== index))
+    }
+
+    const totalMilestoneSum = milestones.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0)
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
@@ -66,7 +94,15 @@ export function NewProjectPage() {
             const response = await api.post('/projects', {
                 ...formData,
                 dueDate: formData.deadline,
-                pmId: currentUser.id // Set current user as PM by default
+                pmId: currentUser.id, // Set current user as PM by default
+                milestones: milestones.map(m => ({
+                    name: m.name,
+                    dueDate: m.dueDate ? new Date(m.dueDate) : undefined,
+                    amount: parseFloat(m.amount) || 0,
+                    description: m.description,
+                    completed: false,
+                    status: 'pending'
+                }))
             })
 
             const savedProject = mapProject(response.data)
@@ -243,6 +279,99 @@ export function NewProjectPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </div>
+
+                        {/* Milestone Setup Section */}
+                        <div className="space-y-4 pt-2 border-t">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-base font-semibold flex items-center gap-2">
+                                        <Flag className="h-4 w-4 text-primary" />
+                                        Project Milestones & Payment Stages
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">
+                                        Configure deliverables, target dates, and payment amounts for each milestone stage.
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={addMilestoneRow}
+                                    className="h-8 text-xs font-medium"
+                                >
+                                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Milestone
+                                </Button>
+                            </div>
+
+                            {milestones.length > 0 && (
+                                <div className="space-y-3">
+                                    {milestones.map((m, idx) => (
+                                        <div key={idx} className="p-3.5 rounded-lg border bg-card/60 space-y-3">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-bold text-primary px-2 py-0.5 rounded bg-primary/10">
+                                                    Stage #{idx + 1}
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => removeMilestoneRow(idx)}
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+
+                                            <div className="grid gap-3 sm:grid-cols-12">
+                                                <div className="sm:col-span-6 space-y-1">
+                                                    <Label className="text-xs">Milestone Title</Label>
+                                                    <Input
+                                                        placeholder="e.g. Design & Wireframes"
+                                                        value={m.name}
+                                                        onChange={(e) => updateMilestoneRow(idx, 'name', e.target.value)}
+                                                        className="h-8 text-sm"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="sm:col-span-3 space-y-1">
+                                                    <Label className="text-xs">Target Due Date</Label>
+                                                    <Input
+                                                        type="date"
+                                                        value={m.dueDate}
+                                                        onChange={(e) => updateMilestoneRow(idx, 'dueDate', e.target.value)}
+                                                        className="h-8 text-sm"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="sm:col-span-3 space-y-1">
+                                                    <Label className="text-xs">Amount ({getCurrencySymbol()})</Label>
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="e.g. 25000"
+                                                        value={m.amount}
+                                                        onChange={(e) => updateMilestoneRow(idx, 'amount', e.target.value)}
+                                                        className="h-8 text-sm"
+                                                        min="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Milestone Total Tally */}
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs">
+                                        <span className="font-medium text-foreground">
+                                            Total Milestone Sum: <strong>{formatCurrency(totalMilestoneSum)}</strong>
+                                        </span>
+                                        {parseFloat(formData.budget) > 0 && (
+                                            <span className={`font-semibold ${totalMilestoneSum === parseFloat(formData.budget) ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                {Math.round((totalMilestoneSum / parseFloat(formData.budget)) * 100)}% of Project Budget ({formatCurrency(parseFloat(formData.budget))})
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex items-center justify-between p-4 rounded-lg border bg-slate-50/50">

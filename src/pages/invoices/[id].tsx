@@ -10,7 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote, Phone, Globe, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote, Phone, Globe, CheckCircle, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import api from '@/lib/api-client'
 import type { Invoice, Client } from '@/types'
@@ -53,8 +53,18 @@ export function InvoiceDetailPage() {
         const fetchInvoiceData = async () => {
             if (!id) return;
             try {
-                const invoiceRes = await api.get(`/invoices/${id}`)
-                const invData = invoiceRes.data
+                let invData: any = null;
+                try {
+                    const invoiceRes = await api.get(`/invoices/${id}`);
+                    invData = invoiceRes.data;
+                } catch (authErr) {
+                    // If unauthorized/public viewer, fetch from public invoice route
+                    const publicRes = await api.get(`/invoices/public/${id}`);
+                    invData = publicRes.data;
+                }
+
+                if (!invData) throw new Error("Invoice data not found");
+
                 const mappedInvoice: Invoice = {
                     id: invData._id,
                     invoiceNumber: invData.invoiceNumber,
@@ -98,9 +108,13 @@ export function InvoiceDetailPage() {
                     const setRes = await api.get('/settings');
                     setSettings(setRes.data);
                 } catch (e) {
-                    console.error("Failed to fetch settings", e);
+                    try {
+                        const publicSetRes = await api.get('/settings/public');
+                        setSettings(publicSetRes.data);
+                    } catch (err) {
+                        console.error("Failed to fetch public settings", err);
+                    }
                 }
-
 
             } catch (error) {
                 console.error("Failed to fetch invoice", error)
@@ -185,9 +199,10 @@ export function InvoiceDetailPage() {
                 </div>
             )}
             <div className="p-4 sm:p-12 relative z-10">
-                {/* Header Top: Logo & Invoice details */}
+                {/* Combined Header: Left (Logo + BILL FROM) & Right (INVOICE title + BILL TO) */}
                 <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-8">
-                    <div className="flex-1">
+                    {/* Left Column: Logo & BILL FROM with compact natural spacing */}
+                    <div className="flex-1 space-y-3">
                         <div className="flex items-center gap-2">
                             {settings?.billing?.invoiceLogo || settings?.companyProfile?.logo ? (
                                 <img 
@@ -195,60 +210,65 @@ export function InvoiceDetailPage() {
                                     alt="Company Logo" 
                                     style={{ 
                                         width: settings.companyProfile.logoWidth !== 'auto' ? settings.companyProfile.logoWidth : undefined,
-                                        height: settings.companyProfile.logoHeight || '32px',
-                                        maxWidth: '250px'
+                                        height: settings.companyProfile.logoHeight || '36px',
+                                        maxHeight: '56px',
+                                        maxWidth: '240px'
                                     }} 
                                     className="object-contain"
                                 />
                             ) : (
-                                <h1 className="text-3xl font-black text-slate-800 tracking-tight" style={{ color: themeColor }}>
+                                <h1 className="text-2xl font-black text-slate-800 tracking-tight" style={{ color: themeColor }}>
                                     {settings?.companyProfile?.name || 'NEXPRISM'}
                                 </h1>
                             )}
                         </div>
-                    </div>
-                    
-                    <div className="flex-1 flex flex-col items-start sm:items-end">
-                        <h2 className="text-5xl font-black mb-4 text-slate-800 tracking-wider">INVOICE</h2>
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm w-full sm:w-auto text-left">
-                            <span className="text-slate-600">Invoice No:</span>
-                            <span className="font-medium text-slate-900 text-right">#{invoice.invoiceNumber}</span>
-                            <span className="text-slate-600">Invoice Date:</span>
-                            <span className="font-medium text-slate-900 text-right">{formatDate(invoice.date)}</span>
+
+                        {/* BILL FROM right below Logo */}
+                        <div className="space-y-1 pt-1">
+                            <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">BILL FROM:</p>
+                            <h3 className="text-base font-bold text-slate-900">{settings?.companyProfile?.name || 'Nexprism Agency'}</h3>
+                            <p className="text-slate-600 text-sm whitespace-pre-wrap max-w-[300px] break-words">
+                                {settings?.companyProfile?.address || '13th Floor, IT Park Digital Valley\nB-1307-1308 Mota Varachha Surat,\nGujarat 394105 India'}
+                            </p>
+                            {settings?.companyProfile?.gst && (
+                                <p className="text-slate-600 text-sm font-medium mt-1 break-words">
+                                    GSTIN: {settings.companyProfile.gst}
+                                </p>
+                            )}
                         </div>
                     </div>
-                </div>
 
-                {/* Header Bottom: BILL FROM & BILL TO aligned */}
-                <div className="flex flex-col sm:flex-row justify-between items-start mb-12 gap-8">
-                    {/* BILL FROM */}
-                    <div className="flex-1 space-y-1">
-                        <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">BILL FROM:</p>
-                        <h3 className="text-lg font-bold text-slate-900">{settings?.companyProfile?.name || 'NEXPRISM'}</h3>
-                        <p className="text-slate-600 text-sm whitespace-pre-wrap max-w-[280px] break-words">
-                            {settings?.companyProfile?.address || '13th Floor, IT Park Digital Valley\nB-1307-1308 Mota Varachha Surat,\nGujarat 394105 India'}
-                        </p>
-                        {settings?.companyProfile?.gst && (
-                            <p className="text-slate-600 text-sm font-medium mt-1 break-words">
-                                GSTIN: {settings.companyProfile.gst}
-                            </p>
-                        )}
-                    </div>
+                    {/* Right Column: INVOICE Details & BILL TO */}
+                    <div className="flex-1 flex flex-col items-start sm:items-end space-y-4">
+                        <div className="w-full sm:w-auto text-left sm:text-right">
+                            <h2 className="text-4xl font-black mb-3 text-slate-800 tracking-wider">INVOICE</h2>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm w-full sm:w-auto text-left">
+                                <span className="text-slate-600">Invoice No:</span>
+                                <span className="font-medium text-slate-900 text-right">#{invoice.invoiceNumber}</span>
+                                <span className="text-slate-600">Invoice Date:</span>
+                                <span className="font-medium text-slate-900 text-right">{formatDate(invoice.date)}</span>
+                                {invoice.dueDate && (
+                                    <>
+                                        <span className="text-slate-600">Due Date:</span>
+                                        <span className="font-medium text-slate-900 text-right">{formatDate(invoice.dueDate)}</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
 
-                    {/* BILL TO */}
-                    <div className="flex-1 flex flex-col items-start sm:items-end">
-                        <div className="w-full sm:w-auto text-left sm:max-w-[320px] space-y-1">
-                            <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">BILL TO:</p>
-                            <h3 className="text-lg font-bold text-slate-900 uppercase break-words">
+                        {/* BILL TO */}
+                        <div className="w-full sm:w-auto text-left sm:max-w-[320px] space-y-1 pt-1">
+                            <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">BILL TO:</p>
+                            <h3 className="text-base font-bold text-slate-900 uppercase break-words">
                                 {invoice.billingInfo?.name || client?.company || client?.name || 'Client Name'}
                             </h3>
                             {(invoice.billingInfo?.address || client?.address) && (
-                                <p className="text-slate-600 text-sm mt-1 whitespace-pre-wrap break-words">
+                                <p className="text-slate-600 text-sm mt-0.5 whitespace-pre-wrap break-words">
                                     Address: {invoice.billingInfo?.address || client?.address}
                                 </p>
                             )}
                             {(invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin) && (
-                                <p className="text-slate-600 text-sm mt-1 font-medium break-words">
+                                <p className="text-slate-600 text-sm mt-0.5 font-medium break-words">
                                     GSTIN: {invoice.billingInfo?.gstNumber || client?.gstNumber || client?.gstin}
                                 </p>
                             )}
@@ -279,67 +299,126 @@ export function InvoiceDetailPage() {
                     </table>
                 </div>
 
-                {/* Totals Section */}
-                <div className="flex justify-end mb-12">
-                    <div className="w-72 space-y-4">
-                        <div className="flex justify-between text-slate-600 font-medium">
-                            <span>Subtotal</span>
-                            <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
+                {/* Middle Breakdown: Left (T&C & Contacts) & Right (Totals, Paid Amount & Bank Details) */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-8 mb-8 pt-4">
+                    {/* Left Column: Terms & Conditions & Contact Info */}
+                    <div className="flex-1 space-y-6 max-w-md w-full">
+                        {/* Terms & Conditions */}
+                        <div className="space-y-2 bg-slate-50/70 p-4 rounded-xl border border-slate-200/70">
+                            <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                <FileText className="h-3.5 w-3.5 text-primary" />
+                                Terms & Conditions
+                            </h4>
+                            <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                {invoice.termsAndConditions || settings?.billing?.termsAndConditions || '1. Please pay within the due date to avoid late fees.\n2. Invoices are payable via UPI, Bank Transfer or Online Payment.\n3. Thank you for choosing our services.'}
+                            </div>
                         </div>
-                        {invoice.tax > 0 && (
-                            <div className="flex justify-between text-slate-600 font-medium pb-4 border-b border-slate-200">
-                                <span>Tax (18%)</span>
-                                <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
+
+                        {/* Contact details & Thank you */}
+                        <div className="space-y-3 pt-1">
+                            <h4 className="font-extrabold text-slate-900 text-sm tracking-wider uppercase font-sans">
+                                {settings?.billing?.invoiceFooterHeading || 'THANK YOU FOR YOUR BUSINESS'}
+                            </h4>
+                            <div className="flex flex-col gap-2.5">
+                                {(settings?.billing?.invoicePhone || settings?.companyProfile?.phone) && (
+                                    <div className="flex items-center gap-3 text-slate-800 text-sm font-semibold tracking-wide">
+                                        <div 
+                                            className="w-7 h-7 rounded-md flex items-center justify-center text-white shadow-xs shrink-0" 
+                                            style={{ backgroundColor: themeColor || '#0052cc' }}
+                                        >
+                                            <Phone className="h-3.5 w-3.5 fill-current" />
+                                        </div>
+                                        <span>{settings?.billing?.invoicePhone || settings?.companyProfile?.phone}</span>
+                                    </div>
+                                )}
+                                {(settings?.billing?.invoiceEmail || settings?.companyProfile?.email) && (
+                                    <div className="flex items-center gap-3 text-slate-800 text-sm font-semibold tracking-wide">
+                                        <div 
+                                            className="w-7 h-7 rounded-md flex items-center justify-center text-white shadow-xs shrink-0" 
+                                            style={{ backgroundColor: themeColor || '#0052cc' }}
+                                        >
+                                            <Mail className="h-3.5 w-3.5" />
+                                        </div>
+                                        <span>{settings?.billing?.invoiceEmail || settings?.companyProfile?.email}</span>
+                                    </div>
+                                )}
+                                {(settings?.billing?.invoiceWebsite || settings?.companyProfile?.website) && (
+                                    <div className="flex items-center gap-3 text-slate-800 text-sm font-semibold tracking-wide">
+                                        <div 
+                                            className="w-7 h-7 rounded-md flex items-center justify-center text-white shadow-xs shrink-0" 
+                                            style={{ backgroundColor: themeColor || '#0052cc' }}
+                                        >
+                                            <Globe className="h-3.5 w-3.5" />
+                                        </div>
+                                        <span>{settings?.billing?.invoiceWebsite || settings?.companyProfile?.website}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Totals breakdown + Paid Amount Bar + Stamp + Bank Details right below */}
+                    <div className="w-full sm:w-80 relative shrink-0 pt-1 space-y-6">
+                        <div className="relative">
+                            <div className="space-y-2.5 text-sm pb-3">
+                                <div className="flex justify-between items-center text-slate-800">
+                                    <span className="font-bold text-slate-900 text-sm">Total :</span>
+                                    <span className="font-bold text-slate-900 font-mono text-base">{formatCurrency(invoice.subtotal || invoice.total, invoice.currency)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-slate-800">
+                                    <span className="font-bold text-slate-900 text-sm">IGST (18%) :</span>
+                                    <span className="font-bold text-slate-900 font-mono text-base">
+                                        {invoice.tax > 0 ? formatCurrency(invoice.tax, invoice.currency) : 'N/A'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center text-slate-800">
+                                    <span className="font-bold text-slate-900 text-sm">Sub-total :</span>
+                                    <span className="font-bold text-slate-900 font-mono text-base">{formatCurrency(invoice.total, invoice.currency)}</span>
+                                </div>
+                            </div>
+
+                            {/* Solid Rounded Paid Amount / Amount Due Banner */}
+                            <div 
+                                className="rounded-lg px-5 py-3 flex justify-between items-center text-white shadow-xs font-bold text-base mt-2"
+                                style={{ backgroundColor: themeColor || '#0052cc' }}
+                            >
+                                <span className="tracking-wide">
+                                    {invoice.status === 'paid' ? 'Paid Amount' : 'Amount Due'}
+                                </span>
+                                <span className="font-mono text-lg font-black tracking-tight">
+                                    {formatCurrency(invoice.status === 'paid' ? (invoice.paidAmount || invoice.total) : invoice.total, invoice.currency)}
+                                </span>
+                            </div>
+
+                            {/* Paid / Unpaid Stamp Overlay */}
+                            {invoice.status === 'paid' ? (
+                                <div className="absolute -bottom-7 right-3 pointer-events-none z-20">
+                                    <div className="border-[3px] border-[#5cb85c] text-[#5cb85c] bg-white/95 backdrop-blur-xs px-4 py-1 rounded-md font-black text-2xl tracking-widest uppercase rotate-[-10deg] shadow-xs select-none">
+                                        PAID
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="absolute -bottom-7 right-3 pointer-events-none z-20">
+                                    <div className="border-[3px] border-[#d9534f] text-[#d9534f] bg-white/95 backdrop-blur-xs px-4 py-1 rounded-md font-black text-2xl tracking-widest uppercase rotate-[-10deg] shadow-xs select-none">
+                                        UNPAID
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Bank Account Details (Directly below Paid Amount on the Right) */}
+                        {settings?.billing?.bankDetails && (
+                            <div className="space-y-1.5 pt-2">
+                                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                    <CreditCard className="h-3.5 w-3.5 text-primary" />
+                                    Bank Account Details
+                                </h4>
+                                <div className="whitespace-pre-wrap text-slate-700 text-xs font-medium leading-relaxed bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/70">
+                                    {settings.billing.bankDetails}
+                                </div>
                             </div>
                         )}
-                        <div className="flex justify-between text-2xl font-black" style={{ color: themeColor }}>
-                            <span>Total</span>
-                            <span>{formatCurrency(invoice.total, invoice.currency)}</span>
-                        </div>
                     </div>
-                </div>
-
-                {/* Footer Section */}
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-8 mt-8 pt-8 relative before:absolute before:top-0 before:left-[-3rem] before:right-[-3rem] before:h-2 before:bg-slate-100 before:content-[''] overflow-visible">
-                    {/* Contact Details & Terms (Left) */}
-                    <div className="flex flex-col gap-6 max-w-sm relative z-10">
-                        <div className="space-y-2">
-                            <h4 className="font-black text-slate-900 text-lg uppercase tracking-wider">Thank you for your business</h4>
-                            <div className="text-xs text-slate-500">
-                                <p className="whitespace-pre-wrap">{invoice.termsAndConditions}</p>
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-3 mt-2">
-                            {settings?.companyProfile?.phone && (
-                                <div className="flex items-center gap-3 text-slate-800">
-                                    <div className="p-2 rounded-md text-white shadow-sm" style={{ backgroundColor: themeColor }}><Phone className="h-4 w-4" /></div>
-                                    <span className="font-semibold">{settings.companyProfile.phone}</span>
-                                </div>
-                            )}
-                            {settings?.companyProfile?.email && (
-                                <div className="flex items-center gap-3 text-slate-800">
-                                    <div className="p-2 rounded-md text-white shadow-sm" style={{ backgroundColor: themeColor }}><Mail className="h-4 w-4" /></div>
-                                    <span className="font-semibold">{settings.companyProfile.email}</span>
-                                </div>
-                            )}
-                            {settings?.companyProfile?.website && (
-                                <div className="flex items-center gap-3 text-slate-800">
-                                    <div className="p-2 rounded-md text-white shadow-sm" style={{ backgroundColor: themeColor }}><Globe className="h-4 w-4" /></div>
-                                    <span className="font-semibold">{settings.companyProfile.website}</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Bank Details (Right) */}
-                    {settings?.billing?.bankDetails && (
-                        <div className="flex flex-col gap-3 w-full sm:max-w-xs relative z-10">
-                             <h4 className="font-black text-slate-900 text-lg uppercase tracking-wider mb-2">Payment Method</h4>
-                             <div className="whitespace-pre-wrap text-slate-700 text-sm font-medium leading-relaxed grid grid-cols-1 gap-1">
-                                 {settings.billing.bankDetails}
-                             </div>
-                        </div>
-                    )}
                 </div>
 
                 {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
