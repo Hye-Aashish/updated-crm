@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label'
 import {
     Building2, Users, CreditCard, FolderKanban, Bell, MessageSquare,
     Upload, Save, Plus, Trash2, Edit, Eye, EyeOff, Shield, Mail, CheckCircle, AlertCircle, Loader2,
-    Layout, GripVertical, ChevronUp, ChevronDown, Brain, Sparkles, ExternalLink, KeyRound
+    Layout, GripVertical, ChevronUp, ChevronDown, Brain, Sparkles, ExternalLink, KeyRound,
+    Clock, Coffee
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import api from '@/lib/api-client'
@@ -47,7 +48,7 @@ function hexToHSL(hex: string) {
     return `${(h * 360).toFixed(1)} ${(s * 100).toFixed(1)}% ${(l * 100).toFixed(1)}%`;
 }
 
-type SettingsTab = 'company' | 'users' | 'roles' | 'billing' | 'templates' | 'project-settings' | 'notifications' | 'email' | 'whatsapp' | 'dashboard-builder' | 'ai-config'
+type SettingsTab = 'company' | 'users' | 'roles' | 'billing' | 'templates' | 'project-settings' | 'notifications' | 'email' | 'whatsapp' | 'dashboard-builder' | 'ai-config' | 'attendance'
 
 export function SettingsPage() {
     const { currentUser, setSettings: setGlobalSettings } = useAppStore()
@@ -103,6 +104,7 @@ export function SettingsPage() {
 
     const tabs = [
         { id: 'company' as SettingsTab, label: 'Company Profile', icon: Building2 },
+        { id: 'attendance' as SettingsTab, label: 'Attendance & Shifts', icon: Clock },
         { id: 'users' as SettingsTab, label: 'Users', icon: Users },
         { id: 'roles' as SettingsTab, label: 'Roles & Permissions', icon: Shield },
         { id: 'billing' as SettingsTab, label: 'Billing & Payments', icon: CreditCard },
@@ -153,6 +155,7 @@ export function SettingsPage() {
                     ) : (
                         <>
                             {activeTab === 'company' && <CompanyProfileTab data={settings?.companyProfile} onSave={(d: any) => updateSettings('companyProfile', d)} saving={saving} />}
+                            {activeTab === 'attendance' && <AttendanceSettingsTab data={settings?.attendance} onSave={(d: any) => updateSettings('attendance', d)} saving={saving} />}
                             {activeTab === 'users' && <UsersRolesTab />}
                             {activeTab === 'roles' && <RolesPermissionsTab data={settings?.roles} onSave={(d: any) => updateSettings('roles', d)} saving={saving} />}
                             {activeTab === 'billing' && <BillingTab data={settings?.billing} onSave={(d: any) => updateSettings('billing', d)} saving={saving} />}
@@ -1696,6 +1699,193 @@ function AIConfigTab({ data, onSave, saving }: any) {
                 <Button className="w-full" onClick={() => onSave(formData)} disabled={saving}>
                     {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     {saving ? 'Saving...' : 'Save AI Configuration'}
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
+
+function AttendanceSettingsTab({ data, onSave, saving }: any) {
+    const [formData, setFormData] = useState({
+        standardShiftHours: data?.standardShiftHours ?? 9.0,
+        lunchBreakHours: data?.lunchBreakHours ?? 1.0,
+        halfDayThresholdHours: data?.halfDayThresholdHours ?? 4.5,
+        gracePeriodMinutes: data?.gracePeriodMinutes ?? 15,
+        shiftStartTime: data?.shiftStartTime || '09:30',
+        shiftEndTime: data?.shiftEndTime || '18:30',
+    })
+
+    useEffect(() => {
+        if (data) {
+            setFormData({
+                standardShiftHours: data.standardShiftHours ?? 9.0,
+                lunchBreakHours: data.lunchBreakHours ?? 1.0,
+                halfDayThresholdHours: data.halfDayThresholdHours ?? 4.5,
+                gracePeriodMinutes: data.gracePeriodMinutes ?? 15,
+                shiftStartTime: data.shiftStartTime || '09:30',
+                shiftEndTime: data.shiftEndTime || '18:30',
+            })
+        }
+    }, [data])
+
+    const handleChange = (e: any) => {
+        const { id, value, type } = e.target
+        setFormData((prev: any) => ({
+            ...prev,
+            [id]: type === 'number' ? parseFloat(value) || 0 : value
+        }))
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-primary" />
+                    Attendance & Shift Settings
+                </CardTitle>
+                <CardDescription>
+                    Configure standard daily working hours, lunch break durations, and shift timings for your organization.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {/* Live Preview Cards */}
+                <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Live Preview (Employee View)
+                    </Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent border border-blue-500/20 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                            <div className="bg-blue-500 rounded-2xl p-3 text-white shadow-lg shadow-blue-500/30">
+                                <Clock className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground">Standard Shift</p>
+                                <p className="text-xl sm:text-2xl font-black text-foreground">
+                                    {(Number(formData.standardShiftHours) || 0).toFixed(1)} Hours
+                                </p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                    {formData.shiftStartTime} to {formData.shiftEndTime}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                            <div className="bg-amber-500 rounded-2xl p-3 text-white shadow-lg shadow-amber-500/30">
+                                <Coffee className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground">Lunch Break</p>
+                                <p className="text-xl sm:text-2xl font-black text-foreground">
+                                    {(Number(formData.lunchBreakHours) || 0).toFixed(1)} Hour{Number(formData.lunchBreakHours) !== 1 ? 's' : ''}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                    Grace Period: {formData.gracePeriodMinutes} mins
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                    <div className="space-y-2">
+                        <Label htmlFor="standardShiftHours">Standard Shift Duration (Hours)</Label>
+                        <Input
+                            id="standardShiftHours"
+                            type="number"
+                            step="0.5"
+                            min="1"
+                            max="24"
+                            value={formData.standardShiftHours}
+                            onChange={handleChange}
+                            placeholder="9.0"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Expected full-day working hours for team members (e.g. 9.0, 8.5, 8.0).
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="lunchBreakHours">Lunch / Break Duration (Hours)</Label>
+                        <Input
+                            id="lunchBreakHours"
+                            type="number"
+                            step="0.25"
+                            min="0"
+                            max="5"
+                            value={formData.lunchBreakHours}
+                            onChange={handleChange}
+                            placeholder="1.0"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Total allowed daily lunch / tea break time (e.g. 1.0 = 60 mins, 0.75 = 45 mins).
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="halfDayThresholdHours">Half-Day Threshold (Minimum Hours)</Label>
+                        <Input
+                            id="halfDayThresholdHours"
+                            type="number"
+                            step="0.5"
+                            min="1"
+                            max="12"
+                            value={formData.halfDayThresholdHours}
+                            onChange={handleChange}
+                            placeholder="4.5"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Work hours below this threshold will automatically be marked as Half-Day on checkout.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="gracePeriodMinutes">Late Check-In Grace Period (Minutes)</Label>
+                        <Input
+                            id="gracePeriodMinutes"
+                            type="number"
+                            step="5"
+                            min="0"
+                            max="120"
+                            value={formData.gracePeriodMinutes}
+                            onChange={handleChange}
+                            placeholder="15"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Allowed buffer time after shift start before marking attendance as late.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="shiftStartTime">Shift Start Time</Label>
+                        <Input
+                            id="shiftStartTime"
+                            type="time"
+                            value={formData.shiftStartTime}
+                            onChange={handleChange}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Official company office start timing (e.g., 09:30 AM).
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="shiftEndTime">Shift End Time</Label>
+                        <Input
+                            id="shiftEndTime"
+                            type="time"
+                            value={formData.shiftEndTime}
+                            onChange={handleChange}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Official company office wrap-up timing (e.g., 06:30 PM).
+                        </p>
+                    </div>
+                </div>
+
+                <Button className="w-full sm:w-auto" onClick={() => onSave(formData)} disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {saving ? 'Saving...' : 'Save Shift Settings'}
                 </Button>
             </CardContent>
         </Card>

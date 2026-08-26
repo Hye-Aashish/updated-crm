@@ -299,8 +299,19 @@ router.post('/check-out', protect, async (req, res) => {
         const totalDuration = Math.floor((attendance.checkOut - attendance.checkIn) / 1000 / 60);
         attendance.totalWorkTime = totalDuration - attendance.totalBreakTime;
 
-        // Half-day Logic (e.g., < 4 hours)
-        if (attendance.totalWorkTime < 240) {
+        // Half-day Logic (dynamic from settings, default 4.5 hours / 270 mins or 4 hours / 240 mins)
+        let thresholdMinutes = 270;
+        try {
+            const Setting = require('../models/Setting');
+            const setting = await Setting.findOne({ type: 'general' });
+            if (setting?.attendance?.halfDayThresholdHours) {
+                thresholdMinutes = Number(setting.attendance.halfDayThresholdHours) * 60;
+            }
+        } catch (e) {
+            console.error('Error fetching half-day threshold setting:', e.message);
+        }
+
+        if (attendance.totalWorkTime < thresholdMinutes) {
             attendance.isHalfDay = true;
             attendance.status = 'half-day';
         }

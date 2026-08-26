@@ -200,11 +200,28 @@ router.get('/public', async (req, res) => {
 router.get('/', protect, async (req, res) => {
     try {
         let settings = await Setting.findOne({ type: 'general' });
+        let isModified = false;
         if (!settings) {
             settings = new Setting({ type: 'general', roles: defaultRoles });
-            await settings.save();
+            isModified = true;
         } else if (!settings.roles || settings.roles.length === 0) {
             settings.roles = defaultRoles;
+            isModified = true;
+        }
+
+        if (!settings.attendance || !settings.attendance.standardShiftHours) {
+            settings.attendance = {
+                standardShiftHours: 9.0,
+                lunchBreakHours: 1.0,
+                halfDayThresholdHours: 4.5,
+                gracePeriodMinutes: 15,
+                shiftStartTime: '09:30',
+                shiftEndTime: '18:30'
+            };
+            isModified = true;
+        }
+
+        if (isModified) {
             await settings.save();
         }
 
@@ -277,6 +294,10 @@ router.put('/', protect, authorize('admin', 'owner'), async (req, res) => {
         if (req.body.payroll) {
             const current = settings.payroll ? settings.payroll.toObject() : {};
             settings.payroll = { ...current, ...req.body.payroll };
+        }
+        if (req.body.attendance) {
+            const current = settings.attendance ? settings.attendance.toObject() : {};
+            settings.attendance = { ...current, ...req.body.attendance };
         }
         if (req.body.apiKeys) {
             const current = settings.apiKeys ? settings.apiKeys.toObject() : {};

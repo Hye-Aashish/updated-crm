@@ -38,6 +38,7 @@ build/
 # Temp files
 vite-error*.txt
 push-error.txt
+scratch/
 
 # Uploads
 backend/public/uploads/*

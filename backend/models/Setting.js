@@ -72,6 +72,14 @@ const settingSchema = new mongoose.Schema({
             label: { type: String }
         }]
     },
+    attendance: {
+        standardShiftHours: { type: Number, default: 9.0 },
+        lunchBreakHours: { type: Number, default: 1.0 },
+        halfDayThresholdHours: { type: Number, default: 4.5 },
+        gracePeriodMinutes: { type: Number, default: 15 },
+        shiftStartTime: { type: String, default: '09:30' },
+        shiftEndTime: { type: String, default: '18:30' },
+    },
     apiKeys: {
         gemini: { type: String, default: '' },
         openai: { type: String, default: '' },

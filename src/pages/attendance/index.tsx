@@ -14,7 +14,11 @@ import {
     CheckCircle2,
     Info,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Settings,
+    Edit3,
+    Loader2,
+    Save
 } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
@@ -23,6 +27,16 @@ import { useAppStore } from '@/store'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { AttendanceSheet } from '@/components/attendance/attendance-sheet'
 import { LivePresenceBoard } from '@/components/attendance/live-presence-board'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export function AttendancePage() {
     const { toast } = useToast()
@@ -34,6 +48,19 @@ export function AttendancePage() {
     const [selectedDate, setSelectedDate] = useState(new Date())
     const [loading, setLoading] = useState(true)
 
+    // Dynamic Shift Settings
+    const [shiftSettings, setShiftSettings] = useState({
+        standardShiftHours: 9.0,
+        lunchBreakHours: 1.0,
+        halfDayThresholdHours: 4.5,
+        gracePeriodMinutes: 15,
+        shiftStartTime: '09:30',
+        shiftEndTime: '18:30',
+    })
+    const [isShiftModalOpen, setIsShiftModalOpen] = useState(false)
+    const [editShiftData, setEditShiftData] = useState(shiftSettings)
+    const [savingShift, setSavingShift] = useState(false)
+
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner'
     const displayUsers = isAdmin ? users : (currentUser ? [currentUser] : [])
 
@@ -43,7 +70,8 @@ export function AttendancePage() {
             try {
                 await Promise.all([
                     fetchStatus(),
-                    fetchHistory()
+                    fetchHistory(),
+                    fetchShiftSettings()
                 ])
                 if (isAdmin) {
                     await fetchUsers()
@@ -56,6 +84,50 @@ export function AttendancePage() {
             init()
         }
     }, [currentUser, isAdmin, selectedDate])
+
+    const fetchShiftSettings = async () => {
+        try {
+            const res = await api.get('/settings')
+            if (res.data?.attendance) {
+                setShiftSettings(prev => ({
+                    ...prev,
+                    ...res.data.attendance
+                }))
+                setEditShiftData(prev => ({
+                    ...prev,
+                    ...res.data.attendance
+                }))
+            }
+        } catch (error) {
+            console.error('Failed to fetch attendance settings')
+        }
+    }
+
+    const handleSaveShiftSettings = async () => {
+        setSavingShift(true)
+        try {
+            const res = await api.put('/settings', { attendance: editShiftData })
+            if (res.data?.attendance) {
+                setShiftSettings(res.data.attendance)
+            } else {
+                setShiftSettings(editShiftData)
+            }
+            setIsShiftModalOpen(false)
+            toast({
+                title: 'SHIFT SETTINGS UPDATED',
+                description: 'Standard shift and break timings have been updated successfully.',
+                variant: 'success'
+            })
+        } catch (error: any) {
+            toast({
+                title: 'UPDATE FAILED',
+                description: error.response?.data?.message || 'Failed to update shift settings',
+                variant: 'destructive'
+            })
+        } finally {
+            setSavingShift(false)
+        }
+    }
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -321,41 +393,214 @@ export function AttendancePage() {
             </div>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="bg-gradient-to-br from-blue-500/5 to-transparent border-none shadow-sm">
-                    <CardContent className="p-6 flex items-center gap-4">
-                        <div className="bg-blue-500 rounded-2xl p-3 text-white shadow-lg shadow-blue-200">
-                            <Clock className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Standard Shift</p>
-                            <p className="text-2xl font-black">9.0 Hours</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-gradient-to-br from-amber-500/5 to-transparent border-none shadow-sm">
-                    <CardContent className="p-6 flex items-center gap-4">
-                        <div className="bg-amber-500 rounded-2xl p-3 text-white shadow-lg shadow-amber-200">
-                            <Coffee className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Lunch Break</p>
-                            <p className="text-2xl font-black">1.0 Hour</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-gradient-to-br from-purple-500/5 to-transparent border-none shadow-sm">
-                    <CardContent className="p-6 flex items-center gap-4">
-                        <div className="bg-purple-500 rounded-2xl p-3 text-white shadow-lg shadow-purple-200">
-                            <Info className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Monthly Status</p>
-                            <p className="text-2xl font-black">Consistent</p>
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Shift & Break Overview</h3>
+                    {isAdmin && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setEditShiftData(shiftSettings)
+                                setIsShiftModalOpen(true)
+                            }}
+                            className="h-8 gap-1.5 text-xs font-medium"
+                        >
+                            <Settings className="h-3.5 w-3.5" />
+                            Configure Shift Settings
+                        </Button>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Card className="bg-gradient-to-br from-blue-500/5 via-blue-500/10 to-transparent border border-blue-500/10 shadow-sm relative overflow-hidden group">
+                        <CardContent className="p-6 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-blue-500 rounded-2xl p-3 text-white shadow-lg shadow-blue-200">
+                                    <Clock className="h-6 w-6" />
+                                </div>
+                                <div>
+                                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Standard Shift</p>
+                                    <p className="text-2xl font-black tracking-tight">
+                                        {(Number(shiftSettings.standardShiftHours) || 9).toFixed(1)} Hours
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        {shiftSettings.shiftStartTime || '09:30'} - {shiftSettings.shiftEndTime || '18:30'}
+                                    </p>
+                                </div>
+                            </div>
+                            {isAdmin && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                        setEditShiftData(shiftSettings)
+                                        setIsShiftModalOpen(true)
+                                    }}
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground opacity-60 hover:opacity-100"
+                                    title="Edit Standard Shift Hours"
+                                >
+                                    <Edit3 className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-amber-500/5 via-amber-500/10 to-transparent border border-amber-500/10 shadow-sm relative overflow-hidden group">
+                        <CardContent className="p-6 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-amber-500 rounded-2xl p-3 text-white shadow-lg shadow-amber-200">
+                                    <Coffee className="h-6 w-6" />
+                                </div>
+                                <div>
+                                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Lunch Break</p>
+                                    <p className="text-2xl font-black tracking-tight">
+                                        {(Number(shiftSettings.lunchBreakHours) || 1).toFixed(1)} Hour{Number(shiftSettings.lunchBreakHours) !== 1 ? 's' : ''}
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        Grace: {shiftSettings.gracePeriodMinutes || 15} mins buffer
+                                    </p>
+                                </div>
+                            </div>
+                            {isAdmin && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                        setEditShiftData(shiftSettings)
+                                        setIsShiftModalOpen(true)
+                                    }}
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground opacity-60 hover:opacity-100"
+                                    title="Edit Lunch Break Hours"
+                                >
+                                    <Edit3 className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-purple-500/5 via-purple-500/10 to-transparent border border-purple-500/10 shadow-sm">
+                        <CardContent className="p-6 flex items-center gap-4">
+                            <div className="bg-purple-500 rounded-2xl p-3 text-white shadow-lg shadow-purple-200">
+                                <Info className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Half-Day Threshold</p>
+                                <p className="text-2xl font-black tracking-tight">
+                                    {(Number(shiftSettings.halfDayThresholdHours) || 4.5).toFixed(1)} Hours
+                                </p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                    Below this marks half-day
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
+
+            {/* Admin Shift Configuration Modal */}
+            <Dialog open={isShiftModalOpen} onOpenChange={setIsShiftModalOpen}>
+                <DialogContent className="sm:max-w-[480px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Clock className="h-5 w-5 text-primary" />
+                            Set Standard Shift & Timings
+                        </DialogTitle>
+                        <DialogDescription>
+                            Configure standard daily working hours and break policies for all employees.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-3">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="modalShiftHours" className="text-xs">Standard Shift (Hours)</Label>
+                                <Input
+                                    id="modalShiftHours"
+                                    type="number"
+                                    step="0.5"
+                                    min="1"
+                                    max="24"
+                                    value={editShiftData.standardShiftHours}
+                                    onChange={(e) => setEditShiftData(prev => ({ ...prev, standardShiftHours: parseFloat(e.target.value) || 0 }))}
+                                    placeholder="9.0"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="modalBreakHours" className="text-xs">Lunch Break (Hours)</Label>
+                                <Input
+                                    id="modalBreakHours"
+                                    type="number"
+                                    step="0.25"
+                                    min="0"
+                                    max="5"
+                                    value={editShiftData.lunchBreakHours}
+                                    onChange={(e) => setEditShiftData(prev => ({ ...prev, lunchBreakHours: parseFloat(e.target.value) || 0 }))}
+                                    placeholder="1.0"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="modalHalfDay" className="text-xs">Half-Day Min (Hours)</Label>
+                                <Input
+                                    id="modalHalfDay"
+                                    type="number"
+                                    step="0.5"
+                                    min="1"
+                                    max="12"
+                                    value={editShiftData.halfDayThresholdHours}
+                                    onChange={(e) => setEditShiftData(prev => ({ ...prev, halfDayThresholdHours: parseFloat(e.target.value) || 0 }))}
+                                    placeholder="4.5"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="modalGrace" className="text-xs">Grace Period (Mins)</Label>
+                                <Input
+                                    id="modalGrace"
+                                    type="number"
+                                    step="5"
+                                    min="0"
+                                    max="120"
+                                    value={editShiftData.gracePeriodMinutes}
+                                    onChange={(e) => setEditShiftData(prev => ({ ...prev, gracePeriodMinutes: parseInt(e.target.value) || 0 }))}
+                                    placeholder="15"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="modalStart" className="text-xs">Shift Start Time</Label>
+                                <Input
+                                    id="modalStart"
+                                    type="time"
+                                    value={editShiftData.shiftStartTime}
+                                    onChange={(e) => setEditShiftData(prev => ({ ...prev, shiftStartTime: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="modalEnd" className="text-xs">Shift End Time</Label>
+                                <Input
+                                    id="modalEnd"
+                                    type="time"
+                                    value={editShiftData.shiftEndTime}
+                                    onChange={(e) => setEditShiftData(prev => ({ ...prev, shiftEndTime: e.target.value }))}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsShiftModalOpen(false)} disabled={savingShift}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSaveShiftSettings} disabled={savingShift} className="gap-2">
+                            {savingShift ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            {savingShift ? 'Saving...' : 'Save Settings'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Monthly Attendance Sheet (Everyone) */}
             <div className="space-y-4 pt-8 border-t">
