@@ -4,7 +4,7 @@ const Invoice = require('../models/Invoice');
 const Client = require('../models/Client');
 const Project = require('../models/Project');
 const sendEmail = require('../utils/sendEmail');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -100,7 +100,7 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // CREATE a new invoice
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, checkPermission('invoices', 'create'), async (req, res) => {
     const invoice = new Invoice({
         invoiceNumber: req.body.invoiceNumber,
         clientId: req.body.clientId,
@@ -233,7 +233,7 @@ router.post('/', protect, async (req, res) => {
 });
 
 // UPDATE an invoice
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, checkPermission('invoices', 'edit'), async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
@@ -268,7 +268,7 @@ router.put('/:id', protect, async (req, res) => {
 });
 
 // DELETE an invoice
-router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
+router.delete('/:id', protect, checkPermission('invoices', 'delete'), async (req, res) => {
     try {
         const deletedInvoice = await Invoice.findByIdAndDelete(req.params.id);
         if (!deletedInvoice) return res.status(404).json({ message: 'Invoice not found' });
@@ -468,7 +468,8 @@ router.post('/:id/payment-session', async (req, res) => {
 
         res.json({
             payment_session_id: response.data.payment_session_id,
-            order_id: response.data.order_id
+            order_id: response.data.order_id,
+            environment: isSandbox ? 'sandbox' : 'production'
         });
 
     } catch (err) {
@@ -481,7 +482,7 @@ router.post('/:id/payment-session', async (req, res) => {
 });
 
 // Record MANUAL payment (Admin/Owner only)
-router.post('/:id/manual-payment', protect, authorize('admin', 'owner'), async (req, res) => {
+router.post('/:id/manual-payment', protect, checkPermission('invoices', 'mark_paid'), async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });

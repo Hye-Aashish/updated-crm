@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Amc = require('../models/Amc');
 const Invoice = require('../models/Invoice');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Helper: generate next invoice number
 const getNextInvoiceNumber = async () => {
@@ -62,7 +62,7 @@ router.get('/', protect, async (req, res, next) => {
 });
 
 // CREATE AMC
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, checkPermission('amc', 'create'), async (req, res) => {
     try {
         // Block client role
         if (req.user.role === 'client') {
@@ -143,7 +143,7 @@ router.get('/:id', protect, async (req, res, next) => {
 });
 
 // UPDATE AMC
-router.put('/:id', protect, async (req, res, next) => {
+router.put('/:id', protect, checkPermission('amc', 'edit'), async (req, res, next) => {
     try {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
@@ -161,7 +161,7 @@ router.put('/:id', protect, async (req, res, next) => {
 });
 
 // DELETE AMC
-router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res, next) => {
+router.delete('/:id', protect, checkPermission('amc', 'delete'), async (req, res, next) => {
     try {
         const deleted = await Amc.findByIdAndDelete(req.params.id);
         if (!deleted) return res.status(404).json({ message: 'AMC not found' });
@@ -174,7 +174,7 @@ router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res, nex
 // ─── Special Actions ──────────────────────────────────────────────────────────
 
 // GENERATE AMC Invoice
-router.post('/:id/generate-invoice', protect, async (req, res, next) => {
+router.post('/:id/generate-invoice', protect, checkPermission('amc', 'edit'), async (req, res, next) => {
     try {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
@@ -229,7 +229,7 @@ router.post('/:id/generate-invoice', protect, async (req, res, next) => {
 });
 
 // RENEW AMC
-router.post('/:id/renew', protect, async (req, res, next) => {
+router.post('/:id/renew', protect, checkPermission('amc', 'edit'), async (req, res, next) => {
     try {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });

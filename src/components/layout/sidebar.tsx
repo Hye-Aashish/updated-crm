@@ -21,7 +21,9 @@ import {
     Shield,
     Globe,
     BellRing,
-    Brain
+    Brain,
+    FileSignature,
+    Trophy
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -104,6 +106,11 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Digital Products', href: '/products', icon: Briefcase }, // Can use a better icon like Package later
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
         { name: 'Team', href: '/team?tab=members', icon: Users },
+        { name: 'Capacity Planning', href: '/team/capacity', icon: BarChart },
+        { name: 'Approvals', href: '/approvals', icon: FileSignature },
+        { name: 'Email Campaigns', href: '/campaigns', icon: MessageSquare },
+        { name: 'Goals & OKRs', href: '/goals', icon: Trophy },
+        { name: 'Offer Letters', href: '/offer-letters', icon: Shield },
         { name: 'Attendance', href: '/attendance', icon: Clock }, // Updated link
         { name: 'Time Tracking', href: '/time', icon: Clock },
         { name: 'Invoices', href: '/invoices', icon: FileText },
@@ -156,6 +163,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Digital Products': return !!p.projects?.view // Fallback to projects permission for now, or true for owner
             case 'Tasks': return !!p.tasks?.view
             case 'Team': return !!p.team?.view
+            case 'Offer Letters': return !!p.team?.view
             case 'Attendance': return !!p.attendance?.view
             case 'Time Tracking': return !!p.time_tracking?.view
             case 'Invoices': return !!p.invoices?.view
@@ -173,8 +181,8 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Reports': return !!p.reports?.view
             case 'Files': return !!p.files?.view
             case 'Settings': return !!p.settings?.view
-            case 'Roles & Permissions': return !!p.roles?.view || String(currentUser?.role) === 'admin'
-            case 'AI Assistant': return !!p.ai_assistant?.use || String(currentUser?.role) === 'admin'
+            case 'Roles & Permissions': return !!p.roles?.view
+            case 'AI Assistant': return !!p.ai_assistant?.use
             default: return true
         }
     })

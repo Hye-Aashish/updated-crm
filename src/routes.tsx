@@ -12,6 +12,9 @@ const LoginPage = lazy(() => import('./pages/auth/login').then(m => ({ default: 
 const ForgotPasswordPage = lazy(() => import('./pages/auth/forgot-password').then(m => ({ default: m.ForgotPasswordPage })))
 const PublicLeadForm = lazy(() => import('./pages/public/lead-form').then(m => ({ default: m.PublicLeadForm })))
 const PublicQuotationView = lazy(() => import('./pages/public/quotation-view'))
+const PublicCandidateForm = lazy(() => import('./pages/public/candidate-form').then(m => ({ default: m.PublicCandidateForm })))
+const PublicOfferView = lazy(() => import('./pages/public/offer-view'))
+const PublicApprovalSignPage = lazy(() => import('./pages/public/approval-sign'))
 
 // Dashboard Pages
 const DashboardPage = lazy(() => import('./pages/dashboard').then(m => ({ default: m.DashboardPage })))
@@ -33,6 +36,7 @@ const TaskDetailPage = lazy(() => import('./pages/tasks/[id]').then(m => ({ defa
 
 const TeamPage = lazy(() => import('./pages/team').then(m => ({ default: m.TeamPage })))
 const TeamMemberPage = lazy(() => import('./pages/team/[id]').then(m => ({ default: m.TeamMemberPage })))
+const OfferLettersPage = lazy(() => import('./pages/team/candidates').then(m => ({ default: m.OfferLettersPage })))
 
 const TimePage = lazy(() => import('./pages/time').then(m => ({ default: m.TimePage })))
 const TimeReportsPage = lazy(() => import('./pages/time/reports').then(m => ({ default: m.TimeReportsPage })))
@@ -65,6 +69,11 @@ const QuotationEditor = lazy(() => import('./pages/quotations/create'))
 const QuotationDetailPage = lazy(() => import('./pages/quotations/[id]'))
 const EmployeeDashboardPage = lazy(() => import('./pages/employee-dashboard').then(m => ({ default: m.EmployeeDashboardPage })))
 const EmployeeSettingsPage = lazy(() => import('./pages/employee-settings').then(m => ({ default: m.EmployeeSettingsPage })))
+
+const ResourceCapacityPage = lazy(() => import('./pages/team/capacity').then(m => ({ default: m.ResourceCapacityPage })))
+const ApprovalsPage = lazy(() => import('./pages/approvals').then(m => ({ default: m.ApprovalsPage })))
+const CampaignsPage = lazy(() => import('./pages/marketing/campaigns').then(m => ({ default: m.CampaignsPage })))
+const GoalsPage = lazy(() => import('./pages/goals').then(m => ({ default: m.GoalsPage })))
 
 import { usePermissions } from './hooks/use-permissions'
 import { useAppStore } from './store'
@@ -99,6 +108,10 @@ export function AppRoutes() {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/f/:id" element={<PublicLeadForm />} />
                 <Route path="/q/:id" element={<PublicQuotationView />} />
+                <Route path="/candidate-form/:token" element={<PublicCandidateForm />} />
+                <Route path="/offer/:token" element={<PublicOfferView />} />
+                <Route path="/approval/:token" element={<PublicApprovalSignPage />} />
+                <Route path="/public/approval/:token" element={<PublicApprovalSignPage />} />
                 <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
                 <Route path="/i/:id" element={<InvoiceDetailPage />} />
 
@@ -129,6 +142,8 @@ export function AppRoutes() {
                     {/* Operations */}
                     <Route path="team" element={<PermissionGuard module="team"><TeamPage /></PermissionGuard>} />
                     <Route path="team/:id" element={<PermissionGuard module="team"><TeamMemberPage /></PermissionGuard>} />
+                    <Route path="offer-letters" element={<PermissionGuard module="team"><OfferLettersPage /></PermissionGuard>} />
+                    <Route path="team/offer-letters" element={<PermissionGuard module="team"><OfferLettersPage /></PermissionGuard>} />
 
                     <Route path="time" element={<PermissionGuard module="time_tracking"><TimePage /></PermissionGuard>} />
                     <Route path="time/reports" element={<PermissionGuard module="time_tracking"><TimeReportsPage /></PermissionGuard>} />
@@ -163,6 +178,13 @@ export function AppRoutes() {
                     <Route path="quotations/create" element={<PermissionGuard module="quotations"><QuotationEditor /></PermissionGuard>} />
                     <Route path="quotations/:id" element={<PermissionGuard module="quotations"><QuotationDetailPage /></PermissionGuard>} />
                     <Route path="quotations/:id/edit" element={<PermissionGuard module="quotations"><QuotationEditor /></PermissionGuard>} />
+
+                    {/* New Business Efficiency Modules */}
+                    <Route path="capacity" element={<PermissionGuard module="team"><ResourceCapacityPage /></PermissionGuard>} />
+                    <Route path="team/capacity" element={<PermissionGuard module="team"><ResourceCapacityPage /></PermissionGuard>} />
+                    <Route path="approvals" element={<ApprovalsPage />} />
+                    <Route path="campaigns" element={<PermissionGuard module="leads"><CampaignsPage /></PermissionGuard>} />
+                    <Route path="goals" element={<GoalsPage />} />
                 </Route>
 
                 {/* Employee Routes */}

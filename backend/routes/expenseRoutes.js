@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Expense = require('../models/Expense');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Get all expenses
 router.get('/', protect, async (req, res) => {
@@ -20,7 +20,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // Create expense (Staff only — clients cannot create)
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, checkPermission('expenses', 'create'), async (req, res) => {
     // Block clients from creating expenses
     if (req.user.role === 'client') {
         return res.status(403).json({ message: 'Clients cannot create expenses' });
@@ -46,7 +46,7 @@ router.post('/', protect, async (req, res) => {
 });
 
 // Delete expense
-router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
+router.delete('/:id', protect, checkPermission('expenses', 'delete'), async (req, res) => {
     try {
         const deletedExpense = await Expense.findByIdAndDelete(req.params.id);
         if (!deletedExpense) return res.status(404).json({ message: 'Expense not found' });

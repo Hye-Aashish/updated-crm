@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { Avatar } from '@/components/ui/avatar'
+import { mapUser } from '@/lib/mappers'
+import { usePermissions } from '@/hooks/use-permissions'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,6 +37,7 @@ import { useToast } from '@/hooks/use-toast'
 import { AttendanceSheet } from '@/components/attendance/attendance-sheet'
 
 export function TeamPage() {
+    const { canCreate, canDelete } = usePermissions()
     const navigate = useNavigate()
     const location = useLocation()
     const { toast } = useToast()
@@ -232,7 +235,14 @@ export function TeamPage() {
                     >
                         <Clock className="mr-1.5 sm:mr-2 h-4 w-4" /> Attendance
                     </Button>
-                    {activeTab === 'members' && (['admin', 'owner'].includes(useAppStore.getState().currentUser?.role)) && (
+                    <Button
+                        variant="outline"
+                        className="h-9 px-3 sm:px-4 text-xs sm:text-sm border-blue-200 text-blue-700 hover:bg-blue-50"
+                        onClick={() => navigate('/offer-letters')}
+                    >
+                        <FileText className="mr-1.5 sm:mr-2 h-4 w-4" /> Offer Letters & Onboarding
+                    </Button>
+                    {activeTab === 'members' && canCreate('team') && (
                         <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
                             <DialogTrigger asChild>
                                 <Button className="h-9 px-3 sm:px-4 text-xs sm:text-sm">
@@ -496,7 +506,7 @@ export function TeamPage() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent>
                                                         <DropdownMenuItem onClick={() => navigate(`/team/${user.id}`)}>View Profile</DropdownMenuItem>
-                                                        {['admin', 'owner'].includes(useAppStore.getState().currentUser?.role) && (
+                                                        {canDelete('team') && (
                                                             <DropdownMenuItem className="text-red-600" onClick={() => setUserToDelete(user.id)}>
                                                                 <Trash2 className="mr-2 h-4 w-4" /> Release
                                                             </DropdownMenuItem>

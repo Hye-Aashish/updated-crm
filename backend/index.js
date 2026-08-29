@@ -54,6 +54,9 @@ require('./socket/chatSocket')(io);
 require('./socket/projectChatSocket')(io);
 require('./socket/monitoringSocket')(io);
 
+// Initialize Cron Jobs
+require('./services/cronService');
+
 const PORT = process.env.PORT || 5000;
 
 // ── Security Middleware ─────────────────────────────────────────────────────
@@ -105,6 +108,7 @@ const publicEndpointLimiter = rateLimit({
 });
 app.use('/api/tracking', publicEndpointLimiter);
 app.use('/api/lead-forms/public', publicEndpointLimiter);
+app.use('/api/candidates/public', publicEndpointLimiter);
 
 // 3. Body parser with limits
 app.use(express.json({ limit: '10mb' }));
@@ -186,7 +190,11 @@ const routes = {
     test: require('./routes/testRoutes'),
     'ai-assistant': require('./routes/aiAssistantRoutes'),
     products: require('./routes/productRoutes'),
-    'client-products': require('./routes/clientProductRoutes')
+    'client-products': require('./routes/clientProductRoutes'),
+    candidates: require('./routes/candidateRoutes'),
+    approvals: require('./routes/approvalRoutes'),
+    campaigns: require('./routes/campaignRoutes'),
+    goals: require('./routes/goalRoutes')
 };
 
 Object.entries(routes).forEach(([path, handler]) => {

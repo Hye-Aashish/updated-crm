@@ -1108,11 +1108,11 @@ export function InvoiceDetailPage() {
         try {
             // Get Payment Session
             const res = await api.post(`/invoices/${id}/payment-session`)
-            const { payment_session_id } = res.data
+            const { payment_session_id, environment } = res.data
 
             // Initialize Cashfree
             const cashfree = (window as any).Cashfree({
-                mode: "sandbox" // Change to "production" for live
+                mode: environment || "sandbox"
             })
 
             // Open Checkout

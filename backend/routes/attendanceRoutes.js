@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Attendance = require('../models/Attendance');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 const timeEntryRouter = require('./timeEntryRoutes');
 
 // Helper to normalize any date input to UTC midnight (in IST context)
@@ -360,7 +360,7 @@ router.get('/monthly', protect, async (req, res) => {
 });
 
 // Manual Attendance Management (Admin only)
-router.post('/manual', protect, authorize('admin', 'owner'), async (req, res) => {
+router.post('/manual', protect, checkPermission('attendance', 'manage_all'), async (req, res) => {
     try {
         const { userId, date, status } = req.body;
         const targetDate = getMidnightUTC(date);

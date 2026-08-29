@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Domain = require('../models/Domain');
 const Invoice = require('../models/Invoice');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Helper: generate next invoice number
 const getNextInvoiceNumber = async () => {
@@ -57,7 +57,7 @@ router.get('/', protect, async (req, res, next) => {
 });
 
 // CREATE domain
-router.post('/', protect, authorize('admin', 'owner'), async (req, res, next) => {
+router.post('/', protect, checkPermission('domains', 'create'), async (req, res, next) => {
     try {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Clients cannot create Domain/Hosting entries' });
@@ -114,7 +114,7 @@ router.get('/:id', protect, async (req, res, next) => {
 });
 
 // UPDATE domain
-router.put('/:id', protect, authorize('admin', 'owner'), async (req, res, next) => {
+router.put('/:id', protect, checkPermission('domains', 'edit'), async (req, res, next) => {
     try {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
@@ -131,7 +131,7 @@ router.put('/:id', protect, authorize('admin', 'owner'), async (req, res, next) 
 });
 
 // DELETE domain
-router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res, next) => {
+router.delete('/:id', protect, checkPermission('domains', 'delete'), async (req, res, next) => {
     try {
         const deleted = await Domain.findByIdAndDelete(req.params.id);
         if (!deleted) return res.status(404).json({ message: 'Record not found' });
@@ -142,7 +142,7 @@ router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res, nex
 });
 
 // GENERATE Domain Invoice
-router.post('/:id/generate-invoice', protect, authorize('admin', 'owner'), async (req, res, next) => {
+router.post('/:id/generate-invoice', protect, checkPermission('domains', 'edit'), async (req, res, next) => {
     try {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
@@ -197,7 +197,7 @@ router.post('/:id/generate-invoice', protect, authorize('admin', 'owner'), async
 });
 
 // RENEW domain
-router.post('/:id/renew', protect, authorize('admin', 'owner'), async (req, res, next) => {
+router.post('/:id/renew', protect, checkPermission('domains', 'edit'), async (req, res, next) => {
     try {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });

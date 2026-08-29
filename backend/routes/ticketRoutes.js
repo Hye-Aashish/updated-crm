@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Ticket = require('../models/Ticket');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Helper to escape special regex characters
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -41,7 +41,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // Create ticket
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, checkPermission('tickets', 'create'), async (req, res) => {
     const ticket = new Ticket({
         subject: req.body.subject,
         description: req.body.description,
@@ -95,7 +95,7 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // Update ticket
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, checkPermission('tickets', 'edit'), async (req, res) => {
     try {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
@@ -137,7 +137,7 @@ router.put('/:id', protect, async (req, res) => {
 });
 
 // Delete ticket
-router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => {
+router.delete('/:id', protect, checkPermission('tickets', 'delete'), async (req, res) => {
     try {
         await Ticket.findByIdAndDelete(req.params.id);
         res.json({ message: 'Ticket deleted' });

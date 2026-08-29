@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
 import { timeEntryService } from '@/lib/timeEntryService'
 import { mapTask, mapUser, mapProject } from '@/lib/mappers'
+import { usePermissions } from '@/hooks/use-permissions'
 
 // Task Status Type
 type TaskStatus = {
@@ -57,6 +58,7 @@ export function TasksPage() {
     const { currentUser, tasks: storeTasks, users, projects, setTasks: setStoreTasks, setUsers, setProjects, addTask: addStoreTask, updateTask: updateStoreTask } = useAppStore()
 
     const [tasks, setTasks] = useState(storeTasks)
+    const { canCreate, canDelete } = usePermissions()
     const [statuses, setStatuses] = useState<TaskStatus[]>(INITIAL_STATUSES)
     const [view, setView] = useState<'list' | 'kanban'>('kanban')
     const [draggedTask, setDraggedTask] = useState<any>(null)
@@ -920,7 +922,7 @@ export function TasksPage() {
                         </Dialog>
                     )}
 
-                    {['owner', 'admin', 'pm', 'employee', 'developer'].includes(currentUser?.role || '') && (
+                    {canCreate('tasks') && (
                         <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button size="sm" className="h-9">

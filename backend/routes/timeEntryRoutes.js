@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const TimeEntry = require('../models/TimeEntry');
 const Task = require('../models/Task');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Get all time entries with filters
 router.get('/', protect, async (req, res) => {
@@ -226,7 +226,7 @@ router.put('/:id', protect, async (req, res) => {
 });
 
 // Delete a time entry
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', protect, checkPermission('time_tracking', 'manage_all'), async (req, res) => {
     try {
         const timeEntry = await TimeEntry.findById(req.params.id);
 

@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAppStore } from '@/store'
 import { MoreHorizontal, Trash2, Clock, Video, FileText, Calendar as CalendarIcon } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { usePermissions } from '@/hooks/use-permissions'
 
 interface TaskBoardCardProps {
     task: any
@@ -26,7 +27,8 @@ export function TaskBoardCardV2({ task, users, setSelectedTask, handleDragStart,
     const assignee = users.find(u => u.id === task.assigneeId)
     const project = projects.find(p => p.id === task.projectId)
 
-    const canDelete = currentUser?.role === 'admin' || currentUser?.role === 'owner' || (project && project.pmId === currentUser?.id)
+    const { canDelete: checkCanDelete } = usePermissions()
+    const canDelete = checkCanDelete('tasks') || (project && project.pmId === currentUser?.id)
 
     const [elapsed, setElapsed] = useState(task.totalTimeSpent || 0)
 

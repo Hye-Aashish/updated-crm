@@ -61,6 +61,81 @@ router.get('/', protect, async (req, res) => {
     }
 });
 
+// GET team resource capacity & workload distribution
+router.get('/capacity', protect, async (req, res) => {
+    try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients cannot access team capacity' });
+        }
+
+        const User = require('../models/User');
+        const users = await User.find({ role: { $ne: 'client' } }).select('name email role avatar designation department');
+
+        const now = new Date();
+        const tasks = await Task.find({ status: { $ne: 'archived' } }).populate('projectId', 'name');
+
+        const capacityData = users.map(user => {
+            const userId = user._id.toString();
+            const userTasks = tasks.filter(t => t.assigneeId?.toString() === userId);
+
+            const todoCount = userTasks.filter(t => t.status === 'todo').length;
+            const inProgressCount = userTasks.filter(t => t.status === 'in-progress' || t.status === 'in_progress').length;
+            const reviewCount = userTasks.filter(t => t.status === 'review').length;
+            const doneCount = userTasks.filter(t => t.status === 'done' || t.status === 'completed').length;
+            const totalActive = todoCount + inProgressCount + reviewCount;
+
+            const overdueCount = userTasks.filter(t => {
+                if (t.status === 'done' || t.status === 'completed' || !t.dueDate) return false;
+                return new Date(t.dueDate) < now;
+            }).length;
+
+            // Workload load score (0 to 100+): assuming max standard active concurrency is 6 tasks
+            const maxIdealTasks = 6;
+            const loadScore = Math.min(100, Math.round((totalActive / maxIdealTasks) * 100));
+
+            let status = 'healthy';
+            if (loadScore > 85 || overdueCount >= 2) status = 'overloaded';
+            else if (loadScore >= 50) status = 'optimal';
+            else if (loadScore === 0) status = 'available';
+
+            return {
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    avatar: user.avatar,
+                    designation: user.designation,
+                    department: user.department
+                },
+                stats: {
+                    totalTasks: userTasks.length,
+                    activeTasks: totalActive,
+                    todo: todoCount,
+                    inProgress: inProgressCount,
+                    review: reviewCount,
+                    done: doneCount,
+                    overdue: overdueCount,
+                    loadScore,
+                    status
+                },
+                tasks: userTasks.slice(0, 15).map(t => ({
+                    id: t._id,
+                    title: t.title,
+                    status: t.status,
+                    priority: t.priority,
+                    dueDate: t.dueDate,
+                    projectName: t.projectId?.name || 'General'
+                }))
+            };
+        });
+
+        res.json(capacityData);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // GET task activities (filters: userId, day)
 router.get('/activities', protect, async (req, res) => {
     try {

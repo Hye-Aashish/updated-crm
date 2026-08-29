@@ -3,13 +3,13 @@ const router = express.Router();
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const Setting = require('../models/Setting');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Helper to get days in month
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
 
 // Get payroll for all employees (Admin/Owner only)
-router.get('/all', protect, authorize('admin', 'owner'), async (req, res) => {
+router.get('/all', protect, checkPermission('payroll', 'manage'), async (req, res) => {
     try {
         const { month, year, workingDays } = req.query;
         const targetMonth = month ? parseInt(month) : new Date().getMonth();

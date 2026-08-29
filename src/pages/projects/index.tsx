@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
+import { usePermissions } from '@/hooks/use-permissions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ProjectService } from '@/lib/services/project.service'
 import { ClientService } from '@/lib/services/client.service'
@@ -15,6 +16,7 @@ import { PageSkeleton } from '@/components/ui/page-skeleton'
 
 export function ProjectsPage() {
     const navigate = useNavigate()
+    const { canCreate } = usePermissions()
     const [view, setView] = useState<'grid' | 'list'>('grid')
     const [loading, setLoading] = useState(true)
     const { projects, clients, invoices, currentUser, setProjects, setClients } = useAppStore()
@@ -108,7 +110,7 @@ export function ProjectsPage() {
                             onChange={(e) => handleDateChange('end', e.target.value)}
                         />
                     </div>
-                    {['owner', 'admin', 'pm'].includes(currentUser?.role || '') && (
+                    {canCreate('projects') && (
                         <Button onClick={() => navigate('/projects/new')} className="h-10">
                             <Plus className="mr-1 h-4 w-4" /> New Project
                         </Button>

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
+import { usePermissions } from '@/hooks/use-permissions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
@@ -30,6 +31,7 @@ import type { Invoice } from '@/types'
 
 export function InvoicesPage() {
     const navigate = useNavigate()
+    const { canCreate, canEdit, canDelete } = usePermissions()
     const { toast } = useToast()
     const { invoices, clients, currentUser, setInvoices, setClients } = useAppStore()
     const [loading, setLoading] = useState(true)
@@ -220,7 +222,7 @@ export function InvoicesPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
                     <p className="text-muted-foreground mt-1">Manage billing and payments.</p>
                 </div>
-                {['owner', 'admin'].includes(currentUser?.role || '') && (
+                {canCreate('invoices') && (
                     <Button onClick={() => navigate('/invoices/new')}>
                         <Plus className="mr-2 h-4 w-4" /> Create Invoice
                     </Button>
@@ -343,9 +345,9 @@ export function InvoicesPage() {
                                                         Pay
                                                     </Button>
                                                 )}
-                                                {['owner', 'admin'].includes(currentUser?.role || '') && invoice.status !== 'cancelled' && (
+                                                {canEdit('invoices') && invoice.status !== 'cancelled' && (
                                                     <>
-                                                        {invoice.status !== 'paid' && (
+                                                        {(canEdit('invoices')) && (
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"

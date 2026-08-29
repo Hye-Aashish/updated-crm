@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Setting = require('../models/Setting');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorize, clearPermissionCache } = require('../middleware/authMiddleware');
 
 const defaultRoles = [
     {
@@ -306,6 +306,7 @@ router.put('/', protect, authorize('admin', 'owner'), async (req, res) => {
 
         settings.updatedAt = Date.now();
         const updated = await settings.save();
+        clearPermissionCache(); // Bust the cache so new permissions take effect immediately
         res.json(updated);
     } catch (err) {
         res.status(500).json({ message: err.message });
