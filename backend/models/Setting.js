@@ -88,6 +88,21 @@ const settingSchema = new mongoose.Schema({
         gemini: { type: String, default: '' },
         openai: { type: String, default: '' },
     },
+    whatsappSettings: {
+        connectionMode: { type: String, enum: ['qr_code', 'cloud_api'], default: 'qr_code' },
+        qrSessionStatus: { type: String, enum: ['disconnected', 'qr_ready', 'connected'], default: 'disconnected' },
+        connectedPhone: { type: String, default: '' },
+        connectedAt: Date,
+        sessionToken: { type: String, default: '' },
+        phoneNumberId: { type: String, default: '' },
+        accessToken: { type: String, default: '' },
+        businessAccountId: { type: String, default: '' },
+        webhookVerifyToken: { type: String, default: 'nexcrm_wa_secret' },
+        autoCreateLead: { type: Boolean, default: true },
+        defaultStage: { type: String, default: 'new' },
+        templateName: { type: String, default: 'invoice_notification' },
+        enabled: { type: Boolean, default: true }
+    },
     updatedAt: { type: Date, default: Date.now }
 });
 

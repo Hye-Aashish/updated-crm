@@ -8,7 +8,7 @@ import {
     Building2, Users, CreditCard, FolderKanban, Bell, MessageSquare,
     Upload, Save, Plus, Trash2, Edit, Eye, EyeOff, Shield, Mail, CheckCircle, AlertCircle, Loader2,
     Layout, GripVertical, ChevronUp, ChevronDown, Brain, Sparkles, ExternalLink, KeyRound,
-    Clock, Coffee
+    Clock, Coffee, Copy, Check, Send, Smartphone, QrCode, RefreshCw, Unlink, Wifi, WifiOff
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import api from '@/lib/api-client'
@@ -1376,119 +1376,520 @@ function DashboardBuilderTab({ data, availableRoles, onSave, saving }: any) {
 }
 
 function WhatsAppSettingsTab({ data, onSave, saving }: any) {
+    const { toast } = useToast()
+    const [connectionMode, setConnectionMode] = useState<'qr_code' | 'cloud_api'>('qr_code')
     const [formData, setFormData] = useState(data || {
+        connectionMode: 'qr_code',
         phoneNumberId: '',
         accessToken: '',
         businessAccountId: '',
+        webhookVerifyToken: 'nexcrm_wa_secret',
+        autoCreateLead: true,
+        defaultStage: 'new',
         templateName: 'invoice_notification',
-        enabled: false
+        enabled: true
     })
     const [showToken, setShowToken] = useState(false)
+    const [copied, setCopied] = useState(false)
 
-    useEffect(() => { if (data) setFormData(data) }, [data])
+    // QR Session State
+    const [qrStatus, setQrStatus] = useState<'disconnected' | 'qr_ready' | 'connected'>('disconnected')
+    const [connectedPhone, setConnectedPhone] = useState('')
+    const [connectedAt, setConnectedAt] = useState<string | null>(null)
+    const [qrCodeDataURI, setQrCodeDataURI] = useState('')
+    const [refreshingQr, setRefreshingQr] = useState(false)
+    const [syncingChats, setSyncingChats] = useState(false)
+
+    // Simulator State
+    const [testPhone, setTestPhone] = useState('919876543210')
+    const [testName, setTestName] = useState('Rohan Sharma')
+    const [testMessage, setTestMessage] = useState('Hello! I want information about your CRM packages.')
+    const [testNotes, setTestNotes] = useState('Interested in 5 user licenses & mobile support.')
+    const [testingWebhook, setTestingWebhook] = useState(false)
+
+    useEffect(() => {
+        if (data) {
+            setFormData({
+                connectionMode: 'qr_code',
+                webhookVerifyToken: 'nexcrm_wa_secret',
+                autoCreateLead: true,
+                defaultStage: 'new',
+                enabled: true,
+                ...data
+            })
+            if (data.connectionMode) setConnectionMode(data.connectionMode)
+        }
+        fetchQrSession()
+    }, [data])
+
+    useEffect(() => {
+        let interval: any;
+        if (connectionMode === 'qr_code') {
+            interval = setInterval(() => {
+                fetchQrSession();
+            }, 3000); // Poll every 3 seconds
+        }
+        return () => clearInterval(interval);
+    }, [connectionMode]);
+
+    const fetchQrSession = async () => {
+        try {
+            const res = await api.get('/whatsapp/qr-session')
+            if (res.data) {
+                setQrStatus(res.data.status || 'disconnected')
+                setConnectedPhone(res.data.connectedPhone || '')
+                setConnectedAt(res.data.connectedAt ? new Date(res.data.connectedAt).toLocaleString() : null)
+                if (res.data.qrCodeDataURI) setQrCodeDataURI(res.data.qrCodeDataURI)
+            }
+        } catch (e) {
+            console.error("Failed to fetch QR session", e)
+        }
+    }
+
+    const handleRefreshQr = async () => {
+        setRefreshingQr(true)
+        await fetchQrSession()
+        setTimeout(() => setRefreshingQr(false), 500)
+    }
+
+    const handleSyncChats = async () => {
+        setSyncingChats(true)
+        try {
+            const res = await api.post('/whatsapp/sync-chats', { chatLimit: 50, messageLimit: 20 })
+            toast({
+                title: 'SYNC INITIATED 🎉',
+                description: res.data.message || 'Background sync has started. It may take a few minutes.',
+                variant: 'success'
+            })
+        } catch (error: any) {
+            toast({ 
+                title: 'SYNC ERROR', 
+                description: error.response?.data?.message || 'Failed to sync historical chats', 
+                variant: 'destructive' 
+            })
+        } finally {
+            setSyncingChats(false)
+        }
+    }
+
+    const handleDisconnectDevice = async () => {
+        try {
+            await api.post('/whatsapp/disconnect-device')
+            setQrStatus('disconnected')
+            setConnectedPhone('')
+            setConnectedAt(null)
+            toast({ title: 'UNLINKED', description: 'WhatsApp session disconnected.' })
+        } catch (error: any) {
+            toast({ title: 'DISCONNECT ERROR', description: 'Failed to disconnect session', variant: 'destructive' })
+        }
+    }
 
     const handleChange = (e: any) => {
         const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
         setFormData({ ...formData, [e.target.id]: value })
     }
 
+    const webhookUrl = typeof window !== 'undefined'
+        ? `${window.location.origin.replace(':5173', ':5000')}/api/whatsapp/webhook`
+        : '/api/whatsapp/webhook'
+
+    const handleCopyWebhook = () => {
+        navigator.clipboard.writeText(webhookUrl)
+        setCopied(true)
+        toast({ title: 'COPIED!', description: 'Webhook Callback URL copied to clipboard.' })
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    const handleRunTestWebhook = async () => {
+        if (!testPhone.trim()) {
+            toast({ title: 'REQUIRED FIELD', description: 'Please enter a test phone number.', variant: 'destructive' })
+            return
+        }
+        setTestingWebhook(true)
+        try {
+            const res = await api.post('/whatsapp/test-webhook', {
+                phone: testPhone,
+                name: testName,
+                message: testMessage,
+                notes: testNotes
+            })
+            toast({
+                title: 'WEBHOOK TEST SUCCESS',
+                description: res.data.message || 'WhatsApp message ingested successfully!',
+                variant: 'success'
+            })
+        } catch (error: any) {
+            toast({
+                title: 'TEST FAILED',
+                description: error.response?.data?.message || 'Failed to simulate WhatsApp webhook',
+                variant: 'destructive'
+            })
+        } finally {
+            setTestingWebhook(false)
+        }
+    }
+
+
     return (
-        <Card className="border-none shadow-none bg-transparent">
+        <Card className="border-none shadow-none bg-transparent space-y-6">
             <CardHeader className="px-0 pt-0">
-                <CardTitle className="text-2xl font-black flex items-center gap-3">
-                    <div className="p-2 bg-green-500/10 rounded-xl text-green-600">
-                        <MessageSquare className="h-6 w-6" />
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <CardTitle className="text-2xl font-black flex items-center gap-3">
+                            <div className="p-2 bg-green-500/10 rounded-xl text-green-600">
+                                <MessageSquare className="h-6 w-6" />
+                            </div>
+                            WhatsApp Integration & Automation
+                        </CardTitle>
+                        <CardDescription className="text-sm font-medium mt-1">
+                            Connect your WhatsApp account via QR Code scan or Meta Cloud API for automated lead capture & chat notes.
+                        </CardDescription>
                     </div>
-                    WhatsApp Cloud API
-                </CardTitle>
-                <CardDescription className="text-sm font-medium">
-                    Configure official Meta WhatsApp Cloud API to send invoices directly to client phones.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="px-0 space-y-6">
-                <div className="flex items-center justify-between p-4 rounded-2xl border bg-muted/20">
-                    <div className="space-y-0.5">
-                        <Label className="text-sm font-black uppercase tracking-wider">Enable WhatsApp Invoicing</Label>
-                        <p className="text-xs text-muted-foreground">Toggle this to show "Send via WhatsApp" on invoices.</p>
-                    </div>
-                    <Switch
-                        id="enabled"
-                        checked={formData.enabled}
-                        onCheckedChange={(checked) => setFormData({ ...formData, enabled: checked })}
-                    />
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="phoneNumberId" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Phone Number ID</Label>
-                        <Input
-                            id="phoneNumberId"
-                            value={formData.phoneNumberId || ''}
-                            onChange={handleChange}
-                            placeholder="e.g. 106342888888888"
-                            className="h-12 rounded-xl border-muted-foreground/20"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="businessAccountId" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Business Account ID</Label>
-                        <Input
-                            id="businessAccountId"
-                            value={formData.businessAccountId || ''}
-                            onChange={handleChange}
-                            placeholder="e.g. 104555555555555"
-                            className="h-12 rounded-xl border-muted-foreground/20"
-                        />
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="accessToken" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Permanent Access Token</Label>
-                    <div className="flex gap-2">
-                        <Input
-                            id="accessToken"
-                            type={showToken ? "text" : "password"}
-                            value={formData.accessToken || ''}
-                            onChange={handleChange}
-                            placeholder="EAAG..."
-                            className="h-12 rounded-xl border-muted-foreground/20"
-                        />
-                        <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl shrink-0" onClick={() => setShowToken(!showToken)}>
-                            {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    <div className="flex bg-muted/40 p-1 rounded-xl border">
+                        <Button
+                            variant={connectionMode === 'qr_code' ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => {
+                                setConnectionMode('qr_code')
+                                setFormData({ ...formData, connectionMode: 'qr_code' })
+                            }}
+                            className="rounded-lg text-xs font-bold gap-2"
+                        >
+                            <QrCode className="h-4 w-4" />
+                            Scan QR Code
+                        </Button>
+                        <Button
+                            variant={connectionMode === 'cloud_api' ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => {
+                                setConnectionMode('cloud_api')
+                                setFormData({ ...formData, connectionMode: 'cloud_api' })
+                            }}
+                            className="rounded-lg text-xs font-bold gap-2"
+                        >
+                            <MessageSquare className="h-4 w-4" />
+                            Meta Cloud API
                         </Button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground italic">Generate this from the Meta for Developers portal under WhatsApp {'->'} Getting Started.</p>
+                </div>
+            </CardHeader>
+
+            <CardContent className="px-0 space-y-6">
+                {/* Global Toggle & Lead Auto-Creation */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-4 rounded-2xl border bg-muted/20">
+                        <div className="space-y-0.5">
+                            <Label className="text-sm font-black uppercase tracking-wider">Enable WhatsApp Integration</Label>
+                            <p className="text-xs text-muted-foreground">Master switch for WhatsApp webhooks & direct messaging.</p>
+                        </div>
+                        <Switch
+                            id="enabled"
+                            checked={formData.enabled}
+                            onCheckedChange={(checked) => setFormData({ ...formData, enabled: checked })}
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 rounded-2xl border bg-muted/20">
+                        <div className="space-y-0.5">
+                            <Label className="text-sm font-black uppercase tracking-wider">Auto-Create Leads</Label>
+                            <p className="text-xs text-muted-foreground">New WhatsApp numbers will automatically become pipeline leads.</p>
+                        </div>
+                        <Switch
+                            id="autoCreateLead"
+                            checked={formData.autoCreateLead}
+                            onCheckedChange={(checked) => setFormData({ ...formData, autoCreateLead: checked })}
+                        />
+                    </div>
                 </div>
 
-                <div className="space-y-2">
-                    <Label htmlFor="templateName" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Default Template Name</Label>
-                    <Input
-                        id="templateName"
-                        value={formData.templateName || ''}
-                        onChange={handleChange}
-                        placeholder="invoice_notification"
-                        className="h-12 rounded-xl border-muted-foreground/20"
-                    />
-                    <p className="text-[10px] text-muted-foreground">Ensure this template exists and is approved in your Meta Business Manager.</p>
+                {/* QR CODE SCANNER SECTION */}
+                {connectionMode === 'qr_code' && (
+                    <div className="p-6 rounded-2xl border bg-card shadow-sm space-y-6 border-green-500/30">
+                        <div className="flex items-center justify-between border-b pb-4">
+                            <div className="flex items-center gap-2 text-green-600 font-black text-sm uppercase tracking-wider">
+                                <QrCode className="h-5 w-5" />
+                                <span>SCAN QR CODE TO LINK WHATSAPP PHONE</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {qrStatus === 'connected' ? (
+                                    <Badge className="bg-green-600 text-white font-bold flex items-center gap-1.5 px-3 py-1 text-xs">
+                                        <Wifi className="h-3.5 w-3.5" />
+                                        CONNECTED
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="text-amber-600 border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 font-bold flex items-center gap-1.5 px-3 py-1 text-xs">
+                                        <WifiOff className="h-3.5 w-3.5" />
+                                        READY TO PAIR
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        {qrStatus === 'connected' ? (
+                            <div className="p-6 rounded-2xl bg-green-500/10 border border-green-500/30 flex flex-col md:flex-row items-center justify-between gap-6">
+                                <div className="space-y-2 text-center md:text-left">
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-600 text-white text-xs font-black uppercase tracking-wider">
+                                        <CheckCircle className="h-4 w-4" /> Device Linked & Active
+                                    </div>
+                                    <h3 className="text-2xl font-black text-foreground">{connectedPhone}</h3>
+                                    <p className="text-xs text-muted-foreground font-medium">
+                                        Connected session active. Incoming WhatsApp messages on this number will automatically create Leads & comments.
+                                    </p>
+                                    {connectedAt && (
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
+                                            Linked on: {connectedAt}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-col gap-2 shrink-0">
+                                    <Button
+                                        variant="destructive"
+                                        onClick={handleDisconnectDevice}
+                                        className="h-11 px-6 rounded-xl font-bold flex items-center gap-2"
+                                    >
+                                        <Unlink className="h-4 w-4" />
+                                        Unlink WhatsApp Device
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                                {/* QR Display */}
+                                <div className="flex flex-col items-center justify-center p-6 bg-muted/20 border rounded-2xl space-y-4">
+                                    <div className="relative p-4 bg-white rounded-2xl shadow-xl border border-muted">
+                                        <div className="bg-white p-2 rounded-xl shadow-inner border inline-block mx-auto relative overflow-hidden group">
+                                            {qrStatus === 'qr_ready' && qrCodeDataURI ? (
+                                                <img
+                                                    src={qrCodeDataURI}
+                                                    alt="WhatsApp QR Code"
+                                                    className={`w-48 h-48 object-contain transition-all duration-300 ${refreshingQr ? 'opacity-20 scale-95 blur-sm' : 'opacity-100 scale-100'}`}
+                                                />
+                                            ) : qrStatus === 'connected' ? (
+                                                <div className="w-48 h-48 flex flex-col items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg">
+                                                    <CheckCircle className="h-12 w-12 mb-2" />
+                                                    <span className="font-bold text-sm">Linked Successfully</span>
+                                                </div>
+                                            ) : (
+                                                <div className="w-48 h-48 flex flex-col items-center justify-center bg-muted/30 text-muted-foreground rounded-lg">
+                                                    <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                                                    <span className="text-xs font-medium">Generating QR...</span>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Blur Overlay during refresh */}
+                                            {refreshingQr && (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm z-10 rounded-xl">
+                                                    <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+                                                    <span className="text-xs font-bold mt-2 text-primary">Refreshing...</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleRefreshQr}
+                                            disabled={refreshingQr}
+                                            className="rounded-xl text-xs font-bold"
+                                        >
+                                            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${refreshingQr ? 'animate-spin' : ''}`} />
+                                            Refresh QR Code
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Scan Instructions */}
+                                <div className="space-y-6">
+                                    <div className="space-y-3">
+                                        <h4 className="text-sm font-black uppercase tracking-wider text-muted-foreground">How to Connect:</h4>
+                                        <ol className="space-y-2 text-xs font-semibold text-foreground/80 list-decimal list-inside leading-relaxed">
+                                            <li>Open <span className="font-bold text-green-600">WhatsApp</span> on your phone.</li>
+                                            <li>Tap <span className="font-bold">Menu (⋮)</span> on Android or <span className="font-bold">Settings</span> on iPhone.</li>
+                                            <li>Select <span className="font-bold">Linked Devices</span> and tap <span className="font-bold">Link a Device</span>.</li>
+                                            <li>Point your phone camera at the QR code on the left to scan.</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Webhook Configuration Card */}
+                <div className="p-5 rounded-2xl border bg-card space-y-4 shadow-sm">
+                    <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                        <Smartphone className="h-4 w-4" />
+                        <span>WEBHOOK CALLBACK CONFIGURATION</span>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Webhook Callback URL</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                value={webhookUrl}
+                                readOnly
+                                className="h-11 rounded-xl bg-muted/30 font-mono text-xs border-muted-foreground/20"
+                            />
+                            <Button
+                                variant="outline"
+                                onClick={handleCopyWebhook}
+                                className="h-11 px-4 rounded-xl font-bold flex items-center gap-2 shrink-0"
+                            >
+                                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                                {copied ? 'Copied' : 'Copy URL'}
+                            </Button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                            Use this Webhook URL in Meta Developer Portal (or UltraMsg / Wati / Twilio / Custom gateway).
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="webhookVerifyToken" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Webhook Verification Token</Label>
+                        <Input
+                            id="webhookVerifyToken"
+                            value={formData.webhookVerifyToken || 'nexcrm_wa_secret'}
+                            onChange={handleChange}
+                            placeholder="nexcrm_wa_secret"
+                            className="h-11 rounded-xl border-muted-foreground/20 font-mono"
+                        />
+                    </div>
                 </div>
 
-                <div className="pt-6">
+                {/* META CLOUD API SECTION */}
+                {connectionMode === 'cloud_api' && (
+                    <div className="p-5 rounded-2xl border bg-card space-y-4 shadow-sm">
+                        <div className="flex items-center gap-2 text-green-600 font-bold text-sm">
+                            <MessageSquare className="h-4 w-4" />
+                            <span>META CLOUD API CREDENTIALS</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="phoneNumberId" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Phone Number ID</Label>
+                                <Input
+                                    id="phoneNumberId"
+                                    value={formData.phoneNumberId || ''}
+                                    onChange={handleChange}
+                                    placeholder="e.g. 106342888888888"
+                                    className="h-11 rounded-xl border-muted-foreground/20"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="businessAccountId" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Business Account ID</Label>
+                                <Input
+                                    id="businessAccountId"
+                                    value={formData.businessAccountId || ''}
+                                    onChange={handleChange}
+                                    placeholder="e.g. 104555555555555"
+                                    className="h-11 rounded-xl border-muted-foreground/20"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="accessToken" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Permanent Access Token</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="accessToken"
+                                    type={showToken ? "text" : "password"}
+                                    value={formData.accessToken || ''}
+                                    onChange={handleChange}
+                                    placeholder="EAAG..."
+                                    className="h-11 rounded-xl border-muted-foreground/20"
+                                />
+                                <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl shrink-0" onClick={() => setShowToken(!showToken)}>
+                                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Save Settings Button */}
+                <div>
                     <Button
-                        className="h-14 w-full rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl border-none"
+                        className="h-12 w-full rounded-xl bg-green-600 hover:bg-green-700 text-white font-black hover:scale-[1.01] active:scale-[0.99] transition-all shadow-lg border-none"
                         onClick={() => onSave(formData)}
                         disabled={saving}
                     >
                         {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-                        {saving ? 'UPDATING API CONFIG...' : 'CONSERVE WHATSAPP SETTINGS'}
+                        {saving ? 'SAVING WHATSAPP SETTINGS...' : 'SAVE WHATSAPP CONFIGURATION'}
                     </Button>
                 </div>
 
-                <Alert className="bg-blue-50/50 border-blue-200">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertTitle className="text-xs font-bold text-blue-800 uppercase tracking-widest">Official API Note</AlertTitle>
-                    <AlertDescription className="text-xs text-blue-700 font-medium">
-                        This integration uses the official WhatsApp Cloud API. Messages will be sent from your registered business number. Make sure your Meta App is in 'Live' mode for production use.
-                    </AlertDescription>
-                </Alert>
+                {/* Simulator Card */}
+                <div className="p-5 rounded-2xl border border-green-500/30 bg-green-500/5 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-black text-xs uppercase tracking-wider">
+                            <Send className="h-4 w-4" />
+                            <span>TEST WHATSAPP LEAD INGESTION SIMULATION</span>
+                        </div>
+                        <Badge variant="outline" className="border-green-600/40 text-green-700 bg-green-50 dark:bg-green-950/40">
+                            TESTER
+                        </Badge>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                        Simulate an incoming WhatsApp message payload to test automatic Lead creation & comment logging.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <Label className="text-[11px] font-bold">Phone Number</Label>
+                            <Input
+                                value={testPhone}
+                                onChange={(e) => setTestPhone(e.target.value)}
+                                placeholder="919876543210"
+                                className="h-10 text-xs rounded-lg"
+                            />
+                        </div>
+                        <div>
+                            <Label className="text-[11px] font-bold">Sender Name</Label>
+                            <Input
+                                value={testName}
+                                onChange={(e) => setTestName(e.target.value)}
+                                placeholder="Rohan Sharma"
+                                className="h-10 text-xs rounded-lg"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <Label className="text-[11px] font-bold">Incoming WhatsApp Message</Label>
+                            <Input
+                                value={testMessage}
+                                onChange={(e) => setTestMessage(e.target.value)}
+                                placeholder="Hello! I want CRM details."
+                                className="h-10 text-xs rounded-lg"
+                            />
+                        </div>
+                        <div>
+                            <Label className="text-[11px] font-bold">Notes / Comments</Label>
+                            <Input
+                                value={testNotes}
+                                onChange={(e) => setTestNotes(e.target.value)}
+                                placeholder="Client requested pricing sheet"
+                                className="h-10 text-xs rounded-lg"
+                            />
+                        </div>
+                    </div>
+
+                    <Button
+                        onClick={handleRunTestWebhook}
+                        disabled={testingWebhook}
+                        variant="outline"
+                        className="w-full h-11 rounded-xl border-green-600/40 text-green-700 dark:text-green-400 hover:bg-green-600 hover:text-white font-bold transition-all"
+                    >
+                        {testingWebhook ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                        {testingWebhook ? 'PROCESSING SIMULATION...' : 'TRIGGER TEST INCOMING WHATSAPP MESSAGE'}
+                    </Button>
+                </div>
             </CardContent>
         </Card>
     )

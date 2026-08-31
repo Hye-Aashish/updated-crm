@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Bell, Trash2, Edit2, Check, X, Star } from 'lucide-react'
+import { Bell, Trash2, Edit2, Check, X, Star, MessageSquare, Send, Smartphone, ExternalLink } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Lead } from '@/types'
 import api from '@/lib/api-client'
@@ -21,10 +21,21 @@ interface LeadDetailsPanelProps {
 
 function ActivityItem({ activity }: { activity: any }) {
     const [expanded, setExpanded] = useState(false)
+    const isWhatsApp = activity.content?.includes('[WhatsApp]') || activity.content?.toLowerCase().includes('whatsapp')
     const isLong = activity.content?.length > 150 || (activity.content?.match(/\n/g) || []).length >= 3
     
     return (
-        <div className="bg-muted/30 p-3 rounded-lg text-sm border border-border/40 transition-colors flex flex-col">
+        <div className={`p-3 rounded-lg text-sm border transition-colors flex flex-col ${
+            isWhatsApp 
+                ? 'bg-green-500/10 border-green-500/30 dark:bg-green-950/20' 
+                : 'bg-muted/30 border-border/40'
+        }`}>
+            {isWhatsApp && (
+                <div className="flex items-center gap-1.5 mb-1.5 text-green-600 dark:text-green-400 font-bold text-[11px]">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>WhatsApp Interaction</span>
+                </div>
+            )}
             <p className={`font-medium text-foreground break-words whitespace-pre-wrap ${!expanded && isLong ? 'line-clamp-3' : ''}`}>
                 {activity.content}
             </p>
@@ -38,7 +49,9 @@ function ActivityItem({ activity }: { activity: any }) {
             )}
             <div className="flex justify-between items-center mt-2 pt-2 border-t border-border/30">
                 <span className="text-[10px] font-medium text-muted-foreground uppercase">{new Date(activity.createdAt).toLocaleString()}</span>
-                <Badge variant="outline" className="text-[9px] font-semibold">{activity.type}</Badge>
+                <Badge variant={isWhatsApp ? "secondary" : "outline"} className={`text-[9px] font-semibold ${isWhatsApp ? 'bg-green-500/20 text-green-700 dark:text-green-300' : ''}`}>
+                    {isWhatsApp ? 'WhatsApp' : activity.type}
+                </Badge>
             </div>
         </div>
     )
@@ -270,7 +283,24 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
                 </div>
                 <div>
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Phone</Label>
-                    {isEditing ? <Input value={editForm.phone || ''} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="h-7 text-sm font-medium mt-1" /> : <p className="font-medium text-sm">{lead.phone || '-'}</p>}
+                    {isEditing ? (
+                        <Input value={editForm.phone || ''} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="h-7 text-sm font-medium mt-1" />
+                    ) : (
+                        <div className="flex items-center gap-2 mt-1">
+                            <p className="font-medium text-sm">{lead.phone || '-'}</p>
+                            {lead.phone && (
+                                <a
+                                    href={`https://wa.me/${String(lead.phone).replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white px-2 py-0.5 rounded-full transition-all border border-green-500/30"
+                                >
+                                    <MessageSquare className="h-3 w-3" />
+                                    <span>WhatsApp</span>
+                                </a>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

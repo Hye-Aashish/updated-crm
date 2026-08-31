@@ -43,3 +43,7 @@ scratch/
 # Uploads
 backend/public/uploads/*
 !backend/public/uploads/.gitkeep
+
+# WhatsApp sessions
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/

@@ -109,6 +109,7 @@ const publicEndpointLimiter = rateLimit({
 app.use('/api/tracking', publicEndpointLimiter);
 app.use('/api/lead-forms/public', publicEndpointLimiter);
 app.use('/api/candidates/public', publicEndpointLimiter);
+app.use('/api/whatsapp/webhook', publicEndpointLimiter);
 
 // 3. Body parser with limits
 app.use(express.json({ limit: '10mb' }));
@@ -194,7 +195,8 @@ const routes = {
     candidates: require('./routes/candidateRoutes'),
     approvals: require('./routes/approvalRoutes'),
     campaigns: require('./routes/campaignRoutes'),
-    goals: require('./routes/goalRoutes')
+    goals: require('./routes/goalRoutes'),
+    whatsapp: require('./routes/whatsappRoutes')
 };
 
 Object.entries(routes).forEach(([path, handler]) => {
@@ -223,6 +225,10 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
 
 // Connect to DB in background
 connectDB().then(() => {
+    // Initialize WhatsApp Web Client
+    const { initWhatsAppClient } = require('./services/whatsappClient');
+    initWhatsAppClient();
+
     const { startReminderScheduler } = require('./services/reminderScheduler');
     startReminderScheduler();
 }).catch(err => {

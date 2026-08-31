@@ -303,6 +303,10 @@ router.put('/', protect, authorize('admin', 'owner'), async (req, res) => {
             const current = settings.apiKeys ? settings.apiKeys.toObject() : {};
             settings.apiKeys = { ...current, ...req.body.apiKeys };
         }
+        if (req.body.whatsappSettings) {
+            const current = settings.whatsappSettings ? settings.whatsappSettings.toObject() : {};
+            settings.whatsappSettings = { ...current, ...req.body.whatsappSettings };
+        }
 
         settings.updatedAt = Date.now();
         const updated = await settings.save();

@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
     Plus, Mail, Phone, Briefcase, CheckSquare, Users, Code,
-    Clock, CheckCircle, Trash2, Upload, MoreHorizontal
+    Clock, CheckCircle, Trash2, Upload, MoreHorizontal, FileText
 } from 'lucide-react'
 import { getInitials } from '@/lib/utils'
 import {
