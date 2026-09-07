@@ -35,6 +35,8 @@ import { ProjectFileDialog } from '@/components/projects/project-file-dialog'
 import { ProjectTaskDialog } from '@/components/projects/project-task-dialog'
 import { ProjectMilestonesTab } from '@/components/projects/project-milestones-tab'
 import { Flag } from 'lucide-react'
+import { ProjectNotes } from '@/components/projects/project-notes'
+import { ProjectCredentials } from '@/components/projects/project-credentials'
 import { useState } from 'react'
 
 import { mapProject, mapClient, mapUser, mapInvoice, mapTask } from '@/lib/mappers'
@@ -339,6 +341,8 @@ export function ProjectDetailPage() {
                     {isVisible('team') && <TabsTrigger value="team">Team ({displayTeam.length})</TabsTrigger>}
                     <TabsTrigger value="files">Files ({projectFiles.length})</TabsTrigger>
                     {['owner', 'admin', 'client'].includes(currentUser?.role) && isVisible('invoices') && <TabsTrigger value="invoices">Invoices ({projectInvoices.length})</TabsTrigger>}
+                    <TabsTrigger value="notes">Notes ({project.notes?.length || 0})</TabsTrigger>
+                    <TabsTrigger value="credentials">Credentials ({project.credentials?.length || 0})</TabsTrigger>
                     {isVisible('chat') && <TabsTrigger value="chat">Chat</TabsTrigger>}
                 </TabsList>
 
@@ -632,6 +636,14 @@ export function ProjectDetailPage() {
                             </Button>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="notes">
+                    <ProjectNotes projectId={project.id} />
+                </TabsContent>
+
+                <TabsContent value="credentials">
+                    <ProjectCredentials projectId={project.id} />
                 </TabsContent>
             </Tabs>
             {/* File Preview Modal */}

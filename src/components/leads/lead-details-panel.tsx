@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Bell, Trash2, Edit2, Check, X, Star, MessageSquare, Send, Smartphone, ExternalLink } from 'lucide-react'
+import { Bell, Trash2, Edit2, Check, X, Star, MessageSquare, Send, Smartphone, ExternalLink, Loader2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Lead } from '@/types'
 import api from '@/lib/api-client'
@@ -63,6 +63,7 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
     const [reminderDate, setReminderDate] = useState('')
     const [reminderTone, setReminderTone] = useState('default')
     const [newTagInput, setNewTagInput] = useState('')
+    const [savingNote, setSavingNote] = useState(false)
     
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState<Partial<Lead>>(lead)
@@ -134,6 +135,7 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
     const handleAddNote = async () => {
         const targetId = lead?.id || lead?._id
         if (!targetId || !newActivityContent.trim()) return
+        setSavingNote(true)
         try {
             const updatedLead = await onAddActivity(targetId, newActivityContent)
             if (updatedLead) {
@@ -148,6 +150,8 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
             }
         } catch (error) {
             console.error("Add Note Error:", error)
+        } finally {
+            setSavingNote(false)
         }
     }
 
@@ -399,7 +403,10 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
                 <div className="space-y-2">
                     <Textarea placeholder="Add a note or update on this lead..." value={newActivityContent} onChange={(e) => setNewActivityContent(e.target.value)} className="min-h-[100px] text-sm rounded-lg" />
                     <div className="flex justify-end">
-                        <Button size="sm" onClick={handleAddNote} disabled={!newActivityContent.trim()} className="font-bold text-xs uppercase tracking-wider">Save Note</Button>
+                        <Button size="sm" onClick={handleAddNote} disabled={!newActivityContent.trim() || savingNote} className="font-bold text-xs uppercase tracking-wider">
+                            {savingNote && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                            {savingNote ? "Saving..." : "Save Note"}
+                        </Button>
                     </div>
                 </div>
             </div>

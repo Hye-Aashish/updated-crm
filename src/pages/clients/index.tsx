@@ -10,9 +10,11 @@ import { EmptyState } from '@/components/empty-state'
 import { ClientService } from '@/lib/services/client.service'
 import { StatsCard } from '@/components/stats-card'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
+import { useToast } from '@/hooks/use-toast'
 
 export function ClientsPage() {
     const navigate = useNavigate()
+    const { toast } = useToast()
     const { clients, setClients } = useAppStore()
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -62,9 +64,21 @@ export function ClientsPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
                     <p className="text-muted-foreground mt-1">Manage your client relationships and contacts.</p>
                 </div>
-                <Button onClick={() => navigate('/clients/new')} className="w-full sm:w-auto">
-                    <Plus className="mr-2 h-4 w-4" /> Add Client
-                </Button>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <Button variant="outline" onClick={() => {
+                        const url = `${window.location.origin}/#/client-onboarding`;
+                        navigator.clipboard.writeText(url);
+                        toast({
+                            title: "Link Copied",
+                            description: "Client onboarding link copied to clipboard.",
+                        });
+                    }}>
+                        Copy Onboarding Link
+                    </Button>
+                    <Button onClick={() => navigate('/clients/new')}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Client
+                    </Button>
+                </div>
             </div>
 
             {/* --- Module Specific KPIs --- */}

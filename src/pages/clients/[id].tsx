@@ -849,12 +849,23 @@ export function ClientDetailPage() {
 
                                             {/* Action Buttons */}
                                             <div className="flex items-center gap-2 pt-3 border-t">
+                                                {cp.projectId && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="default"
+                                                        className="flex-1 text-xs gap-1.5 shadow-xs bg-indigo-600 hover:bg-indigo-700"
+                                                        onClick={() => router.push(`/projects/${cp.projectId}`)}
+                                                    >
+                                                        <Folder className="h-3.5 w-3.5" /> Project Workspace
+                                                    </Button>
+                                                )}
                                                 <Button
                                                     size="sm"
+                                                    variant={cp.projectId ? "secondary" : "default"}
                                                     className="flex-1 text-xs gap-1.5 shadow-xs"
                                                     onClick={() => openManager(cp)}
                                                 >
-                                                    <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Manage & Track
+                                                    <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Manage
                                                 </Button>
                                                 <Button
                                                     variant="outline"

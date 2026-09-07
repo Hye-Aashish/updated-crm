@@ -3,6 +3,9 @@ const router = express.Router();
 const clientController = require('../controllers/clientController');
 const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 
+// Public route for onboarding form
+router.post('/public/onboarding', clientController.createPublicClient);
+
 router.get('/', protect, checkPermission('clients', 'view'), clientController.getClients);
 router.get('/:id', protect, checkPermission('clients', 'view'), clientController.getClientById);
 router.post('/', protect, checkPermission('clients', 'create'), clientController.createClient);

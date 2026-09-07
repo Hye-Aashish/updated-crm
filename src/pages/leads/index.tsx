@@ -59,10 +59,17 @@ export function LeadsPage() {
             })
         }
         
+        // Search inside interaction history (activities)
+        let matchesActivities = false
+        if (l.activities && q) {
+            matchesActivities = l.activities.some(a => a.content?.toLowerCase().includes(q))
+        }
+        
         const matchesSearch = !q || 
                               l.name?.toLowerCase().includes(q) || 
                               (cleanPhone && cleanQ && cleanPhone.includes(cleanQ)) || 
                               matchesCustomField || 
+                              matchesActivities ||
                               l.company?.toLowerCase().includes(q) ||
                               l.email?.toLowerCase().includes(q)
         return matchesTag && matchesSearch
@@ -75,7 +82,7 @@ export function LeadsPage() {
     const [viewLeadDialogOpen, setViewLeadDialogOpen] = useState(false)
 
     // Form States
-    const [newLead, setNewLead] = useState({ name: '', company: '', value: '', source: '', email: '', phone: '' })
+    const [newLead, setNewLead] = useState({ name: '', company: '', value: '', source: '', email: '', phone: '', project: '' })
     const [newStage, setNewStage] = useState({ label: '', color: 'bg-blue-500' })
 
     const handleAddLead = async () => {
@@ -89,7 +96,7 @@ export function LeadsPage() {
             }
             const res = await api.post('/leads', payload)
             setLeads([...leads, { id: res.data._id, ...payload, activities: [], customFields: {} }])
-            setNewLead({ name: '', company: '', value: '', source: '', email: '', phone: '' })
+            setNewLead({ name: '', company: '', value: '', source: '', email: '', phone: '', project: '' })
             setIsLeadDialogOpen(false)
             toast({ title: "Success", description: "Lead added successfully" })
         } catch (error) {
@@ -275,7 +282,10 @@ export function LeadsPage() {
                                         <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Value</Label><Input type="number" value={newLead.value} onChange={(e) => setNewLead({ ...newLead, value: e.target.value })} placeholder="Ex: 50000" className="rounded-lg h-10" /></div>
                                         <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Source</Label><Input value={newLead.source} onChange={(e) => setNewLead({ ...newLead, source: e.target.value })} placeholder="e.g. Website" className="rounded-lg h-10" /></div>
                                     </div>
-                                    <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Phone</Label><Input value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+91 98765 43210" className="rounded-lg h-10" /></div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Project</Label><Input value={newLead.project} onChange={(e) => setNewLead({ ...newLead, project: e.target.value })} placeholder="e.g. Website" className="rounded-lg h-10" /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs font-semibold text-primary uppercase ml-1">Phone</Label><Input value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+91 98765 43210" className="rounded-lg h-10" /></div>
+                                    </div>
                                     <Button onClick={handleAddLead} className="w-full mt-2 font-bold rounded-lg h-11 tracking-wide">Create Lead</Button>
                                 </div>
                             </DialogContent>

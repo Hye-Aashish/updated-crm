@@ -14,6 +14,7 @@ const projectSchema = new mongoose.Schema({
     clientId: { type: String, required: true },
     pmId: { type: String },
     members: [{ type: String }],
+    clientProductId: { type: String }, // Link to ClientProduct if this is a digital product
     type: { type: String, default: 'web-development' }, // Added
     paymentModel: { type: String, default: 'milestone' }, // Added
     progress: { type: Number, default: 0 },
@@ -47,6 +48,21 @@ const projectSchema = new mongoose.Schema({
         completedAt: { type: Date }
     }],
     autoInvoice: { type: Boolean, default: false },
+    notes: [{
+        text: { type: String, required: true },
+        createdBy: { type: String, required: true },
+        creatorName: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now }
+    }],
+    credentials: [{
+        title: { type: String, required: true },
+        type: { type: String, default: 'other' },
+        url: { type: String },
+        username: { type: String, required: true },
+        password: { type: String, required: true },
+        createdBy: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now }
+    }],
     createdAt: { type: Date, default: Date.now }
 });
 

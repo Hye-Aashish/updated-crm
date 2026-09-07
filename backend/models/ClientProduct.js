@@ -67,6 +67,7 @@ const clientProductSchema = new mongoose.Schema({
     dueDate: { type: Date },
     assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     customizations: { type: String },
+    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' }, // Link to corresponding Project
     tasks: [taskItemSchema],
     milestones: [milestoneSchema],
     paymentHistory: [paymentRecordSchema],

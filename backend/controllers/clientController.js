@@ -148,3 +148,30 @@ exports.deleteClient = async (req, res, next) => {
         next(err);
     }
 };
+
+exports.createPublicClient = async (req, res, next) => {
+    try {
+        const clientData = { ...req.body };
+        // Public form submissions might not have an assigned user, 
+        // they will just be 'new' status
+        clientData.status = 'new';
+        
+        const client = new Client(clientData);
+        const newClient = await client.save();
+
+        // Trigger Notification
+        try {
+            const Notification = require('../models/Notification');
+            await Notification.create({
+                title: 'New Client Onboarding Submitted',
+                message: `Client "${newClient.company || newClient.name}" has completed the onboarding form.`,
+                type: 'new_client',
+                relatedId: newClient._id
+            });
+        } catch (nErr) { console.error('Notif Error:', nErr); }
+
+        res.status(201).json({ message: 'Client onboarded successfully', client: { _id: newClient._id, name: newClient.name } });
+    } catch (err) {
+        next(err);
+    }
+};

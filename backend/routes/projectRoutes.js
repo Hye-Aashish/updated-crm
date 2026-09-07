@@ -9,4 +9,12 @@ router.post('/', protect, checkPermission('projects', 'create'), projectControll
 router.put('/:id', protect, checkPermission('projects', 'edit'), projectController.updateProject);
 router.delete('/:id', protect, checkPermission('projects', 'delete'), projectController.deleteProject);
 
+router.post('/:id/notes', protect, projectController.addNote);
+router.put('/:id/notes/:noteId', protect, projectController.updateNote);
+router.delete('/:id/notes/:noteId', protect, projectController.deleteNote);
+
+router.post('/:id/credentials', protect, projectController.addCredential);
+router.put('/:id/credentials/:credentialId', protect, projectController.updateCredential);
+router.delete('/:id/credentials/:credentialId', protect, projectController.deleteCredential);
+
 module.exports = router;

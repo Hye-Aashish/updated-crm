@@ -131,3 +131,153 @@ exports.deleteProject = async (req, res, next) => {
         next(err);
     }
 };
+
+exports.addNote = async (req, res, next) => {
+    try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients are not allowed to add notes' });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        project.notes.push({
+            text: req.body.text,
+            createdBy: req.user._id,
+            creatorName: req.user.name
+        });
+
+        await project.save();
+        res.status(201).json(project);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateNote = async (req, res, next) => {
+    try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients are not allowed to edit notes' });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        const note = project.notes.id(req.params.noteId);
+        if (!note) return res.status(404).json({ message: 'Note not found' });
+
+        if (note.createdBy !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner') {
+             return res.status(403).json({ message: 'Not authorized to edit this note' });
+        }
+
+        note.text = req.body.text;
+        await project.save();
+        res.json(project);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.deleteNote = async (req, res, next) => {
+    try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients are not allowed to delete notes' });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        const note = project.notes.id(req.params.noteId);
+        if (!note) return res.status(404).json({ message: 'Note not found' });
+
+        if (note.createdBy !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner') {
+             return res.status(403).json({ message: 'Not authorized to delete this note' });
+        }
+
+        project.notes.pull(req.params.noteId);
+        await project.save();
+        res.json(project);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.addCredential = async (req, res, next) => {
+    try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients are not allowed to add credentials' });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        project.credentials.push({
+            title: req.body.title,
+            type: req.body.type,
+            url: req.body.url,
+            username: req.body.username,
+            password: req.body.password,
+            createdBy: req.user._id
+        });
+
+        await project.save();
+        res.status(201).json(project);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateCredential = async (req, res, next) => {
+    try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients are not allowed to edit credentials' });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        const credential = project.credentials.id(req.params.credentialId);
+        if (!credential) return res.status(404).json({ message: 'Credential not found' });
+
+        if (credential.createdBy !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner') {
+             return res.status(403).json({ message: 'Not authorized to edit this credential' });
+        }
+
+        credential.title = req.body.title;
+        credential.type = req.body.type;
+        credential.url = req.body.url;
+        credential.username = req.body.username;
+        if (req.body.password) {
+            credential.password = req.body.password;
+        }
+
+        await project.save();
+        res.json(project);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.deleteCredential = async (req, res, next) => {
+    try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients are not allowed to delete credentials' });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        const credential = project.credentials.id(req.params.credentialId);
+        if (!credential) return res.status(404).json({ message: 'Credential not found' });
+
+        if (credential.createdBy !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner') {
+             return res.status(403).json({ message: 'Not authorized to delete this credential' });
+        }
+
+        project.credentials.pull(req.params.credentialId);
+        await project.save();
+        res.json(project);
+    } catch (err) {
+        next(err);
+    }
+};

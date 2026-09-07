@@ -8,6 +8,7 @@ const leadSchema = new mongoose.Schema({
     stage: { type: String, required: true }, // Links to PipelineStage id
     email: String,
     phone: String,
+    project: String,
     rating: { type: Number, default: 0, min: 0, max: 5 },
     customFields: { type: Map, of: String },
     activities: [{

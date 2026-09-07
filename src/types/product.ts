@@ -43,6 +43,7 @@ export interface ClientProduct {
     _id?: string
     client: string | any
     product: string | Product
+    projectId?: string // Added Link to generated Project
     customPrice: number
     paidAmount?: number
     paymentStatus?: 'unpaid' | 'partial' | 'paid' | 'overdue'

@@ -68,7 +68,7 @@ export interface Client {
 }
 
 // Project Types
-export type ProjectType = 'website' | 'web-app' | 'ecommerce' | 'landing' | 'maintenance'
+export type ProjectType = 'website' | 'web-app' | 'ecommerce' | 'landing' | 'maintenance' | 'digital-product'
 export type ProjectStatus = 'planning' | 'in-progress' | 'review' | 'completed' | 'on-hold'
 export type PaymentModel = 'advance' | 'milestone' | 'retainer'
 
@@ -92,10 +92,30 @@ export interface Milestone {
     completedAt?: Date | string
 }
 
+export interface ProjectNote {
+    _id: string
+    text: string
+    createdBy: string
+    creatorName: string
+    createdAt: Date
+}
+
+export interface ProjectCredential {
+    _id: string
+    title: string
+    type: string
+    url?: string
+    username: string
+    password?: string
+    createdBy: string
+    createdAt: Date
+}
+
 export interface Project {
     id: string
     name: string
     clientId: string
+    clientProductId?: string // Added
     type: ProjectType
     status: ProjectStatus
     startDate: Date
@@ -110,6 +130,8 @@ export interface Project {
     priority?: 'low' | 'medium' | 'high' | 'urgent' // Added
     progress?: number // Progress percentage 0-100
     autoInvoice?: boolean // Auto generate invoice on completion
+    notes?: ProjectNote[] // Added
+    credentials?: ProjectCredential[] // Added
     createdAt: Date
     updatedAt: Date
 }

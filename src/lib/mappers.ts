@@ -7,6 +7,7 @@ export const mapProject = (p: any): Project => {
         name: p.name,
         description: p.description,
         clientId: p.clientId,
+        clientProductId: p.clientProductId,
         status: p.status,
         deadline: p.dueDate || p.deadline ? new Date(p.dueDate || p.deadline) : new Date(),
         dueDate: p.dueDate || p.deadline ? new Date(p.dueDate || p.deadline) : new Date(),
@@ -25,6 +26,23 @@ export const mapProject = (p: any): Project => {
         priority: p.priority,
         createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
         updatedAt: p.updatedAt || p.createdAt ? new Date(p.updatedAt || p.createdAt) : new Date(),
+        notes: p.notes ? p.notes.map((n: any) => ({
+            _id: n._id,
+            text: n.text,
+            createdBy: n.createdBy,
+            creatorName: n.creatorName,
+            createdAt: new Date(n.createdAt)
+        })) : [],
+        credentials: p.credentials ? p.credentials.map((c: any) => ({
+            _id: c._id,
+            title: c.title,
+            type: c.type,
+            url: c.url,
+            username: c.username,
+            password: c.password,
+            createdBy: c.createdBy,
+            createdAt: new Date(c.createdAt)
+        })) : []
     }
 };
 

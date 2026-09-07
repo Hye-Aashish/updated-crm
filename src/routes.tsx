@@ -15,6 +15,7 @@ const PublicQuotationView = lazy(() => import('./pages/public/quotation-view'))
 const PublicCandidateForm = lazy(() => import('./pages/public/candidate-form').then(m => ({ default: m.PublicCandidateForm })))
 const PublicOfferView = lazy(() => import('./pages/public/offer-view'))
 const PublicApprovalSignPage = lazy(() => import('./pages/public/approval-sign'))
+const PublicClientOnboarding = lazy(() => import('./pages/public/client-onboarding').then(m => ({ default: m.PublicClientOnboarding })))
 
 // Dashboard Pages
 const DashboardPage = lazy(() => import('./pages/dashboard').then(m => ({ default: m.DashboardPage })))
@@ -114,6 +115,7 @@ export function AppRoutes() {
                 <Route path="/public/approval/:token" element={<PublicApprovalSignPage />} />
                 <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
                 <Route path="/i/:id" element={<InvoiceDetailPage />} />
+                <Route path="/client-onboarding" element={<PublicClientOnboarding />} />
 
 
                 {/* Dashboard Routes */}

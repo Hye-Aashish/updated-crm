@@ -209,6 +209,55 @@ exports.assignProductToClient = async (req, res) => {
         });
 
         const saved = await newClientProduct.save();
+
+        // --- NEW: Generate a parallel Project workspace for this Digital Product ---
+        try {
+            const ProjectModel = require('../models/Project');
+            const TaskModel = require('../models/Task');
+            
+            const productDoc = await Product.findById(productId);
+            const productName = productDoc ? productDoc.name : 'Digital Product';
+            
+            const newProject = new ProjectModel({
+                name: `${productName} (Product)`,
+                description: customizations || `Digital product assigned on ${new Date().toLocaleDateString()}`,
+                status: 'in-progress',
+                startDate: saved.startDate,
+                dueDate: saved.dueDate || new Date(new Date().setMonth(new Date().getMonth() + 1)), // default to 1 month if not set
+                budget: numPrice,
+                clientId: clientId,
+                pmId: req.user ? req.user._id : undefined,
+                members: Array.isArray(assignedTo) ? assignedTo : [],
+                type: 'digital-product',
+                clientProductId: saved._id
+            });
+            
+            const savedProject = await newProject.save();
+            
+            // Create normal Tasks for the Project if initial tasks were provided
+            if (Array.isArray(tasks) && tasks.length > 0) {
+                const projectTasks = tasks.map(t => ({
+                    title: t.title,
+                    description: t.description || '',
+                    projectId: savedProject._id,
+                    status: 'todo',
+                    priority: 'medium',
+                    dueDate: t.dueDate ? new Date(t.dueDate) : undefined,
+                    creatorId: req.user ? req.user._id : undefined
+                }));
+                await TaskModel.insertMany(projectTasks);
+            }
+            
+            // Link back to ClientProduct
+            saved.projectId = savedProject._id;
+            await saved.save();
+            
+        } catch (projErr) {
+            console.error('Failed to create parallel project for digital product:', projErr);
+            // Non-fatal, we continue
+        }
+        // ------------------------------------------------------------------------
+
         const populated = await ClientProduct.findById(saved._id)
             .populate('client', 'name email company status')
             .populate('product')
