@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, LayoutGrid, List as ListIcon, Briefcase, CheckSquare, AlertTriangle, Layers, Calendar, Globe, Smartphone, Shield, Clock, FileCode, ArrowUpRight, CheckCircle2 } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List as ListIcon, Briefcase, CheckSquare, AlertTriangle, Layers, Globe, Smartphone, Clock, FileCode, ArrowUpRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

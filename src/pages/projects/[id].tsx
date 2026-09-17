@@ -281,9 +281,9 @@ export function ProjectDetailPage() {
                     <CardContent className="p-3.5 space-y-1">
                         <p className="text-[10px] font-bold text-muted-foreground uppercase">Deliverables Live</p>
                         <div className="flex items-center gap-2 pt-0.5">
-                            {project.websiteRequired && <Globe className={`h-4 w-4 ${project.websiteStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} title="Website" />}
-                            {project.androidRequired && <Smartphone className={`h-4 w-4 ${project.androidStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} title="Android" />}
-                            {project.iosRequired && <Smartphone className={`h-4 w-4 ${project.iosStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} title="iOS" />}
+                            {project.websiteRequired && <span title="Website"><Globe className={`h-4 w-4 ${project.websiteStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} /></span>}
+                            {project.androidRequired && <span title="Android"><Smartphone className={`h-4 w-4 ${project.androidStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} /></span>}
+                            {project.iosRequired && <span title="iOS"><Smartphone className={`h-4 w-4 ${project.iosStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} /></span>}
                         </div>
                         <p className="text-[10px] text-muted-foreground font-semibold">Active Trackers</p>
                     </CardContent>
@@ -566,15 +566,15 @@ export function ProjectDetailPage() {
                                 </div>
                                 <div className="p-3 bg-muted/40 rounded-lg border">
                                     <span className="text-muted-foreground text-[10px] uppercase font-bold">Advance Amount</span>
-                                    <p className="font-bold text-lg text-emerald-600 pt-0.5">{formatCurrency(project.advanceAmount)}</p>
+                                    <p className="font-bold text-lg text-emerald-600 pt-0.5">{formatCurrency(project.advanceAmount || 0)}</p>
                                 </div>
                                 <div className="p-3 bg-muted/40 rounded-lg border">
                                     <span className="text-muted-foreground text-[10px] uppercase font-bold">Milestone Amount</span>
-                                    <p className="font-bold text-lg text-blue-600 pt-0.5">{formatCurrency(project.milestoneAmount)}</p>
+                                    <p className="font-bold text-lg text-blue-600 pt-0.5">{formatCurrency(project.milestoneAmount || 0)}</p>
                                 </div>
                                 <div className="p-3 bg-muted/40 rounded-lg border">
                                     <span className="text-muted-foreground text-[10px] uppercase font-bold">Final Amount</span>
-                                    <p className="font-bold text-lg text-purple-600 pt-0.5">{formatCurrency(project.finalAmount)}</p>
+                                    <p className="font-bold text-lg text-purple-600 pt-0.5">{formatCurrency(project.finalAmount || 0)}</p>
                                 </div>
                             </div>
                         </CardContent>
