@@ -15,11 +15,11 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { ChevronLeft, Info, Plus, Trash2, Flag, Globe, Smartphone, Server, Layers, Layers2 } from 'lucide-react'
+import { ChevronLeft, Globe, Smartphone, Server, Layers2 } from 'lucide-react'
 import type { ProjectStatus, ProjectType, PaymentModel } from '@/types'
 import api from '@/lib/api-client'
 import { mapProject, mapClient, mapUser } from '@/lib/mappers'
-import { getCurrencySymbol, formatCurrency } from '@/lib/utils'
+import { getCurrencySymbol } from '@/lib/utils'
 
 export function NewProjectPage() {
     const navigate = useNavigate()

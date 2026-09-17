@@ -23,7 +23,7 @@ export function ProjectsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [healthFilter, setHealthFilter] = useState<string>('all')
     const [typeFilter, setTypeFilter] = useState<string>('all')
-    const { projects, clients, invoices, currentUser, setProjects, setClients } = useAppStore()
+    const { projects, clients, setProjects, setClients } = useAppStore()
 
     // Fetch Projects & Clients from API
     useEffect(() => {
@@ -53,8 +53,6 @@ export function ProjectsPage() {
     const atRiskProjects = projects.filter(p => p.health === 'yellow').length
     
     const websitesLive = projects.filter(p => p.websiteStatus === 'live' || !!p.websiteUrl).length
-    const androidAppsLive = projects.filter(p => p.androidStatus === 'live' || !!p.androidAppUrl).length
-    const iosAppsLive = projects.filter(p => p.iosStatus === 'live' || !!p.iosAppUrl).length
 
     // Filter Logic
     const filteredProjects = projects.filter(p => {
@@ -296,10 +294,10 @@ export function ProjectsPage() {
                                             </td>
                                             <td className="px-6 py-3.5">
                                                 <div className="flex items-center gap-1">
-                                                    {p.websiteRequired && <Globe className="h-3.5 w-3.5 text-blue-500" title="Website" />}
-                                                    {p.androidRequired && <Smartphone className="h-3.5 w-3.5 text-emerald-500" title="Android" />}
-                                                    {p.iosRequired && <Smartphone className="h-3.5 w-3.5 text-purple-500" title="iOS" />}
-                                                </div>
+                                                     {p.websiteRequired && <span title="Website"><Globe className="h-3.5 w-3.5 text-blue-500" /></span>}
+                                                     {p.androidRequired && <span title="Android"><Smartphone className="h-3.5 w-3.5 text-emerald-500" /></span>}
+                                                     {p.iosRequired && <span title="iOS"><Smartphone className="h-3.5 w-3.5 text-purple-500" /></span>}
+                                                 </div>
                                             </td>
                                             <td className="px-6 py-3.5 font-bold text-foreground">
                                                 {formatCurrency(p.budget)}
