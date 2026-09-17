@@ -15,8 +15,8 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { ChevronLeft, Info, Plus, Trash2, Flag, Calendar, DollarSign } from 'lucide-react'
-import type { ProjectStatus, ProjectType, PaymentModel, Milestone } from '@/types'
+import { ChevronLeft, Info, Plus, Trash2, Flag } from 'lucide-react'
+import type { ProjectStatus, ProjectType, PaymentModel } from '@/types'
 import api from '@/lib/api-client'
 import {
     Popover,

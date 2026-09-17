@@ -71,31 +71,7 @@ export function NewProjectPage() {
         domain: '',
     })
 
-    const [milestones, setMilestones] = useState<Array<{ name: string; dueDate: string; amount: string; description?: string }>>([])
 
-    const addMilestoneRow = () => {
-        setMilestones(prev => [
-            ...prev,
-            {
-                name: `Milestone ${prev.length + 1}`,
-                dueDate: formData.deadline || '',
-                amount: '',
-                description: ''
-            }
-        ])
-    }
-
-    const updateMilestoneRow = (index: number, field: string, value: string) => {
-        setMilestones(prev => {
-            const copy = [...prev]
-            copy[index] = { ...copy[index], [field]: value }
-            return copy
-        })
-    }
-
-    const removeMilestoneRow = (index: number) => {
-        setMilestones(prev => prev.filter((_, i) => i !== index))
-    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

@@ -27,25 +27,15 @@ import { TaskBoard } from '@/components/tasks/task-board'
 
 import { ProjectTeamDialog } from '@/components/projects/project-team-dialog'
 import { ProjectFileDialog } from '@/components/projects/project-file-dialog'
-import { ProjectTaskDialog } from '@/components/projects/project-task-dialog'
-import { ProjectMilestonesTab } from '@/components/projects/project-milestones-tab'
-import { ProjectNotes } from '@/components/projects/project-notes'
-import { ProjectCredentials } from '@/components/projects/project-credentials'
 import { ProjectTimelineView } from '@/components/projects/project-timeline-view'
 import { CheckpointProofDialog } from '@/components/projects/checkpoint-proof-dialog'
 
-import { mapProject, mapClient, mapUser, mapInvoice, mapTask } from '@/lib/mappers'
+import { mapProject, mapClient, mapUser } from '@/lib/mappers'
 
 export function ProjectDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { toast } = useToast()
-
-    const [teamDialogOpen, setTeamDialogOpen] = useState(false)
-    const [fileDialogOpen, setFileDialogOpen] = useState(false)
-    const [taskDialogOpen, setTaskDialogOpen] = useState(false)
-    const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<any>(null)
-    const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null)
 
     // Module State
     const [checkpoints, setCheckpoints] = useState<any[]>([])
@@ -65,10 +55,10 @@ export function ProjectDetailPage() {
 
     const {
         projects, setProjects,
-        tasks, setTasks,
+        tasks,
         users, setUsers,
-        files, setFiles,
-        invoices, setInvoices,
+        files,
+        invoices,
         clients, setClients,
         currentUser,
         updateProject,
@@ -129,7 +119,6 @@ export function ProjectDetailPage() {
     const pm = users.find(u => u.id === project.pmId)
     const projectTasks = tasks.filter(t => t.projectId === project.id)
     const projectFiles = files.filter(f => f.projectId === project.id)
-    const projectInvoices = invoices.filter(i => i.projectId === project.id)
 
     const health = project.health || 'green'
 
