@@ -15,16 +15,10 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { ChevronLeft, Info, Plus, Trash2, Flag, Calendar, DollarSign } from 'lucide-react'
+import { ChevronLeft, Info, Plus, Trash2, Flag, Globe, Smartphone, Server, Layers, Layers2 } from 'lucide-react'
 import type { ProjectStatus, ProjectType, PaymentModel } from '@/types'
 import api from '@/lib/api-client'
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover"
-
-import { mapProject, mapClient } from '@/lib/mappers'
+import { mapProject, mapClient, mapUser } from '@/lib/mappers'
 import { getCurrencySymbol, formatCurrency } from '@/lib/utils'
 
 export function NewProjectPage() {
@@ -33,28 +27,48 @@ export function NewProjectPage() {
     const addProject = useAppStore((state) => state.addProject)
     const setClients = useAppStore((state) => state.setClients)
     const clients = useAppStore((state) => state.clients)
+    const users = useAppStore((state) => state.users)
+    const setUsers = useAppStore((state) => state.setUsers)
     const currentUser = useAppStore((state) => state.currentUser)
     const [loading, setLoading] = useState(false)
 
-    // Fetch if missing
     useEffect(() => {
         if (clients.length === 0) {
-            api.get('/clients').then(res => {
-                setClients(res.data.map(mapClient))
-            }).catch(console.error)
+            api.get('/clients').then(res => setClients(res.data.map(mapClient))).catch(console.error)
         }
-    }, [clients.length, setClients])
+        if (users.length === 0) {
+            api.get('/users').then(res => setUsers(res.data.map(mapUser))).catch(console.error)
+        }
+    }, [clients.length, users.length, setClients, setUsers])
 
     const [formData, setFormData] = useState({
         name: '',
         description: '',
         clientId: '',
+        pmId: currentUser?.id || '',
+        developers: [] as string[],
+        designers: [] as string[],
         status: 'planning' as ProjectStatus,
+        startDate: new Date().toISOString().split('T')[0],
         deadline: '',
         budget: '',
-        type: 'web-development' as ProjectType,
+        advanceAmount: '',
+        milestoneAmount: '',
+        finalAmount: '',
+        type: 'lms' as ProjectType,
         paymentModel: 'milestone' as PaymentModel,
+        priority: 'medium',
         autoInvoice: false,
+
+        // Deliverables
+        websiteRequired: true,
+        androidRequired: true,
+        iosRequired: false,
+        adminPanelRequired: true,
+        apiRequired: true,
+        hostingRequired: true,
+        maintenanceRequired: false,
+        domain: '',
     })
 
     const [milestones, setMilestones] = useState<Array<{ name: string; dueDate: string; amount: string; description?: string }>>([])
@@ -63,7 +77,7 @@ export function NewProjectPage() {
         setMilestones(prev => [
             ...prev,
             {
-                name: `Milestone ${prev.length + 1}: `,
+                name: `Milestone ${prev.length + 1}`,
                 dueDate: formData.deadline || '',
                 amount: '',
                 description: ''
@@ -83,18 +97,19 @@ export function NewProjectPage() {
         setMilestones(prev => prev.filter((_, i) => i !== index))
     }
 
-    const totalMilestoneSum = milestones.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0)
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
 
         try {
-            // Send data to Backend API
             const response = await api.post('/projects', {
                 ...formData,
+                budget: parseFloat(formData.budget) || 0,
+                advanceAmount: parseFloat(formData.advanceAmount) || 0,
+                milestoneAmount: parseFloat(formData.milestoneAmount) || 0,
+                finalAmount: parseFloat(formData.finalAmount) || 0,
                 dueDate: formData.deadline,
-                pmId: currentUser.id, // Set current user as PM by default
+                pmId: formData.pmId || currentUser.id,
                 milestones: milestones.map(m => ({
                     name: m.name,
                     dueDate: m.dueDate ? new Date(m.dueDate) : undefined,
@@ -106,15 +121,14 @@ export function NewProjectPage() {
             })
 
             const savedProject = mapProject(response.data)
-
             addProject(savedProject)
 
             toast({
-                title: "Project created",
-                description: `${formData.name} has been initiated successfully.`,
+                title: "Project Initialized",
+                description: `${formData.name} created! Automatic template checkpoints generated.`,
             })
 
-            navigate('/projects')
+            navigate(`/projects/${savedProject.id || savedProject._id}`)
         } catch (error) {
             console.error(error)
             toast({
@@ -133,45 +147,46 @@ export function NewProjectPage() {
     }
 
     return (
-        <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="space-y-6 max-w-4xl mx-auto font-sans pb-10">
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" onClick={() => navigate('/projects')}>
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold">New Project</h1>
-                    <p className="text-muted-foreground">Start a new project for a client</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Create New Project</h1>
+                    <p className="text-sm text-muted-foreground font-medium">Initiate client project with automatic template checkpoints & deliverable tracking.</p>
                 </div>
             </div>
 
-            <Card>
+            <Card className="border border-border/60">
                 <CardHeader>
-                    <CardTitle>Project Details</CardTitle>
-                    <CardDescription>Define the scope and timeline of the project</CardDescription>
+                    <CardTitle className="text-lg font-bold">1. Project & Client Info</CardTitle>
+                    <CardDescription>Select project type to automatically load corresponding workflow checkpoints.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Project Name</Label>
-                            <Input
-                                id="name"
-                                name="name"
-                                placeholder="e.g. Corporate Website Redesign"
-                                required
-                                value={formData.name}
-                                onChange={handleChange}
-                            />
-                        </div>
-
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="clientId">Client</Label>
+                                <Label htmlFor="name" className="text-xs font-bold uppercase">Project Name</Label>
+                                <Input
+                                    id="name"
+                                    name="name"
+                                    placeholder="e.g. Acme Online Academy LMS"
+                                    required
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    className="h-10 text-sm"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="clientId" className="text-xs font-bold uppercase">Client</Label>
                                 <Select
                                     value={formData.clientId}
                                     onValueChange={(value) => setFormData(prev => ({ ...prev, clientId: value }))}
                                     required
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className="h-10 text-sm font-medium">
                                         <SelectValue placeholder="Select a client" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -183,9 +198,50 @@ export function NewProjectPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </div>
+
+                        {/* Template Picker */}
+                        <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
+                            <Label className="text-xs font-bold uppercase text-primary flex items-center gap-1.5">
+                                <Layers2 className="h-4 w-4" /> Template & Workflow Selection
+                            </Label>
+                            <Select
+                                value={formData.type}
+                                onValueChange={(value: ProjectType) => setFormData(prev => ({ ...prev, type: value }))}
+                            >
+                                <SelectTrigger className="h-10 bg-card text-sm font-bold">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="lms" className="font-bold">🎓 LMS (Learning Management System - 53 Checkpoints Auto-Generated)</SelectItem>
+                                    <SelectItem value="website" className="font-bold">🌐 Website Project (Design, SEO, Live Domain Workflow)</SelectItem>
+                                    <SelectItem value="mobile-app" className="font-bold">📱 Mobile Application (Android & iOS Stores)</SelectItem>
+                                    <SelectItem value="crm-erp" className="font-bold">💼 CRM / ERP Software System</SelectItem>
+                                    <SelectItem value="ecommerce" className="font-bold">🛒 E-Commerce Platform</SelectItem>
+                                    <SelectItem value="custom" className="font-bold">⚙️ Custom Project (No pre-loaded template)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[11px] text-muted-foreground font-medium">
+                                Selected template will automatically generate all phases, mandatory checkpoints, proof rules, and dependency chains upon creation.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <div className="space-y-2">
+                                <Label htmlFor="startDate" className="text-xs font-bold uppercase">Start Date</Label>
+                                <Input
+                                    id="startDate"
+                                    name="startDate"
+                                    type="date"
+                                    required
+                                    value={formData.startDate}
+                                    onChange={handleChange}
+                                    className="h-10 text-sm"
+                                />
+                            </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="deadline">Deadline</Label>
+                                <Label htmlFor="deadline" className="text-xs font-bold uppercase">Expected Deadline</Label>
                                 <Input
                                     id="deadline"
                                     name="deadline"
@@ -193,205 +249,114 @@ export function NewProjectPage() {
                                     required
                                     value={formData.deadline}
                                     onChange={handleChange}
+                                    className="h-10 text-sm"
                                 />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="pmId" className="text-xs font-bold uppercase">Project Manager</Label>
+                                <Select
+                                    value={formData.pmId}
+                                    onValueChange={(value) => setFormData(prev => ({ ...prev, pmId: value }))}
+                                >
+                                    <SelectTrigger className="h-10 text-sm font-semibold">
+                                        <SelectValue placeholder="Assign PM" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {users.map(u => (
+                                            <SelectItem key={u.id || u._id} value={u.id || u._id || ''}>
+                                                {u.name} ({u.role})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                                id="description"
-                                name="description"
-                                placeholder="Project goals, scope, and key deliverables..."
-                                className="min-h-[100px]"
-                                value={formData.description}
-                                onChange={handleChange}
-                            />
+                        {/* Deliverables Toggles */}
+                        <div className="space-y-3 pt-4 border-t">
+                            <Label className="text-xs font-bold uppercase tracking-wider block text-foreground">Required Deliverables & Modules</Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                    <Label className="text-xs font-bold flex items-center gap-1.5"><Globe className="h-3.5 w-3.5 text-blue-500" /> Website</Label>
+                                    <Switch checked={formData.websiteRequired} onCheckedChange={(v) => setFormData(p => ({ ...p, websiteRequired: v }))} />
+                                </div>
+                                <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                    <Label className="text-xs font-bold flex items-center gap-1.5"><Smartphone className="h-3.5 w-3.5 text-emerald-500" /> Android App</Label>
+                                    <Switch checked={formData.androidRequired} onCheckedChange={(v) => setFormData(p => ({ ...p, androidRequired: v }))} />
+                                </div>
+                                <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                    <Label className="text-xs font-bold flex items-center gap-1.5"><Smartphone className="h-3.5 w-3.5 text-purple-500" /> iOS App</Label>
+                                    <Switch checked={formData.iosRequired} onCheckedChange={(v) => setFormData(p => ({ ...p, iosRequired: v }))} />
+                                </div>
+                                <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                    <Label className="text-xs font-bold flex items-center gap-1.5"><Server className="h-3.5 w-3.5 text-amber-500" /> Admin Panel</Label>
+                                    <Switch checked={formData.adminPanelRequired} onCheckedChange={(v) => setFormData(p => ({ ...p, adminPanelRequired: v }))} />
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {['owner', 'admin'].includes(currentUser?.role) && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="budget">Budget ({getCurrencySymbol()})</Label>
+                        {/* Financials & Budget */}
+                        <div className="space-y-4 pt-4 border-t">
+                            <Label className="text-xs font-bold uppercase tracking-wider block text-foreground">Financial & Payment Setup</Label>
+                            <div className="grid gap-4 md:grid-cols-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-bold">Total Budget ({getCurrencySymbol()})</Label>
                                     <Input
-                                        id="budget"
                                         name="budget"
                                         type="number"
-                                        placeholder="50000"
+                                        placeholder="100000"
                                         required
                                         value={formData.budget}
                                         onChange={handleChange}
+                                        className="h-9 text-sm font-bold"
                                     />
                                 </div>
-                            )}
-
-                            <div className="space-y-2">
-                                <Label htmlFor="type">Project Type</Label>
-                                <Select
-                                    value={formData.type}
-                                    onValueChange={(value: ProjectType) => setFormData(prev => ({ ...prev, type: value }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="web-development">Web Development</SelectItem>
-                                        <SelectItem value="app-development">App Development</SelectItem>
-                                        <SelectItem value="design">Design</SelectItem>
-                                        <SelectItem value="marketing">Marketing</SelectItem>
-                                        <SelectItem value="seo">SEO</SelectItem>
-                                        <SelectItem value="other">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-bold">Advance Amount</Label>
+                                    <Input
+                                        name="advanceAmount"
+                                        type="number"
+                                        placeholder="30000"
+                                        value={formData.advanceAmount}
+                                        onChange={handleChange}
+                                        className="h-9 text-sm font-semibold"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-bold">Milestone Amount</Label>
+                                    <Input
+                                        name="milestoneAmount"
+                                        type="number"
+                                        placeholder="40000"
+                                        value={formData.milestoneAmount}
+                                        onChange={handleChange}
+                                        className="h-9 text-sm font-semibold"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-bold">Final Amount</Label>
+                                    <Input
+                                        name="finalAmount"
+                                        type="number"
+                                        placeholder="30000"
+                                        value={formData.finalAmount}
+                                        onChange={handleChange}
+                                        className="h-9 text-sm font-semibold"
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="paymentModel">Payment Model</Label>
-                                <Select
-                                    value={formData.paymentModel}
-                                    onValueChange={(value: PaymentModel) => setFormData(prev => ({ ...prev, paymentModel: value }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="advance">Advance</SelectItem>
-                                        <SelectItem value="milestone">Milestone</SelectItem>
-                                        <SelectItem value="retainer">Retainer</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="status">Initial Status</Label>
-                                <Select
-                                    value={formData.status}
-                                    onValueChange={(value: ProjectStatus) => setFormData(prev => ({ ...prev, status: value }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="planning">Planning</SelectItem>
-                                        <SelectItem value="in-progress">In Progress</SelectItem>
-                                        <SelectItem value="on-hold">On Hold</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        {/* Milestone Setup Section */}
-                        <div className="space-y-4 pt-2 border-t">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h4 className="text-base font-semibold flex items-center gap-2">
-                                        <Flag className="h-4 w-4 text-primary" />
-                                        Project Milestones & Payment Stages
-                                    </h4>
-                                    <p className="text-xs text-muted-foreground">
-                                        Configure deliverables, target dates, and payment amounts for each milestone stage.
-                                    </p>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={addMilestoneRow}
-                                    className="h-8 text-xs font-medium"
-                                >
-                                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Milestone
-                                </Button>
-                            </div>
-
-                            {milestones.length > 0 && (
-                                <div className="space-y-3">
-                                    {milestones.map((m, idx) => (
-                                        <div key={idx} className="p-3.5 rounded-lg border bg-card/60 space-y-3">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className="text-xs font-bold text-primary px-2 py-0.5 rounded bg-primary/10">
-                                                    Stage #{idx + 1}
-                                                </span>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => removeMilestoneRow(idx)}
-                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
-
-                                            <div className="grid gap-3 sm:grid-cols-12">
-                                                <div className="sm:col-span-6 space-y-1">
-                                                    <Label className="text-xs">Milestone Title</Label>
-                                                    <Input
-                                                        placeholder="e.g. Design & Wireframes"
-                                                        value={m.name}
-                                                        onChange={(e) => updateMilestoneRow(idx, 'name', e.target.value)}
-                                                        className="h-8 text-sm"
-                                                        required
-                                                    />
-                                                </div>
-                                                <div className="sm:col-span-3 space-y-1">
-                                                    <Label className="text-xs">Target Due Date</Label>
-                                                    <Input
-                                                        type="date"
-                                                        value={m.dueDate}
-                                                        onChange={(e) => updateMilestoneRow(idx, 'dueDate', e.target.value)}
-                                                        className="h-8 text-sm"
-                                                        required
-                                                    />
-                                                </div>
-                                                <div className="sm:col-span-3 space-y-1">
-                                                    <Label className="text-xs">Amount ({getCurrencySymbol()})</Label>
-                                                    <Input
-                                                        type="number"
-                                                        placeholder="e.g. 25000"
-                                                        value={m.amount}
-                                                        onChange={(e) => updateMilestoneRow(idx, 'amount', e.target.value)}
-                                                        className="h-8 text-sm"
-                                                        min="0"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {/* Milestone Total Tally */}
-                                    <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs">
-                                        <span className="font-medium text-foreground">
-                                            Total Milestone Sum: <strong>{formatCurrency(totalMilestoneSum)}</strong>
-                                        </span>
-                                        {parseFloat(formData.budget) > 0 && (
-                                            <span className={`font-semibold ${totalMilestoneSum === parseFloat(formData.budget) ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                                {Math.round((totalMilestoneSum / parseFloat(formData.budget)) * 100)}% of Project Budget ({formatCurrency(parseFloat(formData.budget))})
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 rounded-lg border bg-slate-50/50">
-                            <div className="space-y-0.5">
-                                <div className="flex items-center gap-2">
-                                    <Label className="text-base">Auto-Generate Invoice</Label>
-                                    <Popover>
-                                        <PopoverTrigger>
-                                            <Info className="h-4 w-4 text-slate-400" />
-                                        </PopoverTrigger>
-                                        <PopoverContent className="text-xs">
-                                            When project matches 'Completed' status, an invoice will be automatically generated and sent to the client's email.
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                                <p className="text-sm text-muted-foreground">Automatically bill the client upon completion</p>
-                            </div>
-                            <Switch
-                                checked={formData.autoInvoice}
-                                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, autoInvoice: checked }))}
+                        <div className="space-y-2 pt-2">
+                            <Label htmlFor="description" className="text-xs font-bold uppercase">Project Description & Scope</Label>
+                            <Textarea
+                                id="description"
+                                name="description"
+                                placeholder="Key goals, technical stack, and client expectations..."
+                                className="min-h-[90px] text-sm"
+                                value={formData.description}
+                                onChange={handleChange}
                             />
                         </div>
 
@@ -399,8 +364,8 @@ export function NewProjectPage() {
                             <Button type="button" variant="outline" onClick={() => navigate('/projects')}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={loading}>
-                                {loading ? 'Creating...' : 'Create Project'}
+                            <Button type="submit" disabled={loading} className="font-bold px-6">
+                                {loading ? 'Initializing Project & Checkpoints...' : 'Create Project'}
                             </Button>
                         </div>
                     </form>

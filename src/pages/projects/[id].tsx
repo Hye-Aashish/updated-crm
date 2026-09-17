@@ -1,54 +1,68 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
     ChevronLeft, Calendar, DollarSign, Clock, CheckSquare,
     MoreHorizontal, Edit, Trash2, Plus, FileText, Paperclip,
     Download, ExternalLink, Users, AlertCircle, TrendingUp,
-    MessageCircle, MessageSquare, Eye
+    MessageCircle, MessageSquare, Eye, Globe, Smartphone, CheckCircle2,
+    Shield, Flag, AlertTriangle, RefreshCw, PhoneCall, Mail, Send
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import api from '@/lib/api-client'
+import { useToast } from '@/hooks/use-toast'
 import { TaskBoard } from '@/components/tasks/task-board'
-
 
 import { ProjectTeamDialog } from '@/components/projects/project-team-dialog'
 import { ProjectFileDialog } from '@/components/projects/project-file-dialog'
 import { ProjectTaskDialog } from '@/components/projects/project-task-dialog'
 import { ProjectMilestonesTab } from '@/components/projects/project-milestones-tab'
-import { Flag } from 'lucide-react'
 import { ProjectNotes } from '@/components/projects/project-notes'
 import { ProjectCredentials } from '@/components/projects/project-credentials'
-import { useState } from 'react'
+import { ProjectTimelineView } from '@/components/projects/project-timeline-view'
+import { CheckpointProofDialog } from '@/components/projects/checkpoint-proof-dialog'
 
 import { mapProject, mapClient, mapUser, mapInvoice, mapTask } from '@/lib/mappers'
 
 export function ProjectDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const { toast } = useToast()
+
     const [teamDialogOpen, setTeamDialogOpen] = useState(false)
     const [fileDialogOpen, setFileDialogOpen] = useState(false)
     const [taskDialogOpen, setTaskDialogOpen] = useState(false)
     const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<any>(null)
-    const [previewFile, setPreviewFile] = useState<{url: string, name: string, type: string} | null>(null)
+    const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null)
+
+    // Module State
+    const [checkpoints, setCheckpoints] = useState<any[]>([])
+    const [bugs, setBugs] = useState<any[]>([])
+    const [followups, setFollowups] = useState<any[]>([])
+    const [activitiesLog, setActivitiesLog] = useState<any[]>([])
+    const [completionReadiness, setCompletionReadiness] = useState<any>(null)
+
+    // Dialog & Form States
+    const [selectedCpForProof, setSelectedCpForProof] = useState<any>(null)
+    const [proofDialogOpen, setProofDialogOpen] = useState(false)
+    const [newBugDialogOpen, setNewBugDialogOpen] = useState(false)
+    const [newBug, setNewBug] = useState({ title: '', description: '', severity: 'medium', priority: 'medium', assignedDeveloper: '' })
+
+    const [newFollowUpDialogOpen, setNewFollowUpDialogOpen] = useState(false)
+    const [newFollowUp, setNewFollowUp] = useState({ type: 'update', summary: '', clientResponse: '', followUpDate: '' })
+
     const {
         projects, setProjects,
         tasks, setTasks,
@@ -57,388 +71,312 @@ export function ProjectDetailPage() {
         invoices, setInvoices,
         clients, setClients,
         currentUser,
-        activities,
-        deleteProject // Destructure
+        updateProject,
+        deleteProject
     } = useAppStore()
 
-    const [permissions, setPermissions] = useState<any>(null)
+    const project = projects.find((p) => p.id === id || p._id === id)
 
-    useEffect(() => {
-        api.get('/settings').then(res => {
-            if (currentUser?.role && currentUser.role !== 'owner' && res.data.roles) {
-                const role = res.data.roles.find((r: any) => r.name === currentUser.role)
-                if (role) setPermissions(role.permissions)
-            }
-        })
-    }, [currentUser])
-
-    const isVisible = (field: string) => {
-        if (!currentUser || currentUser.role === 'owner') return true
-        if (!permissions) return true // Default to visible while loading
-        return permissions.projects?.fields?.[field] !== false
-    }
-
-    const project = projects.find((p) => p.id === id)
-
-    const handleDelete = async () => {
+    const fetchModuleData = async () => {
         if (!project) return
-        if (window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
-            try {
-                await api.delete(`/projects/${project.id}`)
-                deleteProject(project.id)
-                navigate('/projects')
-            } catch (error) {
-                console.error("Delete failed", error)
-                navigate('/projects')
-            }
+        const pId = project._id || project.id
+        try {
+            const [cpRes, bugRes, folRes, actRes, compRes] = await Promise.all([
+                api.get(`/projects/${pId}/checkpoints`).catch(() => ({ data: [] })),
+                api.get(`/projects/${pId}/bugs`).catch(() => ({ data: [] })),
+                api.get(`/projects/${pId}/followups`).catch(() => ({ data: [] })),
+                api.get(`/projects/${pId}/activities`).catch(() => ({ data: [] })),
+                api.get(`/projects/${pId}/completion-check`).catch(() => ({ data: null }))
+            ])
+            setCheckpoints(cpRes.data || [])
+            setBugs(bugRes.data || [])
+            setFollowups(folRes.data || [])
+            setActivitiesLog(actRes.data || [])
+            setCompletionReadiness(compRes.data)
+        } catch (err) {
+            console.error("Error loading project module data", err)
         }
     }
 
-    // Fetch Data on Reload
+    useEffect(() => {
+        fetchModuleData()
+    }, [id, project?.id])
+
+    // Load initial data
     useEffect(() => {
         const fetchData = async () => {
-            // Only fetch if data is missing. Fresh data is better but length check is simple.
-            if (projects.length === 0 || clients.length === 0 || users.length === 0 || files.length === 0 || invoices.length === 0 || tasks.length === 0) {
+            if (projects.length === 0 || clients.length === 0 || users.length === 0) {
                 try {
-                    const [projectsRes, clientsRes, usersRes, filesRes, invoicesRes, tasksRes] = await Promise.all([
-                        projects.length === 0 ? api.get('/projects').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
-                        clients.length === 0 ? api.get('/clients').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
-                        users.length === 0 ? api.get('/users').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
-                        files.length === 0 ? api.get('/files').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
-                        invoices.length === 0 ? api.get('/invoices').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
-                        tasks.length === 0 ? api.get('/tasks').catch(() => ({ data: null })) : Promise.resolve({ data: null })
+                    const [pRes, cRes, uRes] = await Promise.all([
+                        api.get('/projects'),
+                        api.get('/clients'),
+                        api.get('/users')
                     ])
-
-                    if (projectsRes.data) {
-                        setProjects(projectsRes.data.map(mapProject))
-                    }
-                    if (clientsRes.data) {
-                        setClients(clientsRes.data.map(mapClient))
-                    }
-                    if (usersRes?.data) {
-                        setUsers(usersRes.data.map(mapUser))
-                    }
-                    if (filesRes?.data) {
-                        setFiles(filesRes.data.map((f: any) => ({
-                            id: f._id,
-                            name: f.name,
-                            type: f.type,
-                            size: f.size,
-                            url: f.url,
-                            projectId: f.projectId,
-                            clientId: f.clientId,
-                            uploadedBy: f.uploadedBy,
-                            uploadedAt: new Date(f.uploadedAt),
-                        })))
-                    }
-                    if (invoicesRes?.data) {
-                        setInvoices(invoicesRes.data.map(mapInvoice))
-                    }
-                    if (tasksRes?.data) {
-                        setTasks(tasksRes.data.map(mapTask))
-                    }
-                } catch (error) {
-                    console.error("Error fetching detail data", error)
+                    if (pRes.data) setProjects(pRes.data.map(mapProject))
+                    if (cRes.data) setClients(cRes.data.map(mapClient))
+                    if (uRes.data) setUsers(uRes.data.map(mapUser))
+                } catch (e) {
+                    console.error(e)
                 }
             }
         }
         fetchData()
-    }, [id, projects.length, clients.length, users.length, files.length, invoices.length, tasks.length, setProjects, setClients, setUsers, setFiles, setInvoices, setTasks])
+    }, [projects.length, clients.length, users.length, setProjects, setClients, setUsers])
 
+    if (!project) return <div className="p-10 text-center font-bold text-muted-foreground">Loading project workspace...</div>
 
-    if (!project && projects.length > 0) {
-        return (
-            <div className="flex flex-col items-center justify-center h-[50vh]">
-                <h2 className="text-2xl font-bold mb-2">Project Not Found</h2>
-                <p className="text-muted-foreground mb-4">The project you are looking for does not exist or has been deleted.</p>
-                <Button onClick={() => navigate('/projects')}>Back to Projects</Button>
-            </div>
-        )
-    }
-
-    if (!project) return <div className="p-10 text-center">Loading project details...</div>
-
-    // Derived Data
+    const client = clients.find(c => c.id === project.clientId)
+    const pm = users.find(u => u.id === project.pmId)
     const projectTasks = tasks.filter(t => t.projectId === project.id)
-    const completedTasks = projectTasks.filter(t => t.status === 'done').length
-    const progress = projectTasks.length > 0 ? (completedTasks / projectTasks.length) * 100 : (project.progress || 0)
-
     const projectFiles = files.filter(f => f.projectId === project.id)
     const projectInvoices = invoices.filter(i => i.projectId === project.id)
 
-    // Team Members (Dynamic)
-    const projectMembers = project.members || []
-    const assigneeIds = Array.from(new Set(projectTasks.map(t => t.assigneeId).filter(Boolean)))
-    const combinedMemberIds = Array.from(new Set([...projectMembers, ...assigneeIds]))
+    const health = project.health || 'green'
 
-    // Add PM to team if not already
-    if (project.pmId && !combinedMemberIds.includes(project.pmId)) combinedMemberIds.push(project.pmId)
+    const handleDelete = async () => {
+        if (window.confirm("Are you sure you want to delete this project? This cannot be undone.")) {
+            try {
+                await api.delete(`/projects/${project.id}`)
+                deleteProject(project.id)
+                navigate('/projects')
+            } catch (err) {
+                navigate('/projects')
+            }
+        }
+    }
 
-    const teamMembers = users.filter(u => combinedMemberIds.includes(u.id))
-    const displayTeam = teamMembers.length > 0 ? teamMembers : []
-    const pm = users.find(u => u.id === project.pmId)
-    const client = clients.find(c => c.id === project.clientId)
+    // Checkpoint Status Update
+    const handleCheckpointUpdate = async (cpId: string, status: string, extra: any = {}) => {
+        const pId = project._id || project.id
+        try {
+            await api.put(`/projects/${pId}/checkpoints/${cpId}`, { status, ...extra })
+            toast({ description: `Checkpoint updated to ${status}` })
+            fetchModuleData()
+            // Refresh parent project progress & health
+            const updatedP = await api.get(`/projects/${pId}`)
+            updateProject(project.id, mapProject(updatedP.data))
+        } catch (err: any) {
+            toast({
+                title: 'Operation Blocked',
+                description: err.response?.data?.message || 'Failed to update checkpoint',
+                variant: 'destructive'
+            })
+        }
+    }
 
-    // Project Activities
-    const projectActivities = activities.filter(a => a.projectId === project.id || a.metadata?.projectId === project.id).slice(0, 5)
+    const handleCreateBug = async () => {
+        if (!newBug.title || !newBug.description) return
+        const pId = project._id || project.id
+        try {
+            await api.post(`/projects/${pId}/bugs`, newBug)
+            toast({ description: 'QA Bug reported successfully' })
+            setNewBug({ title: '', description: '', severity: 'medium', priority: 'medium', assignedDeveloper: '' })
+            setNewBugDialogOpen(false)
+            fetchModuleData()
+        } catch (err) {
+            toast({ title: 'Error', description: 'Failed to create bug', variant: 'destructive' })
+        }
+    }
 
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'completed': return 'bg-green-500 hover:bg-green-600'
-            case 'in-progress': return 'bg-blue-500 hover:bg-blue-600'
-            case 'on-hold': return 'bg-yellow-500 hover:bg-yellow-600'
-            default: return 'bg-gray-500 hover:bg-gray-600'
+    const handleCreateFollowUp = async () => {
+        if (!newFollowUp.summary || !newFollowUp.followUpDate) return
+        const pId = project._id || project.id
+        try {
+            await api.post(`/projects/${pId}/followups`, newFollowUp)
+            toast({ description: 'Client follow-up scheduled' })
+            setNewFollowUp({ type: 'update', summary: '', clientResponse: '', followUpDate: '' })
+            setNewFollowUpDialogOpen(false)
+            fetchModuleData()
+        } catch (err) {
+            toast({ title: 'Error', description: 'Failed to schedule follow-up', variant: 'destructive' })
         }
     }
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
+        <div className="space-y-6 font-sans pb-10">
+            {/* Breadcrumb Header */}
             <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
                     <button onClick={() => navigate('/projects')} className="hover:text-primary transition-colors">Projects</button>
-                    <ChevronLeft className="h-4 w-4 rotate-180" />
-                    <span className="text-foreground font-medium truncate">{project.name}</span>
+                    <ChevronLeft className="h-3.5 w-3.5 rotate-180" />
+                    <span className="text-foreground truncate">{project.name}</span>
                 </div>
 
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="space-y-1">
                         <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold">{project.name}</h1>
-                            <Badge className={getStatusColor(project.status)}>
-                                {project.status.replace('-', ' ')}
-                            </Badge>
+                            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">{project.name}</h1>
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase ${
+                                health === 'green' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/30' :
+                                health === 'yellow' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/30 animate-pulse' :
+                                health === 'red' ? 'bg-red-500/10 text-red-600 border border-red-500/30 animate-pulse' :
+                                health === 'blue' ? 'bg-blue-500/10 text-blue-600 border border-blue-500/30' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                                ● HEALTH: {health.toUpperCase()}
+                            </span>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                                <Users className="h-4 w-4" />
-                                <span>{client?.company || client?.name || 'Unknown Client'}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4" />
-                                <span>Due: {new Date(project.deadline).toLocaleDateString()}</span>
-                            </div>
-                        </div>
+                        <p className="text-sm text-muted-foreground font-semibold">
+                            Client: <span className="text-foreground">{client?.company || client?.name || 'Client'}</span> • PM: <span className="text-foreground">{pm?.name || 'Unassigned'}</span> • Deadline: <span className="text-foreground">{new Date(project.deadline).toLocaleDateString()}</span>
+                        </p>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                         {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
-                            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${project.id}/edit`)}>
-                                <Edit className="mr-2 h-4 w-4" /> Edit Project
+                            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${project.id}/edit`)} className="h-9 font-bold text-xs">
+                                <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit Project
                             </Button>
                         )}
                         {['owner', 'admin'].includes(currentUser?.role) && (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem className="text-red-600" onClick={handleDelete}>
-                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Project
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:bg-destructive/10">
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {['owner', 'admin', 'client'].includes(currentUser?.role) && isVisible('budget') && (
-                    <Card>
-                        <CardContent className="p-6">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Budget</p>
-                                    <h3 className="text-2xl font-bold mt-2">{formatCurrency(project.budget)}</h3>
-                                </div>
-                                <div className="p-2 bg-slate-100 dark:bg-slate-900/20 rounded-lg">
-                                    <DollarSign className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-                {['owner', 'admin', 'client'].includes(currentUser?.role) && isVisible('invoices') && (
-                    <Card>
-                        <CardContent className="p-6">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">{currentUser.role === 'client' ? 'Total Paid' : 'Received'}</p>
-                                    <h3 className="text-2xl font-bold mt-2 text-emerald-600">
-                                        {formatCurrency(projectInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
-                                    </h3>
-                                    <p className="text-[10px] text-muted-foreground mt-1">
-                                        {projectInvoices.filter(i => i.status === 'paid').length} Paid Invoices
-                                    </p>
-                                </div>
-                                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg">
-                                    <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Hours Logged</p>
-                                <h3 className="text-2xl font-bold mt-2">--</h3>
-                                {['owner', 'pm'].includes(currentUser?.role) && (
-                                    <p className="text-xs text-muted-foreground mt-1">Billable: --</p>
-                                )}
-                            </div>
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                        </div>
+            {/* Quick KPI Strip */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <Card className="bg-card border-border/60">
+                    <CardContent className="p-3.5 space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Overall Progress</p>
+                        <p className="text-xl font-black text-primary">{project.progress || 0}%</p>
+                        <Progress value={project.progress || 0} className="h-1.5" />
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Task Progress</p>
-                                <h3 className="text-2xl font-bold mt-2">{Math.round(progress)}%</h3>
-                                <Progress value={progress} className="h-2 mt-2 w-24" />
-                            </div>
-                            <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
-                                <CheckSquare className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                            </div>
-                        </div>
+
+                <Card className="bg-card border-border/60">
+                    <CardContent className="p-3.5 space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Checkpoints</p>
+                        <p className="text-xl font-black text-foreground">
+                            {checkpoints.filter(c => c.status === 'completed').length} / {checkpoints.length}
+                        </p>
+                        <p className="text-[10px] font-semibold text-emerald-600">Automated Pipeline</p>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Pending Items</p>
-                                <h3 className="text-2xl font-bold mt-2">{projectTasks.length - completedTasks}</h3>
-                                <p className="text-xs text-red-500 mt-1">{projectTasks.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'done').length} Overdue</p>
-                            </div>
-                            <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-                                <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                            </div>
+
+                <Card className="bg-card border-border/60">
+                    <CardContent className="p-3.5 space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Open QA Bugs</p>
+                        <p className="text-xl font-black text-red-600">
+                            {bugs.filter(b => b.status !== 'closed').length}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-semibold">
+                            {bugs.filter(b => b.severity === 'critical' && b.status !== 'closed').length} Critical
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-card border-border/60">
+                    <CardContent className="p-3.5 space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Project Budget</p>
+                        <p className="text-xl font-black text-foreground">{formatCurrency(project.budget)}</p>
+                        <p className="text-[10px] text-emerald-600 font-semibold">
+                            Status: {project.paymentStatus || 'Pending'}
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-card border-border/60">
+                    <CardContent className="p-3.5 space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Deliverables Live</p>
+                        <div className="flex items-center gap-2 pt-0.5">
+                            {project.websiteRequired && <Globe className={`h-4 w-4 ${project.websiteStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} title="Website" />}
+                            {project.androidRequired && <Smartphone className={`h-4 w-4 ${project.androidStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} title="Android" />}
+                            {project.iosRequired && <Smartphone className={`h-4 w-4 ${project.iosStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} title="iOS" />}
                         </div>
+                        <p className="text-[10px] text-muted-foreground font-semibold">Active Trackers</p>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Tabs Content */}
+            {/* 14 SaaS Functional Tabs */}
             <Tabs defaultValue="overview" className="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="milestones" className="gap-1.5">
-                        <Flag className="h-3.5 w-3.5" />
-                        Milestones ({project.milestones?.length || 0})
-                    </TabsTrigger>
-                    <TabsTrigger value="tasks">Tasks ({projectTasks.length})</TabsTrigger>
-                    {isVisible('team') && <TabsTrigger value="team">Team ({displayTeam.length})</TabsTrigger>}
-                    <TabsTrigger value="files">Files ({projectFiles.length})</TabsTrigger>
-                    {['owner', 'admin', 'client'].includes(currentUser?.role) && isVisible('invoices') && <TabsTrigger value="invoices">Invoices ({projectInvoices.length})</TabsTrigger>}
-                    <TabsTrigger value="notes">Notes ({project.notes?.length || 0})</TabsTrigger>
-                    <TabsTrigger value="credentials">Credentials ({project.credentials?.length || 0})</TabsTrigger>
-                    {isVisible('chat') && <TabsTrigger value="chat">Chat</TabsTrigger>}
+                <TabsList className="flex overflow-x-auto w-full justify-start h-11 p-1 bg-muted/40 border border-border/50 rounded-xl custom-scrollbar">
+                    <TabsTrigger value="overview" className="text-xs font-bold">Overview</TabsTrigger>
+                    <TabsTrigger value="checkpoints" className="text-xs font-bold">Checkpoints ({checkpoints.length})</TabsTrigger>
+                    <TabsTrigger value="timeline" className="text-xs font-bold">Timeline</TabsTrigger>
+                    <TabsTrigger value="tasks" className="text-xs font-bold">Tasks ({projectTasks.length})</TabsTrigger>
+                    <TabsTrigger value="team" className="text-xs font-bold">Team</TabsTrigger>
+                    <TabsTrigger value="client-updates" className="text-xs font-bold">Client Updates</TabsTrigger>
+                    <TabsTrigger value="followups" className="text-xs font-bold">Follow-ups ({followups.length})</TabsTrigger>
+                    <TabsTrigger value="payments" className="text-xs font-bold">Payments</TabsTrigger>
+                    <TabsTrigger value="website" className="text-xs font-bold">Website</TabsTrigger>
+                    <TabsTrigger value="android" className="text-xs font-bold">Android</TabsTrigger>
+                    <TabsTrigger value="ios" className="text-xs font-bold">iOS</TabsTrigger>
+                    <TabsTrigger value="bugs" className="text-xs font-bold">QA & Bugs ({bugs.length})</TabsTrigger>
+                    <TabsTrigger value="files" className="text-xs font-bold">Files ({projectFiles.length})</TabsTrigger>
+                    <TabsTrigger value="activities" className="text-xs font-bold">Audit Log</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="overview" className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-2 space-y-6">
+                {/* 1. OVERVIEW TAB */}
+                <TabsContent value="overview" className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 space-y-6">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Description</CardTitle>
+                                    <CardTitle className="text-base font-bold">Project Scope & Summary</CardTitle>
                                 </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                        {project.description || "No description provided for this project."}
+                                <CardContent className="space-y-4 text-sm">
+                                    <p className="text-muted-foreground leading-relaxed">
+                                        {project.description || 'No detailed description specified.'}
                                     </p>
-                                    <div className="mt-6">
-                                        <h4 className="text-sm font-semibold mb-3">Key Deliverables</h4>
-                                        <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                                            {project.milestones && project.milestones.length > 0 ? (
-                                                project.milestones.map((m, i) => (
-                                                    <li key={i}>{m.name} {m.completed ? '(Completed)' : ''}</li>
-                                                ))
-                                            ) : (
-                                                <>
-                                                    {/* Fallback mock deliverables if no milestones, as per user request to not remove anything */}
-                                                    <li>Detailed Requirements Specification</li>
-                                                    <li>UI/UX Design Mockups</li>
-                                                    <li>Functional Prototype</li>
-                                                    <li>Production Deployment</li>
-                                                </>
-                                            )}
-                                        </ul>
-                                    </div>
                                 </CardContent>
                             </Card>
 
-                            {/* Recent Activity (Dynamic from store) */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Recent Activity</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4">
-                                        {projectActivities.length > 0 ? (
-                                            projectActivities.map((activity, i) => (
-                                                <div key={i} className="flex gap-4 items-start">
-                                                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                                        <Avatar className="h-8 w-8">
-                                                            <AvatarFallback>{getInitials(users.find(u => u.id === activity.userId)?.name || 'User')}</AvatarFallback>
-                                                        </Avatar>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm text-foreground">
-                                                            <span className="font-semibold">{users.find(u => u.id === activity.userId)?.name || 'Someone'}</span> {activity.description}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">{new Date(activity.createdAt).toLocaleString()}</p>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground">No recent activity.</p>
+                            {/* Readiness Validation Check Card */}
+                            {completionReadiness && (
+                                <Card className={`border ${completionReadiness.canComplete ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-amber-500/5 border-amber-500/30'}`}>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-bold flex items-center justify-between">
+                                            <span className="flex items-center gap-2">
+                                                <Shield className="h-4 w-4 text-primary" />
+                                                Completion Validation Rules Check
+                                            </span>
+                                            <Badge variant={completionReadiness.canComplete ? "default" : "secondary"}>
+                                                {completionReadiness.canComplete ? '✓ Ready to Complete' : '⚠️ Action Required'}
+                                            </Badge>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="text-xs space-y-2 font-medium">
+                                        <div className="flex items-center justify-between">
+                                            <span>Uncompleted Mandatory Checkpoints:</span>
+                                            <span className="font-bold">{completionReadiness.uncompletedMandatoryCount}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span>Unresolved Critical QA Bugs:</span>
+                                            <span className="font-bold">{completionReadiness.unresolvedCriticalBugsCount}</span>
+                                        </div>
+                                        {completionReadiness.uncompletedMandatoryList?.length > 0 && (
+                                            <div className="p-2.5 bg-amber-500/10 rounded-lg space-y-1 text-[11px] text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                                                <p className="font-bold">Pending Mandatory Checkpoints:</p>
+                                                {completionReadiness.uncompletedMandatoryList.map((m: any) => (
+                                                    <p key={m.id}>• {m.title} ({m.phase})</p>
+                                                ))}
+                                            </div>
                                         )}
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
 
                         <div className="space-y-6">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Project Details</CardTitle>
+                                    <CardTitle className="text-base font-bold">Deliverables Readiness</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-4 text-sm">
-                                    <div className="flex justify-between py-2 border-b">
-                                        <span className="text-muted-foreground">Client</span>
-                                        <span className="font-medium">{client?.company || client?.name || 'Unknown'}</span>
+                                <CardContent className="space-y-3 text-xs font-semibold">
+                                    <div className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
+                                        <span className="flex items-center gap-2"><Globe className="h-4 w-4 text-blue-500" /> Website Status</span>
+                                        <Badge variant="outline" className="uppercase text-[9px]">{project.websiteStatus || 'Not Started'}</Badge>
                                     </div>
-                                    <div className="flex justify-between py-2 border-b">
-                                        <span className="text-muted-foreground">Start Date</span>
-                                        <span className="font-medium">{new Date(project.startDate).toLocaleDateString()}</span>
+                                    <div className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
+                                        <span className="flex items-center gap-2"><Smartphone className="h-4 w-4 text-emerald-500" /> Android App</span>
+                                        <Badge variant="outline" className="uppercase text-[9px]">{project.androidStatus || 'Not Started'}</Badge>
                                     </div>
-                                    <div className="flex justify-between py-2 border-b">
-                                        <span className="text-muted-foreground">End Date</span>
-                                        <span className="font-medium">{new Date(project.deadline).toLocaleDateString()}</span>
-                                    </div>
-                                    <div className="flex justify-between py-2 border-b">
-                                        <span className="text-muted-foreground">Priority</span>
-                                        <Badge variant="outline" className="capitalize">{project.priority || 'medium'}</Badge>
-                                    </div>
-                                    <div className="flex justify-between py-2">
-                                        <span className="text-muted-foreground">Team Lead</span>
-                                        <div className="flex items-center gap-2">
-                                            <Avatar className="h-5 w-5">
-                                                <AvatarFallback>{getInitials(pm?.name || 'NA')}</AvatarFallback>
-                                            </Avatar>
-                                            <span className="font-medium">{pm?.name || 'Unassigned'}</span>
-                                        </div>
+                                    <div className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
+                                        <span className="flex items-center gap-2"><Smartphone className="h-4 w-4 text-purple-500" /> iOS App</span>
+                                        <Badge variant="outline" className="uppercase text-[9px]">{project.iosStatus || 'Not Started'}</Badge>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -446,240 +384,447 @@ export function ProjectDetailPage() {
                     </div>
                 </TabsContent>
 
-                <TabsContent value="milestones" className="space-y-4">
-                    <ProjectMilestonesTab
-                        project={project}
-                        onProjectUpdate={(updated) => updateProject(project.id, updated)}
+                {/* 2. CHECKPOINTS TAB */}
+                <TabsContent value="checkpoints" className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-base font-bold">Automated Checkpoints & Workflow Rules</h3>
+                        <Button size="sm" onClick={fetchModuleData} variant="outline" className="h-8 text-xs font-bold">
+                            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh Pipeline
+                        </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                        {checkpoints.map((cp) => {
+                            const isCompleted = cp.status === 'completed'
+                            const isOverdue = cp.status === 'overdue' || (cp.dueDate && new Date(cp.dueDate) < new Date() && !isCompleted)
+
+                            return (
+                                <Card key={cp._id || cp.id} className={`border transition-all ${
+                                    isCompleted ? 'bg-emerald-500/5 border-emerald-500/30' :
+                                    isOverdue ? 'bg-red-500/5 border-red-500/30' : 'bg-card border-border/60'
+                                }`}>
+                                    <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{cp.phase}</span>
+                                                {cp.isMandatory && <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/30">Mandatory</span>}
+                                                {cp.proofRequired && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 border border-blue-500/30">Proof Needed</span>}
+                                            </div>
+                                            <p className="text-sm font-bold text-foreground">{cp.title}</p>
+                                            {cp.dependencies && cp.dependencies.length > 0 && (
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Prerequisites: {cp.dependencies.map((d: any) => d.title || d).join(', ')}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant={isCompleted ? "secondary" : "outline"} className={`text-[9px] font-bold uppercase ${
+                                                isCompleted ? 'bg-emerald-500/20 text-emerald-700' :
+                                                isOverdue ? 'bg-red-500/20 text-red-700' : ''
+                                            }`}>
+                                                {cp.status.replace('_', ' ')}
+                                            </Badge>
+
+                                            {!isCompleted && (
+                                                <Button 
+                                                    size="sm" 
+                                                    onClick={() => {
+                                                        if (cp.proofRequired) {
+                                                            setSelectedCpForProof(cp)
+                                                            setProofDialogOpen(true)
+                                                        } else {
+                                                            handleCheckpointUpdate(cp._id || cp.id, 'completed')
+                                                        }
+                                                    }}
+                                                    className="h-8 text-xs font-bold"
+                                                >
+                                                    Complete Step
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
+                </TabsContent>
+
+                {/* 3. TIMELINE TAB */}
+                <TabsContent value="timeline">
+                    <ProjectTimelineView 
+                        checkpoints={checkpoints} 
+                        onCheckpointClick={(cp) => {
+                            if (cp.proofRequired) {
+                                setSelectedCpForProof(cp)
+                                setProofDialogOpen(true)
+                            }
+                        }}
                     />
                 </TabsContent>
 
+                {/* 4. TASKS TAB */}
                 <TabsContent value="tasks" className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold">Tasks</h3>
-                        {['owner', 'admin', 'pm', 'employee', 'developer'].includes(currentUser?.role || '') && (
-                            <Button size="sm" onClick={() => {
-                                setSelectedTaskForEdit(null)
-                                setTaskDialogOpen(true)
-                            }}>
-                                <Plus className="mr-2 h-4 w-4" /> Add Task
-                            </Button>
-                        )}
+                        <h3 className="text-base font-bold">Task Management Board</h3>
+                        <Button size="sm" onClick={() => { setSelectedTaskForEdit(null); setTaskDialogOpen(true) }} className="h-8 font-bold text-xs">
+                            <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Task
+                        </Button>
                     </div>
                     {projectTasks.length === 0 ? (
-                        <div className="p-8 text-center text-muted-foreground bg-muted/30 rounded-lg border border-dashed">
-                            <p>No tasks found for this project.</p>
-                            <Button variant="link" className="mt-2">Create your first task</Button>
+                        <div className="p-8 text-center text-muted-foreground border border-dashed rounded-xl text-xs font-medium">
+                            No tasks created for this project yet.
                         </div>
                     ) : (
                         <TaskBoard tasks={projectTasks} />
                     )}
                 </TabsContent>
 
+                {/* 5. TEAM TAB */}
                 <TabsContent value="team">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {displayTeam.map(user => (
-                            <Card key={user.id}>
+                        {users.filter(u => (project.members || []).includes(u.id) || u.id === project.pmId).map(user => (
+                            <Card key={user.id} className="border border-border/60">
                                 <CardContent className="p-4 flex items-center gap-4">
                                     <Avatar className="h-10 w-10">
                                         <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <p className="font-semibold">{user.name}</p>
-                                        <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                                        <p className="font-bold text-sm text-foreground">{user.name}</p>
+                                        <p className="text-xs text-muted-foreground capitalize font-medium">{user.role}</p>
                                     </div>
-                                    <Button variant="ghost" size="icon" className="ml-auto">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
                                 </CardContent>
                             </Card>
                         ))}
-                        {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
-                            <Card
-                                className="border-dashed hover:bg-muted/50 cursor-pointer flex items-center justify-center min-h-[80px]"
-                                onClick={() => setTeamDialogOpen(true)}
-                            >
-                                <div className="flex flex-col items-center text-muted-foreground">
-                                    <Plus className="h-6 w-6 mb-1" />
-                                    <span className="text-sm">Manage Team</span>
-                                </div>
-                            </Card>
-                        )}
                     </div>
                 </TabsContent>
 
-                <ProjectTeamDialog
-                    project={project}
-                    open={teamDialogOpen}
-                    onOpenChange={setTeamDialogOpen}
-                />
-                <ProjectFileDialog
-                    project={project}
-                    open={fileDialogOpen}
-                    onOpenChange={setFileDialogOpen}
-                />
-                <ProjectTaskDialog
-                    projectId={project.id}
-                    open={taskDialogOpen}
-                    onOpenChange={setTaskDialogOpen}
-                    task={selectedTaskForEdit}
-                />
+                {/* 6. CLIENT UPDATES TAB */}
+                <TabsContent value="client-updates" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold">Client Communication Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-xs font-semibold">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="p-3 bg-muted/40 rounded-lg border">
+                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Last Call</span>
+                                    <p className="font-bold text-sm pt-0.5">{project.lastCallDate ? new Date(project.lastCallDate).toLocaleDateString() : 'No Record'}</p>
+                                </div>
+                                <div className="p-3 bg-muted/40 rounded-lg border">
+                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Last WhatsApp</span>
+                                    <p className="font-bold text-sm pt-0.5">{project.lastWhatsAppDate ? new Date(project.lastWhatsAppDate).toLocaleDateString() : 'No Record'}</p>
+                                </div>
+                                <div className="p-3 bg-muted/40 rounded-lg border">
+                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Last Email</span>
+                                    <p className="font-bold text-sm pt-0.5">{project.lastEmailDate ? new Date(project.lastEmailDate).toLocaleDateString() : 'No Record'}</p>
+                                </div>
+                                <div className="p-3 bg-muted/40 rounded-lg border">
+                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Next Follow-up</span>
+                                    <p className="font-bold text-sm text-primary pt-0.5">{project.nextFollowUpDate ? new Date(project.nextFollowUpDate).toLocaleDateString() : 'Not Set'}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
+                {/* 7. FOLLOW-UPS TAB */}
+                <TabsContent value="followups" className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-base font-bold">Scheduled Follow-ups</h3>
+                        <Button size="sm" onClick={() => setNewFollowUpDialogOpen(true)} className="h-8 text-xs font-bold">
+                            <Plus className="mr-1.5 h-3.5 w-3.5" /> Schedule Follow-up
+                        </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                        {followups.map((f) => (
+                            <Card key={f._id || f.id} className="border border-border/60">
+                                <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs font-medium">
+                                    <div className="space-y-1">
+                                        <p className="font-bold text-sm text-foreground">{f.summary}</p>
+                                        <p className="text-muted-foreground">Type: <span className="uppercase font-bold text-primary">{f.type}</span> • Scheduled for: <span className="font-bold text-foreground">{new Date(f.followUpDate).toLocaleString()}</span></p>
+                                        {f.clientResponse && <p className="text-emerald-600 font-semibold">Client Response: {f.clientResponse}</p>}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </TabsContent>
+
+                {/* 8. PAYMENTS TAB */}
+                <TabsContent value="payments" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold">Financial Summary & Milestone Billing</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-xs font-semibold">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="p-3 bg-muted/40 rounded-lg border">
+                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Total Budget</span>
+                                    <p className="font-bold text-lg pt-0.5">{formatCurrency(project.budget)}</p>
+                                </div>
+                                <div className="p-3 bg-muted/40 rounded-lg border">
+                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Advance Amount</span>
+                                    <p className="font-bold text-lg text-emerald-600 pt-0.5">{formatCurrency(project.advanceAmount)}</p>
+                                </div>
+                                <div className="p-3 bg-muted/40 rounded-lg border">
+                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Milestone Amount</span>
+                                    <p className="font-bold text-lg text-blue-600 pt-0.5">{formatCurrency(project.milestoneAmount)}</p>
+                                </div>
+                                <div className="p-3 bg-muted/40 rounded-lg border">
+                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Final Amount</span>
+                                    <p className="font-bold text-lg text-purple-600 pt-0.5">{formatCurrency(project.finalAmount)}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* 9. WEBSITE TAB */}
+                <TabsContent value="website" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold flex items-center gap-2">
+                                <Globe className="h-5 w-5 text-blue-500" /> Website Deployment Tracker
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-xs font-medium">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Website Status</Label>
+                                    <Input value={project.websiteStatus || 'not-started'} readOnly className="h-9 uppercase font-bold" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Domain</Label>
+                                    <Input value={project.domain || '-'} readOnly className="h-9 font-semibold" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Production URL</Label>
+                                    <Input value={project.productionUrl || project.websiteUrl || '-'} readOnly className="h-9 font-semibold text-primary" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* 10. ANDROID TAB */}
+                <TabsContent value="android" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold flex items-center gap-2">
+                                <Smartphone className="h-5 w-5 text-emerald-500" /> Android App Tracker
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-xs font-medium">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Android Status</Label>
+                                    <Input value={project.androidStatus || 'not-started'} readOnly className="h-9 uppercase font-bold" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">App Version</Label>
+                                    <Input value={project.androidVersion || 'v1.0.0'} readOnly className="h-9 font-semibold" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Play Store Link</Label>
+                                    <Input value={project.androidAppUrl || '-'} readOnly className="h-9 font-semibold text-primary" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* 11. IOS TAB */}
+                <TabsContent value="ios" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold flex items-center gap-2">
+                                <Smartphone className="h-5 w-5 text-purple-500" /> iOS App Tracker
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-xs font-medium">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">iOS Status</Label>
+                                    <Input value={project.iosStatus || 'not-started'} readOnly className="h-9 uppercase font-bold" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">App Version</Label>
+                                    <Input value={project.iosVersion || 'v1.0.0'} readOnly className="h-9 font-semibold" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">App Store Link</Label>
+                                    <Input value={project.iosAppUrl || '-'} readOnly className="h-9 font-semibold text-primary" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* 12. QA BUGS TAB */}
+                <TabsContent value="bugs" className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-base font-bold">QA & Bug Tracker</h3>
+                        <Button size="sm" onClick={() => setNewBugDialogOpen(true)} className="h-8 text-xs font-bold">
+                            <Plus className="mr-1.5 h-3.5 w-3.5" /> Report Bug
+                        </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                        {bugs.map((b) => (
+                            <Card key={b._id || b.id} className="border border-border/60">
+                                <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant={b.severity === 'critical' ? 'destructive' : 'secondary'} className="uppercase text-[9px] font-black">
+                                                {b.severity}
+                                            </Badge>
+                                            <p className="font-bold text-sm text-foreground">{b.title}</p>
+                                        </div>
+                                        <p className="text-muted-foreground">{b.description}</p>
+                                    </div>
+
+                                    <Badge variant="outline" className="uppercase font-bold text-[9px] w-fit">
+                                        {b.status.replace('_', ' ')}
+                                    </Badge>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </TabsContent>
+
+                {/* 13. FILES TAB */}
                 <TabsContent value="files">
                     <Card>
                         <CardHeader>
                             <div className="flex justify-between items-center">
-                                <CardTitle>Files & Documents</CardTitle>
-                                {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
-                                    <Button size="sm" variant="outline" onClick={() => setFileDialogOpen(true)}>
-                                        <Paperclip className="mr-2 h-4 w-4" /> Add Important File
-                                    </Button>
-                                )}
+                                <CardTitle className="text-base font-bold">Files & Documents</CardTitle>
+                                <Button size="sm" variant="outline" onClick={() => setFileDialogOpen(true)} className="h-8 text-xs font-bold">
+                                    <Paperclip className="mr-1.5 h-3.5 w-3.5" /> Add File
+                                </Button>
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-2">
-                                {projectFiles.length === 0 ? (
-                                    <div className="text-center py-8 text-muted-foreground border-dashed border-2 rounded-xl">
-                                        No files uploaded yet.
-                                    </div>
-                                ) : (
-                                    projectFiles.map((file) => (
-                                        <div key={file.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded">
-                                                    <FileText className="h-4 w-4 text-blue-600" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium">{file.name}</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {(file.size / 1024 / 1024).toFixed(2)} MB • Uploaded {new Date(file.uploadedAt).toLocaleDateString()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Button variant="ghost" size="sm" onClick={() => setPreviewFile(file)} title="View Live">
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="sm" asChild title="Download">
-                                                    <a href={file.url} download target="_blank" rel="noopener noreferrer">
-                                                        <Download className="h-4 w-4" />
-                                                    </a>
-                                                </Button>
+                            <div className="space-y-2 text-xs font-medium">
+                                {projectFiles.map((file) => (
+                                    <div key={file.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                        <div className="flex items-center gap-3">
+                                            <FileText className="h-4 w-4 text-primary" />
+                                            <div>
+                                                <p className="font-bold text-foreground">{file.name}</p>
+                                                <p className="text-[10px] text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                                             </div>
                                         </div>
-                                    ))
-                                )}
+                                        <Button variant="ghost" size="sm" asChild>
+                                            <a href={file.url} download target="_blank" rel="noreferrer"><Download className="h-4 w-4" /></a>
+                                        </Button>
+                                    </div>
+                                ))}
                             </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
 
-                {['owner', 'admin', 'client'].includes(currentUser?.role) && (
-                    <TabsContent value="invoices">
-                        <Card>
-                            <CardHeader>
-                                <div className="flex justify-between items-center">
-                                    <CardTitle>Invoices</CardTitle>
-                                    {['owner', 'admin'].includes(currentUser?.role) && (
-                                        <Button size="sm" variant="outline"><Plus className="mr-2 h-4 w-4" /> Create Invoice</Button>
-                                    )}
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {projectInvoices.length === 0 ? (
-                                        <div className="text-center py-8 text-muted-foreground">No invoices generated for this project.</div>
-                                    ) : (
-                                        projectInvoices.map(inv => (
-                                            <div key={inv.id} className="flex justify-between items-center p-3 border rounded-lg">
-                                                <div>
-                                                    <div className="font-medium">{inv.invoiceNumber}</div>
-                                                    <div className="text-xs text-muted-foreground">{new Date(inv.date).toLocaleDateString()}</div>
-                                                </div>
-                                                <div className="flex items-center gap-4">
-                                                    <Badge variant={inv.status === 'paid' ? 'default' : 'secondary'}>{inv.status}</Badge>
-                                                    <span className="font-bold">{formatCurrency(inv.total)}</span>
-                                                    <Button variant="ghost" size="icon"><ExternalLink className="h-4 w-4" /></Button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                )}
-
-                <TabsContent value="chat">
-                    <Card className="min-h-[500px] flex flex-col backdrop-blur-sm border-2 animate-in fade-in duration-700">
+                {/* 14. AUDIT ACTIVITY LOG TAB */}
+                <TabsContent value="activities" className="space-y-4">
+                    <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <MessageCircle className="h-5 w-5 text-blue-600" />
-                                Project Collaboration Hub
-                            </CardTitle>
+                            <CardTitle className="text-base font-bold">Audit & Action History</CardTitle>
                         </CardHeader>
-                        <CardContent className="flex-1 flex flex-col justify-center items-center text-center p-12">
-                            <div className="h-24 w-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl shadow-xl shadow-blue-200 flex items-center justify-center mb-8 rotate-3 hover:rotate-0 transition-transform duration-500">
-                                <MessageSquare className="h-12 w-12 text-white" />
-                            </div>
-                            <h3 className="text-2xl font-black mb-3">Instant Team Synchronization</h3>
-                            <p className="text-muted-foreground text-sm max-w-[420px] mb-10 leading-relaxed">
-                                Experience seamless collaboration. Our dedicated project chat room connects all stakeholders—clients, project managers, and developers—in one unified space for real-time clarity.
-                            </p>
-                            <Button
-                                onClick={() => navigate('/project-chat')}
-                                size="lg"
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-10 h-14 rounded-2xl shadow-lg shadow-blue-200 font-bold text-lg group"
-                            >
-                                Enter Discussion Room
-                                <ChevronLeft className="ml-2 h-5 w-5 rotate-180 group-hover:translate-x-1 transition-transform" />
-                            </Button>
+                        <CardContent className="space-y-3">
+                            {activitiesLog.map((act) => (
+                                <div key={act._id || act.id} className="p-3 rounded-lg border bg-card text-xs font-medium space-y-1">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-bold text-foreground">{act.userName}</span>
+                                        <span className="text-[10px] text-muted-foreground">{new Date(act.createdAt).toLocaleString()}</span>
+                                    </div>
+                                    <p className="text-muted-foreground">{act.description}</p>
+                                </div>
+                            ))}
                         </CardContent>
                     </Card>
-                </TabsContent>
-
-                <TabsContent value="notes">
-                    <ProjectNotes projectId={project.id} />
-                </TabsContent>
-
-                <TabsContent value="credentials">
-                    <ProjectCredentials projectId={project.id} />
                 </TabsContent>
             </Tabs>
-            {/* File Preview Modal */}
-            <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
-                <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+
+            {/* Proof Submission Modal */}
+            <CheckpointProofDialog
+                open={proofDialogOpen}
+                onOpenChange={setProofDialogOpen}
+                checkpoint={selectedCpForProof}
+                onSubmitProof={async (proofData) => {
+                    if (selectedCpForProof) {
+                        await handleCheckpointUpdate(selectedCpForProof._id || selectedCpForProof.id, 'completed', proofData)
+                    }
+                }}
+            />
+
+            {/* Bug Report Modal */}
+            <Dialog open={newBugDialogOpen} onOpenChange={setNewBugDialogOpen}>
+                <DialogContent className="max-w-md rounded-xl font-sans">
                     <DialogHeader>
-                        <DialogTitle className="truncate pr-8">{previewFile?.name}</DialogTitle>
+                        <DialogTitle className="font-bold text-lg">Report QA Bug / Defect</DialogTitle>
                     </DialogHeader>
-                    <div className="flex-1 w-full bg-muted/30 rounded-md overflow-hidden relative flex items-center justify-center">
-                        {previewFile && (
-                            previewFile.type?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(previewFile.name.split('.').pop()?.toLowerCase() || '') ? (
-                                <img 
-                                    src={previewFile.url} 
-                                    alt={previewFile.name} 
-                                    className="max-w-full max-h-full object-contain" 
-                                />
-                            ) : previewFile.type === 'pdf' || previewFile.name.toLowerCase().endsWith('.pdf') ? (
-                                <iframe 
-                                    src={previewFile.url} 
-                                    className="w-full h-full border-0"
-                                    title={previewFile.name}
-                                />
-                            ) : (
-                                <div className="text-center p-8">
-                                    <FileText className="h-16 w-16 mx-auto text-muted-foreground opacity-50 mb-4" />
-                                    <h3 className="text-lg font-medium">No Live Preview Available</h3>
-                                    <p className="text-muted-foreground mb-4">This file type cannot be previewed in the browser.</p>
-                                    <Button asChild>
-                                        <a href={previewFile.url} target="_blank" rel="noopener noreferrer">
-                                            Download to View
-                                        </a>
-                                    </Button>
-                                </div>
-                            )
-                        )}
+                    <div className="space-y-3 py-2 text-xs">
+                        <div className="space-y-1">
+                            <Label className="font-bold">Title</Label>
+                            <Input placeholder="e.g. Login endpoint fails on invalid token" value={newBug.title} onChange={e => setNewBug({ ...newBug, title: e.target.value })} className="h-9" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="font-bold">Severity</Label>
+                            <Select value={newBug.severity} onValueChange={v => setNewBug({ ...newBug, severity: v })}>
+                                <SelectTrigger className="h-9 font-bold"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="critical" className="font-bold text-red-600">CRITICAL</SelectItem>
+                                    <SelectItem value="high" className="font-bold text-amber-600">HIGH</SelectItem>
+                                    <SelectItem value="medium" className="font-bold text-blue-600">MEDIUM</SelectItem>
+                                    <SelectItem value="low" className="font-bold text-gray-600">LOW</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="font-bold">Description</Label>
+                            <Textarea placeholder="Steps to reproduce..." value={newBug.description} onChange={e => setNewBug({ ...newBug, description: e.target.value })} className="min-h-[80px]" />
+                        </div>
                     </div>
+                    <DialogFooter>
+                        <Button size="sm" onClick={handleCreateBug} className="font-bold">Submit Bug</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Follow-up Schedule Modal */}
+            <Dialog open={newFollowUpDialogOpen} onOpenChange={setNewFollowUpDialogOpen}>
+                <DialogContent className="max-w-md rounded-xl font-sans">
+                    <DialogHeader>
+                        <DialogTitle className="font-bold text-lg">Schedule Client Follow-up</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2 text-xs">
+                        <div className="space-y-1">
+                            <Label className="font-bold">Follow-up Date & Time</Label>
+                            <Input type="datetime-local" value={newFollowUp.followUpDate} onChange={e => setNewFollowUp({ ...newFollowUp, followUpDate: e.target.value })} className="h-9" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="font-bold">Communication Type</Label>
+                            <Select value={newFollowUp.type} onValueChange={v => setNewFollowUp({ ...newFollowUp, type: v })}>
+                                <SelectTrigger className="h-9 font-bold"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="call" className="font-bold">Call</SelectItem>
+                                    <SelectItem value="whatsapp" className="font-bold">WhatsApp</SelectItem>
+                                    <SelectItem value="email" className="font-bold">Email</SelectItem>
+                                    <SelectItem value="meeting" className="font-bold">Meeting</SelectItem>
+                                    <SelectItem value="update" className="font-bold">Status Update</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="font-bold">Summary / Notes</Label>
+                            <Textarea placeholder="Client agenda or discussion points..." value={newFollowUp.summary} onChange={e => setNewFollowUp({ ...newFollowUp, summary: e.target.value })} className="min-h-[80px]" />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button size="sm" onClick={handleCreateFollowUp} className="font-bold">Save Follow-up</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

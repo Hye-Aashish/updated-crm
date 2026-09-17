@@ -68,8 +68,9 @@ export interface Client {
 }
 
 // Project Types
-export type ProjectType = 'website' | 'web-app' | 'ecommerce' | 'landing' | 'maintenance' | 'digital-product'
+export type ProjectType = 'website' | 'web-app' | 'mobile-app' | 'lms' | 'crm-erp' | 'ecommerce' | 'maintenance' | 'digital-product' | 'custom'
 export type ProjectStatus = 'planning' | 'in-progress' | 'review' | 'completed' | 'on-hold'
+export type ProjectHealth = 'green' | 'yellow' | 'red' | 'blue' | 'completed'
 export type PaymentModel = 'advance' | 'milestone' | 'retainer'
 
 export interface Milestone {
@@ -111,27 +112,175 @@ export interface ProjectCredential {
     createdAt: Date
 }
 
+export interface ProjectCheckpoint {
+    id?: string
+    _id?: string
+    projectId: string
+    phase: string
+    phaseOrder?: number
+    title: string
+    description?: string
+    order?: number
+    assignedTo?: string
+    assignedRole?: string
+    startDate?: Date | string
+    dueDate?: Date | string
+    completionDate?: Date | string
+    status: 'not_started' | 'in_progress' | 'blocked' | 'pending_review' | 'completed' | 'rejected' | 'overdue'
+    isMandatory: boolean
+    priority: 'low' | 'medium' | 'high' | 'urgent'
+    proofRequired?: boolean
+    proofType?: 'url' | 'build_file' | 'version' | 'transaction_ref' | 'screenshot' | 'any'
+    proofUrl?: string
+    proofFile?: string
+    proofVersion?: string
+    proofRef?: string
+    remarks?: string
+    dependencies?: (ProjectCheckpoint | string)[]
+    approvalRequired?: boolean
+    approvedBy?: string
+    approvedAt?: Date | string
+    rejectionReason?: string
+    createdAt?: Date | string
+}
+
+export interface ProjectBug {
+    id?: string
+    _id?: string
+    projectId: string
+    title: string
+    description: string
+    severity: 'critical' | 'high' | 'medium' | 'low'
+    priority: 'low' | 'medium' | 'high' | 'urgent'
+    assignedDeveloper?: string
+    status: 'open' | 'in_progress' | 'fixed' | 'retest_required' | 'closed'
+    attachment?: string
+    resolution?: string
+    createdBy: string
+    createdAt: Date | string
+}
+
+export interface ProjectActivityLog {
+    id?: string
+    _id?: string
+    projectId: string
+    userId: string
+    userName: string
+    action: string
+    description: string
+    createdAt: Date | string
+}
+
+export interface ProjectFollowUpRecord {
+    id?: string
+    _id?: string
+    projectId: string
+    type: 'call' | 'whatsapp' | 'email' | 'meeting' | 'update'
+    summary: string
+    clientResponse?: string
+    followUpDate: Date | string
+    status: 'pending' | 'completed'
+    createdBy: string
+    createdAt: Date | string
+}
+
+export interface ProjectTemplatePhase {
+    name: string
+    order: number
+    checkpoints: {
+        title: string
+        order: number
+        defaultRole?: string
+        defaultDurationDays?: number
+        priority?: 'low' | 'medium' | 'high' | 'urgent'
+        isMandatory?: boolean
+        proofRequired?: boolean
+        proofType?: 'url' | 'build_file' | 'version' | 'transaction_ref' | 'screenshot' | 'any'
+        approvalRequired?: boolean
+        dependencyIndices?: number[]
+    }[]
+}
+
+export interface ProjectTemplate {
+    id?: string
+    _id?: string
+    name: string
+    projectType: string
+    description?: string
+    phases: ProjectTemplatePhase[]
+    isSystemDefault?: boolean
+}
+
 export interface Project {
     id: string
+    _id?: string
     name: string
     clientId: string
-    clientProductId?: string // Added
+    clientProductId?: string
     type: ProjectType
     status: ProjectStatus
+    health?: ProjectHealth
     startDate: Date
     deadline: Date
-    dueDate: Date // Alias for deadline
+    dueDate: Date
     budget: number
+    advanceAmount?: number
+    milestoneAmount?: number
+    finalAmount?: number
+    paymentStatus?: 'paid' | 'partially-paid' | 'pending' | 'overdue'
     paymentModel: PaymentModel
     description: string
     milestones: Milestone[]
     pmId: string
-    members: string[] // Added for multi-user assignment
-    priority?: 'low' | 'medium' | 'high' | 'urgent' // Added
-    progress?: number // Progress percentage 0-100
-    autoInvoice?: boolean // Auto generate invoice on completion
-    notes?: ProjectNote[] // Added
-    credentials?: ProjectCredential[] // Added
+    members: string[]
+    developers?: string[]
+    designers?: string[]
+    priority?: 'low' | 'medium' | 'high' | 'urgent'
+    progress?: number
+    autoInvoice?: boolean
+    notes?: ProjectNote[]
+    credentials?: ProjectCredential[]
+
+    // Deliverables
+    websiteRequired?: boolean
+    websiteStatus?: 'not-started' | 'development' | 'testing' | 'ready' | 'deployed' | 'live' | 'down'
+    domain?: string
+    websiteUrl?: string
+    stagingUrl?: string
+    productionUrl?: string
+
+    androidRequired?: boolean
+    androidStatus?: 'not-started' | 'development' | 'build-generated' | 'testing' | 'production-build' | 'submitted' | 'live'
+    androidAppUrl?: string
+    androidVersion?: string
+    androidBuildNumber?: string
+
+    iosRequired?: boolean
+    iosStatus?: 'not-started' | 'development' | 'build-generated' | 'testing' | 'production-build' | 'submitted' | 'live'
+    iosAppUrl?: string
+    iosVersion?: string
+    iosBuildNumber?: string
+
+    adminPanelRequired?: boolean
+    apiRequired?: boolean
+    hostingRequired?: boolean
+    maintenanceRequired?: boolean
+
+    // Client Communication
+    lastClientUpdate?: Date | string
+    lastCallDate?: Date | string
+    lastWhatsAppDate?: Date | string
+    lastEmailDate?: Date | string
+    clientResponse?: string
+    nextFollowUpDate?: Date | string
+    followUpNotes?: string
+
+    // Handover & Approval
+    sourceCodeHandover?: boolean
+    credentialsHandover?: boolean
+    documentationHandover?: boolean
+    clientApproved?: boolean
+
     createdAt: Date
     updatedAt: Date
 }

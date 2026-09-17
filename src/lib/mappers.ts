@@ -4,26 +4,76 @@ export const mapProject = (p: any): Project => {
     if (!p) return {} as Project;
     return {
         id: p._id || p.id,
+        _id: p._id || p.id,
         name: p.name,
         description: p.description,
         clientId: p.clientId,
         clientProductId: p.clientProductId,
         status: p.status,
+        health: p.health || 'green',
         deadline: p.dueDate || p.deadline ? new Date(p.dueDate || p.deadline) : new Date(),
         dueDate: p.dueDate || p.deadline ? new Date(p.dueDate || p.deadline) : new Date(),
         budget: p.budget || 0,
-        type: p.type,
-        paymentModel: p.paymentModel,
+        advanceAmount: p.advanceAmount || 0,
+        milestoneAmount: p.milestoneAmount || 0,
+        finalAmount: p.finalAmount || 0,
+        paymentStatus: p.paymentStatus || 'pending',
+        type: p.type || 'custom',
+        paymentModel: p.paymentModel || 'milestone',
         progress: p.progress || 0,
         startDate: p.startDate ? new Date(p.startDate) : new Date(),
+        pmId: p.pmId || 'u2',
+        members: p.members || [],
+        developers: p.developers || [],
+        designers: p.designers || [],
+        priority: p.priority || 'medium',
+        autoInvoice: p.autoInvoice || false,
+
+        // Deliverables
+        websiteRequired: p.websiteRequired || false,
+        websiteStatus: p.websiteStatus || 'not-started',
+        domain: p.domain,
+        websiteUrl: p.websiteUrl,
+        stagingUrl: p.stagingUrl,
+        productionUrl: p.productionUrl,
+
+        androidRequired: p.androidRequired || false,
+        androidStatus: p.androidStatus || 'not-started',
+        androidAppUrl: p.androidAppUrl,
+        androidVersion: p.androidVersion,
+        androidBuildNumber: p.androidBuildNumber,
+
+        iosRequired: p.iosRequired || false,
+        iosStatus: p.iosStatus || 'not-started',
+        iosAppUrl: p.iosAppUrl,
+        iosVersion: p.iosVersion,
+        iosBuildNumber: p.iosBuildNumber,
+
+        adminPanelRequired: p.adminPanelRequired || false,
+        apiRequired: p.apiRequired || false,
+        hostingRequired: p.hostingRequired || false,
+        maintenanceRequired: p.maintenanceRequired || false,
+
+        // Client Communication
+        lastClientUpdate: p.lastClientUpdate ? new Date(p.lastClientUpdate) : undefined,
+        lastCallDate: p.lastCallDate ? new Date(p.lastCallDate) : undefined,
+        lastWhatsAppDate: p.lastWhatsAppDate ? new Date(p.lastWhatsAppDate) : undefined,
+        lastEmailDate: p.lastEmailDate ? new Date(p.lastEmailDate) : undefined,
+        clientResponse: p.clientResponse,
+        nextFollowUpDate: p.nextFollowUpDate ? new Date(p.nextFollowUpDate) : undefined,
+        followUpNotes: p.followUpNotes,
+
+        // Handover & Approval
+        sourceCodeHandover: p.sourceCodeHandover || false,
+        credentialsHandover: p.credentialsHandover || false,
+        documentationHandover: p.documentationHandover || false,
+        clientApproved: p.clientApproved || false,
+
         milestones: (p.milestones || []).map((m: any, i: number) => ({
             ...m,
             id: m._id ? m._id.toString() : (m.id || `m_${i}`),
             _id: m._id ? m._id.toString() : m.id
         })),
-        pmId: p.pmId || 'u2',
-        members: p.members || [],
-        priority: p.priority,
         createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
         updatedAt: p.updatedAt || p.createdAt ? new Date(p.updatedAt || p.createdAt) : new Date(),
         notes: p.notes ? p.notes.map((n: any) => ({

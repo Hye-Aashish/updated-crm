@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, LayoutGrid, List as ListIcon, Briefcase, CheckSquare, AlertTriangle, Layers, Calendar } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List as ListIcon, Briefcase, CheckSquare, AlertTriangle, Layers, Calendar, Globe, Smartphone, Shield, Clock, FileCode, ArrowUpRight, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -19,6 +20,9 @@ export function ProjectsPage() {
     const { canCreate } = usePermissions()
     const [view, setView] = useState<'grid' | 'list'>('grid')
     const [loading, setLoading] = useState(true)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [healthFilter, setHealthFilter] = useState<string>('all')
+    const [typeFilter, setTypeFilter] = useState<string>('all')
     const { projects, clients, invoices, currentUser, setProjects, setClients } = useAppStore()
 
     // Fetch Projects & Clients from API
@@ -41,178 +45,280 @@ export function ProjectsPage() {
         fetchData()
     }, [setProjects, setClients])
 
-    // --- Date Filter Logic ---
-    const today = new Date()
-    const startOfYear = new Date(today.getFullYear(), 0, 1)
-    const endOfYear = new Date(today.getFullYear(), 11, 31)
-
-    const formatDateForInput = (d: Date) => d.toISOString().split('T')[0]
-
-    const [dateRange, setDateRange] = useState({
-        start: formatDateForInput(startOfYear),
-        end: formatDateForInput(endOfYear)
-    })
-
-    const handleDateChange = (key: 'start' | 'end', value: string) => {
-        setDateRange(prev => ({ ...prev, [key]: value }))
-    }
-
-    const isDateInFilter = (dateStr: Date) => {
-        if (!dateStr) return false
-        const date = new Date(dateStr)
-        const start = new Date(dateRange.start)
-        const end = new Date(dateRange.end)
-        end.setHours(23, 59, 59, 999)
-        return date >= start && date <= end
-    }
-
-    // --- KPI Calculations (Comprehensive) ---
-    // Count based on all projects to avoid '0' issue while filter is loading or restrictive
+    // Metrics Calculations
     const totalProjects = projects.length
     const activeProjects = projects.filter(p => ['in-progress', 'planning', 'on-hold'].includes(p.status)).length
     const completedProjects = projects.filter(p => p.status === 'completed').length
-    const delayedProjects = projects.filter(p => {
-        if (p.status === 'completed') return false
-        return p.dueDate && new Date(p.dueDate) < new Date()
-    }).length
-
-    // Projects to display in the grid (can be filtered by date if needed)
-    const displayProjects = projects.filter(p => {
-        // Only apply date filter if not showing all
-        return isDateInFilter(p.startDate) || isDateInFilter(p.createdAt)
-    })
+    const delayedProjects = projects.filter(p => p.health === 'red' || (p.dueDate && new Date(p.dueDate) < new Date() && p.status !== 'completed')).length
+    const atRiskProjects = projects.filter(p => p.health === 'yellow').length
     
+    const websitesLive = projects.filter(p => p.websiteStatus === 'live' || !!p.websiteUrl).length
+    const androidAppsLive = projects.filter(p => p.androidStatus === 'live' || !!p.androidAppUrl).length
+    const iosAppsLive = projects.filter(p => p.iosStatus === 'live' || !!p.iosAppUrl).length
+
+    // Filter Logic
+    const filteredProjects = projects.filter(p => {
+        const matchesSearch = !searchQuery || 
+            p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            p.type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            clients.find(c => c.id === p.clientId)?.company.toLowerCase().includes(searchQuery.toLowerCase())
+        
+        const matchesHealth = healthFilter === 'all' || p.health === healthFilter
+        const matchesType = typeFilter === 'all' || p.type === typeFilter
+
+        return matchesSearch && matchesHealth && matchesType
+    })
+
     if (loading && projects.length === 0) {
         return <PageSkeleton />
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 font-sans pb-10">
+            {/* Page Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Projects</h1>
-                    <p className="text-sm text-muted-foreground mt-1">Manage and track all ongoing projects.</p>
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Project Management Dashboard</h1>
+                    <p className="text-sm text-muted-foreground mt-1 font-medium">Track development progress, automated checkpoints, health indicators, and live deliverables.</p>
                 </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <div className="flex items-center gap-2 bg-muted/40 p-2 rounded-lg border overflow-x-auto whitespace-nowrap">
-                        <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <Input
-                            type="date"
-                            className="h-8 w-[130px] bg-background border-none shadow-none text-xs md:text-sm p-1"
-                            value={dateRange.start}
-                            onChange={(e) => handleDateChange('start', e.target.value)}
-                        />
-                        <span className="text-muted-foreground text-xs">-</span>
-                        <Input
-                            type="date"
-                            className="h-8 w-[130px] bg-background border-none shadow-none text-xs md:text-sm p-1"
-                            value={dateRange.end}
-                            onChange={(e) => handleDateChange('end', e.target.value)}
-                        />
-                    </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => navigate('/projects/developer-dashboard')} className="h-9 font-bold text-xs">
+                        <FileCode className="mr-1.5 h-4 w-4 text-primary" /> Developer Workspace
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => navigate('/projects/templates')} className="h-9 font-bold text-xs">
+                        <Layers className="mr-1.5 h-4 w-4 text-primary" /> Templates Engine
+                    </Button>
                     {canCreate('projects') && (
-                        <Button onClick={() => navigate('/projects/new')} className="h-10">
-                            <Plus className="mr-1 h-4 w-4" /> New Project
+                        <Button onClick={() => navigate('/projects/new')} className="h-9 font-bold text-xs">
+                            <Plus className="mr-1.5 h-4 w-4" /> New Project
                         </Button>
                     )}
                 </div>
             </div>
 
-            {/* --- Module Specific KPIs --- */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatsCard title="Total Projects" value={totalProjects} icon={Briefcase} color="#8b5cf6" bg="bg-purple-50" />
-                <StatsCard title="Active" value={activeProjects} icon={Layers} color="#0ea5e9" bg="bg-sky-50" />
-                <StatsCard title="Completed" value={completedProjects} icon={CheckSquare} color="#22c55e" bg="bg-green-50" />
-                <StatsCard title="Delayed" value={delayedProjects} icon={AlertTriangle} color="#ef4444" bg="bg-red-50" />
+            {/* Comprehensive SaaS Dashboard KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <StatsCard title="Total Projects" value={totalProjects} icon={Briefcase} color="#8b5cf6" bg="bg-purple-50 dark:bg-purple-950/20" />
+                <StatsCard title="Active Projects" value={activeProjects} icon={Layers} color="#0ea5e9" bg="bg-sky-50 dark:bg-sky-950/20" />
+                <StatsCard title="Completed" value={completedProjects} icon={CheckSquare} color="#22c55e" bg="bg-green-50 dark:bg-green-950/20" />
+                <StatsCard title="Delayed (Red)" value={delayedProjects} icon={AlertTriangle} color="#ef4444" bg="bg-red-50 dark:bg-red-950/20" />
+                <StatsCard title="At Risk (Yellow)" value={atRiskProjects} icon={Clock} color="#eab308" bg="bg-amber-50 dark:bg-amber-950/20" />
+                <StatsCard title="Websites Live" value={websitesLive} icon={Globe} color="#3b82f6" bg="bg-blue-50 dark:bg-blue-950/20" />
             </div>
 
-            {/* --- Filters & Search --- */}
-            <div className="flex items-center gap-4">
-                <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input placeholder="Search projects..." className="pl-10" />
+            {/* Filters & Search Toolbar */}
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="relative flex-1 w-full">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by project name, type, or client..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 h-9 text-xs rounded-lg bg-card"
+                    />
                 </div>
-                <div className="flex bg-muted rounded-md p-1">
-                    <Button
-                        variant={view === 'grid' ? 'secondary' : 'ghost'}
-                        size="sm"
-                        onClick={() => setView('grid')}
-                    >
-                        <LayoutGrid className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant={view === 'list' ? 'secondary' : 'ghost'}
-                        size="sm"
-                        onClick={() => setView('list')}
-                    >
-                        <ListIcon className="h-4 w-4" />
-                    </Button>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Select value={healthFilter} onValueChange={setHealthFilter}>
+                        <SelectTrigger className="h-9 w-[140px] text-xs font-semibold bg-card">
+                            <SelectValue placeholder="Health Filter" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs font-semibold">All Health</SelectItem>
+                            <SelectItem value="green" className="text-xs font-semibold text-emerald-600">🟢 On Track</SelectItem>
+                            <SelectItem value="yellow" className="text-xs font-semibold text-amber-600">🟡 At Risk</SelectItem>
+                            <SelectItem value="red" className="text-xs font-semibold text-red-600">🔴 Delayed</SelectItem>
+                            <SelectItem value="blue" className="text-xs font-semibold text-blue-600">🔵 On Hold</SelectItem>
+                            <SelectItem value="completed" className="text-xs font-semibold text-gray-600">🏁 Completed</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                        <SelectTrigger className="h-9 w-[140px] text-xs font-semibold bg-card">
+                            <SelectValue placeholder="Type Filter" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs font-semibold">All Types</SelectItem>
+                            <SelectItem value="website" className="text-xs font-semibold">Website</SelectItem>
+                            <SelectItem value="mobile-app" className="text-xs font-semibold">Mobile App</SelectItem>
+                            <SelectItem value="lms" className="text-xs font-semibold">LMS</SelectItem>
+                            <SelectItem value="crm-erp" className="text-xs font-semibold">CRM / ERP</SelectItem>
+                            <SelectItem value="ecommerce" className="text-xs font-semibold">E-Commerce</SelectItem>
+                            <SelectItem value="custom" className="text-xs font-semibold">Custom</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <div className="flex bg-muted rounded-lg p-1 border">
+                        <Button
+                            variant={view === 'grid' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setView('grid')}
+                            className="h-7 w-7 p-0"
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant={view === 'list' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setView('list')}
+                            className="h-7 w-7 p-0"
+                        >
+                            <ListIcon className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
             </div>
 
-            {/* --- Projects Grid --- */}
-            <div className={view === 'grid' ? 'grid gap-6 md:grid-cols-2 lg:grid-cols-3' : 'space-y-4'}>
-                {displayProjects.map((project) => {
-                    const client = clients.find((c) => c.id === project.clientId)
-                    return (
-                        <Card key={project.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
-                            <CardHeader className="pb-3">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <CardTitle className="text-base font-semibold">{project.name}</CardTitle>
-                                        <p className="text-sm text-muted-foreground mt-1">{client?.company || 'Unknown Client'}</p>
-                                    </div>
-                                    <Badge variant={project.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
-                                        {project.status}
-                                    </Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div>
-                                        <div className="flex justify-between text-sm mb-2">
-                                            <span className="text-muted-foreground">Progress</span>
-                                            <span className="font-medium">{project.progress || 0}%</span>
+            {/* Projects Presentation */}
+            {view === 'grid' ? (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredProjects.map((project) => {
+                        const client = clients.find((c) => c.id === project.clientId)
+                        const health = project.health || 'green'
+
+                        return (
+                            <Card 
+                                key={project.id || project._id} 
+                                className="hover:shadow-md transition-all cursor-pointer border-border/60 bg-card hover:border-primary/50 flex flex-col justify-between"
+                                onClick={() => navigate(`/projects/${project.id || project._id}`)}
+                            >
+                                <CardHeader className="pb-3">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                                    health === 'green' ? 'bg-emerald-500' :
+                                                    health === 'yellow' ? 'bg-amber-500 animate-pulse' :
+                                                    health === 'red' ? 'bg-red-500 animate-pulse' :
+                                                    health === 'blue' ? 'bg-blue-500' : 'bg-gray-400'
+                                                }`} title={`Health: ${health}`} />
+                                                <CardTitle className="text-base font-bold text-foreground hover:text-primary transition-colors line-clamp-1">
+                                                    {project.name}
+                                                </CardTitle>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground font-semibold">{client?.company || client?.name || 'Client'}</p>
                                         </div>
-                                        <Progress value={project.progress || 0} className="h-2" />
+
+                                        <Badge variant="outline" className="text-[9px] font-black uppercase tracking-wider text-primary border-primary/30">
+                                            {project.type || 'Custom'}
+                                        </Badge>
+                                    </div>
+                                </CardHeader>
+
+                                <CardContent className="space-y-4 pt-0">
+                                    {/* Progress Bar */}
+                                    <div>
+                                        <div className="flex justify-between text-xs mb-1.5 font-bold">
+                                            <span className="text-muted-foreground">Completion</span>
+                                            <span className="text-primary">{project.progress || 0}%</span>
+                                        </div>
+                                        <Progress value={project.progress || 0} className="h-2 rounded-full" />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        {['owner', 'pm', 'client'].includes(currentUser?.role) ? (
-                                            <>
-                                                <div>
-                                                    <p className="text-muted-foreground text-xs">Budget</p>
-                                                    <p className="font-medium">{formatCurrency(project.budget)}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-muted-foreground text-xs">Paid</p>
-                                                    <p className="font-medium text-emerald-600">
-                                                        {formatCurrency((invoices || []).filter(i => i.projectId === project.id && i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0))}
-                                                    </p>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div>
-                                                    <p className="text-muted-foreground text-xs">Start Date</p>
-                                                    <p className="font-medium">{formatDate(project.startDate)}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-muted-foreground text-xs">Deadline</p>
-                                                    <p className="font-medium">{formatDate(project.dueDate)}</p>
-                                                </div>
-                                            </>
+                                    {/* Deliverable Status Pills */}
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {project.websiteRequired && (
+                                            <Badge variant="secondary" className="text-[9px] font-bold flex items-center gap-1 bg-blue-500/10 text-blue-700 dark:text-blue-300">
+                                                <Globe className="h-3 w-3" /> Web: {project.websiteStatus || 'Dev'}
+                                            </Badge>
+                                        )}
+                                        {project.androidRequired && (
+                                            <Badge variant="secondary" className="text-[9px] font-bold flex items-center gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                                                <Smartphone className="h-3 w-3" /> Android: {project.androidStatus || 'Dev'}
+                                            </Badge>
+                                        )}
+                                        {project.iosRequired && (
+                                            <Badge variant="secondary" className="text-[9px] font-bold flex items-center gap-1 bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                                                <Smartphone className="h-3 w-3" /> iOS: {project.iosStatus || 'Dev'}
+                                            </Badge>
                                         )}
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )
-                })}
-            </div>
+
+                                    {/* Budget & Due Date */}
+                                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-border/20 font-medium">
+                                        <div>
+                                            <p className="text-muted-foreground text-[10px] uppercase font-bold">Budget</p>
+                                            <p className="font-bold text-foreground">{formatCurrency(project.budget)}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-muted-foreground text-[10px] uppercase font-bold">Deadline</p>
+                                            <p className="font-bold text-foreground">{formatDate(project.dueDate || project.deadline)}</p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                </div>
+            ) : (
+                /* List View Table */
+                <div className="bg-card border border-border/60 rounded-xl overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-muted/40 text-[11px] uppercase font-bold tracking-wider text-muted-foreground border-b border-border/40">
+                                <tr>
+                                    <th className="px-6 py-3.5">Project & Client</th>
+                                    <th className="px-6 py-3.5">Health</th>
+                                    <th className="px-6 py-3.5">Progress</th>
+                                    <th className="px-6 py-3.5">Deliverables</th>
+                                    <th className="px-6 py-3.5">Budget</th>
+                                    <th className="px-6 py-3.5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/30 text-xs font-medium">
+                                {filteredProjects.map((p) => {
+                                    const client = clients.find(c => c.id === p.clientId)
+                                    const health = p.health || 'green'
+
+                                    return (
+                                        <tr key={p.id || p._id} className="hover:bg-accent/5 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id || p._id}`)}>
+                                            <td className="px-6 py-3.5">
+                                                <div className="font-bold text-sm text-foreground">{p.name}</div>
+                                                <div className="text-muted-foreground">{client?.company || client?.name || 'Client'} • {p.type || 'Custom'}</div>
+                                            </td>
+                                            <td className="px-6 py-3.5">
+                                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                                                    health === 'green' ? 'bg-emerald-500/10 text-emerald-600' :
+                                                    health === 'yellow' ? 'bg-amber-500/10 text-amber-600' :
+                                                    health === 'red' ? 'bg-red-500/10 text-red-600' : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                    ● {health}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-3.5">
+                                                <div className="w-32 space-y-1">
+                                                    <div className="flex justify-between text-[10px] font-bold">
+                                                        <span>{p.progress || 0}%</span>
+                                                    </div>
+                                                    <Progress value={p.progress || 0} className="h-1.5" />
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3.5">
+                                                <div className="flex items-center gap-1">
+                                                    {p.websiteRequired && <Globe className="h-3.5 w-3.5 text-blue-500" title="Website" />}
+                                                    {p.androidRequired && <Smartphone className="h-3.5 w-3.5 text-emerald-500" title="Android" />}
+                                                    {p.iosRequired && <Smartphone className="h-3.5 w-3.5 text-purple-500" title="iOS" />}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3.5 font-bold text-foreground">
+                                                {formatCurrency(p.budget)}
+                                            </td>
+                                            <td className="px-6 py-3.5 text-right">
+                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+                                                    <ArrowUpRight className="h-4 w-4" />
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
-
 
 export default ProjectsPage

@@ -30,6 +30,8 @@ const ProjectsPage = lazy(() => import('./pages/projects').then(m => ({ default:
 const NewProjectPage = lazy(() => import('./pages/projects/new').then(m => ({ default: m.NewProjectPage })))
 const ProjectDetailPage = lazy(() => import('./pages/projects/[id]').then(m => ({ default: m.ProjectDetailPage })))
 const EditProjectPage = lazy(() => import('./pages/projects/edit').then(m => ({ default: m.EditProjectPage })))
+const DeveloperDashboardPage = lazy(() => import('./pages/projects/developer-dashboard').then(m => ({ default: m.DeveloperDashboardPage })))
+const ProjectTemplatesPage = lazy(() => import('./pages/projects/templates').then(m => ({ default: m.ProjectTemplatesPage })))
 const ProductsPage = lazy(() => import('./pages/products').then(m => ({ default: m.ProductsPage })))
 
 const TasksPage = lazy(() => import('./pages/tasks').then(m => ({ default: m.TasksPage })))
@@ -133,6 +135,8 @@ export function AppRoutes() {
 
                     <Route path="projects" element={<PermissionGuard module="projects"><ProjectsPage /></PermissionGuard>} />
                     <Route path="projects/new" element={<PermissionGuard module="projects"><NewProjectPage /></PermissionGuard>} />
+                    <Route path="projects/developer-dashboard" element={<PermissionGuard module="projects"><DeveloperDashboardPage /></PermissionGuard>} />
+                    <Route path="projects/templates" element={<PermissionGuard module="projects"><ProjectTemplatesPage /></PermissionGuard>} />
                     <Route path="projects/:id" element={<PermissionGuard module="projects"><ProjectDetailPage /></PermissionGuard>} />
                     <Route path="projects/:id/edit" element={<PermissionGuard module="projects"><EditProjectPage /></PermissionGuard>} />
 

@@ -166,6 +166,7 @@ app.use((req, res, next) => {
 // Routes Registration
 const routes = {
     projects: require('./routes/projectRoutes'),
+    'project-templates': require('./routes/projectTemplateRoutes'),
     clients: require('./routes/clientRoutes'),
     users: require('./routes/userRoutes'),
     tasks: require('./routes/taskRoutes'),
