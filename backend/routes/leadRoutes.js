@@ -54,6 +54,26 @@ router.delete('/stages/:id', protect, authorize('admin', 'owner'), async (req, r
 });
 
 
+const isAuthorizedForLead = async (user, lead) => {
+    if (!lead) return false;
+    if (user.role === 'admin' || user.role === 'owner') return true;
+
+    // Unassigned lead OR assigned to current user
+    if (!lead.assignedTo || lead.assignedTo === user._id.toString()) return true;
+
+    // Check if role has view_all permissions in DB
+    try {
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const userRoleConfig = settings?.roles?.find(r => r.name === user.role);
+        if (userRoleConfig?.permissions?.leads?.view_all || userRoleConfig?.permissions?.dashboard?.scope?.view_all) {
+            return true;
+        }
+    } catch (e) { }
+
+    return false;
+};
+
 // --- LEADS ROUTES ---
 
 // GET all leads
@@ -66,7 +86,14 @@ router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
 
         let filter = {};
         if (!canViewAll) {
-            filter = { assignedTo: req.user._id.toString() };
+            filter = {
+                $or: [
+                    { assignedTo: req.user._id.toString() },
+                    { assignedTo: { $exists: false } },
+                    { assignedTo: null },
+                    { assignedTo: "" }
+                ]
+            };
         }
         const leads = await Lead.find(filter).sort({ createdAt: -1 });
         res.json(leads);
@@ -81,7 +108,7 @@ router.post('/', protect, checkPermission('leads', 'create'), async (req, res) =
         // Whitelist allowed fields to prevent mass assignment
         const allowedFields = ['name', 'company', 'email', 'phone', 'value', 'source', 'stage',
             'assignedTo', 'notes', 'customFields', 'reminder', 'tags', 'website', 'address',
-            'industry', 'designation', 'description'];
+            'industry', 'designation', 'description', 'project'];
         const safeData = {};
         allowedFields.forEach(f => { if (req.body[f] !== undefined) safeData[f] = req.body[f]; });
         const lead = new Lead(safeData);
@@ -104,14 +131,15 @@ router.post('/', protect, checkPermission('leads', 'create'), async (req, res) =
     }
 });
 
-// UPDATE lead
+// GET lead by id
 router.get('/:id', protect, async (req, res) => {
     try {
         const lead = await Lead.findById(req.params.id);
         if (!lead) return res.status(404).json({ message: 'Lead not found' });
 
-        if (req.user.role !== 'admin' && req.user.role !== 'owner' && lead.assignedTo !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Not authorized' });
+        const canAccess = await isAuthorizedForLead(req.user, lead);
+        if (!canAccess) {
+            return res.status(403).json({ message: 'Not authorized for this lead' });
         }
         res.json(lead);
     } catch (err) {
@@ -119,19 +147,21 @@ router.get('/:id', protect, async (req, res) => {
     }
 });
 
+// UPDATE lead
 router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) => {
     try {
         const lead = await Lead.findById(req.params.id);
         if (!lead) return res.status(404).json({ message: 'Lead not found' });
 
-        if (req.user.role !== 'admin' && req.user.role !== 'owner' && lead.assignedTo !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Not authorized' });
+        const canAccess = await isAuthorizedForLead(req.user, lead);
+        if (!canAccess) {
+            return res.status(403).json({ message: 'Not authorized to edit this lead' });
         }
 
         // Whitelist allowed update fields
         const allowedFields = ['name', 'company', 'email', 'phone', 'value', 'source', 'stage',
             'assignedTo', 'notes', 'customFields', 'reminder', 'tags', 'website', 'address',
-            'industry', 'designation', 'description', 'lostReason'];
+            'industry', 'designation', 'description', 'lostReason', 'project'];
         const safeData = {};
         allowedFields.forEach(f => { if (req.body[f] !== undefined) safeData[f] = req.body[f]; });
 
@@ -158,8 +188,9 @@ router.post('/:id/activities', protect, async (req, res) => {
         const lead = await Lead.findById(req.params.id);
         if (!lead) return res.status(404).json({ message: 'Lead not found' });
 
-        if (req.user.role !== 'admin' && req.user.role !== 'owner' && lead.assignedTo !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Not authorized' });
+        const canAccess = await isAuthorizedForLead(req.user, lead);
+        if (!canAccess) {
+            return res.status(403).json({ message: 'Not authorized to add activities to this lead' });
         }
 
         lead.activities.push({
@@ -172,7 +203,7 @@ router.post('/:id/activities', protect, async (req, res) => {
         try {
             const { analyzeLeadPriorityAndExtractReminder } = require('../services/aiService');
             const aiResult = await analyzeLeadPriorityAndExtractReminder(lead.activities, req.body.clientTime);
-            
+
             lead.aiPriority = aiResult.priority;
             lead.aiPriorityReason = aiResult.reason;
 

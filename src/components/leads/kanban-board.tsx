@@ -2,8 +2,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Trash2, ExternalLink, Users, Star } from 'lucide-react'
+import { MoreHorizontal, Trash2, ExternalLink, Users, Star, Clock, Folder } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { getLeadFollowUpInfo } from '@/lib/followup-utils'
+import { format } from 'date-fns'
 import type { Lead, PipelineStage } from '@/types'
 
 interface KanbanBoardProps {
@@ -48,77 +50,98 @@ export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, o
 
                             {/* Cards Container */}
                             <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar">
-                                {stageLeads.map((lead) => (
-                                    <Card
-                                        key={lead.id}
-                                        draggable
-                                        onDragStart={() => onDragStart(lead)}
-                                        onClick={() => onLeadClick(lead)}
-                                        className={`dashboard-card cursor-grab active:cursor-grabbing group border border-l-4 transition-all duration-300 ${
-                                            lead.aiPriority === 'green'
-                                                ? 'border-emerald-500/30 border-l-emerald-500 bg-emerald-500/[0.02] dark:bg-emerald-500/[0.01] hover:bg-emerald-500/[0.04]'
-                                                : lead.aiPriority === 'yellow'
-                                                ? 'border-yellow-500/30 border-l-yellow-500 bg-yellow-500/[0.02] dark:bg-yellow-500/[0.01] hover:bg-yellow-500/[0.04]'
-                                                : 'border-red-500/30 border-l-red-500 bg-red-500/[0.02] dark:bg-red-500/[0.01] hover:bg-red-500/[0.04]'
-                                        }`}
-                                    >
-                                        <CardContent className="p-4 relative">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="font-bold text-sm text-foreground tracking-tight group-hover:text-primary transition-colors pr-6">
-                                                    {lead.company}
-                                                </div>
-                                                <div className="flex items-center gap-0.5 mt-1" title={`${lead.rating || 0} Stars`}>
-                                                    {[1, 2, 3, 4, 5].map(star => (
-                                                        <Star key={star} className={`h-3 w-3 ${star <= (lead.rating || 0) ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground/30'}`} />
-                                                    ))}
-                                                </div>
-                                                <div className="absolute top-3 right-3">
-                                                    <DropdownMenu modal={false}>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted" onClick={(e) => e.stopPropagation()}>
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-40">
-                                                            <DropdownMenuItem className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); onLeadClick(lead); }}>
-                                                                <ExternalLink className="mr-2 h-3 w-3" /> View Details
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem className="text-xs text-destructive focus:text-destructive cursor-pointer" onClick={(e) => { e.stopPropagation(); onDeleteLead(lead.id); }}>
-                                                                <Trash2 className="mr-2 h-3 w-3" /> Delete Lead
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </div>
+                                {stageLeads.map((lead) => {
+                                    const followUpInfo = getLeadFollowUpInfo(lead.reminder)
+                                    const borderClass = followUpInfo.status !== 'none' 
+                                        ? `${followUpInfo.borderLeft} ${followUpInfo.cardBg}` 
+                                        : lead.aiPriority === 'green'
+                                        ? 'border-emerald-500/30 border-l-emerald-500 bg-emerald-500/[0.02]'
+                                        : lead.aiPriority === 'yellow'
+                                        ? 'border-yellow-500/30 border-l-yellow-500 bg-yellow-500/[0.02]'
+                                        : 'border-red-500/30 border-l-red-500 bg-red-500/[0.02]'
 
-                                            <div className="space-y-3">
-                                                <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-2">
-                                                    <Users className="h-3 w-3" />
-                                                    {lead.name}
-                                                </div>
-                                                
-                                                {lead.tags && lead.tags.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                        {lead.tags.map(tag => (
-                                                            <span key={tag} className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary/80 text-secondary-foreground border border-border/20">
-                                                                {tag}
-                                                            </span>
+                                    return (
+                                        <Card
+                                            key={lead.id}
+                                            draggable
+                                            onDragStart={() => onDragStart(lead)}
+                                            onClick={() => onLeadClick(lead)}
+                                            className={`dashboard-card cursor-grab active:cursor-grabbing group border transition-all duration-300 ${borderClass}`}
+                                        >
+                                            <CardContent className="p-4 relative">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="font-bold text-sm text-foreground tracking-tight group-hover:text-primary transition-colors pr-6">
+                                                        {lead.company}
+                                                    </div>
+                                                    <div className="flex items-center gap-0.5 mt-1" title={`${lead.rating || 0} Stars`}>
+                                                        {[1, 2, 3, 4, 5].map(star => (
+                                                            <Star key={star} className={`h-3 w-3 ${star <= (lead.rating || 0) ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground/30'}`} />
                                                         ))}
                                                     </div>
-                                                )}
-
-                                                <div className="flex items-center justify-between pt-3 border-t border-border/10">
-                                                    <span className="text-base font-bold text-foreground">{formatCurrency(lead.value)}</span>
-                                                    {lead.source && (
-                                                        <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 border-primary/20 bg-primary/5 text-primary rounded-md">
-                                                            {lead.source}
-                                                        </Badge>
-                                                    )}
+                                                    <div className="absolute top-3 right-3">
+                                                        <DropdownMenu modal={false}>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted" onClick={(e) => e.stopPropagation()}>
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" className="w-40">
+                                                                <DropdownMenuItem className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); onLeadClick(lead); }}>
+                                                                    <ExternalLink className="mr-2 h-3 w-3" /> View Details
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem className="text-xs text-destructive focus:text-destructive cursor-pointer" onClick={(e) => { e.stopPropagation(); onDeleteLead(lead.id); }}>
+                                                                    <Trash2 className="mr-2 h-3 w-3" /> Delete Lead
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
+
+                                                <div className="space-y-3">
+                                                    <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-2">
+                                                        <Users className="h-3 w-3" />
+                                                        {lead.name}
+                                                    </div>
+
+                                                    {lead.project && (
+                                                        <div className="text-[11px] font-semibold text-primary flex items-center gap-1.5">
+                                                            <Folder className="h-3 w-3 shrink-0" />
+                                                            <span className="truncate">{lead.project}</span>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {lead.reminder?.date && (
+                                                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold border ${followUpInfo.badgeBg} ${followUpInfo.badgeText} ${followUpInfo.badgeBorder} w-fit`}>
+                                                            <Clock className="h-3 w-3 shrink-0" />
+                                                            <span className="truncate">
+                                                                {followUpInfo.label}: {format(new Date(lead.reminder.date), 'MMM d, h:mm a')}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    {lead.tags && lead.tags.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {lead.tags.map(tag => (
+                                                                <span key={tag} className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary/80 text-secondary-foreground border border-border/20">
+                                                                    {tag}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-center justify-between pt-3 border-t border-border/10">
+                                                        <span className="text-base font-bold text-foreground">{formatCurrency(lead.value)}</span>
+                                                        {lead.source && (
+                                                            <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 border-primary/20 bg-primary/5 text-primary rounded-md">
+                                                                {lead.source}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )
+                                })}
                                 {stageLeads.length === 0 && (
                                     <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-border/40 rounded-lg bg-muted/5">
                                         <span className="text-[10px] font-medium text-muted-foreground">No leads in this stage</span>

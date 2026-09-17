@@ -14,7 +14,7 @@ router.get('/', protect, async (req, res) => {
             // Full data for admins
             const users = await query.select('-password');
             res.json(users);
-        } else if (['pm', 'developer', 'employee'].includes(userRole)) {
+        } else if (userRole !== 'client') {
             // Limited data for other staff for assignment purposes
             const users = await query.select('name email role avatar designation department');
             res.json(users);

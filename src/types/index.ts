@@ -291,6 +291,7 @@ export interface Lead {
     stage: string
     email?: string
     phone?: string
+    project?: string
     rating?: number
     customFields?: Record<string, string>
     activities?: LeadActivity[]

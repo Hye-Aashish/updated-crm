@@ -147,6 +147,7 @@ export const mapLead = (l: any): Lead => {
         stage: l.stage,
         email: l.email,
         phone: l.phone,
+        project: l.project,
         customFields: l.customFields || {},
         activities: l.activities || [],
         reminder: l.reminder,

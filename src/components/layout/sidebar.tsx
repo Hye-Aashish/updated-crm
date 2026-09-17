@@ -91,8 +91,13 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
 
             // Permissions Logic
             if (currentUser?.role && currentUser.role !== 'owner' && res.data.roles) {
-                const role = res.data.roles.find((r: any) => r.name === currentUser.role)
-                if (role) setPermissions(role.permissions)
+                const userRole = (currentUser.role || '').toLowerCase().replace(/[\s_]+/g, '');
+                const role = res.data.roles.find((r: any) => {
+                    const rName = (r.name || '').toLowerCase().replace(/[\s_]+/g, '');
+                    const rLabel = (r.label || '').toLowerCase().replace(/[\s_]+/g, '');
+                    return rName === userRole || rLabel === userRole;
+                });
+                if (role) setPermissions(role.permissions || {});
             }
         }).catch(err => console.error("Logo fetch error", err))
     }, [currentUser])
@@ -132,7 +137,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         { name: 'Settings', href: '/settings', icon: Settings },
     ]
     const filteredItems = navItems.filter(item => {
-        if (currentUser?.role === 'owner') return true
+        if (currentUser?.role === 'owner' || currentUser?.role === 'admin') return true
 
         // Hardcoded restrictions for client role to ensure security
         if (currentUser?.role === 'client') {
@@ -160,9 +165,13 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Screen Monitoring': return !!p.screen_monitoring?.view
             case 'Clients': return !!p.clients?.view
             case 'Projects': return !!p.projects?.view
-            case 'Digital Products': return !!p.projects?.view // Fallback to projects permission for now, or true for owner
+            case 'Digital Products': return !!p.projects?.view
             case 'Tasks': return !!p.tasks?.view
             case 'Team': return !!p.team?.view
+            case 'Capacity Planning': return !!(p.capacity?.view || p.team?.view)
+            case 'Approvals': return !!(p.approvals?.view || p.payroll?.view)
+            case 'Email Campaigns': return !!(p.campaigns?.view || p.leads?.view)
+            case 'Goals & OKRs': return !!(p.goals?.view || p.projects?.view)
             case 'Offer Letters': return !!p.team?.view
             case 'Attendance': return !!p.attendance?.view
             case 'Time Tracking': return !!p.time_tracking?.view
@@ -183,7 +192,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Settings': return !!p.settings?.view
             case 'Roles & Permissions': return !!p.roles?.view
             case 'AI Assistant': return !!p.ai_assistant?.use
-            default: return true
+            default: return false
         }
     })
 

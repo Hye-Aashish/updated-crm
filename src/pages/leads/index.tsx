@@ -17,6 +17,7 @@ import { LeadFormBuilder } from '@/components/leads/lead-form-builder'
 import { FollowUpsView } from '@/components/leads/follow-ups-view'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import type { Lead } from '@/types'
+import { getLeadFollowUpInfo } from '@/lib/followup-utils'
 
 const COLOR_OPTIONS = [
     { value: 'bg-blue-500', label: 'Blue' }, { value: 'bg-green-500', label: 'Green' },
@@ -36,44 +37,52 @@ export function LeadsPage() {
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
 
-    // Filters state
-    const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all')
-    const [searchQuery, setSearchQuery] = useState<string>('')
-    const allTags = Array.from(new Set(leads.flatMap(l => l.tags || [])))
+// Filters state
+const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all')
+const [selectedFollowUpFilter, setSelectedFollowUpFilter] = useState<string>('all')
+const [searchQuery, setSearchQuery] = useState<string>('')
+const allTags = Array.from(new Set(leads.flatMap(l => l.tags || [])))
+
+const filteredLeads = leads.filter(l => {
+    const matchesTag = selectedTagFilter === 'all' || (l.tags || []).includes(selectedTagFilter)
     
-    const filteredLeads = leads.filter(l => {
-        const matchesTag = selectedTagFilter === 'all' || (l.tags || []).includes(selectedTagFilter)
-        const q = searchQuery.toLowerCase()
-        
-        const phoneStr = l.phone ? String(l.phone) : ''
-        const cleanPhone = phoneStr.replace(/[\s-()+]/g, '')
-        const cleanQ = q.replace(/[\s-()+]/g, '')
-        
-        // Search inside all custom fields
-        let matchesCustomField = false
-        if (l.customFields && q) {
-            matchesCustomField = Object.values(l.customFields).some(val => {
-                const strVal = String(val)
-                const cleanVal = strVal.replace(/[\s-()+]/g, '')
-                return strVal.toLowerCase().includes(q) || (cleanVal && cleanQ && cleanVal.includes(cleanQ))
-            })
-        }
-        
-        // Search inside interaction history (activities)
-        let matchesActivities = false
-        if (l.activities && q) {
-            matchesActivities = l.activities.some(a => a.content?.toLowerCase().includes(q))
-        }
-        
-        const matchesSearch = !q || 
-                              l.name?.toLowerCase().includes(q) || 
-                              (cleanPhone && cleanQ && cleanPhone.includes(cleanQ)) || 
-                              matchesCustomField || 
-                              matchesActivities ||
-                              l.company?.toLowerCase().includes(q) ||
-                              l.email?.toLowerCase().includes(q)
-        return matchesTag && matchesSearch
-    })
+    const matchesFollowUp = selectedFollowUpFilter === 'all' || (() => {
+        const info = getLeadFollowUpInfo(l.reminder)
+        if (selectedFollowUpFilter === 'none') return !info.status
+        return info.status === selectedFollowUpFilter
+    })()
+
+    const q = searchQuery.toLowerCase()
+    
+    const phoneStr = l.phone ? String(l.phone) : ''
+    const cleanPhone = phoneStr.replace(/[\s-()+]/g, '')
+    const cleanQ = q.replace(/[\s-()+]/g, '')
+    
+    // Search inside all custom fields
+    let matchesCustomField = false
+    if (l.customFields && q) {
+        matchesCustomField = Object.values(l.customFields).some(val => {
+            const strVal = String(val)
+            const cleanVal = strVal.replace(/[\s-()+]/g, '')
+            return strVal.toLowerCase().includes(q) || (cleanVal && cleanQ && cleanVal.includes(cleanQ))
+        })
+    }
+    
+    // Search inside interaction history (activities)
+    let matchesActivities = false
+    if (l.activities && q) {
+        matchesActivities = l.activities.some(a => a.content?.toLowerCase().includes(q))
+    }
+    
+    const matchesSearch = !q || 
+                          l.name?.toLowerCase().includes(q) || 
+                          (cleanPhone && cleanQ && cleanPhone.includes(cleanQ)) || 
+                          matchesCustomField || 
+                          matchesActivities ||
+                          l.company?.toLowerCase().includes(q) ||
+                          l.email?.toLowerCase().includes(q)
+    return matchesTag && matchesFollowUp && matchesSearch
+})
 
     // Dialog States
     const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false)
@@ -170,6 +179,22 @@ export function LeadsPage() {
                                 {allTags.map(tag => (
                                     <SelectItem key={tag} value={tag} className="text-xs font-semibold uppercase">{tag}</SelectItem>
                                 ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Follow-up Status Filter Selector */}
+                    <div className="w-[140px] sm:w-[160px]">
+                        <Select value={selectedFollowUpFilter} onValueChange={setSelectedFollowUpFilter}>
+                            <SelectTrigger className="h-9 rounded-lg border-border/60 text-xs font-semibold bg-card">
+                                <SelectValue placeholder="Follow-up Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="text-xs font-semibold">ALL FOLLOW-UPS</SelectItem>
+                                <SelectItem value="overdue" className="text-xs font-semibold text-red-600 dark:text-red-400">🔴 MISSED</SelectItem>
+                                <SelectItem value="today" className="text-xs font-semibold text-amber-600 dark:text-amber-400">🟡 TODAY</SelectItem>
+                                <SelectItem value="future" className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">🟢 FUTURE</SelectItem>
+                                <SelectItem value="none" className="text-xs font-semibold text-muted-foreground">NO FOLLOW-UP</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

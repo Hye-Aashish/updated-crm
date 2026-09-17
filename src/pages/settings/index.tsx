@@ -948,8 +948,37 @@ function EmailSettingsTab({ data, onSave, saving }: any) {
 function RolesPermissionsTab({ data, onSave, saving }: any) {
     const [roles, setRoles] = useState<any[]>(data || [])
     const [selectedRoleIndex, setSelectedRoleIndex] = useState(0)
+    const { toast } = useToast()
 
     useEffect(() => { if (data) setRoles(data) }, [data])
+
+    const isProtectedRole = (roleName: string) => {
+        const protectedNames = ['admin', 'owner']
+        return protectedNames.includes((roleName || '').toLowerCase())
+    }
+
+    const handleDeleteRole = (idx: number) => {
+        const roleToDelete = roles[idx]
+        if (!roleToDelete) return
+        const roleLabel = roleToDelete.label || roleToDelete.name
+
+        if (isProtectedRole(roleToDelete.name)) {
+            toast({
+                title: "Cannot Delete System Role",
+                description: "Default Administrator and Owner roles cannot be deleted.",
+                variant: "destructive"
+            })
+            return
+        }
+
+        if (!window.confirm(`Are you sure you want to delete the role "${roleLabel}"?`)) return
+
+        const newRoles = roles.filter((_, i) => i !== idx)
+        setRoles(newRoles)
+        const nextIndex = Math.max(0, Math.min(selectedRoleIndex, newRoles.length - 1))
+        setSelectedRoleIndex(nextIndex)
+        onSave(newRoles)
+    }
 
     const handlePermissionChange = (module: string, action: string, checked: boolean) => {
         const newRoles = [...roles]
@@ -981,20 +1010,49 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
 
     return (
         <Card>
-            <CardHeader><CardTitle>Roles & Permissions</CardTitle><CardDescription>Manage granular access controls for each role</CardDescription></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Roles & Permissions</CardTitle>
+                    <CardDescription>Manage granular access controls for each role</CardDescription>
+                </div>
+                <Button onClick={() => onSave(roles)} disabled={saving} className="brand-gradient border-none shadow-md">
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {saving ? 'Saving...' : 'Save All Changes'}
+                </Button>
+            </CardHeader>
             <CardContent className="flex flex-col md:flex-row gap-6">
                 <div className="w-full md:w-1/4 border-r pr-0 md:pr-4 space-y-2">
-                    {roles.map((role, idx) => (
-                        <div
-                            key={idx}
-                            className={`p-2 rounded cursor-pointer font-medium ${selectedRoleIndex === idx ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                            onClick={() => setSelectedRoleIndex(idx)}
-                        >
-                            {role.label || role.name}
-                        </div>
-                    ))}
-                    <Button variant="outline" className="w-full mt-4" onClick={() => {
-                        setRoles([...roles, { name: 'new_role', label: 'New Role', permissions: {} }])
+                    {roles.map((role, idx) => {
+                        const isProtected = isProtectedRole(role.name)
+                        const isSelected = selectedRoleIndex === idx
+
+                        return (
+                            <div
+                                key={idx}
+                                className={`p-2.5 rounded-lg cursor-pointer font-medium flex items-center justify-between transition-all ${
+                                    isSelected ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-foreground'
+                                }`}
+                                onClick={() => setSelectedRoleIndex(idx)}
+                            >
+                                <span className="truncate pr-2">{role.label || role.name}</span>
+                                {!isProtected && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteRole(idx); }}
+                                        className={`p-1 rounded-md transition-colors ${
+                                            isSelected 
+                                            ? 'text-primary-foreground/70 hover:text-white hover:bg-white/20' 
+                                            : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                                        }`}
+                                        title={`Delete ${role.label || role.name}`}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+                        )
+                    })}
+                    <Button variant="outline" className="w-full mt-4 border-dashed" onClick={() => {
+                        setRoles([...roles, { name: `custom_role_${roles.length}`, label: 'New Role', permissions: {} }])
                         setSelectedRoleIndex(roles.length)
                     }}>
                         <Plus className="mr-2 h-4 w-4" /> Add Role
@@ -1003,17 +1061,33 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
                 <div className="flex-1 space-y-6">
                     {roles[selectedRoleIndex] && (
                         <>
-                            <div className="space-y-2">
-                                <Label>Role Label</Label>
-                                <Input
-                                    value={roles[selectedRoleIndex].label}
-                                    onChange={(e) => {
-                                        const newRoles = [...roles]
-                                        newRoles[selectedRoleIndex].label = e.target.value
-                                        newRoles[selectedRoleIndex].name = e.target.value.toLowerCase().replace(/\s+/g, '_')
-                                        setRoles(newRoles)
-                                    }}
-                                />
+                            <div className="flex items-center justify-between gap-4 p-4 bg-muted/20 rounded-xl border border-dashed">
+                                <div className="flex-1 space-y-1">
+                                    <Label className="text-xs text-muted-foreground uppercase font-bold">Role Label</Label>
+                                    <Input
+                                        value={roles[selectedRoleIndex].label || ''}
+                                        className="font-bold text-base bg-background"
+                                        onChange={(e) => {
+                                            const newRoles = [...roles]
+                                            newRoles[selectedRoleIndex].label = e.target.value
+                                            if (!isProtectedRole(newRoles[selectedRoleIndex].name)) {
+                                                newRoles[selectedRoleIndex].name = e.target.value.toLowerCase().replace(/\s+/g, '_')
+                                            }
+                                            setRoles(newRoles)
+                                        }}
+                                    />
+                                </div>
+                                {!isProtectedRole(roles[selectedRoleIndex].name) && (
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => handleDeleteRole(selectedRoleIndex)}
+                                        className="flex items-center gap-1.5 self-end rounded-lg font-bold text-xs"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete Role
+                                    </Button>
+                                )}
                             </div>
                             <div className="border rounded-lg overflow-hidden">
                                 <div className="grid grid-cols-5 gap-4 bg-muted p-3 font-medium text-sm">

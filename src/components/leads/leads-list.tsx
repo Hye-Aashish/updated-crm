@@ -1,8 +1,10 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, Trash2, ExternalLink, Star } from 'lucide-react'
+import { MoreHorizontal, Trash2, ExternalLink, Star, Clock } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatCurrency } from '@/lib/utils'
+import { getLeadFollowUpInfo } from '@/lib/followup-utils'
+import { format } from 'date-fns'
 import type { Lead, PipelineStage } from '@/types'
 
 interface LeadsListProps {
@@ -22,6 +24,7 @@ export function LeadsList({ leads, stages, onLeadClick, onDeleteLead }: LeadsLis
                             <th className="px-6 py-4">Company</th>
                             <th className="hidden md:table-cell px-6 py-4">Rating</th>
                             <th className="hidden md:table-cell px-6 py-4">Contact</th>
+                            <th className="hidden lg:table-cell px-6 py-4">Follow-up Status</th>
                             <th className="hidden sm:table-cell px-6 py-4">Value</th>
                             <th className="px-6 py-4">Stage</th>
                             <th className="px-6 py-4 text-right">Actions</th>
@@ -30,16 +33,24 @@ export function LeadsList({ leads, stages, onLeadClick, onDeleteLead }: LeadsLis
                     <tbody className="divide-y divide-border/30 text-sm">
                         {leads.map((lead) => {
                             const stage = stages.find(s => s.id === lead.stage)
+                            const followUpInfo = getLeadFollowUpInfo(lead.reminder)
+
                             return (
-                                <tr key={lead.id} className="hover:bg-accent/5 transition-colors group cursor-pointer" onClick={() => onLeadClick(lead)}>
+                                <tr key={lead.id} className={`hover:bg-accent/5 transition-colors group cursor-pointer ${followUpInfo.cardBg}`} onClick={() => onLeadClick(lead)}>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                                lead.aiPriority === 'green' ? 'bg-emerald-500' : lead.aiPriority === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'
-                                            }`} title={`AI Priority: ${lead.aiPriorityReason}`} />
+                                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                                followUpInfo.status === 'overdue' ? 'bg-red-500 animate-pulse' :
+                                                followUpInfo.status === 'today' ? 'bg-amber-500' :
+                                                followUpInfo.status === 'future' ? 'bg-emerald-500' :
+                                                lead.aiPriority === 'green' ? 'bg-emerald-500' :
+                                                lead.aiPriority === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'
+                                            }`} title={followUpInfo.label} />
                                             <div className="font-bold text-foreground group-hover:text-primary transition-colors">{lead.company}</div>
                                         </div>
-                                        <div className="text-[10px] text-muted-foreground font-medium mt-0.5">{lead.source}</div>
+                                        <div className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                                            {lead.source} {lead.project ? `• ${lead.project}` : ''}
+                                        </div>
 
                                         {lead.tags && lead.tags.length > 0 && (
                                             <div className="flex flex-wrap gap-1 mt-1.5">
@@ -61,6 +72,16 @@ export function LeadsList({ leads, stages, onLeadClick, onDeleteLead }: LeadsLis
                                     <td className="hidden md:table-cell px-6 py-4">
                                         <div className="font-semibold text-foreground">{lead.name}</div>
                                         <div className="text-[10px] text-muted-foreground">{lead.email}</div>
+                                    </td>
+                                    <td className="hidden lg:table-cell px-6 py-4">
+                                        {lead.reminder?.date ? (
+                                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold border ${followUpInfo.badgeBg} ${followUpInfo.badgeText} ${followUpInfo.badgeBorder}`}>
+                                                <Clock className="h-3 w-3 shrink-0" />
+                                                <span>{followUpInfo.label} ({format(new Date(lead.reminder.date), 'MMM d, h:mm a')})</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">No Follow-up</span>
+                                        )}
                                     </td>
                                     <td className="hidden sm:table-cell px-6 py-4">
                                         <div className="font-bold text-foreground">{formatCurrency(lead.value)}</div>

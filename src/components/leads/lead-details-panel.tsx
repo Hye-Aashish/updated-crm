@@ -120,6 +120,7 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
                 source: editForm.source,
                 email: editForm.email,
                 phone: editForm.phone,
+                project: editForm.project,
                 customFields: editForm.customFields
             }
             const res = await api.put(`/leads/${targetId}`, payload)
@@ -268,6 +269,10 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
                 <div>
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Contact Name</Label>
                     {isEditing ? <Input value={editForm.name || ''} onChange={e => setEditForm({...editForm, name: e.target.value})} className="h-7 text-sm font-semibold mt-1" /> : <p className="font-semibold">{lead.name}</p>}
+                </div>
+                <div>
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Project</Label>
+                    {isEditing ? <Input value={editForm.project || ''} onChange={e => setEditForm({...editForm, project: e.target.value})} placeholder="e.g. Website" className="h-7 text-sm font-semibold mt-1" /> : <p className="font-semibold text-primary">{lead.project || '-'}</p>}
                 </div>
                 <div>
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Company</Label>

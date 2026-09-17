@@ -8,7 +8,8 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         default: 'employee',
-        enum: ['admin', 'owner', 'employee', 'client', 'developer', 'pm'] // Restrict valid roles
+        lowercase: true,
+        trim: true
     },
     clientId: { type: String }, // Linked to Client model if role is 'client'
     employeeId: { type: String },

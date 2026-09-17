@@ -208,11 +208,50 @@ export function RolesPermissionsPage() {
         setRoles(newRoles)
     }
 
-    const handleDeleteRole = (idx: number) => {
-        if (!window.confirm("Are you sure you want to delete this role?")) return
+    const isProtectedRole = (roleName: string) => {
+        const protectedNames = ['admin', 'owner']
+        return protectedNames.includes((roleName || '').toLowerCase())
+    }
+
+    const handleDeleteRole = async (idx: number) => {
+        const roleToDelete = roles[idx]
+        if (!roleToDelete) return
+        const roleLabel = roleToDelete.label || roleToDelete.name
+
+        if (isProtectedRole(roleToDelete.name)) {
+            toast({
+                title: "Cannot Delete System Role",
+                description: "Default Administrator and Owner roles cannot be deleted.",
+                variant: "destructive"
+            })
+            return
+        }
+
+        if (!window.confirm(`Are you sure you want to delete the role "${roleLabel}"?`)) return
+
         const newRoles = roles.filter((_, i) => i !== idx)
         setRoles(newRoles)
-        if (selectedRoleIndex >= newRoles.length) setSelectedRoleIndex(0)
+        const nextIndex = Math.max(0, Math.min(selectedRoleIndex, newRoles.length - 1))
+        setSelectedRoleIndex(nextIndex)
+
+        // Save changes automatically
+        setSaving(true)
+        try {
+            await api.put('/settings', { roles: newRoles })
+            toast({
+                title: 'Role Deleted',
+                description: `The role "${roleLabel}" has been removed successfully.`,
+                variant: 'success'
+            })
+        } catch (error: any) {
+            toast({
+                title: 'Error',
+                description: error.response?.data?.message || "Failed to delete role",
+                variant: "destructive"
+            })
+        } finally {
+            setSaving(false)
+        }
     }
 
     const handleToggleAllGroup = (groupItems: string[], enable: boolean) => {
@@ -258,30 +297,40 @@ export function RolesPermissionsPage() {
                     <div className="w-full lg:w-56 shrink-0 space-y-4">
                         <h3 className="font-bold text-xs uppercase tracking-widest text-muted-foreground px-1">Roles</h3>
                         <div className="space-y-1.5">
-                            {roles.map((role, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer font-semibold transition-all ${
-                                        selectedRoleIndex === idx 
-                                        ? 'bg-primary text-primary-foreground shadow-lg scale-[1.02]' 
-                                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                                    }`}
-                                    onClick={() => setSelectedRoleIndex(idx)}
-                                >
-                                    <div className="flex items-center gap-2.5">
-                                        <Shield className={`h-4 w-4 ${selectedRoleIndex === idx ? 'text-primary-foreground' : 'text-primary'}`} />
-                                        <span className="truncate text-sm">{role.label || role.name}</span>
+                            {roles.map((role, idx) => {
+                                const isProtected = isProtectedRole(role.name)
+                                const isSelected = selectedRoleIndex === idx
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer font-semibold transition-all ${
+                                            isSelected 
+                                            ? 'bg-primary text-primary-foreground shadow-lg scale-[1.02]' 
+                                            : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                                        }`}
+                                        onClick={() => setSelectedRoleIndex(idx)}
+                                    >
+                                        <div className="flex items-center gap-2.5 min-w-0 pr-1">
+                                            <Shield className={`h-4 w-4 shrink-0 ${isSelected ? 'text-primary-foreground' : 'text-primary'}`} />
+                                            <span className="truncate text-sm">{role.label || role.name}</span>
+                                        </div>
+                                        {!isProtected && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteRole(idx); }}
+                                                className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                                                    isSelected 
+                                                    ? 'text-primary-foreground/70 hover:text-white hover:bg-white/20' 
+                                                    : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                                                }`}
+                                                title={`Delete ${role.label || role.name}`}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        )}
                                     </div>
-                                    {selectedRoleIndex !== idx && !['admin', 'owner', 'employee', 'client', 'pm', 'developer'].includes(role.name) && (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteRole(idx); }}
-                                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-all"
-                                        >
-                                            <Trash2 className="h-3 w-3" />
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                         <Button variant="outline" className="w-full border-dashed rounded-xl text-xs" onClick={() => {
                             setRoles([...roles, { name: `custom_role_${roles.length}`, label: 'New Role', permissions: {} }])
@@ -296,7 +345,7 @@ export function RolesPermissionsPage() {
                         {selectedRole && (
                             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                                 {/* Role Name Header */}
-                                <div className="mb-6 p-4 bg-muted/30 rounded-2xl border border-dashed flex flex-col sm:flex-row sm:items-center gap-4">
+                                <div className="mb-6 p-4 bg-muted/30 rounded-2xl border border-dashed flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div className="flex-1">
                                         <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Role Display Name</Label>
                                         <Input
@@ -305,16 +354,29 @@ export function RolesPermissionsPage() {
                                             onChange={(e) => {
                                                 const newRoles = JSON.parse(JSON.stringify(roles))
                                                 newRoles[selectedRoleIndex].label = e.target.value
-                                                if (!['admin', 'owner', 'employee', 'client', 'pm', 'developer'].includes(newRoles[selectedRoleIndex].name)) {
+                                                if (!isProtectedRole(newRoles[selectedRoleIndex].name)) {
                                                     newRoles[selectedRoleIndex].name = e.target.value.toLowerCase().replace(/\s+/g, '_')
                                                 }
                                                 setRoles(newRoles)
                                             }}
                                         />
                                     </div>
-                                    <div className="px-3 py-1.5 bg-background rounded-lg border flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Key:</span>
-                                        <code className="text-xs font-mono font-bold text-primary">{selectedRole.name}</code>
+                                    <div className="flex items-center gap-3">
+                                        <div className="px-3 py-1.5 bg-background rounded-lg border flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Key:</span>
+                                            <code className="text-xs font-mono font-bold text-primary">{selectedRole.name}</code>
+                                        </div>
+                                        {!isProtectedRole(selectedRole.name) && (
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                onClick={() => handleDeleteRole(selectedRoleIndex)}
+                                                className="rounded-xl flex items-center gap-1.5 shadow-sm text-xs font-bold shrink-0"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                                Delete Role
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
 
