@@ -85,15 +85,7 @@ export function NewProjectPage() {
                 milestoneAmount: parseFloat(formData.milestoneAmount) || 0,
                 finalAmount: parseFloat(formData.finalAmount) || 0,
                 dueDate: formData.deadline,
-                pmId: formData.pmId || currentUser.id,
-                milestones: milestones.map(m => ({
-                    name: m.name,
-                    dueDate: m.dueDate ? new Date(m.dueDate) : undefined,
-                    amount: parseFloat(m.amount) || 0,
-                    description: m.description,
-                    completed: false,
-                    status: 'pending'
-                }))
+                pmId: formData.pmId || currentUser?.id,
             })
 
             const savedProject = mapProject(response.data)
@@ -105,11 +97,11 @@ export function NewProjectPage() {
             })
 
             navigate(`/projects/${savedProject.id || savedProject._id}`)
-        } catch (error) {
+        } catch (error: any) {
             console.error(error)
             toast({
                 title: "Error",
-                description: "Failed to create project.",
+                description: error.response?.data?.message || error.message || "Failed to create project.",
                 variant: "destructive"
             })
         } finally {
