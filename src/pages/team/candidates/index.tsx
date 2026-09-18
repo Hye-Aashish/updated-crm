@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,8 +8,8 @@ import { Avatar } from '@/components/ui/avatar'
 import {
     Plus, Search, Settings, FileText, Send, CheckCircle2,
     Clock, ShieldCheck, Download, UserPlus, Copy, Eye,
-    MoreHorizontal, Trash2, Mail, ExternalLink, Loader2, AlertCircle,
-    UserCheck, Users, Sparkles
+    MoreHorizontal, Trash2, Mail, ExternalLink, Loader2,
+    UserCheck, Users
 } from 'lucide-react'
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -31,7 +30,6 @@ import OfferApprovalDialog from './offer-approval-dialog'
 
 export function OfferLettersPage() {
     const { toast } = useToast()
-    const navigate = useNavigate()
     const { currentUser } = useAppStore()
 
     const [loading, setLoading] = useState(true)

@@ -1,17 +1,30 @@
 const ProjectMessage = require('../models/ProjectMessage');
+const jwt = require('jsonwebtoken');
+
+// Helper to verify JWT token from socket handshake or query
+const verifySocketToken = (socket) => {
+    try {
+        const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+        if (!token) return null;
+        return jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+        return null;
+    }
+};
 
 module.exports = (io) => {
     io.on('connection', (socket) => {
 
         // Join a Project Room
         socket.on('join_project_chat', (projectId) => {
+            if (!projectId) return;
             socket.join(`project_${projectId}`);
             console.log(`[Socket] User ${socket.id} joined project chat: ${projectId}`);
         });
 
         // Leave a Project Room
         socket.on('leave_project_chat', (projectId) => {
-            socket.leave(`project_${projectId}`);
+            if (projectId) socket.leave(`project_${projectId}`);
         });
 
         // Send Message to Project Room
@@ -20,17 +33,22 @@ module.exports = (io) => {
             try {
                 const { projectId, senderId, senderName, senderRole, message, attachments } = data;
 
-                if (!projectId || !senderId) {
-                    console.error('[Socket] Missing projectId or senderId');
+                if (!projectId) {
+                    console.error('[Socket] Missing projectId');
                     return;
                 }
 
+                const user = verifySocketToken(socket);
+                const sId = user ? (user.id || user._id) : (senderId || 'unknown');
+                const sName = user ? (user.name || senderName) : (senderName || 'User');
+                const sRole = user ? (user.role || senderRole) : (senderRole || 'member');
+
                 const newMessage = new ProjectMessage({
                     projectId,
-                    senderId,
-                    senderName,
-                    senderRole,
-                    message,
+                    senderId: sId,
+                    senderName: sName,
+                    senderRole: sRole,
+                    message: message || '',
                     attachments: attachments || []
                 });
 

@@ -53,6 +53,26 @@ router.delete('/stages/:id', protect, authorize('admin', 'owner'), async (req, r
     }
 });
 
+// PUT reorder stages
+router.put('/stages/reorder', protect, authorize('admin', 'owner'), async (req, res) => {
+    try {
+        const { stageOrders } = req.body;
+        if (Array.isArray(stageOrders)) {
+            const bulkOps = stageOrders.map(item => ({
+                updateOne: {
+                    filter: { id: item.id },
+                    update: { $set: { order: item.order } }
+                }
+            }));
+            await PipelineStage.bulkWrite(bulkOps);
+        }
+        const updatedStages = await PipelineStage.find().sort({ order: 1 });
+        res.json(updatedStages);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 
 const isAuthorizedForLead = async (user, lead) => {
     if (!lead) return false;
@@ -225,6 +245,87 @@ router.post('/:id/activities', protect, async (req, res) => {
         const updatedLead = await lead.save();
         res.json(updatedLead);
     } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// POST /:id/followups - Log a Follow-up Interaction with Outcome and Next Follow-up
+router.post('/:id/followups', protect, async (req, res) => {
+    try {
+        const lead = await Lead.findById(req.params.id);
+        if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+        const canAccess = await isAuthorizedForLead(req.user, lead);
+        if (!canAccess) {
+            return res.status(403).json({ message: 'Not authorized to follow up on this lead' });
+        }
+
+        const {
+            outcome,
+            note,
+            nextFollowUpDate,
+            reminderMinutes,
+            reminderTone,
+            followUpType,
+            noNextFollowUp,
+            newStage
+        } = req.body;
+
+        const userName = req.user ? req.user.name : 'Sales Team';
+        const now = new Date();
+
+        // 1. Log activity record
+        const activityItem = {
+            content: note || outcome,
+            type: followUpType || 'call',
+            outcome: outcome,
+            nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
+            reminderMinutes: reminderMinutes || 30,
+            createdByName: userName,
+            createdAt: now
+        };
+
+        if (!lead.activities) lead.activities = [];
+        lead.activities.push(activityItem);
+
+        // 2. Update last follow-up summaries
+        lead.lastFollowUpDate = now;
+        lead.lastFollowUpOutcome = outcome;
+        lead.lastNote = note || outcome;
+
+        // 3. Process Next Follow-up vs No Next Follow-up
+        if (nextFollowUpDate) {
+            lead.reminder = {
+                date: new Date(nextFollowUpDate),
+                tone: reminderTone || 'default',
+                completed: false,
+                reminderMinutes: reminderMinutes || 30,
+                sentReminders: []
+            };
+        } else if (noNextFollowUp) {
+            lead.reminder = {
+                date: null,
+                tone: 'default',
+                completed: true,
+                sentReminders: []
+            };
+            if (newStage) {
+                lead.stage = newStage;
+            }
+        }
+
+        // 4. Run optional AI priority refresh
+        try {
+            const { analyzeLeadPriorityAndExtractReminder } = require('../services/aiService');
+            const aiResult = await analyzeLeadPriorityAndExtractReminder(lead.activities);
+            if (aiResult?.priority) lead.aiPriority = aiResult.priority;
+            if (aiResult?.reason) lead.aiPriorityReason = aiResult.reason;
+        } catch (aiErr) { }
+
+        const savedLead = await lead.save();
+        res.json(savedLead);
+    } catch (err) {
+        console.error('Follow-up Save Error:', err);
         res.status(400).json({ message: err.message });
     }
 });

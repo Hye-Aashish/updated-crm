@@ -12,14 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-    ChevronLeft, Calendar, DollarSign, Clock, CheckSquare,
-    MoreHorizontal, Edit, Trash2, Plus, FileText, Paperclip,
-    Download, ExternalLink, Users, AlertCircle, TrendingUp,
-    MessageCircle, MessageSquare, Eye, Globe, Smartphone, CheckCircle2,
-    Shield, Flag, AlertTriangle, RefreshCw, PhoneCall, Mail, Send
+    ChevronLeft, Edit, Trash2, Plus, FileText, Paperclip,
+    Download, Globe, Smartphone, Shield, Flag, RefreshCw
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
@@ -29,6 +25,7 @@ import { ProjectTeamDialog } from '@/components/projects/project-team-dialog'
 import { ProjectFileDialog } from '@/components/projects/project-file-dialog'
 import { ProjectTimelineView } from '@/components/projects/project-timeline-view'
 import { CheckpointProofDialog } from '@/components/projects/checkpoint-proof-dialog'
+import { ProjectMilestonesTab } from '@/components/projects/project-milestones-tab'
 
 import { mapProject, mapClient, mapUser } from '@/lib/mappers'
 
@@ -43,6 +40,8 @@ export function ProjectDetailPage() {
     const [followups, setFollowups] = useState<any[]>([])
     const [activitiesLog, setActivitiesLog] = useState<any[]>([])
     const [completionReadiness, setCompletionReadiness] = useState<any>(null)
+
+    const [fileDialogOpen, setFileDialogOpen] = useState(false)
 
     // Dialog & Form States
     const [selectedCpForProof, setSelectedCpForProof] = useState<any>(null)
@@ -279,23 +278,34 @@ export function ProjectDetailPage() {
                 </Card>
             </div>
 
-            {/* 14 SaaS Functional Tabs */}
+            {/* Functional Tabs */}
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList className="flex overflow-x-auto w-full justify-start h-11 p-1 bg-muted/40 border border-border/50 rounded-xl custom-scrollbar">
                     <TabsTrigger value="overview" className="text-xs font-bold">Overview</TabsTrigger>
-                    <TabsTrigger value="checkpoints" className="text-xs font-bold">Checkpoints ({checkpoints.length})</TabsTrigger>
+                    <TabsTrigger value="milestones" className="text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 data-[state=active]:bg-amber-600 data-[state=active]:text-white flex items-center gap-1.5 px-3">
+                        <Flag className="h-3.5 w-3.5" /> Milestones ({project.milestones?.length || 0})
+                    </TabsTrigger>
+                    {currentUser?.role !== 'client' && (
+                        <TabsTrigger value="checkpoints" className="text-xs font-bold">Checkpoints ({checkpoints.length})</TabsTrigger>
+                    )}
                     <TabsTrigger value="timeline" className="text-xs font-bold">Timeline</TabsTrigger>
                     <TabsTrigger value="tasks" className="text-xs font-bold">Tasks ({projectTasks.length})</TabsTrigger>
                     <TabsTrigger value="team" className="text-xs font-bold">Team</TabsTrigger>
                     <TabsTrigger value="client-updates" className="text-xs font-bold">Client Updates</TabsTrigger>
-                    <TabsTrigger value="followups" className="text-xs font-bold">Follow-ups ({followups.length})</TabsTrigger>
+                    {currentUser?.role !== 'client' && (
+                        <TabsTrigger value="followups" className="text-xs font-bold">Follow-ups ({followups.length})</TabsTrigger>
+                    )}
                     <TabsTrigger value="payments" className="text-xs font-bold">Payments</TabsTrigger>
                     <TabsTrigger value="website" className="text-xs font-bold">Website</TabsTrigger>
                     <TabsTrigger value="android" className="text-xs font-bold">Android</TabsTrigger>
                     <TabsTrigger value="ios" className="text-xs font-bold">iOS</TabsTrigger>
-                    <TabsTrigger value="bugs" className="text-xs font-bold">QA & Bugs ({bugs.length})</TabsTrigger>
+                    {currentUser?.role !== 'client' && (
+                        <TabsTrigger value="bugs" className="text-xs font-bold">QA & Bugs ({bugs.length})</TabsTrigger>
+                    )}
                     <TabsTrigger value="files" className="text-xs font-bold">Files ({projectFiles.length})</TabsTrigger>
-                    <TabsTrigger value="activities" className="text-xs font-bold">Audit Log</TabsTrigger>
+                    {currentUser?.role !== 'client' && (
+                        <TabsTrigger value="activities" className="text-xs font-bold">Audit Log</TabsTrigger>
+                    )}
                 </TabsList>
 
                 {/* 1. OVERVIEW TAB */}
@@ -371,6 +381,14 @@ export function ProjectDetailPage() {
                             </Card>
                         </div>
                     </div>
+                </TabsContent>
+
+                {/* 1.5 MILESTONES TAB */}
+                <TabsContent value="milestones" className="space-y-4">
+                    <ProjectMilestonesTab 
+                        project={project} 
+                        onProjectUpdate={(updated) => updateProject(project.id, updated)} 
+                    />
                 </TabsContent>
 
                 {/* 2. CHECKPOINTS TAB */}
@@ -456,7 +474,7 @@ export function ProjectDetailPage() {
                 <TabsContent value="tasks" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-base font-bold">Task Management Board</h3>
-                        <Button size="sm" onClick={() => { setSelectedTaskForEdit(null); setTaskDialogOpen(true) }} className="h-8 font-bold text-xs">
+                        <Button size="sm" onClick={() => navigate('/tasks')} className="h-8 font-bold text-xs">
                             <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Task
                         </Button>
                     </div>
@@ -543,31 +561,38 @@ export function ProjectDetailPage() {
 
                 {/* 8. PAYMENTS TAB */}
                 <TabsContent value="payments" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base font-bold">Financial Summary & Milestone Billing</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4 text-xs font-semibold">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="p-3 bg-muted/40 rounded-lg border">
-                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Total Budget</span>
-                                    <p className="font-bold text-lg pt-0.5">{formatCurrency(project.budget)}</p>
+                    {currentUser?.role !== 'client' && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base font-bold">Financial Summary & Milestone Billing Breakdown</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4 text-xs font-semibold">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <div className="p-3 bg-muted/40 rounded-lg border">
+                                        <span className="text-muted-foreground text-[10px] uppercase font-bold">Total Budget</span>
+                                        <p className="font-bold text-lg pt-0.5">{formatCurrency(project.budget)}</p>
+                                    </div>
+                                    <div className="p-3 bg-muted/40 rounded-lg border">
+                                        <span className="text-muted-foreground text-[10px] uppercase font-bold">Advance Amount</span>
+                                        <p className="font-bold text-lg text-emerald-600 pt-0.5">{formatCurrency(project.advanceAmount || 0)}</p>
+                                    </div>
+                                    <div className="p-3 bg-muted/40 rounded-lg border">
+                                        <span className="text-muted-foreground text-[10px] uppercase font-bold">Milestone Amount</span>
+                                        <p className="font-bold text-lg text-blue-600 pt-0.5">{formatCurrency(project.milestoneAmount || 0)}</p>
+                                    </div>
+                                    <div className="p-3 bg-muted/40 rounded-lg border">
+                                        <span className="text-muted-foreground text-[10px] uppercase font-bold">Final Amount</span>
+                                        <p className="font-bold text-lg text-purple-600 pt-0.5">{formatCurrency(project.finalAmount || 0)}</p>
+                                    </div>
                                 </div>
-                                <div className="p-3 bg-muted/40 rounded-lg border">
-                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Advance Amount</span>
-                                    <p className="font-bold text-lg text-emerald-600 pt-0.5">{formatCurrency(project.advanceAmount || 0)}</p>
-                                </div>
-                                <div className="p-3 bg-muted/40 rounded-lg border">
-                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Milestone Amount</span>
-                                    <p className="font-bold text-lg text-blue-600 pt-0.5">{formatCurrency(project.milestoneAmount || 0)}</p>
-                                </div>
-                                <div className="p-3 bg-muted/40 rounded-lg border">
-                                    <span className="text-muted-foreground text-[10px] uppercase font-bold">Final Amount</span>
-                                    <p className="font-bold text-lg text-purple-600 pt-0.5">{formatCurrency(project.finalAmount || 0)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <ProjectMilestonesTab 
+                        project={project} 
+                        onProjectUpdate={(updated) => updateProject(project.id, updated)} 
+                    />
                 </TabsContent>
 
                 {/* 9. WEBSITE TAB */}
@@ -816,6 +841,9 @@ export function ProjectDetailPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Project File Dialog */}
+            {project && <ProjectFileDialog open={fileDialogOpen} onOpenChange={setFileDialogOpen} project={project} />}
         </div>
     )
 }

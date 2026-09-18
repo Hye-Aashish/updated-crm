@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
     CheckCircle2, XCircle, FileText, Download, Eye,
-    ShieldCheck, AlertCircle, Loader2, User, Landmark, GraduationCap
+    ShieldCheck, AlertCircle, Loader2
 } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'

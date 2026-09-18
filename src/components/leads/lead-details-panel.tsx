@@ -5,59 +5,99 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Bell, Trash2, Edit2, Check, X, Star, MessageSquare, Send, Smartphone, ExternalLink, Loader2 } from 'lucide-react'
+import {
+    Bell, Trash2, Edit2, Check, X, Star, MessageSquare, PhoneCall,
+    Clock, Calendar, UserCheck, AlertTriangle, PhoneOff, Mail, CheckCircle2, Loader2
+} from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import type { Lead } from '@/types'
+import type { Lead, PipelineStage } from '@/types'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { mapLead } from '@/lib/mappers'
+import { format } from 'date-fns'
 
 interface LeadDetailsPanelProps {
     lead: Lead
+    stages?: PipelineStage[]
     onUpdate: (updatedLead: Lead) => void
+    onOpenFollowUp?: (lead: Lead) => void
     onDelete: (leadId: string) => void
     onAddActivity: (leadId: string, content: string) => Promise<any>
 }
 
 function ActivityItem({ activity }: { activity: any }) {
     const [expanded, setExpanded] = useState(false)
-    const isWhatsApp = activity.content?.includes('[WhatsApp]') || activity.content?.toLowerCase().includes('whatsapp')
+    const isWhatsApp = activity.content?.includes('[WhatsApp]') || activity.content?.toLowerCase().includes('whatsapp') || activity.outcome?.toLowerCase().includes('whatsapp')
     const isLong = activity.content?.length > 150 || (activity.content?.match(/\n/g) || []).length >= 3
+
+    const outcomeText = activity.outcome || activity.type || 'Interaction'
     
+    let Icon = PhoneCall
+    let badgeColor = 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20'
+
+    if (outcomeText.includes('Not Answered')) {
+        Icon = PhoneOff
+        badgeColor = 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20'
+    } else if (outcomeText.includes('WhatsApp')) {
+        Icon = MessageSquare
+        badgeColor = 'bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20'
+    } else if (outcomeText.includes('Email')) {
+        Icon = Mail
+        badgeColor = 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20'
+    } else if (outcomeText.includes('Meeting')) {
+        Icon = Calendar
+        badgeColor = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20'
+    } else if (outcomeText.includes('Connected') || outcomeText.includes('Successful')) {
+        Icon = CheckCircle2
+        badgeColor = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+    } else if (outcomeText.includes('Busy') || outcomeText.includes('Later')) {
+        Icon = Clock
+        badgeColor = 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+    }
+
     return (
-        <div className={`p-3 rounded-lg text-sm border transition-colors flex flex-col ${
-            isWhatsApp 
-                ? 'bg-green-500/10 border-green-500/30 dark:bg-green-950/20' 
-                : 'bg-muted/30 border-border/40'
-        }`}>
-            {isWhatsApp && (
-                <div className="flex items-center gap-1.5 mb-1.5 text-green-600 dark:text-green-400 font-bold text-[11px]">
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    <span>WhatsApp Interaction</span>
+        <div className="p-3.5 rounded-xl border border-border/40 bg-card/60 space-y-2 relative hover:bg-muted/20 transition-colors">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={`text-[10px] font-bold px-2 py-0.5 border flex items-center gap-1.5 ${badgeColor}`}>
+                        <Icon className="h-3 w-3" />
+                        <span>{outcomeText}</span>
+                    </Badge>
+                    {activity.createdByName && (
+                        <span className="text-[10px] font-bold text-muted-foreground">
+                            by {activity.createdByName}
+                        </span>
+                    )}
                 </div>
-            )}
-            <p className={`font-medium text-foreground break-words whitespace-pre-wrap ${!expanded && isLong ? 'line-clamp-3' : ''}`}>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase">
+                    {activity.createdAt ? format(new Date(activity.createdAt), 'MMM d, h:mm a') : ''}
+                </span>
+            </div>
+
+            <p className={`text-xs font-medium text-foreground break-words whitespace-pre-wrap leading-relaxed ${!expanded && isLong ? 'line-clamp-3' : ''}`}>
                 {activity.content}
             </p>
+
             {isLong && (
-                <button 
-                    onClick={() => setExpanded(!expanded)} 
-                    className="text-[10px] text-primary mt-1.5 font-bold hover:underline uppercase tracking-wider self-start"
+                <button
+                    onClick={() => setExpanded(!expanded)}
+                    className="text-[10px] text-primary font-bold hover:underline uppercase tracking-wider self-start"
                 >
                     {expanded ? 'Show Less' : 'Read More'}
                 </button>
             )}
-            <div className="flex justify-between items-center mt-2 pt-2 border-t border-border/30">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase">{new Date(activity.createdAt).toLocaleString()}</span>
-                <Badge variant={isWhatsApp ? "secondary" : "outline"} className={`text-[9px] font-semibold ${isWhatsApp ? 'bg-green-500/20 text-green-700 dark:text-green-300' : ''}`}>
-                    {isWhatsApp ? 'WhatsApp' : activity.type}
-                </Badge>
-            </div>
+
+            {activity.nextFollowUpDate && (
+                <div className="pt-2 border-t border-border/20 flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <Clock className="h-3 w-3" />
+                    <span>Next Follow-up set for: {format(new Date(activity.nextFollowUpDate), 'MMM d, yyyy h:mm a')}</span>
+                </div>
+            )}
         </div>
     )
 }
 
-export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: LeadDetailsPanelProps) {
+export function LeadDetailsPanel({ lead, stages, onUpdate, onOpenFollowUp, onDelete, onAddActivity }: LeadDetailsPanelProps) {
     const { toast } = useToast()
     const [newActivityContent, setNewActivityContent] = useState('')
     const [reminderDate, setReminderDate] = useState('')
@@ -140,13 +180,7 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
         try {
             const updatedLead = await onAddActivity(targetId, newActivityContent)
             if (updatedLead) {
-                onUpdate({
-                    ...lead,
-                    activities: updatedLead.activities,
-                    aiPriority: updatedLead.aiPriority,
-                    aiPriorityReason: updatedLead.aiPriorityReason,
-                    reminder: updatedLead.reminder
-                })
+                onUpdate(updatedLead)
                 setNewActivityContent('')
             }
         } catch (error) {
@@ -190,31 +224,18 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
         }
     }
 
-    const handleSetRating = async (newRating: number) => {
-        const targetId = lead?.id || lead?._id
-        if (!targetId) return
-        try {
-            const res = await api.put(`/leads/${targetId}`, { rating: newRating })
-            onUpdate(mapLead(res.data))
-            toast({ description: "Rating updated successfully" })
-        } catch (error) {
-            console.error("Update Rating Error:", error)
-            toast({ title: "Error", description: "Failed to update rating", variant: "destructive" })
-        }
-    }
-
     return (
         <div className="space-y-6">
-            <div className="flex flex-row items-center justify-between border-b pb-4">
+            <div className="flex flex-row items-center justify-between border-b pb-4 gap-2">
                 <div className="flex flex-col">
-                    <h2 className="text-xl font-bold flex items-center gap-3">
-                        Lead: {lead.company}
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                        {lead.company}
                     </h2>
-                    <div className="flex items-center gap-1 mt-1.5" title="Auto-Calculated Lead Rating">
+                    <div className="flex items-center gap-1 mt-1" title="Lead Rating">
                         {[1, 2, 3, 4, 5].map((star) => (
                             <Star
                                 key={star}
-                                className={`h-4 w-4 transition-colors ${
+                                className={`h-3.5 w-3.5 ${
                                     star <= (lead.rating || 0) 
                                     ? 'fill-yellow-400 text-yellow-500' 
                                     : 'text-muted-foreground/30'
@@ -223,7 +244,18 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
                         ))}
                     </div>
                 </div>
+
                 <div className="flex items-center gap-2">
+                    {onOpenFollowUp && (
+                        <Button
+                            onClick={() => onOpenFollowUp(lead)}
+                            className="h-9 px-4 font-bold text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-xl"
+                        >
+                            <PhoneCall className="mr-1.5 h-3.5 w-3.5" />
+                            Log Follow-up
+                        </Button>
+                    )}
+
                     {isEditing ? (
                         <>
                             <Button variant="ghost" size="icon" onClick={() => { setIsEditing(false); setEditForm(lead) }} className="text-muted-foreground hover:bg-muted">
@@ -313,6 +345,24 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
                 </div>
             </div>
 
+            {/* Follow-up Summary Banner */}
+            {lead.lastFollowUpOutcome && (
+                <div className="p-3.5 bg-card border border-border/60 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Last Interaction Summary</Label>
+                        <Badge variant="outline" className="text-[10px] font-bold">
+                            {lead.lastFollowUpOutcome}
+                        </Badge>
+                    </div>
+                    {lead.lastNote && (
+                        <p className="text-xs font-semibold text-foreground">"{lead.lastNote}"</p>
+                    )}
+                    {lead.lastFollowUpDate && (
+                        <p className="text-[10px] text-muted-foreground">Logged on {format(new Date(lead.lastFollowUpDate), 'MMM d, yyyy h:mm a')}</p>
+                    )}
+                </div>
+            )}
+
             {/* Tag Editor Section */}
             <div className="p-4 bg-muted/20 border border-border/40 rounded-xl space-y-2">
                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Lead Tags</Label>
@@ -342,73 +392,65 @@ export function LeadDetailsPanel({ lead, onUpdate, onDelete, onAddActivity }: Le
                 </div>
             </div>
 
-            {Object.keys(lead.customFields || {}).length > 0 && (
-                <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-500">
-                    {Object.entries(isEditing ? (editForm.customFields || {}) : (lead.customFields || {})).map(([key, value]) => (
-                        <div key={key}>
-                            <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{key.replace(/_/g, ' ')}</Label>
-                            {isEditing ? (
-                                <Input 
-                                    value={String(value || '')} 
-                                    onChange={e => setEditForm({
-                                        ...editForm, 
-                                        customFields: { ...editForm.customFields, [key]: e.target.value }
-                                    })} 
-                                    className="h-7 text-sm font-medium mt-1" 
-                                />
-                            ) : (
-                                <p className="font-medium text-sm">{String(value)}</p>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
-
+            {/* Next Follow-up Quick Setter */}
             <div className="space-y-4 pt-4 border-t">
                 <h4 className="font-bold text-sm flex items-center gap-2">
                     <Bell className="h-4 w-4 text-primary" />
-                    Next Follow-up & Reminders
+                    Scheduled Next Follow-up
                 </h4>
                 <div className="grid grid-cols-2 gap-4 items-end">
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold">Reminder Date</Label>
-                        <Input type="datetime-local" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)} className="h-9 rounded-lg" />
+                        <Label className="text-xs font-semibold">Follow-up Date & Time</Label>
+                        <Input type="datetime-local" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)} className="h-9 rounded-lg text-xs font-semibold" />
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold">Notification Type</Label>
+                        <Label className="text-xs font-semibold">Notification Tone</Label>
                         <Select value={reminderTone} onValueChange={setReminderTone}>
-                            <SelectTrigger className="h-9 rounded-lg">
+                            <SelectTrigger className="h-9 rounded-lg text-xs font-semibold">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="default">Standard Ring</SelectItem>
-                                <SelectItem value="urgent">Urgent Siren</SelectItem>
-                                <SelectItem value="gentle">Gentle Chime</SelectItem>
+                                <SelectItem value="default" className="text-xs font-semibold">Standard Ring</SelectItem>
+                                <SelectItem value="urgent" className="text-xs font-semibold">Urgent Siren</SelectItem>
+                                <SelectItem value="gentle" className="text-xs font-semibold">Gentle Chime</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                 </div>
                 <div className="flex justify-end">
-                    <Button size="sm" onClick={handleSetReminder} variant="outline" className="h-8 font-semibold text-xs">
-                        Set Follow-up
+                    <Button size="sm" onClick={handleSetReminder} variant="outline" className="h-8 font-semibold text-xs rounded-lg">
+                        Set Next Date
                     </Button>
                 </div>
             </div>
 
+            {/* Follow-up Timeline */}
             <div className="space-y-4 pt-4 border-t">
-                <h4 className="font-bold text-sm text-muted-foreground uppercase tracking-wider">Interaction History</h4>
-                <div className="space-y-3 max-h-[250px] overflow-y-auto mb-4 pr-2 custom-scrollbar">
-                    {lead.activities?.slice().reverse().map((activity: any) => (
-                        <ActivityItem key={activity._id} activity={activity} />
+                <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-sm text-foreground uppercase tracking-wider">
+                        Follow-up History & Timeline
+                    </h4>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                        {(lead.activities || []).length} Records
+                    </span>
+                </div>
+
+                <div className="space-y-2.5 max-h-[300px] overflow-y-auto mb-4 pr-1 custom-scrollbar">
+                    {lead.activities?.slice().reverse().map((activity: any, idx: number) => (
+                        <ActivityItem key={activity._id || idx} activity={activity} />
                     ))}
                     {(!lead.activities || lead.activities.length === 0) && (
-                        <p className="text-xs text-muted-foreground italic text-center py-4">No records found.</p>
+                        <p className="text-xs text-muted-foreground italic text-center py-6 border border-dashed rounded-xl">
+                            No follow-up records logged yet. Use the "Log Follow-up" button above to record calls and outcomes.
+                        </p>
                     )}
                 </div>
-                <div className="space-y-2">
-                    <Textarea placeholder="Add a note or update on this lead..." value={newActivityContent} onChange={(e) => setNewActivityContent(e.target.value)} className="min-h-[100px] text-sm rounded-lg" />
+
+                <div className="space-y-2 pt-2 border-t border-border/30">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Quick Note Entry</Label>
+                    <Textarea placeholder="Add a quick note or comment on this lead..." value={newActivityContent} onChange={(e) => setNewActivityContent(e.target.value)} className="min-h-[80px] text-xs rounded-xl" />
                     <div className="flex justify-end">
-                        <Button size="sm" onClick={handleAddNote} disabled={!newActivityContent.trim() || savingNote} className="font-bold text-xs uppercase tracking-wider">
+                        <Button size="sm" onClick={handleAddNote} disabled={!newActivityContent.trim() || savingNote} className="font-bold text-xs uppercase tracking-wider rounded-lg">
                             {savingNote && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
                             {savingNote ? "Saving..." : "Save Note"}
                         </Button>

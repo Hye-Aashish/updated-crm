@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import DOMPurify from 'dompurify'
 import api from '@/lib/api-client'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -701,10 +702,12 @@ export function CampaignsPage() {
                                     <div
                                         className="p-4 sm:p-6 overflow-y-auto max-h-[500px]"
                                         dangerouslySetInnerHTML={{
-                                            __html: selectedCampaign.content
-                                                .replace(/\{\{\s*name\s*\}\}/gi, 'John Doe')
-                                                .replace(/\{\{\s*company\s*\}\}/gi, 'Acme Corp')
-                                                .replace(/\{\{\s*date\s*\}\}/gi, new Date().toLocaleDateString())
+                                            __html: DOMPurify.sanitize(
+                                                selectedCampaign.content
+                                                    .replace(/\{\{\s*name\s*\}\}/gi, 'John Doe')
+                                                    .replace(/\{\{\s*company\s*\}\}/gi, 'Acme Corp')
+                                                    .replace(/\{\{\s*date\s*\}\}/gi, new Date().toLocaleDateString())
+                                            )
                                         }}
                                     />
                                 </div>

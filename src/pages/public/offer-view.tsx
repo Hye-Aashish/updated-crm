@@ -4,9 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-    CheckCircle2, Download, AlertCircle, Loader2, Building2,
-    Briefcase, Calendar, DollarSign, XCircle, FileText, Check, Award,
-    Clock, Shield, MapPin, Phone, Mail, Globe, Sparkles
+    CheckCircle2, Download, AlertCircle, Loader2, XCircle, Check
 } from 'lucide-react'
 import axios from 'axios'
 

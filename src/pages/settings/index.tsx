@@ -1740,7 +1740,7 @@ function WhatsAppSettingsTab({ data, onSave, saving }: any) {
                                                     alt="WhatsApp QR Code"
                                                     className={`w-48 h-48 object-contain transition-all duration-300 ${refreshingQr ? 'opacity-20 scale-95 blur-sm' : 'opacity-100 scale-100'}`}
                                                 />
-                                            ) : qrStatus === 'connected' ? (
+                                            ) : (qrStatus as string) === 'connected' ? (
                                                 <div className="w-48 h-48 flex flex-col items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg">
                                                     <CheckCircle className="h-12 w-12 mb-2" />
                                                     <span className="font-bold text-sm">Linked Successfully</span>
@@ -1773,6 +1773,18 @@ function WhatsAppSettingsTab({ data, onSave, saving }: any) {
                                             <RefreshCw className={`mr-2 h-3.5 w-3.5 ${refreshingQr ? 'animate-spin' : ''}`} />
                                             Refresh QR Code
                                         </Button>
+                                        {(qrStatus as string) === 'connected' && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleSyncChats}
+                                                disabled={syncingChats}
+                                                className="rounded-xl text-xs font-bold border-emerald-500/30 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                                            >
+                                                <RefreshCw className={`mr-2 h-3.5 w-3.5 ${syncingChats ? 'animate-spin' : ''}`} />
+                                                {syncingChats ? 'Syncing...' : 'Sync Recent Chats'}
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
 

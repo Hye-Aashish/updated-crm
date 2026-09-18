@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
 
+import { ChatNotificationListener } from '../chat-notification-listener'
+
 export function DashboardLayout() {
     const [collapsed, setCollapsed] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
@@ -78,8 +80,8 @@ export function DashboardLayout() {
     }
 
     return (
-
         <div className="flex h-[100dvh] bg-background overflow-hidden w-full font-sans">
+            <ChatNotificationListener />
             {/* Sidebar with shared state */}
             <Sidebar
                 collapsed={collapsed}

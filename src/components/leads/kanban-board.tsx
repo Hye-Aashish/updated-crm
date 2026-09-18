@@ -2,7 +2,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Trash2, ExternalLink, Users, Star, Clock, Folder } from 'lucide-react'
+import { MoreHorizontal, Trash2, ExternalLink, Users, Star, Clock, Folder, PhoneCall } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { getLeadFollowUpInfo } from '@/lib/followup-utils'
 import { format } from 'date-fns'
@@ -14,10 +14,11 @@ interface KanbanBoardProps {
     onDragStart: (lead: Lead) => void
     onDrop: (stageId: string) => void
     onLeadClick: (lead: Lead) => void
+    onOpenFollowUp: (lead: Lead) => void
     onDeleteLead: (id: string) => void
 }
 
-export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, onDeleteLead }: KanbanBoardProps) {
+export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, onOpenFollowUp, onDeleteLead }: KanbanBoardProps) {
     const handleDragOver = (e: React.DragEvent) => e.preventDefault()
 
     return (
@@ -30,21 +31,19 @@ export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, o
                     return (
                         <div
                             key={stage.id}
-                            className="w-[280px] flex flex-col h-full bg-muted/20 rounded-xl border border-border/40 transition-colors"
+                            className="w-[290px] flex flex-col h-full bg-muted/20 rounded-2xl border border-border/40 transition-colors"
                             onDragOver={handleDragOver}
                             onDrop={() => onDrop(stage.id)}
                         >
                             {/* Stage Header */}
-                            <div className="p-4 border-b border-border/20">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${stage.color}`} />
-                                        <h3 className="font-bold text-xs uppercase tracking-wider">{stage.label}</h3>
-                                    </div>
-                                    <Badge variant="secondary" className="text-[10px] font-semibold px-2 py-0 h-5 min-w-[20px] justify-center">{stageLeads.length}</Badge>
+                            <div className="p-4 border-b border-border/20 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-2.5 h-2.5 rounded-full ${stage.color}`} />
+                                    <h3 className="font-bold text-xs uppercase tracking-wider">{stage.label}</h3>
                                 </div>
-                                <div className="text-[10px] text-muted-foreground font-medium">
-                                    Total: <span className="text-foreground font-semibold">{formatCurrency(stageValue)}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-muted-foreground">{formatCurrency(stageValue)}</span>
+                                    <Badge variant="secondary" className="text-[10px] font-extrabold px-2 py-0.5 rounded-full">{stageLeads.length}</Badge>
                                 </div>
                             </div>
 
@@ -52,13 +51,9 @@ export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, o
                             <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar">
                                 {stageLeads.map((lead) => {
                                     const followUpInfo = getLeadFollowUpInfo(lead.reminder)
-                                    const borderClass = followUpInfo.status !== 'none' 
+                                    const borderClass = followUpInfo.borderLeft
                                         ? `${followUpInfo.borderLeft} ${followUpInfo.cardBg}` 
-                                        : lead.aiPriority === 'green'
-                                        ? 'border-emerald-500/30 border-l-emerald-500 bg-emerald-500/[0.02]'
-                                        : lead.aiPriority === 'yellow'
-                                        ? 'border-yellow-500/30 border-l-yellow-500 bg-yellow-500/[0.02]'
-                                        : 'border-red-500/30 border-l-red-500 bg-red-500/[0.02]'
+                                        : 'border-border/60 bg-card'
 
                                     return (
                                         <Card
@@ -66,84 +61,72 @@ export function KanbanBoard({ stages, leads, onDragStart, onDrop, onLeadClick, o
                                             draggable
                                             onDragStart={() => onDragStart(lead)}
                                             onClick={() => onLeadClick(lead)}
-                                            className={`dashboard-card cursor-grab active:cursor-grabbing group border transition-all duration-300 ${borderClass}`}
+                                            className={`dashboard-card cursor-grab active:cursor-grabbing group border transition-all duration-300 rounded-xl ${borderClass}`}
                                         >
-                                            <CardContent className="p-4 relative">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div className="font-bold text-sm text-foreground tracking-tight group-hover:text-primary transition-colors pr-6">
+                                            <CardContent className="p-3.5 relative space-y-2.5">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <div className="font-bold text-sm text-foreground tracking-tight group-hover:text-primary transition-colors">
                                                         {lead.company}
                                                     </div>
-                                                    <div className="flex items-center gap-0.5 mt-1" title={`${lead.rating || 0} Stars`}>
-                                                        {[1, 2, 3, 4, 5].map(star => (
-                                                            <Star key={star} className={`h-3 w-3 ${star <= (lead.rating || 0) ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground/30'}`} />
-                                                        ))}
-                                                    </div>
-                                                    <div className="absolute top-3 right-3">
-                                                        <DropdownMenu modal={false}>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted" onClick={(e) => e.stopPropagation()}>
-                                                                    <MoreHorizontal className="h-4 w-4" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="w-40">
-                                                                <DropdownMenuItem className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); onLeadClick(lead); }}>
-                                                                    <ExternalLink className="mr-2 h-3 w-3" /> View Details
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem className="text-xs text-destructive focus:text-destructive cursor-pointer" onClick={(e) => { e.stopPropagation(); onDeleteLead(lead.id); }}>
-                                                                    <Trash2 className="mr-2 h-3 w-3" /> Delete Lead
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </div>
+                                                    <DropdownMenu modal={false}>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md text-muted-foreground hover:bg-muted" onClick={(e) => e.stopPropagation()}>
+                                                                <MoreHorizontal className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-40 rounded-xl">
+                                                            <DropdownMenuItem className="text-xs cursor-pointer font-semibold" onClick={(e) => { e.stopPropagation(); onOpenFollowUp(lead); }}>
+                                                                <PhoneCall className="mr-2 h-3.5 w-3.5 text-primary" /> Follow-up
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-xs cursor-pointer font-semibold" onClick={(e) => { e.stopPropagation(); onLeadClick(lead); }}>
+                                                                <ExternalLink className="mr-2 h-3.5 w-3.5" /> View Details
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-xs text-destructive font-semibold cursor-pointer" onClick={(e) => { e.stopPropagation(); onDeleteLead(lead.id); }}>
+                                                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete Lead
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </div>
 
-                                                <div className="space-y-3">
-                                                    <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-2">
-                                                        <Users className="h-3 w-3" />
+                                                <div className="text-[11px] text-muted-foreground font-medium flex items-center justify-between">
+                                                    <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                                                        <Users className="h-3 w-3 text-muted-foreground" />
                                                         {lead.name}
+                                                    </span>
+                                                    {lead.phone && <span className="text-[10px] text-muted-foreground">{lead.phone}</span>}
+                                                </div>
+
+                                                {/* Follow-up Badge */}
+                                                {lead.reminder?.date && !lead.reminder.completed ? (
+                                                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold border ${followUpInfo.badgeBg} ${followUpInfo.badgeText} ${followUpInfo.badgeBorder}`}>
+                                                        <Clock className="h-3 w-3 shrink-0" />
+                                                        <span className="truncate">
+                                                            {followUpInfo.overdueText || `${followUpInfo.label}: ${format(new Date(lead.reminder.date), 'MMM d, h:mm a')}`}
+                                                        </span>
                                                     </div>
+                                                ) : (
+                                                    <span className="text-[10px] text-muted-foreground italic block">No next follow-up</span>
+                                                )}
 
-                                                    {lead.project && (
-                                                        <div className="text-[11px] font-semibold text-primary flex items-center gap-1.5">
-                                                            <Folder className="h-3 w-3 shrink-0" />
-                                                            <span className="truncate">{lead.project}</span>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {lead.reminder?.date && (
-                                                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold border ${followUpInfo.badgeBg} ${followUpInfo.badgeText} ${followUpInfo.badgeBorder} w-fit`}>
-                                                            <Clock className="h-3 w-3 shrink-0" />
-                                                            <span className="truncate">
-                                                                {followUpInfo.label}: {format(new Date(lead.reminder.date), 'MMM d, h:mm a')}
-                                                            </span>
-                                                        </div>
-                                                    )}
+                                                <div className="flex items-center justify-between pt-2 border-t border-border/20">
+                                                    <span className="text-xs font-bold text-foreground">{formatCurrency(lead.value)}</span>
 
-                                                    {lead.tags && lead.tags.length > 0 && (
-                                                        <div className="flex flex-wrap gap-1 mt-1">
-                                                            {lead.tags.map(tag => (
-                                                                <span key={tag} className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary/80 text-secondary-foreground border border-border/20">
-                                                                    {tag}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex items-center justify-between pt-3 border-t border-border/10">
-                                                        <span className="text-base font-bold text-foreground">{formatCurrency(lead.value)}</span>
-                                                        {lead.source && (
-                                                            <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 border-primary/20 bg-primary/5 text-primary rounded-md">
-                                                                {lead.source}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={(e) => { e.stopPropagation(); onOpenFollowUp(lead); }}
+                                                        className="h-6 px-2.5 rounded-lg text-[10px] font-bold bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                                                    >
+                                                        <PhoneCall className="mr-1 h-3 w-3" />
+                                                        Follow-up
+                                                    </Button>
                                                 </div>
                                             </CardContent>
                                         </Card>
                                     )
                                 })}
+
                                 {stageLeads.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-border/40 rounded-lg bg-muted/5">
+                                    <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-border/40 rounded-xl bg-muted/5">
                                         <span className="text-[10px] font-medium text-muted-foreground">No leads in this stage</span>
                                     </div>
                                 )}

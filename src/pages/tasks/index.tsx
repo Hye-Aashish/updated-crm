@@ -58,7 +58,7 @@ export function TasksPage() {
     const { currentUser, tasks: storeTasks, users, projects, setTasks: setStoreTasks, setUsers, setProjects, addTask: addStoreTask, updateTask: updateStoreTask } = useAppStore()
 
     const [tasks, setTasks] = useState(storeTasks)
-    const { canCreate, canDelete } = usePermissions()
+    const { canCreate } = usePermissions()
     const [statuses, setStatuses] = useState<TaskStatus[]>(INITIAL_STATUSES)
     const [view, setView] = useState<'list' | 'kanban'>('kanban')
     const [draggedTask, setDraggedTask] = useState<any>(null)

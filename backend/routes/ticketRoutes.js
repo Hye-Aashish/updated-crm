@@ -139,8 +139,22 @@ router.put('/:id', protect, checkPermission('tickets', 'edit'), async (req, res)
 // Delete ticket
 router.delete('/:id', protect, checkPermission('tickets', 'delete'), async (req, res) => {
     try {
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        if (req.user.role === 'client') {
+            if (ticket.clientId !== req.user.clientId) {
+                return res.status(403).json({ message: 'Not authorized to delete this ticket' });
+            }
+        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+            const isCreator = ticket.createdBy === req.user._id.toString();
+            if (!isCreator) {
+                return res.status(403).json({ message: 'Not authorized to delete this ticket' });
+            }
+        }
+
         await Ticket.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Ticket deleted' });
+        res.json({ message: 'Ticket deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

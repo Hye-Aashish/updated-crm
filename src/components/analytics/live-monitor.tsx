@@ -24,7 +24,11 @@ export function LiveMonitor() {
     const socketRef = useRef<any>(null);
 
     useEffect(() => {
-        socketRef.current = io(SOCKET_URL);
+        const token = localStorage.getItem('token');
+        socketRef.current = io(SOCKET_URL, {
+            auth: { token },
+            query: { token }
+        });
 
         socketRef.current.on('connect', () => {
             console.log('Connected to monitoring socket');

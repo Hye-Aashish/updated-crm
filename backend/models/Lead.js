@@ -13,15 +13,23 @@ const leadSchema = new mongoose.Schema({
     customFields: { type: Map, of: String },
     activities: [{
         content: String,
-        type: { type: String, enum: ['note', 'call', 'meeting', 'email'], default: 'note' },
+        type: { type: String, default: 'note' },
+        outcome: String,
+        nextFollowUpDate: Date,
+        reminderMinutes: Number,
+        createdByName: String,
         createdAt: { type: Date, default: Date.now }
     }],
     reminder: {
         date: Date,
         tone: { type: String, default: 'default' },
         completed: { type: Boolean, default: false },
+        reminderMinutes: Number,
         sentReminders: [{ type: String }]
     },
+    lastFollowUpDate: Date,
+    lastFollowUpOutcome: String,
+    lastNote: String,
     tags: [{ type: String }],
     aiPriority: { type: String, enum: ['red', 'yellow', 'green'], default: 'red' },
     aiPriorityReason: { type: String, default: 'No interaction history.' },

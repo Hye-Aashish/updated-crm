@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Progress } from '@/components/ui/progress'
 import {
-    Users, ShieldAlert, CheckCircle2, AlertTriangle, Search,
-    Flame, Sparkles, Filter, ArrowUpRight, CheckSquare, Clock, Calendar, BarChart3, RefreshCw
+    Users, CheckCircle2, AlertTriangle, Search,
+    Flame, Sparkles, CheckSquare, Clock, BarChart3, RefreshCw
 } from 'lucide-react'
 import { getInitials } from '@/lib/utils'
 

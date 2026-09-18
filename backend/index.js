@@ -207,8 +207,17 @@ Object.entries(routes).forEach(([path, handler]) => {
 // Serve static widget file
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
-
 app.get('/', (req, res) => res.send('Nexprism CRM API v1.0 - Operational'));
+
+// Serve production dist static files if in production mode
+const distPath = path.join(__dirname, '../dist');
+if (process.env.NODE_ENV === 'production' && require('fs').existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/public') || req.path.includes('.')) return next();
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+}
 
 // Error Middleware
 app.use(errorHandler);

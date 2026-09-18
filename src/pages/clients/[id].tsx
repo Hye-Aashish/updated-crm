@@ -18,7 +18,7 @@ import { ClientProductForm } from '@/components/clients/client-product-dialog'
 import { ClientProductManagerDialog } from '@/components/clients/client-product-manager-dialog'
 import { usePermissions } from '@/hooks/use-permissions'
 import { Progress } from '@/components/ui/progress'
-import { Package, Plus } from 'lucide-react'
+import { Package, Plus, FolderOpen } from 'lucide-react'
 import type { ClientProduct } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -854,9 +854,9 @@ export function ClientDetailPage() {
                                                         size="sm"
                                                         variant="default"
                                                         className="flex-1 text-xs gap-1.5 shadow-xs bg-indigo-600 hover:bg-indigo-700"
-                                                        onClick={() => router.push(`/projects/${cp.projectId}`)}
+                                                        onClick={() => navigate(`/projects/${cp.projectId}`)}
                                                     >
-                                                        <Folder className="h-3.5 w-3.5" /> Project Workspace
+                                                        <FolderOpen className="h-3.5 w-3.5" /> Project Workspace
                                                     </Button>
                                                 )}
                                                 <Button

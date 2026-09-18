@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import {
     CheckCircle2, Upload, FileText, AlertCircle, Loader2,
     Building2, ShieldCheck, User, MapPin, GraduationCap, Landmark,
-    Eye, Trash2
+    Eye
 } from 'lucide-react'
 import axios from 'axios'
 

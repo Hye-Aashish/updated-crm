@@ -10,9 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-    FileText, CheckCircle2, Download, Send, AlertCircle,
-    Loader2, Eye, Award, Sparkles, Building2, Plus, Trash2,
-    RotateCcw, Check, Copy
+    FileText, Download, Send, Loader2, Eye, Sparkles, Plus, Trash2, RotateCcw
 } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'

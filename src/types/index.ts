@@ -425,14 +425,19 @@ export interface Activity {
 
 // Lead & Pipeline Types
 export interface LeadActivity {
-    _id: string
+    _id?: string
     content: string
-    type: 'note' | 'call' | 'meeting' | 'email'
+    type?: string
+    outcome?: string
+    nextFollowUpDate?: Date | string
+    reminderMinutes?: number
+    createdByName?: string
     createdAt: Date | string
 }
 
 export interface Lead {
     id: string
+    _id?: string
     name: string
     company: string
     value: number
@@ -442,12 +447,17 @@ export interface Lead {
     phone?: string
     project?: string
     rating?: number
+    assignedTo?: string
+    lastFollowUpDate?: Date | string
+    lastFollowUpOutcome?: string
+    lastNote?: string
     customFields?: Record<string, string>
     activities?: LeadActivity[]
     reminder?: {
-        date: Date | string
+        date: Date | string | null
         tone?: string
         completed?: boolean
+        reminderMinutes?: number
     }
     tags?: string[]
     aiPriority?: 'red' | 'yellow' | 'green'

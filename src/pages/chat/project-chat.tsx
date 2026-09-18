@@ -105,9 +105,11 @@ export const ProjectChatPage = () => {
 
     // Initial Load & Socket Setup
     useEffect(() => {
-        if (!currentUser) return;
-
-        const newSocket = io(SOCKET_URL);
+        const token = localStorage.getItem('token');
+        const newSocket = io(SOCKET_URL, {
+            auth: { token },
+            query: { token }
+        });
 
         newSocket.on('connect', () => {
             console.log('Connected to project chat');

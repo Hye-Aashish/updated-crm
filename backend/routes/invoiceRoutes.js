@@ -564,16 +564,18 @@ router.post('/payment/webhook', async (req, res) => {
         const settings = await Setting.findOne({ type: 'general' });
         const secret = settings?.billing?.cashfreeClientSecret || process.env.CASHFREE_CLIENT_SECRET;
 
-        if (secret) {
-            if (!signature) {
-                console.warn('[SECURITY] Webhook rejected: missing signature header');
-                return res.status(401).send('Missing webhook signature');
-            }
-            const expectedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('base64');
-            if (signature !== expectedSignature) {
-                console.warn('[SECURITY] Invalid webhook signature rejected');
-                return res.status(401).send('Invalid signature');
-            }
+        if (!secret) {
+            console.warn('[SECURITY] Webhook rejected: Cashfree client secret is not configured in settings or env');
+            return res.status(401).send('Webhook verification unconfigured');
+        }
+        if (!signature) {
+            console.warn('[SECURITY] Webhook rejected: missing signature header');
+            return res.status(401).send('Missing webhook signature');
+        }
+        const expectedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('base64');
+        if (signature !== expectedSignature) {
+            console.warn('[SECURITY] Invalid webhook signature rejected');
+            return res.status(401).send('Invalid signature');
         }
 
         // Cashfree can send webhook in different formats depending on version/config

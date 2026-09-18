@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
 
+import { ChatNotificationListener } from '../chat-notification-listener'
+
 export function EmployeeLayout() {
     const navigate = useNavigate()
     const { currentUser, setCurrentUser, settings, fetchSettings } = useAppStore()
@@ -55,6 +57,7 @@ export function EmployeeLayout() {
 
     return (
         <div className="h-[100dvh] bg-gray-50/90 dark:bg-zinc-900 overflow-hidden flex flex-col">
+            <ChatNotificationListener />
             {/* Employee Sidebar */}
             <EmployeeSidebar
                 collapsed={collapsed}

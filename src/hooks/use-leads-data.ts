@@ -3,6 +3,7 @@ import api from '@/lib/api-client'
 import { useAppStore } from '@/store'
 import { useToast } from '@/hooks/use-toast'
 import type { PipelineStage, LeadForm } from '@/types'
+import { mapLead } from '@/lib/mappers'
 
 export function useLeadsData() {
     const { toast } = useToast()
@@ -21,19 +22,7 @@ export function useLeadsData() {
             ])
 
             setStages(stagesRes.data)
-            setLeads(leadsRes.data.map((l: any) => ({
-                id: l._id,
-                name: l.name,
-                company: l.company,
-                value: l.value,
-                source: l.source,
-                stage: l.stage,
-                email: l.email,
-                phone: l.phone,
-                activities: l.activities || [],
-                reminder: l.reminder,
-                customFields: l.customFields || {}
-            })))
+            setLeads(leadsRes.data.map(mapLead))
             setLeadForms(formsRes.data)
         } catch (error) {
             console.error("Failed to fetch leads data", error)
@@ -76,20 +65,41 @@ export function useLeadsData() {
                 content,
                 type: 'note'
             })
-            const updatedLead = res.data
-            const updatedLeads = leads.map(l => l.id === leadId ? {
-                ...l,
-                activities: updatedLead.activities,
-                aiPriority: updatedLead.aiPriority,
-                aiPriorityReason: updatedLead.aiPriorityReason,
-                reminder: updatedLead.reminder
-            } : l)
+            const updatedLead = mapLead(res.data)
+            const updatedLeads = leads.map(l => l.id === leadId ? updatedLead : l)
             setLeads(updatedLeads)
             toast({ description: "Note added" })
             return updatedLead
         } catch (error: any) {
-            toast({ title: "Error", description: error?.response?.data?.stack || error?.response?.data?.message || error.message || "Failed to add note", variant: "destructive" })
+            toast({ title: "Error", description: error?.response?.data?.message || error.message || "Failed to add note", variant: "destructive" })
             return null
+        }
+    }
+
+    const logFollowUp = async (leadId: string, payload: any) => {
+        try {
+            const res = await api.post(`/leads/${leadId}/followups`, payload)
+            const updatedLead = mapLead(res.data)
+            setLeads(leads.map(l => l.id === leadId ? updatedLead : l))
+            toast({ title: "Success", description: "Follow-up recorded successfully!" })
+            return updatedLead
+        } catch (error: any) {
+            console.error("Log Follow-up Error:", error)
+            toast({ title: "Error", description: error?.response?.data?.message || "Failed to record follow-up", variant: "destructive" })
+            return null
+        }
+    }
+
+    const reorderStages = async (newStages: PipelineStage[]) => {
+        setStages(newStages)
+        try {
+            const stageOrders = newStages.map((s, index) => ({ id: s.id, order: index }))
+            await api.put('/leads/stages/reorder', { stageOrders })
+            toast({ description: "Stage order updated" })
+        } catch (error) {
+            console.error("Reorder stages error:", error)
+            toast({ title: "Error", description: "Failed to save stage order", variant: "destructive" })
+            fetchData()
         }
     }
 
@@ -104,6 +114,8 @@ export function useLeadsData() {
         updateLeadStage,
         deleteLead,
         addActivity,
+        logFollowUp,
+        reorderStages,
         loading
     }
 }

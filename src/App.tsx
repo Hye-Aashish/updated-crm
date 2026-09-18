@@ -1,4 +1,4 @@
-import { HashRouter } from 'react-router-dom'
+import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from './routes'
 import { ThemeProvider } from './components/theme-provider'
 import { Toaster } from './components/ui/toaster'
@@ -18,7 +18,7 @@ function App() {
 
     return (
         <ThemeProvider defaultTheme="light" storageKey="nexprism-theme">
-            <HashRouter>
+            <BrowserRouter>
                 {/* Break Management Components (Visible only in Electron) */}
                 <BreakCheck 
                     open={breakCheck} 
@@ -28,11 +28,11 @@ function App() {
                 <BreakOverlay 
                     open={isOnBreak} 
                     onResume={handleResumeWork} 
-                />
+                    />
                 <ReminderManager />
                 <AppRoutes />
                 <Toaster />
-            </HashRouter>
+            </BrowserRouter>
         </ThemeProvider>
     )
 }

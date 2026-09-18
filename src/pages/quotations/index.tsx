@@ -185,8 +185,8 @@ export default function QuotationsPage() {
                                                 <div>
                                                     <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                                                         {quotation.quotationNumber}
-                                                        {quotation.attachmentUrl && <Paperclip className="w-3 h-3 text-gray-400" title="Has Attachment" />}
-                                                        {quotation.linkedProjectId && <FolderOpen className="w-3 h-3 text-green-500" title="Converted to Project" />}
+                                                        {quotation.attachmentUrl && <span title="Has Attachment"><Paperclip className="w-3 h-3 text-gray-400" /></span>}
+                                                        {quotation.linkedProjectId && <span title="Converted to Project"><FolderOpen className="w-3 h-3 text-green-500" /></span>}
                                                     </div>
                                                     <div className="text-xs text-gray-500">v{quotation.version}</div>
                                                 </div>

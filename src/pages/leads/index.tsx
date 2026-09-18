@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Plus, Settings, List, LayoutGrid, FileText, Trash2, CalendarClock, Search } from 'lucide-react'
+import { Plus, Settings, List, LayoutGrid, FileText, Trash2, CalendarClock, Search, ArrowUp, ArrowDown } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -14,10 +14,10 @@ import { KanbanBoard } from '@/components/leads/kanban-board'
 import { LeadsList } from '@/components/leads/leads-list'
 import { LeadDetailsDialog } from '@/components/leads/lead-details-dialog'
 import { LeadFormBuilder } from '@/components/leads/lead-form-builder'
-import { FollowUpsView } from '@/components/leads/follow-ups-view'
+import { FollowUpDialog } from '@/components/leads/follow-up-dialog'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import type { Lead } from '@/types'
-import { getLeadFollowUpInfo } from '@/lib/followup-utils'
+import { getLeadFollowUpInfo, sortLeadsByFollowUpPriority } from '@/lib/followup-utils'
 
 const COLOR_OPTIONS = [
     { value: 'bg-blue-500', label: 'Blue' }, { value: 'bg-green-500', label: 'Green' },
@@ -30,59 +30,61 @@ export function LeadsPage() {
     const { toast } = useToast()
     const {
         leads, stages, leadForms, setLeads, setStages, setLeadForms,
-        updateLeadStage, deleteLead, addActivity, fetchData, loading
+        updateLeadStage, deleteLead, addActivity, logFollowUp, reorderStages, fetchData, loading
     } = useLeadsData()
 
-    const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'followups'>('kanban')
+    const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+    const [followUpLead, setFollowUpLead] = useState<Lead | null>(null)
+    const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState<boolean>(false)
 
-// Filters state
-const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all')
-const [selectedFollowUpFilter, setSelectedFollowUpFilter] = useState<string>('all')
-const [searchQuery, setSearchQuery] = useState<string>('')
-const allTags = Array.from(new Set(leads.flatMap(l => l.tags || [])))
+    // Filters state
+    const [selectedTagFilter] = useState<string>('all')
+    const [selectedFollowUpFilter, setSelectedFollowUpFilter] = useState<string>('all')
+    const [searchQuery, setSearchQuery] = useState<string>('')
 
-const filteredLeads = leads.filter(l => {
-    const matchesTag = selectedTagFilter === 'all' || (l.tags || []).includes(selectedTagFilter)
-    
-    const matchesFollowUp = selectedFollowUpFilter === 'all' || (() => {
-        const info = getLeadFollowUpInfo(l.reminder)
-        if (selectedFollowUpFilter === 'none') return !info.status
-        return info.status === selectedFollowUpFilter
-    })()
+    // 1. Filter Leads
+    const rawFilteredLeads = leads.filter(l => {
+        const matchesTag = selectedTagFilter === 'all' || (l.tags || []).includes(selectedTagFilter)
+        
+        const matchesFollowUp = selectedFollowUpFilter === 'all' || (() => {
+            const info = getLeadFollowUpInfo(l.reminder)
+            if (selectedFollowUpFilter === 'none') return !l.reminder?.date || l.reminder.completed
+            return info.status === selectedFollowUpFilter
+        })()
 
-    const q = searchQuery.toLowerCase()
-    
-    const phoneStr = l.phone ? String(l.phone) : ''
-    const cleanPhone = phoneStr.replace(/[\s-()+]/g, '')
-    const cleanQ = q.replace(/[\s-()+]/g, '')
-    
-    // Search inside all custom fields
-    let matchesCustomField = false
-    if (l.customFields && q) {
-        matchesCustomField = Object.values(l.customFields).some(val => {
-            const strVal = String(val)
-            const cleanVal = strVal.replace(/[\s-()+]/g, '')
-            return strVal.toLowerCase().includes(q) || (cleanVal && cleanQ && cleanVal.includes(cleanQ))
-        })
-    }
-    
-    // Search inside interaction history (activities)
-    let matchesActivities = false
-    if (l.activities && q) {
-        matchesActivities = l.activities.some(a => a.content?.toLowerCase().includes(q))
-    }
-    
-    const matchesSearch = !q || 
-                          l.name?.toLowerCase().includes(q) || 
-                          (cleanPhone && cleanQ && cleanPhone.includes(cleanQ)) || 
-                          matchesCustomField || 
-                          matchesActivities ||
-                          l.company?.toLowerCase().includes(q) ||
-                          l.email?.toLowerCase().includes(q)
-    return matchesTag && matchesFollowUp && matchesSearch
-})
+        const q = searchQuery.toLowerCase()
+        const phoneStr = l.phone ? String(l.phone) : ''
+        const cleanPhone = phoneStr.replace(/[\s-()+]/g, '')
+        const cleanQ = q.replace(/[\s-()+]/g, '')
+        
+        let matchesCustomField = false
+        if (l.customFields && q) {
+            matchesCustomField = Object.values(l.customFields).some(val => {
+                const strVal = String(val)
+                const cleanVal = strVal.replace(/[\s-()+]/g, '')
+                return strVal.toLowerCase().includes(q) || (cleanVal && cleanQ && cleanVal.includes(cleanQ))
+            })
+        }
+        
+        let matchesActivities = false
+        if (l.activities && q) {
+            matchesActivities = l.activities.some(a => a.content?.toLowerCase().includes(q) || a.outcome?.toLowerCase().includes(q))
+        }
+        
+        const matchesSearch = !q || 
+                              l.name?.toLowerCase().includes(q) || 
+                              (cleanPhone && cleanQ && cleanPhone.includes(cleanQ)) || 
+                              matchesCustomField || 
+                              matchesActivities ||
+                              l.company?.toLowerCase().includes(q) ||
+                              l.email?.toLowerCase().includes(q)
+        return matchesTag && matchesFollowUp && matchesSearch
+    })
+
+    // 2. Sort Leads by Follow-up Priority Rules (Overdue -> Today -> Upcoming -> No Follow-up)
+    const filteredLeads = sortLeadsByFollowUpPriority(rawFilteredLeads)
 
     // Dialog States
     const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false)
@@ -104,7 +106,7 @@ const filteredLeads = leads.filter(l => {
                 stage: stages[0]?.id || 'new'
             }
             const res = await api.post('/leads', payload)
-            setLeads([...leads, { id: res.data._id, ...payload, activities: [], customFields: {} }])
+            setLeads([...leads, { id: res.data._id, _id: res.data._id, ...payload, activities: [], customFields: {} }])
             setNewLead({ name: '', company: '', value: '', source: '', email: '', phone: '', project: '' })
             setIsLeadDialogOpen(false)
             toast({ title: "Success", description: "Lead added successfully" })
@@ -128,6 +130,15 @@ const filteredLeads = leads.filter(l => {
         }
     }
 
+    const handleMoveStage = (index: number, direction: 'up' | 'down') => {
+        const targetIndex = direction === 'up' ? index - 1 : index + 1
+        if (targetIndex < 0 || targetIndex >= stages.length) return
+        const newStages = [...stages]
+        const [moved] = newStages.splice(index, 1)
+        newStages.splice(targetIndex, 0, moved)
+        reorderStages(newStages)
+    }
+
     const handleDeleteStage = async (stageId: string) => {
         if (stages.length <= 1) return
         try {
@@ -139,20 +150,25 @@ const filteredLeads = leads.filter(l => {
         }
     }
 
+    const handleOpenFollowUp = (targetLead: Lead) => {
+        setFollowUpLead(targetLead)
+        setIsFollowUpModalOpen(true)
+    }
+
     if (loading && leads.length === 0) {
         return <PageSkeleton />
     }
 
     return (
-        <div className="space-y-6 h-[calc(100vh-100px)] flex flex-col font-sans pb-10">
+        <div className="space-y-5 h-[calc(100vh-100px)] flex flex-col font-sans pb-6">
             {/* 1. Header Navigation */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0">
                 <div className="space-y-1">
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                        Lead Pipeline
+                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+                        <span>Lead Pipeline & Follow-ups</span>
                     </h1>
                     <p className="text-sm text-muted-foreground font-medium">
-                        Manage your sales pipeline and track conversion stages
+                        Intelligent follow-up priority tracking and sales management
                     </p>
                 </div>
 
@@ -161,88 +177,50 @@ const filteredLeads = leads.filter(l => {
                     <div className="relative w-[180px] sm:w-[220px] shrink-0">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search name or phone..."
+                            placeholder="Search lead or phone..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-9 pl-9 rounded-lg border-border/60 text-xs font-semibold bg-card w-full"
+                            className="h-9 pl-9 rounded-xl border-border/60 text-xs font-semibold bg-card w-full"
                         />
                     </div>
                     
-                    {/* Tag Filter Selector */}
-                    <div className="w-[140px] sm:w-[160px]">
-                        <Select value={selectedTagFilter} onValueChange={setSelectedTagFilter}>
-                            <SelectTrigger className="h-9 rounded-lg border-border/60 text-xs font-semibold bg-card">
-                                <SelectValue placeholder="Filter by Tag" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-[250px]">
-                                <SelectItem value="all" className="text-xs font-semibold">ALL TAGS</SelectItem>
-                                {allTags.map(tag => (
-                                    <SelectItem key={tag} value={tag} className="text-xs font-semibold uppercase">{tag}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
 
-                    {/* Follow-up Status Filter Selector */}
-                    <div className="w-[140px] sm:w-[160px]">
-                        <Select value={selectedFollowUpFilter} onValueChange={setSelectedFollowUpFilter}>
-                            <SelectTrigger className="h-9 rounded-lg border-border/60 text-xs font-semibold bg-card">
-                                <SelectValue placeholder="Follow-up Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all" className="text-xs font-semibold">ALL FOLLOW-UPS</SelectItem>
-                                <SelectItem value="overdue" className="text-xs font-semibold text-red-600 dark:text-red-400">🔴 MISSED</SelectItem>
-                                <SelectItem value="today" className="text-xs font-semibold text-amber-600 dark:text-amber-400">🟡 TODAY</SelectItem>
-                                <SelectItem value="future" className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">🟢 FUTURE</SelectItem>
-                                <SelectItem value="none" className="text-xs font-semibold text-muted-foreground">NO FOLLOW-UP</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
 
-                    <div className="flex bg-muted/30 rounded-lg p-1 border border-border/40">
+                    <div className="flex bg-muted/40 rounded-xl p-1 border border-border/40">
                         <Button
                             variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
                             size="sm"
                             onClick={() => setViewMode('kanban')}
-                            className={`h-8 px-4 rounded-md font-semibold ${viewMode === 'kanban' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
+                            className={`h-7 px-3 rounded-lg font-bold text-xs ${viewMode === 'kanban' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
                         >
-                            <LayoutGrid className="mr-2 h-4 w-4" />
+                            <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
                             Kanban
                         </Button>
                         <Button
                             variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                             size="sm"
                             onClick={() => setViewMode('list')}
-                            className={`h-8 px-4 rounded-md font-semibold ${viewMode === 'list' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
+                            className={`h-7 px-3 rounded-lg font-bold text-xs ${viewMode === 'list' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
                         >
-                            <List className="mr-2 h-4 w-4" />
+                            <List className="mr-1.5 h-3.5 w-3.5" />
                             List
-                        </Button>
-                        <Button
-                            variant={viewMode === 'followups' ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={() => setViewMode('followups')}
-                            className={`h-8 px-4 rounded-md font-semibold ${viewMode === 'followups' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
-                        >
-                            <CalendarClock className="mr-2 h-4 w-4" />
-                            Follow-ups
                         </Button>
                     </div>
 
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setIsLeadFormDialogOpen(true)} className="h-9 px-3 sm:px-4 rounded-lg font-semibold text-[10px] sm:text-xs border-border/60">
-                            <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                            Web Forms
+                        <Button variant="outline" onClick={() => setIsLeadFormDialogOpen(true)} className="h-9 px-3 rounded-xl font-semibold text-[10px] sm:text-xs border-border/60">
+                            <FileText className="mr-1 h-3.5 w-3.5 text-primary" />
+                            Forms
                         </Button>
 
                         <Dialog open={isStageDialogOpen} onOpenChange={setIsStageDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline" className="h-9 px-3 sm:px-4 rounded-lg font-semibold text-[10px] sm:text-xs border-border/60">
-                                    <Settings className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                                <Button variant="outline" className="h-9 px-3 rounded-xl font-semibold text-[10px] sm:text-xs border-border/60">
+                                    <Settings className="mr-1 h-3.5 w-3.5 text-primary" />
                                     Stages
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-sm rounded-xl">
+                            <DialogContent className="max-w-sm rounded-2xl">
                                 <DialogHeader>
                                     <DialogTitle className="font-bold text-xl">Pipeline Stages</DialogTitle>
                                 </DialogHeader>
@@ -268,17 +246,47 @@ const filteredLeads = leads.filter(l => {
                                     <Button onClick={handleAddStage} className="w-full font-bold rounded-lg h-10 shadow-sm">ADD STAGE</Button>
 
                                     <div className="pt-4 border-t border-border/40">
-                                        <h4 className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Existing Stages</h4>
-                                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                                            {stages.map((s) => (
+                                        <h4 className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Existing Stages (Reorder Sequence)</h4>
+                                        <div className="space-y-2 max-h-[240px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {stages.map((s, idx) => (
                                                 <div key={s.id} className="flex items-center justify-between p-2 rounded-lg border border-border/20 bg-muted/5 group hover:bg-muted/10 transition-all">
                                                     <div className="flex items-center gap-2">
-                                                        <div className={`w-2 h-2 rounded-full ${s.color}`} />
+                                                        <span className="text-[10px] font-bold text-muted-foreground w-4">{idx + 1}.</span>
+                                                        <div className={`w-2.5 h-2.5 rounded-full ${s.color}`} />
                                                         <span className="text-xs font-semibold uppercase tracking-wider">{s.label}</span>
                                                     </div>
-                                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteStage(s.id)} disabled={stages.length <= 1} className="h-7 w-7 rounded-md text-destructive">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    <div className="flex items-center gap-0.5">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleMoveStage(idx, 'up')}
+                                                            disabled={idx === 0}
+                                                            className="h-7 w-7 p-0 rounded-md text-muted-foreground hover:text-primary disabled:opacity-30"
+                                                            title="Move Up"
+                                                        >
+                                                            <ArrowUp className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleMoveStage(idx, 'down')}
+                                                            disabled={idx === stages.length - 1}
+                                                            className="h-7 w-7 p-0 rounded-md text-muted-foreground hover:text-primary disabled:opacity-30"
+                                                            title="Move Down"
+                                                        >
+                                                            <ArrowDown className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDeleteStage(s.id)}
+                                                            disabled={stages.length <= 1}
+                                                            className="h-7 w-7 p-0 rounded-md text-destructive hover:bg-destructive/10"
+                                                            title="Delete Stage"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -289,12 +297,12 @@ const filteredLeads = leads.filter(l => {
 
                         <Dialog open={isLeadDialogOpen} onOpenChange={setIsLeadDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button className="h-9 px-3 sm:px-4 rounded-lg font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md text-[10px] sm:text-xs">
-                                    <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                                <Button className="h-9 px-3 sm:px-4 rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md text-[10px] sm:text-xs">
+                                    <Plus className="mr-1 sm:mr-1.5 h-3.5 w-3.5" />
                                     Add Lead
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-md rounded-xl">
+                            <DialogContent className="max-w-md rounded-2xl">
                                 <DialogHeader>
                                     <DialogTitle className="font-bold text-2xl tracking-tight pt-2">Add New Lead</DialogTitle>
                                 </DialogHeader>
@@ -319,8 +327,12 @@ const filteredLeads = leads.filter(l => {
                 </div>
             </div>
 
-            {/* 2. Intelligence Metrics */}
-            <LeadsKPI leads={filteredLeads} />
+            {/* 2. Interactive Follow-up Counter Header Cards */}
+            <LeadsKPI
+                allLeads={leads}
+                selectedFollowUpFilter={selectedFollowUpFilter}
+                onSelectFollowUpFilter={setSelectedFollowUpFilter}
+            />
 
             {/* 3. Operational Viewport */}
             <div className="flex-1 min-h-0">
@@ -331,21 +343,16 @@ const filteredLeads = leads.filter(l => {
                         onDragStart={setDraggedLead}
                         onDrop={async (stageId) => draggedLead && updateLeadStage(draggedLead.id, stageId)}
                         onLeadClick={(l) => { setSelectedLead(l); setViewLeadDialogOpen(true); }}
+                        onOpenFollowUp={handleOpenFollowUp}
                         onDeleteLead={deleteLead}
                     />
-                ) : viewMode === 'list' ? (
+                ) : (
                     <LeadsList
                         leads={filteredLeads}
                         stages={stages}
                         onLeadClick={(l) => { setSelectedLead(l); setViewLeadDialogOpen(true); }}
+                        onOpenFollowUp={handleOpenFollowUp}
                         onDeleteLead={deleteLead}
-                    />
-                ) : (
-                    <FollowUpsView
-                        leads={filteredLeads}
-                        onUpdate={(updated) => setLeads(leads.map(l => l.id === updated.id ? updated : l))}
-                        onDelete={deleteLead}
-                        onAddActivity={addActivity}
                     />
                 )}
             </div>
@@ -356,8 +363,17 @@ const filteredLeads = leads.filter(l => {
                 isOpen={viewLeadDialogOpen}
                 onClose={() => setViewLeadDialogOpen(false)}
                 onUpdate={(updated) => { setSelectedLead(updated); setLeads(leads.map(l => l.id === updated.id ? updated : l)) }}
+                onOpenFollowUp={handleOpenFollowUp}
                 onDelete={deleteLead}
                 onAddActivity={addActivity}
+            />
+
+            <FollowUpDialog
+                lead={followUpLead}
+                isOpen={isFollowUpModalOpen}
+                onClose={() => { setIsFollowUpModalOpen(false); setFollowUpLead(null); }}
+                stages={stages}
+                onSaveFollowUp={logFollowUp}
             />
 
             <LeadFormBuilder

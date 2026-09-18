@@ -18,7 +18,8 @@ const Attendance = require('../models/Attendance');
 const Setting = require('../models/Setting');
 
 // ── Gather ALL CRM Data ─────────────────────────────────────────────────────
-async function gatherCRMData() {
+async function gatherCRMData(user = {}) {
+    const isFinancialAuthorized = !user || user.role === 'admin' || user.role === 'owner';
     const [
         projects,
         clients,
@@ -36,8 +37,8 @@ async function gatherCRMData() {
         Project.find({}, 'name status budget client startDate endDate progress').lean(),
         Client.find({}, 'name company email status').lean(),
         Task.find({}, 'title status priority assigneeId dueDate createdAt updatedAt').sort({ updatedAt: -1 }).limit(100).lean(),
-        Invoice.find({}, 'invoiceNumber total amount dueDate client status').lean(),
-        Expense.find({}, 'description amount category date').sort({ date: -1 }).limit(50).lean(),
+        isFinancialAuthorized ? Invoice.find({}, 'invoiceNumber total amount dueDate client status').lean() : Promise.resolve([]),
+        isFinancialAuthorized ? Expense.find({}, 'description amount category date').sort({ date: -1 }).limit(50).lean() : Promise.resolve([]),
         Lead.find({}, 'name email status source').lean(),
         User.find({}, 'name email role designation department').lean(),
         Ticket.find({}, 'status').lean(),
@@ -429,7 +430,7 @@ router.post('/chat', protect, authorize('owner', 'admin'), async (req, res) => {
         }
 
         // Gather all CRM data
-        const crmData = await gatherCRMData();
+        const crmData = await gatherCRMData(req.user);
         const systemPrompt = buildSystemPrompt(crmData);
 
         // Set SSE Headers
@@ -606,7 +607,7 @@ router.post('/chat', protect, authorize('owner', 'admin'), async (req, res) => {
 // ── Quick Insights Endpoint ──────────────────────────────────────────────────
 router.get('/insights', protect, authorize('owner', 'admin'), async (req, res) => {
     try {
-        const crmData = await gatherCRMData();
+        const crmData = await gatherCRMData(req.user);
 
         const insights = [];
 

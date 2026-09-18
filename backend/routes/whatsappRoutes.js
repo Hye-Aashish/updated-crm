@@ -63,7 +63,16 @@ router.post('/webhook', async (req, res) => {
             messageText = msg.text?.body || msg.caption || `[${msg.type} Attachment]`;
             notes = `Meta Message ID: ${msg.id}`;
         } else {
-            // Generic Webhook Payload (UltraMsg / Custom gateway / Zapier / Make / Test Payload)
+            // Generic Webhook Payload (Verify token requirement)
+            const settings = await Setting.findOne({ type: 'general' });
+            const expectedToken = settings?.whatsappSettings?.webhookVerifyToken || 'nexcrm_wa_secret';
+            const providedToken = req.headers['x-webhook-token'] || req.query.secret || req.query.token || body.secret || body.token;
+
+            if (providedToken !== expectedToken && process.env.NODE_ENV === 'production') {
+                console.warn('[SECURITY] Generic WhatsApp webhook rejected: Token mismatch');
+                return res.status(403).json({ message: 'Forbidden: Invalid webhook secret token' });
+            }
+
             rawPhone = body.phone || body.from || body.number || body.mobile || body.senderPhone;
             senderName = body.name || body.senderName || body.profileName || body.contactName;
             messageText = body.message || body.text || body.body || body.content;

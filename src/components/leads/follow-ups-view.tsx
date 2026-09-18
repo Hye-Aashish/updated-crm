@@ -1,25 +1,24 @@
 import { useState } from 'react'
-import { Lead } from '@/types'
-import { format, isPast, isToday, isFuture } from 'date-fns'
-import { CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import { Lead, PipelineStage } from '@/types'
+import { format } from 'date-fns'
+import { CheckCircle2, Clock, AlertCircle, PhoneCall } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getLeadFollowUpInfo } from '@/lib/followup-utils'
+import { getLeadFollowUpInfo, sortLeadsByFollowUpPriority } from '@/lib/followup-utils'
 import { LeadDetailsPanel } from './lead-details-panel'
+import { Button } from '@/components/ui/button'
 
 interface FollowUpsViewProps {
     leads: Lead[]
+    stages: PipelineStage[]
     onUpdate: (updatedLead: Lead) => void
+    onOpenFollowUp: (lead: Lead) => void
     onDelete: (leadId: string) => void
     onAddActivity: (leadId: string, content: string) => Promise<any>
 }
 
-export function FollowUpsView({ leads, onUpdate, onDelete, onAddActivity }: FollowUpsViewProps) {
+export function FollowUpsView({ leads, stages, onUpdate, onOpenFollowUp, onDelete, onAddActivity }: FollowUpsViewProps) {
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
-    const sortedLeads = [...leads].sort((a, b) => {
-        const timeA = a.reminder?.date ? new Date(a.reminder.date).getTime() : Infinity
-        const timeB = b.reminder?.date ? new Date(b.reminder.date).getTime() : Infinity
-        return timeA - timeB
-    })
+    const sortedLeads = sortLeadsByFollowUpPriority(leads)
 
     const selectedLead = leads.find(l => l.id === selectedLeadId) || null
 
@@ -34,10 +33,10 @@ export function FollowUpsView({ leads, onUpdate, onDelete, onAddActivity }: Foll
 
     return (
         <div className="flex h-full gap-4 overflow-hidden">
-            <div className="w-[40%] h-full flex flex-col border-r border-border/40 pr-4 overflow-y-auto custom-scrollbar space-y-3 pb-4">
+            <div className="w-[42%] h-full flex flex-col border-r border-border/40 pr-3 overflow-y-auto custom-scrollbar space-y-2.5 pb-4">
                 <AnimatePresence mode="popLayout">
                     {sortedLeads.map(lead => {
-                        const hasReminder = !!lead.reminder?.date
+                        const hasReminder = !!lead.reminder?.date && !lead.reminder.completed
                         const info = getLeadFollowUpInfo(lead.reminder)
                         const date = hasReminder ? new Date(lead.reminder!.date) : null
 
@@ -51,26 +50,53 @@ export function FollowUpsView({ leads, onUpdate, onDelete, onAddActivity }: Foll
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.3, type: 'spring' }}
+                                transition={{ duration: 0.2, type: 'spring' }}
                                 key={lead.id} 
                                 onClick={() => setSelectedLeadId(lead.id)}
-                                className={`p-4 rounded-lg bg-card shadow-sm border ${selectedLeadId === lead.id ? 'border-primary shadow-md bg-primary/5' : 'border-border/40 hover:bg-muted/30'} cursor-pointer transition-colors ${info.borderLeft || 'border-l-4 border-l-muted'} flex flex-col xl:flex-row items-start xl:items-center justify-between group gap-2`}
+                                className={`p-3.5 rounded-xl bg-card shadow-sm border ${selectedLeadId === lead.id ? 'border-primary shadow-md bg-primary/5 ring-1 ring-primary/30' : 'border-border/40 hover:bg-muted/30'} cursor-pointer transition-all ${info.borderLeft || 'border-l-4 border-l-muted'} flex flex-col gap-2 group`}
                             >
-                                <div className="flex-1 overflow-hidden">
-                                    <h4 className="font-bold text-foreground text-base group-hover:text-primary transition-colors">
-                                        {lead.name} <span className="text-sm font-medium text-muted-foreground ml-1">({lead.company})</span>
-                                    </h4>
-                                    <div className="flex items-center gap-1.5 mt-1 text-sm font-medium text-muted-foreground">
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {hasReminder ? format(date!, 'MMM d, yyyy h:mm a') : 'No follow-up scheduled'}
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="overflow-hidden">
+                                        <h4 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors truncate">
+                                            {lead.company}
+                                        </h4>
+                                        <p className="text-xs font-semibold text-muted-foreground">
+                                            {lead.name} {lead.phone ? `• ${lead.phone}` : ''}
+                                        </p>
+                                    </div>
+                                    <div className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border shrink-0 ${info.badgeBg} ${info.badgeText} ${info.badgeBorder}`}>
+                                        <StatusIcon className="h-3 w-3" />
+                                        <span>
+                                            {info.status === 'overdue' ? 'MISSED' :
+                                             info.status === 'today' ? 'TODAY' :
+                                             info.status === 'future' ? 'UPCOMING' :
+                                             info.status === 'completed' ? 'DONE' : 'UNSCHEDULED'}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border whitespace-nowrap ${info.badgeBg} ${info.badgeText} ${info.badgeBorder}`}>
-                                    <StatusIcon className="h-3.5 w-3.5" />
-                                    {info.status === 'overdue' ? 'MISSED' :
-                                     info.status === 'today' ? 'TODAY' :
-                                     info.status === 'future' ? 'UPCOMING' :
-                                     info.status === 'completed' ? 'DONE' : 'UNSCHEDULED'}
+
+                                <div className="flex items-center justify-between pt-2 border-t border-border/20 text-xs">
+                                    <div className="flex items-center gap-1.5 text-muted-foreground font-medium text-[11px]">
+                                        <Clock className="h-3 w-3 text-primary" />
+                                        {hasReminder ? (
+                                            info.overdueText ? (
+                                                <strong className="text-red-600 dark:text-red-400 font-bold">{info.overdueText}</strong>
+                                            ) : (
+                                                <span>{format(date!, 'MMM d, h:mm a')}</span>
+                                            )
+                                        ) : (
+                                            <span className="italic">No next date</span>
+                                        )}
+                                    </div>
+
+                                    <Button
+                                        size="sm"
+                                        onClick={(e) => { e.stopPropagation(); onOpenFollowUp(lead); }}
+                                        className="h-7 px-2.5 rounded-lg text-[10px] font-bold bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                                    >
+                                        <PhoneCall className="mr-1 h-3 w-3" />
+                                        Follow-up
+                                    </Button>
                                 </div>
                             </motion.div>
                         )
@@ -78,20 +104,22 @@ export function FollowUpsView({ leads, onUpdate, onDelete, onAddActivity }: Foll
                 </AnimatePresence>
             </div>
             
-            <div className="w-[60%] h-full overflow-y-auto pl-2 custom-scrollbar pb-4">
+            <div className="w-[58%] h-full overflow-y-auto pl-2 custom-scrollbar pb-4">
                 {selectedLead ? (
-                    <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+                    <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-6">
                        <LeadDetailsPanel 
                             lead={selectedLead} 
+                            stages={stages}
                             onUpdate={onUpdate} 
+                            onOpenFollowUp={onOpenFollowUp}
                             onDelete={(id) => { onDelete(id); setSelectedLeadId(null); }} 
                             onAddActivity={onAddActivity} 
                         />
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/10 rounded-xl border border-border/40 border-dashed">
-                        <Clock className="h-10 w-10 mb-4 opacity-20" />
-                        <p>Select a lead to view details</p>
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/10 rounded-2xl border border-border/40 border-dashed">
+                        <Clock className="h-10 w-10 mb-3 opacity-20" />
+                        <p className="font-semibold text-sm">Select a lead to view details & history</p>
                     </div>
                 )}
             </div>

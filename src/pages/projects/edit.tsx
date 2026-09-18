@@ -341,6 +341,7 @@ export function EditProjectPage() {
                                     <SelectContent>
                                         <SelectItem value="planning">Planning</SelectItem>
                                         <SelectItem value="in-progress">In Progress</SelectItem>
+                                        <SelectItem value="review">Review / Testing</SelectItem>
                                         <SelectItem value="on-hold">On Hold</SelectItem>
                                         <SelectItem value="completed">Completed</SelectItem>
                                     </SelectContent>

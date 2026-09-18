@@ -253,7 +253,20 @@ export function OnboardingFormCustomizer({ open, onOpenChange, onSaved }: FormCu
                                                 className="text-xs h-8"
                                             />
                                         </div>
-                                        <div className="sm:col-span-3">
+                                        <div className="sm:col-span-2">
+                                            <select
+                                                value={newFieldType}
+                                                onChange={e => setNewFieldType(e.target.value)}
+                                                className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                                            >
+                                                <option value="text">Text</option>
+                                                <option value="number">Number</option>
+                                                <option value="date">Date</option>
+                                                <option value="url">URL / Link</option>
+                                                <option value="file">File Upload</option>
+                                            </select>
+                                        </div>
+                                        <div className="sm:col-span-2">
                                             <select
                                                 value={newFieldCategory}
                                                 onChange={e => setNewFieldCategory(e.target.value)}
