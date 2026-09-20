@@ -247,7 +247,7 @@ router.post('/invite', protect, async (req, res) => {
         await candidate.save();
 
         const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
-        const inviteLink = `${origin}/#/candidate-form/${token}`;
+        const inviteLink = `${origin}/candidate-form/${token}`;
 
         // Send Email if requested
         if (sendEmailInvite) {
@@ -559,7 +559,7 @@ router.post('/:id/send-offer', protect, async (req, res) => {
         const pdfBuffer = await generateOfferLetterPDF(candidate, companyProfile);
 
         const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
-        const offerPortalLink = `${origin}/#/offer/${candidate.token}`;
+        const offerPortalLink = `${origin}/offer/${candidate.token}`;
 
         let emailSent = false;
         let emailErrMessage = '';

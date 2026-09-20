@@ -12,6 +12,8 @@ const ticketSchema = new mongoose.Schema({
     assignedTo: { type: String },
     createdBy: { type: String },
     screenshot: { type: String }, // Base64 or URL
+    taskId: { type: String }, // Linked Task model ID
+    taskTitle: { type: String }, // Title of linked Task
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

@@ -318,6 +318,7 @@ export interface Task {
     lastStartTime?: number // timestamp
     isTimerRunning?: boolean
     timeEntryId?: string
+    ticketId?: string
 
     createdAt: Date
     updatedAt: Date
@@ -528,6 +529,8 @@ export interface Ticket {
     projectId?: string
     assignedTo: string
     screenshot?: string
+    taskId?: string
+    taskTitle?: string
     createdAt: Date
 }
 

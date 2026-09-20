@@ -66,7 +66,7 @@ export function ClientsPage() {
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                     <Button variant="outline" onClick={() => {
-                        const url = `${window.location.origin}/#/client-onboarding`;
+                        const url = `${window.location.origin}/client-onboarding`;
                         navigator.clipboard.writeText(url);
                         toast({
                             title: "Link Copied",

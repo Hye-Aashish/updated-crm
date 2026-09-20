@@ -164,7 +164,7 @@ router.post('/', protect, checkPermission('invoices', 'create'), async (req, res
                     }
 
                     const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-                    const invoicePageUrl = `${frontendBase}/#/invoices/${newInvoice._id}`;
+                    const invoicePageUrl = `${frontendBase}/invoices/${newInvoice._id}`;
 
                     const message = `
                         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
@@ -332,7 +332,7 @@ router.post('/:id/send', protect, async (req, res) => {
         }
 
         const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-        const invoicePageUrl = `${frontendBase}/#/invoices/${invoice._id}`;
+        const invoicePageUrl = `${frontendBase}/invoices/${invoice._id}`;
 
         const message = `
             <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
@@ -448,7 +448,7 @@ router.post('/:id/payment-session', async (req, res) => {
                 customer_name: client.name
             },
             order_meta: {
-                return_url: `${frontendBase}/#/invoices/${invoice._id}?status=success&order_id={order_id}`,
+                return_url: `${frontendBase}/invoices/${invoice._id}?status=success&order_id={order_id}`,
                 notify_url: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/invoices/payment/webhook`
             }
         };

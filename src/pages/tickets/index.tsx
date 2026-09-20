@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { 
     MessageSquare, Plus, Search, Trash2, User, Upload, Briefcase, 
-    MessageCircle, RefreshCw
+    MessageCircle, RefreshCw, CheckSquare, Link as LinkIcon, Calendar, Clock
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -26,6 +26,8 @@ type Ticket = {
     screenshot?: string
     projectId?: string
     createdBy?: string
+    taskId?: string
+    taskTitle?: string
 }
 
 export function TicketsPage() {
@@ -37,6 +39,25 @@ export function TicketsPage() {
     const [viewTicketDialogOpen, setViewTicketDialogOpen] = useState(false)
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
     
+    // Assign Task Dialog state
+    const [assignTaskDialogOpen, setAssignTaskDialogOpen] = useState(false)
+    const [assigningTicket, setAssigningTicket] = useState<Ticket | null>(null)
+    const [taskMode, setTaskMode] = useState<'create' | 'link'>('create')
+    const [projectTasks, setProjectTasks] = useState<{ _id: string, title: string, status: string }[]>([])
+    const [loadingTasks, setLoadingTasks] = useState(false)
+    const [submittingTask, setSubmittingTask] = useState(false)
+
+    const [taskForm, setTaskForm] = useState({
+        title: '',
+        description: '',
+        projectId: '',
+        assigneeId: '',
+        priority: 'medium',
+        dueDate: '',
+        estimatedHours: '4',
+        existingTaskId: ''
+    })
+
     // Simple Filter States
     const [activeTab, setActiveTab] = useState<'all' | 'open' | 'in-progress' | 'need-discussion' | 'resolved'>('all')
     const [searchQuery, setSearchQuery] = useState('')
@@ -65,6 +86,51 @@ export function TicketsPage() {
             }
             reader.readAsDataURL(file)
         }
+    }
+
+    // Helper: Auto-detect developer assigned to a project
+    const getAssignedDevForProject = (pId: string, currentAssignedToName?: string): { userId: string, userName: string } => {
+        if (!pId) return { userId: '', userName: '' }
+
+        const proj = projects.find(p =>
+            (p.id && p.id.toString() === pId.toString()) ||
+            ((p as any)._id && (p as any)._id.toString() === pId.toString())
+        )
+
+        if (!proj) return { userId: '', userName: '' }
+
+        // Collect all candidate user IDs for this project
+        const candidateUserIds: string[] = []
+        if (Array.isArray((proj as any).developers)) {
+            (proj as any).developers.forEach((d: any) => d && candidateUserIds.push(d.toString()))
+        }
+        if (Array.isArray((proj as any).members)) {
+            (proj as any).members.forEach((m: any) => m && candidateUserIds.push(m.toString()))
+        }
+        if (proj.pmId) {
+            candidateUserIds.push(proj.pmId.toString())
+        }
+
+        // 1. If explicit ticket assignedTo name exists, find that user
+        if (currentAssignedToName && currentAssignedToName.trim()) {
+            const u = users.find(user =>
+                user.name.toLowerCase().trim() === currentAssignedToName.toLowerCase().trim() ||
+                user.id === currentAssignedToName ||
+                (user as any)._id === currentAssignedToName
+            )
+            if (u) return { userId: (u.id || (u as any)._id).toString(), userName: u.name }
+        }
+
+        // 2. Otherwise pick the first non-client user assigned to this project
+        for (const candidateId of candidateUserIds) {
+            const u = users.find(user => {
+                const uId = (user.id || (user as any)._id || '').toString()
+                return (uId === candidateId || user.name.toLowerCase().trim() === candidateId.toLowerCase().trim()) && user.role !== 'client'
+            })
+            if (u) return { userId: (u.id || (u as any)._id).toString(), userName: u.name }
+        }
+
+        return { userId: '', userName: '' }
     }
 
     // Fetch Tickets
@@ -96,6 +162,123 @@ export function TicketsPage() {
         }
         fetchData()
     }, [])
+
+    // Fetch existing tasks when project changes in Task dialog
+    const fetchProjectTasks = async (pId: string) => {
+        if (!pId) {
+            setProjectTasks([])
+            return
+        }
+        setLoadingTasks(true)
+        try {
+            const res = await api.get(`/tasks?projectId=${pId}`)
+            setProjectTasks(res.data || [])
+        } catch (err) {
+            console.error("Failed to fetch tasks for project", err)
+            setProjectTasks([])
+        } finally {
+            setLoadingTasks(false)
+        }
+    }
+
+    // Open Assign Task Modal
+    const handleOpenAssignTask = (ticket: Ticket) => {
+        setAssigningTicket(ticket)
+
+        // Find exact project from ticket.projectId if available
+        let matchedProjectId = ''
+        if (ticket.projectId) {
+            const proj = projects.find(p =>
+                (p.id && p.id.toString() === ticket.projectId?.toString()) ||
+                ((p as any)._id && (p as any)._id.toString() === ticket.projectId?.toString())
+            )
+            if (proj) {
+                matchedProjectId = (proj.id || (proj as any)._id).toString()
+            } else {
+                matchedProjectId = ticket.projectId.toString()
+            }
+        }
+        
+        // Auto-detect assigned developer for this project or ticket
+        const autoDev = getAssignedDevForProject(matchedProjectId, ticket.assignedTo)
+
+        setTaskForm({
+            title: ticket.subject,
+            description: ticket.description || '',
+            projectId: matchedProjectId,
+            assigneeId: autoDev.userId,
+            priority: ticket.priority === 'critical' ? 'urgent' : ticket.priority,
+            dueDate: '',
+            estimatedHours: '4',
+            existingTaskId: ''
+        })
+        setTaskMode('create')
+        setAssignTaskDialogOpen(true)
+        if (matchedProjectId) {
+            fetchProjectTasks(matchedProjectId)
+        }
+    }
+
+    // Submit Assign Task
+    const handleAssignTaskSubmit = async () => {
+        if (!assigningTicket) return
+
+        if (taskMode === 'create' && !taskForm.projectId) {
+            toast({ title: "Required", description: "Please select a project to create this task", variant: "destructive" })
+            return
+        }
+
+        if (taskMode === 'link' && !taskForm.existingTaskId) {
+            toast({ title: "Required", description: "Please select an existing task to link", variant: "destructive" })
+            return
+        }
+
+        setSubmittingTask(true)
+        try {
+            const payload = {
+                mode: taskMode,
+                taskId: taskMode === 'link' ? taskForm.existingTaskId : undefined,
+                title: taskForm.title,
+                description: taskForm.description,
+                projectId: taskForm.projectId,
+                assigneeId: taskForm.assigneeId,
+                priority: taskForm.priority,
+                dueDate: taskForm.dueDate || undefined,
+                estimatedHours: taskForm.estimatedHours ? Number(taskForm.estimatedHours) : undefined
+            }
+
+            const res = await api.post(`/tickets/${assigningTicket._id}/assign-task`, payload)
+            
+            toast({ 
+                title: "Task Assigned!", 
+                description: taskMode === 'create' 
+                    ? `Created & assigned new task: "${taskForm.title}"` 
+                    : `Linked task to support ticket successfully` 
+            })
+
+            setAssignTaskDialogOpen(false)
+            fetchTickets()
+
+            if (selectedTicket && selectedTicket._id === assigningTicket._id) {
+                const updatedT = res.data.ticket
+                setSelectedTicket(updatedT ? updatedT : {
+                    ...selectedTicket,
+                    taskId: res.data.task?._id,
+                    taskTitle: res.data.task?.title,
+                    status: 'in-progress'
+                })
+            }
+        } catch (error: any) {
+            console.error("Assign task failed", error)
+            toast({ 
+                title: "Error", 
+                description: error.response?.data?.message || "Failed to assign task to ticket", 
+                variant: "destructive" 
+            })
+        } finally {
+            setSubmittingTask(false)
+        }
+    }
 
     // Create Ticket
     const handleCreateTicket = async () => {
@@ -188,6 +371,7 @@ export function TicketsPage() {
         const query = searchQuery.toLowerCase()
         const matchesSearch = t.subject.toLowerCase().includes(query) ||
             (t.clientName || '').toLowerCase().includes(query) ||
+            (t.taskTitle || '').toLowerCase().includes(query) ||
             t._id.toLowerCase().includes(query)
         
         let matchesTab = true
@@ -239,7 +423,7 @@ export function TicketsPage() {
                         <h1 className="text-2xl font-bold text-foreground">Support Tickets</h1>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                        View client issues, change requests, and update status with 1 click.
+                        View client issues, assign developer tasks, and update status in 1 click.
                     </p>
                 </div>
 
@@ -305,7 +489,15 @@ export function TicketsPage() {
                                     <select
                                         className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
                                         value={newTicket.projectId}
-                                        onChange={(e) => setNewTicket({ ...newTicket, projectId: e.target.value })}
+                                        onChange={(e) => {
+                                            const pId = e.target.value
+                                            const autoDev = getAssignedDevForProject(pId)
+                                            setNewTicket({
+                                                ...newTicket,
+                                                projectId: pId,
+                                                assignedTo: autoDev.userName || newTicket.assignedTo
+                                            })
+                                        }}
                                     >
                                         <option value="">Select Project</option>
                                         {(currentUser?.role === 'client'
@@ -443,7 +635,7 @@ export function TicketsPage() {
                 <div className="relative">
                     <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                        placeholder="🔍 Search ticket title, client name..."
+                        placeholder="🔍 Search ticket title, client name, task..."
                         className="pl-10 h-10 text-xs font-medium rounded-xl bg-card"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -513,6 +705,31 @@ export function TicketsPage() {
                                             <Briefcase className="h-3.5 w-3.5 text-primary shrink-0" />
                                             <span className="truncate">{getProjectName(ticket.projectId)}</span>
                                         </div>
+
+                                        {/* Linked Task Badge / Assign Action */}
+                                        <div className="pt-1">
+                                            {ticket.taskId ? (
+                                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-bold max-w-full truncate">
+                                                    <CheckSquare className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                                    <span className="truncate" title={ticket.taskTitle || 'Linked Task'}>
+                                                        Task: {ticket.taskTitle || `#${ticket.taskId.slice(-5)}`}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                currentUser?.role !== 'client' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleOpenAssignTask(ticket)
+                                                        }}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 text-[11px] font-bold transition-colors"
+                                                    >
+                                                        <Plus className="h-3.5 w-3.5" /> Assign Task
+                                                    </button>
+                                                )
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Bottom Info & Easy Status Switcher */}
@@ -577,6 +794,39 @@ export function TicketsPage() {
                                 <p className="text-[11px] text-muted-foreground">Created: {new Date(selectedTicket.createdAt).toLocaleString()}</p>
                             </div>
 
+                            {/* Task Assignment Card / Action */}
+                            <div className="p-3.5 rounded-xl border bg-gradient-to-r from-primary/5 to-transparent space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                        <CheckSquare className="h-3.5 w-3.5 text-primary" /> Project Task Link
+                                    </span>
+                                    {currentUser?.role !== 'client' && (
+                                        <Button
+                                            size="sm"
+                                            variant={selectedTicket.taskId ? "outline" : "default"}
+                                            className="h-7 text-xs font-bold"
+                                            onClick={() => handleOpenAssignTask(selectedTicket)}
+                                        >
+                                            {selectedTicket.taskId ? 'Reassign / Change Task' : '+ Assign Task to Ticket'}
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {selectedTicket.taskId ? (
+                                    <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-800 dark:text-emerald-300">
+                                        <div>
+                                            <p className="font-bold text-xs">{selectedTicket.taskTitle || 'Linked Task'}</p>
+                                            <span className="text-[10px] font-mono text-muted-foreground">Task ID: #{selectedTicket.taskId}</span>
+                                        </div>
+                                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[10px] font-extrabold">Assigned</span>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                        No task assigned yet. Assigning a task allows team members to track progress and log time against this ticket.
+                                    </p>
+                                )}
+                            </div>
+
                             {/* Easy Controls */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1 p-3 rounded-xl border bg-card">
@@ -585,6 +835,7 @@ export function TicketsPage() {
                                         className={`w-full h-8 rounded-lg border text-xs font-bold px-2 ${getStatusStyle(selectedTicket.status)}`}
                                         value={selectedTicket.status}
                                         onChange={(e) => handleStatusChange(selectedTicket._id, e.target.value)}
+                                        disabled={currentUser?.role === 'client'}
                                     >
                                         <option value="open">🔵 Open</option>
                                         <option value="in-progress">🟡 In Progress</option>
@@ -611,6 +862,7 @@ export function TicketsPage() {
                                                 toast({ title: "Error", description: "Failed to update assignment", variant: "destructive" });
                                             }
                                         }}
+                                        disabled={currentUser?.role === 'client'}
                                     >
                                         <option value="">Unassigned</option>
                                         {users.map(u => (
@@ -701,6 +953,244 @@ export function TicketsPage() {
 
                                 <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={() => setViewTicketDialogOpen(false)}>
                                     Close
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* 6. Assign / Link Task Dialog Modal */}
+            <Dialog open={assignTaskDialogOpen} onOpenChange={setAssignTaskDialogOpen}>
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                            <CheckSquare className="h-5 w-5 text-primary" /> Assign Task to Ticket
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    {assigningTicket && (
+                        <div className="space-y-4 py-2 text-xs font-semibold">
+                            {/* Ticket Summary Header */}
+                            <div className="p-3 bg-muted/30 rounded-xl border text-xs">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase">Ticket #{assigningTicket._id.slice(-5)}</span>
+                                <h4 className="font-bold text-foreground text-sm line-clamp-1">{assigningTicket.subject}</h4>
+                            </div>
+
+                            {/* Mode Toggle Tabs */}
+                            <div className="grid grid-cols-2 p-1 bg-muted rounded-xl gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setTaskMode('create')}
+                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                                        taskMode === 'create'
+                                            ? 'bg-background text-primary shadow-xs'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    ✨ Create New Task
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setTaskMode('link')
+                                        if (taskForm.projectId) fetchProjectTasks(taskForm.projectId)
+                                    }}
+                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                                        taskMode === 'link'
+                                            ? 'bg-background text-primary shadow-xs'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    🔗 Link Existing Task
+                                </button>
+                            </div>
+
+                            {/* Form Fields */}
+                            {taskMode === 'create' ? (
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Target Project *</Label>
+                                        <select
+                                            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+                                            value={taskForm.projectId}
+                                            onChange={(e) => {
+                                                const pId = e.target.value
+                                                const autoDev = getAssignedDevForProject(pId)
+                                                setTaskForm({
+                                                    ...taskForm,
+                                                    projectId: pId,
+                                                    assigneeId: autoDev.userId || taskForm.assigneeId
+                                                })
+                                                fetchProjectTasks(pId)
+                                            }}
+                                        >
+                                            <option value="">Select Project</option>
+                                            {projects.map(p => (
+                                                <option key={p.id || (p as any)._id} value={p.id || (p as any)._id}>{p.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Task Title *</Label>
+                                        <Input
+                                            value={taskForm.title}
+                                            onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                                            className="h-10 text-xs font-medium"
+                                            placeholder="Task title..."
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-bold">Assignee Developer</Label>
+                                            <select
+                                                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+                                                value={taskForm.assigneeId}
+                                                onChange={(e) => setTaskForm({ ...taskForm, assigneeId: e.target.value })}
+                                            >
+                                                <option value="">Unassigned</option>
+                                                {users.map(u => (
+                                                    <option key={u.id || (u as any)._id} value={u.id || (u as any)._id}>{u.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-bold">Priority</Label>
+                                            <select
+                                                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+                                                value={taskForm.priority}
+                                                onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
+                                            >
+                                                <option value="low">Low</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="high">High</option>
+                                                <option value="urgent">🚨 Urgent</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-bold flex items-center gap-1">
+                                                <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> Due Date
+                                            </Label>
+                                            <Input
+                                                type="date"
+                                                value={taskForm.dueDate}
+                                                onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+                                                className="h-10 text-xs font-medium"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-bold flex items-center gap-1">
+                                                <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Est. Hours
+                                            </Label>
+                                            <Input
+                                                type="number"
+                                                placeholder="4"
+                                                value={taskForm.estimatedHours}
+                                                onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: e.target.value })}
+                                                className="h-10 text-xs font-medium"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Description / Instructions</Label>
+                                        <Textarea
+                                            value={taskForm.description}
+                                            onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                                            placeholder="Task details for developer..."
+                                            className="min-h-[70px] text-xs font-normal"
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Select Project *</Label>
+                                        <select
+                                            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+                                            value={taskForm.projectId}
+                                            onChange={(e) => {
+                                                const pId = e.target.value
+                                                const autoDev = getAssignedDevForProject(pId)
+                                                setTaskForm({
+                                                    ...taskForm,
+                                                    projectId: pId,
+                                                    existingTaskId: '',
+                                                    assigneeId: autoDev.userId || taskForm.assigneeId
+                                                })
+                                                fetchProjectTasks(pId)
+                                            }}
+                                        >
+                                            <option value="">Select Project</option>
+                                            {projects.map(p => (
+                                                <option key={p.id || (p as any)._id} value={p.id || (p as any)._id}>{p.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Select Existing Task *</Label>
+                                        {loadingTasks ? (
+                                            <div className="text-xs text-muted-foreground py-2 flex items-center gap-1.5">
+                                                <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" /> Loading project tasks...
+                                            </div>
+                                        ) : (
+                                            <select
+                                                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+                                                value={taskForm.existingTaskId}
+                                                onChange={(e) => setTaskForm({ ...taskForm, existingTaskId: e.target.value })}
+                                                disabled={!taskForm.projectId}
+                                            >
+                                                <option value="">Select Task from Project</option>
+                                                {projectTasks.map(t => (
+                                                    <option key={t._id} value={t._id}>
+                                                        {t.title} ({t.status})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
+                                        {taskForm.projectId && projectTasks.length === 0 && !loadingTasks && (
+                                            <p className="text-[11px] text-amber-600 dark:text-amber-400 pt-0.5">
+                                                No tasks found for this project. Switch to "Create New Task" tab above.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Modal Action Buttons */}
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-9 text-xs font-bold"
+                                    onClick={() => setAssignTaskDialogOpen(false)}
+                                    disabled={submittingTask}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    className="h-9 text-xs font-bold bg-primary hover:bg-primary/90"
+                                    onClick={handleAssignTaskSubmit}
+                                    disabled={submittingTask}
+                                >
+                                    {submittingTask ? (
+                                        <>
+                                            <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckSquare className="mr-1.5 h-3.5 w-3.5" /> Confirm Task Assignment
+                                        </>
+                                    )}
                                 </Button>
                             </div>
                         </div>

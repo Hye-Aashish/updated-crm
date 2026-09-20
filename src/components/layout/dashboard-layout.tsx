@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
 import { BottomNav } from './bottom-nav'
+import { QuickNotesWidget } from './quick-notes-widget'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
@@ -109,6 +110,9 @@ export function DashboardLayout() {
                         <Outlet />
                     </div>
                 </main>
+
+                {/* Quick Notes Floating Hover Widget */}
+                <QuickNotesWidget />
 
                 {/* Mobile Bottom Navigation */}
                 <BottomNav onMenuClick={() => setMobileOpen(true)} />

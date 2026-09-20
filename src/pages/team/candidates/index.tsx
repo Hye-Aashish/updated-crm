@@ -381,8 +381,8 @@ export function OfferLettersPage() {
                                     const docsCount = cand.documents?.length || 0
                                     const ctc = cand.offerLetter?.ctcAnnual
                                     const joiningDate = cand.offerLetter?.joiningDate
-                                    const publicFormUrl = `${window.location.origin}/#/candidate-form/${cand.token}`
-                                    const publicOfferUrl = `${window.location.origin}/#/offer/${cand.token}`
+                                    const publicFormUrl = `${window.location.origin}/candidate-form/${cand.token}`
+                                    const publicOfferUrl = `${window.location.origin}/offer/${cand.token}`
 
                                     return (
                                         <tr key={cand._id} className="hover:bg-slate-50/70 transition-colors">

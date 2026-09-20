@@ -116,5 +116,67 @@ export const timeEntryService = {
             isRunning: false,
             note
         });
+    },
+
+    // Get detailed time and work speed analytics report
+    async getDetailedReport(filters?: {
+        userId?: string;
+        projectId?: string;
+        startDate?: string;
+        endDate?: string;
+    }): Promise<GranularTimeReportData> {
+        const response = await api.get('/time-entries/reports/detailed', { params: filters });
+        return response.data;
     }
 };
+
+export interface EmployeeSpeedMetric {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    totalHours: number;
+    todayHours: number;
+    yesterdayHours: number;
+    uniqueTasksCount: number;
+    completedTasksCount: number;
+    uniqueProjectsCount: number;
+    totalEntriesCount: number;
+    runningTimersCount: number;
+    tasksPerHour: number;
+    speedRating: string;
+    speedBadgeColor: string;
+}
+
+export interface GranularTimeReportData {
+    summary: {
+        totalLoggedMinutes: number;
+        yesterdayLoggedMinutes: number;
+        todayLoggedMinutes: number;
+        totalEntriesCount: number;
+        uniqueEmployeesCount: number;
+    };
+    employeeLeaderboard: EmployeeSpeedMetric[];
+    yesterdayEntries: Array<{
+        id: string;
+        userName: string;
+        projectName: string;
+        taskTitle: string;
+        startTime: string;
+        endTime?: string;
+        durationMinutes: number;
+        note: string;
+    }>;
+    todayEntries: Array<{
+        id: string;
+        userName: string;
+        projectName: string;
+        taskTitle: string;
+        startTime: string;
+        endTime?: string;
+        durationMinutes: number;
+        isRunning?: boolean;
+        note: string;
+    }>;
+    detailedEntries: TimeEntry[];
+}
+

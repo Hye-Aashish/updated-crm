@@ -35,6 +35,7 @@ const taskSchema = new mongoose.Schema({
     wasPausedByBreak: { type: Boolean, default: false }, // Remember if timer was auto-paused during break
     pausedByUserId: { type: String }, // Remember who paused the task on break
     creatorId: { type: String }, // User who created the task
+    ticketId: { type: String }, // Linked Ticket model ID
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
