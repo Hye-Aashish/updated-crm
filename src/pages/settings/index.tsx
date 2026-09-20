@@ -841,103 +841,283 @@ function NotificationsTab({ data, onSave, saving }: any) {
 }
 
 function EmailSettingsTab({ data, onSave, saving }: any) {
-    const [formData, setFormData] = useState(data || { host: '', port: 587, user: '', pass: '', secure: false, fromEmail: '', fromName: '' })
-    const [testing, setTesting] = useState(false)
+    const { toast } = useToast()
+    const [showPassword, setShowPassword] = useState(false)
+    const [testingSmtp, setTestingSmtp] = useState(false)
+    const [testEmailInput, setTestEmailInput] = useState('')
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
-    const [showPass, setShowPass] = useState(false)
 
-    useEffect(() => { if (data) setFormData(data) }, [data])
+    const [formData, setFormData] = useState({
+        host: data?.host || 'smtp.gmail.com',
+        port: data?.port ?? 465,
+        user: data?.user || 'nexprism@gmail.com',
+        pass: data?.pass || '',
+        fromEmail: data?.fromEmail || 'nexprism@gmail.com',
+        fromName: data?.fromName || 'Nexprism CRM',
+        secure: data?.secure ?? true
+    })
+
+    useEffect(() => {
+        if (data) {
+            setFormData({
+                host: data.host || 'smtp.gmail.com',
+                port: data.port ?? 465,
+                user: data.user || 'nexprism@gmail.com',
+                pass: data.pass || '',
+                fromEmail: data.fromEmail || 'nexprism@gmail.com',
+                fromName: data.fromName || 'Nexprism CRM',
+                secure: data.secure ?? true
+            })
+            if (data.fromEmail) setTestEmailInput(data.fromEmail)
+        }
+    }, [data])
 
     const handleChange = (e: any) => {
-        const val = e.target.id === 'port' ? (parseInt(e.target.value) || 587) : e.target.value
-        setFormData({ ...formData, [e.target.id]: val })
+        const { id, value, type, checked } = e.target
+        setFormData(prev => ({
+            ...prev,
+            [id]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value
+        }))
     }
 
+    // Quick Gmail Preset
+    const applyGmailPreset = () => {
+        setFormData(prev => ({
+            ...prev,
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
+            user: prev.user || 'nexprism@gmail.com',
+            fromEmail: prev.fromEmail || 'nexprism@gmail.com',
+            fromName: prev.fromName || 'Nexprism Support'
+        }))
+        toast({ title: 'GMAIL PRESET APPLIED', description: 'Gmail SMTP server (smtp.gmail.com:465) applied.' })
+    }
 
-    const handleTest = async () => {
-        setTesting(true)
+    // Test SMTP API call
+    const handleTestSmtp = async () => {
+        if (!formData.user || !formData.pass) {
+            toast({ title: 'REQUIRED FIELDS', description: 'Please enter Email and App Password before testing.', variant: 'destructive' })
+            return
+        }
+
+        setTestingSmtp(true)
         setTestResult(null)
         try {
-            const res = await api.post('/settings/test-smtp', formData)
-            setTestResult({ success: true, message: res.data.message })
+            const recipient = testEmailInput || formData.fromEmail || formData.user
+            const res = await api.post('/settings/test-smtp', {
+                ...formData,
+                fromEmail: recipient
+            })
+            setTestResult({ success: true, message: res.data.message || 'SMTP Verified & Test Email Sent Successfully!' })
+            toast({ title: 'SMTP SUCCESS', description: 'Connection verified successfully!', variant: 'success' })
         } catch (error: any) {
-            setTestResult({ success: false, message: error.response?.data?.message || "Failed to connect to SMTP server." })
+            console.error('SMTP test error:', error)
+            const errMsg = error.response?.data?.message || error.message || 'SMTP Connection Failed'
+            setTestResult({ success: false, message: errMsg })
+            toast({ title: 'SMTP TEST FAILED', description: errMsg, variant: 'destructive' })
         } finally {
-            setTesting(false)
+            setTestingSmtp(false)
         }
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>SMTP Settings</CardTitle>
-                <CardDescription>Configure outgoing email server (SMTP) for system notifications and invoices.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                {testResult && (
-                    <Alert variant={testResult.success ? "default" : "destructive"} className={testResult.success ? "border-green-500 text-green-700 bg-green-50" : ""}>
-                        {testResult.success ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                        <AlertTitle>{testResult.success ? "Success" : "Connection Failed"}</AlertTitle>
-                        <AlertDescription>{testResult.message}</AlertDescription>
-                    </Alert>
-                )}
+        <Card className="border shadow-xs">
+            <CardHeader className="border-b bg-muted/20">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <CardTitle className="text-xl font-bold flex items-center gap-2">
+                            <Mail className="h-5 w-5 text-primary" /> Gmail & SMTP Email Configuration
+                        </CardTitle>
+                        <CardDescription className="text-xs mt-1">
+                            Configure Gmail SMTP to send automated system emails, offer letters, invoices, and password resets.
+                        </CardDescription>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="host">SMTP Host</Label>
-                        <Input id="host" value={formData.host || ''} onChange={handleChange} placeholder="smtp.gmail.com" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="port">Port</Label>
-                        <Input id="port" value={formData.port || ''} onChange={handleChange} placeholder="587" />
-                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={applyGmailPreset}
+                        className="h-9 text-xs font-bold gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                    >
+                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                        Apply Gmail Preset
+                    </Button>
                 </div>
+            </CardHeader>
 
-                <div className="grid grid-cols-2 gap-4">
+            <CardContent className="space-y-6 pt-6">
+                {/* SMTP Credentials Form */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                        <Label htmlFor="user">SMTP Username / Email</Label>
-                        <Input id="user" value={formData.user || ''} onChange={handleChange} />
+                        <Label htmlFor="host" className="text-xs font-bold">SMTP Host / Server *</Label>
+                        <Input
+                            id="host"
+                            value={formData.host}
+                            onChange={handleChange}
+                            placeholder="smtp.gmail.com"
+                            className="h-10 text-xs font-medium"
+                        />
+                        <p className="text-[11px] text-muted-foreground">Default Gmail server: <code className="bg-muted px-1 rounded">smtp.gmail.com</code></p>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="pass">SMTP Password</Label>
-                        <div className="flex gap-2">
-                            <Input id="pass" type={showPass ? "text" : "password"} value={formData.pass || ''} onChange={handleChange} />
-                            <Button variant="outline" size="icon" onClick={() => setShowPass(!showPass)}>
-                                {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </Button>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                            <Label htmlFor="port" className="text-xs font-bold">SMTP Port *</Label>
+                            <Input
+                                id="port"
+                                type="number"
+                                value={formData.port}
+                                onChange={handleChange}
+                                placeholder="465"
+                                className="h-10 text-xs font-medium"
+                            />
+                            <p className="text-[11px] text-muted-foreground">465 (SSL) or 587 (TLS)</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold">SSL / TLS Connection</Label>
+                            <div className="h-10 flex items-center justify-between px-3 rounded-xl border bg-muted/20">
+                                <span className="text-xs font-semibold">{formData.secure ? 'SSL (Port 465)' : 'TLS (Port 587)'}</span>
+                                <Switch
+                                    checked={formData.secure}
+                                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, secure: checked, port: checked ? 465 : 587 }))}
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="flex items-center space-x-2 py-2">
-                    <Switch
-                        checked={formData.secure}
-                        onCheckedChange={(checked) => setFormData({ ...formData, secure: checked })}
-                        id="secure"
-                    />
-                    <Label htmlFor="secure">Use SSL (Secure Connection for Port 465)</Label>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <Label htmlFor="fromName">Sender Name</Label>
-                        <Input id="fromName" value={formData.fromName || ''} onChange={handleChange} placeholder="My Company App" />
+                        <Label htmlFor="user" className="text-xs font-bold">Gmail Email Address (User) *</Label>
+                        <Input
+                            id="user"
+                            type="email"
+                            value={formData.user}
+                            onChange={handleChange}
+                            placeholder="nexprism@gmail.com"
+                            className="h-10 text-xs font-medium"
+                        />
                     </div>
+
                     <div className="space-y-2">
-                        <Label htmlFor="fromEmail">Sender Email (From)</Label>
-                        <Input id="fromEmail" value={formData.fromEmail || ''} onChange={handleChange} placeholder="notifications@mycompany.com" />
-                        <p className="text-[10px] text-muted-foreground">Should match SMTP User ideally</p>
+                        <Label htmlFor="pass" className="text-xs font-bold">Gmail App Password *</Label>
+                        <div className="relative">
+                            <Input
+                                id="pass"
+                                type={showPassword ? 'text' : 'password'}
+                                value={formData.pass}
+                                onChange={handleChange}
+                                placeholder="kjtx lbqc ytbw cdnm"
+                                className="h-10 text-xs font-medium pr-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">16-character Google App Password (without spaces or with spaces)</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="fromName" className="text-xs font-bold">Sender Display Name</Label>
+                        <Input
+                            id="fromName"
+                            value={formData.fromName}
+                            onChange={handleChange}
+                            placeholder="Nexprism Support"
+                            className="h-10 text-xs font-medium"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="fromEmail" className="text-xs font-bold">Sender Email Address (From)</Label>
+                        <Input
+                            id="fromEmail"
+                            type="email"
+                            value={formData.fromEmail}
+                            onChange={handleChange}
+                            placeholder="nexprism@gmail.com"
+                            className="h-10 text-xs font-medium"
+                        />
                     </div>
                 </div>
 
-                <div className="flex gap-4 pt-4 border-t">
-                    <Button variant="outline" className="w-full" onClick={handleTest} disabled={testing}>
-                        {testing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                        Test Connection
-                    </Button>
-                    <Button className="w-full" onClick={() => onSave(formData)} disabled={saving}>
-                        {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                        {saving ? 'Saving...' : 'Save Settings'}
+                {/* Gmail App Password Instructions Card */}
+                <div className="p-4 rounded-xl border bg-amber-500/10 border-amber-500/30 text-xs space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200">
+                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span>How to get your Gmail App Password:</span>
+                    </div>
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground leading-relaxed pl-1">
+                        <li>Go to your Google Account (myaccount.google.com) & turn on <b>2-Step Verification</b>.</li>
+                        <li>Search for <b>App Passwords</b> under Security.</li>
+                        <li>Create an app named "CRM" and copy the generated 16-character password into the <b>Gmail App Password</b> field above.</li>
+                    </ol>
+                </div>
+
+                {/* Test Connection Section */}
+                <div className="p-4 rounded-xl border bg-card space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="space-y-0.5">
+                            <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Send className="h-3.5 w-3.5 text-primary" /> Test SMTP Connection & Send Test Email
+                            </h4>
+                            <p className="text-[11px] text-muted-foreground">Send a real-time verification email to ensure SMTP credentials work.</p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                            value={testEmailInput}
+                            onChange={(e) => setTestEmailInput(e.target.value)}
+                            placeholder="Enter recipient email (e.g. nexprism@gmail.com)..."
+                            className="h-9 text-xs flex-1"
+                        />
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleTestSmtp}
+                            disabled={testingSmtp}
+                            className="h-9 text-xs font-bold shrink-0"
+                        >
+                            {testingSmtp ? (
+                                <>
+                                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-primary" /> Verifying Connection...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle className="mr-1.5 h-3.5 w-3.5 text-emerald-600" /> Send Test Email
+                                </>
+                            )}
+                        </Button>
+                    </div>
+
+                    {testResult && (
+                        <div className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 ${
+                            testResult.success 
+                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300' 
+                                : 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-300'
+                        }`}>
+                            {testResult.success ? <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" /> : <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />}
+                            <span>{testResult.message}</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Save Settings Button */}
+                <div className="pt-2 border-t flex justify-end">
+                    <Button
+                        onClick={() => onSave(formData)}
+                        disabled={saving}
+                        className="h-10 px-6 text-xs font-bold bg-primary hover:bg-primary/90"
+                    >
+                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {saving ? 'Saving SMTP Settings...' : 'Save SMTP Settings'}
                     </Button>
                 </div>
             </CardContent>
@@ -2378,5 +2558,7 @@ function AttendanceSettingsTab({ data, onSave, saving }: any) {
         </Card>
     )
 }
+
+
 
 export default SettingsPage
