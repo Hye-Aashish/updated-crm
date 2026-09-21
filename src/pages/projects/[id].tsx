@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -26,6 +26,8 @@ import { ProjectFileDialog } from '@/components/projects/project-file-dialog'
 import { ProjectTimelineView } from '@/components/projects/project-timeline-view'
 import { CheckpointProofDialog } from '@/components/projects/checkpoint-proof-dialog'
 import { ProjectMilestonesTab } from '@/components/projects/project-milestones-tab'
+import { ProjectCheckpointDialog } from '@/components/projects/project-checkpoint-dialog'
+import { ProjectDeliverableDialog } from '@/components/projects/project-deliverable-dialog'
 
 import { mapProject, mapClient, mapUser } from '@/lib/mappers'
 
@@ -42,6 +44,10 @@ export function ProjectDetailPage() {
     const [completionReadiness, setCompletionReadiness] = useState<any>(null)
 
     const [fileDialogOpen, setFileDialogOpen] = useState(false)
+    const [teamDialogOpen, setTeamDialogOpen] = useState(false)
+    const [checkpointDialogOpen, setCheckpointDialogOpen] = useState(false)
+    const [deliverableDialogOpen, setDeliverableDialogOpen] = useState(false)
+    const [deliverableType, setDeliverableType] = useState<'website' | 'android' | 'ios'>('website')
 
     // Dialog & Form States
     const [selectedCpForProof, setSelectedCpForProof] = useState<any>(null)
@@ -57,7 +63,6 @@ export function ProjectDetailPage() {
         tasks,
         users, setUsers,
         files,
-        invoices,
         clients, setClients,
         currentUser,
         updateProject,
@@ -177,6 +182,18 @@ export function ProjectDetailPage() {
             fetchModuleData()
         } catch (err) {
             toast({ title: 'Error', description: 'Failed to schedule follow-up', variant: 'destructive' })
+        }
+    }
+
+    const handleDeleteCheckpoint = async (cpId: string) => {
+        if (!window.confirm("Are you sure you want to delete this checkpoint?")) return
+        const pId = project._id || project.id
+        try {
+            await api.delete(`/projects/${pId}/checkpoints/${cpId}`)
+            toast({ description: 'Checkpoint deleted' })
+            fetchModuleData()
+        } catch (err) {
+            toast({ title: 'Error', description: 'Failed to delete checkpoint', variant: 'destructive' })
         }
     }
 
@@ -395,9 +412,16 @@ export function ProjectDetailPage() {
                 <TabsContent value="checkpoints" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-base font-bold">Automated Checkpoints & Workflow Rules</h3>
-                        <Button size="sm" onClick={fetchModuleData} variant="outline" className="h-8 text-xs font-bold">
-                            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh Pipeline
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button size="sm" onClick={fetchModuleData} variant="outline" className="h-8 text-xs font-bold">
+                                <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh Pipeline
+                            </Button>
+                            {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
+                                <Button size="sm" onClick={() => setCheckpointDialogOpen(true)} className="h-8 text-xs font-bold bg-primary text-primary-foreground gap-1">
+                                    <Plus className="h-3.5 w-3.5" /> Add Checkpoint
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="space-y-3">
@@ -449,6 +473,17 @@ export function ProjectDetailPage() {
                                                     Complete Step
                                                 </Button>
                                             )}
+
+                                            {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    onClick={() => handleDeleteCheckpoint(cp._id || cp.id)}
+                                                    className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -488,7 +523,15 @@ export function ProjectDetailPage() {
                 </TabsContent>
 
                 {/* 5. TEAM TAB */}
-                <TabsContent value="team">
+                <TabsContent value="team" className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-base font-bold">Project Team Members</h3>
+                        {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
+                            <Button size="sm" onClick={() => setTeamDialogOpen(true)} className="h-8 font-bold text-xs">
+                                <Plus className="mr-1.5 h-3.5 w-3.5" /> Manage Team
+                            </Button>
+                        )}
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {users.filter(u => (project.members || []).includes(u.id) || u.id === project.pmId).map(user => (
                             <Card key={user.id} className="border border-border/60">
@@ -599,23 +642,47 @@ export function ProjectDetailPage() {
                 <TabsContent value="website" className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base font-bold flex items-center gap-2">
-                                <Globe className="h-5 w-5 text-blue-500" /> Website Deployment Tracker
-                            </CardTitle>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base font-bold flex items-center gap-2">
+                                    <Globe className="h-5 w-5 text-blue-500" /> Website Deployment Tracker
+                                </CardTitle>
+                                {['owner', 'admin', 'pm', 'developer'].includes(currentUser?.role) && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setDeliverableType('website')
+                                            setDeliverableDialogOpen(true)
+                                        }}
+                                        className="h-8 text-xs font-bold gap-1.5"
+                                    >
+                                        <Edit className="h-3.5 w-3.5" /> Edit Website Details
+                                    </Button>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent className="space-y-4 text-xs font-medium">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <Label className="text-xs font-bold">Website Status</Label>
-                                    <Input value={project.websiteStatus || 'not-started'} readOnly className="h-9 uppercase font-bold" />
+                                    <Input value={(project.websiteStatus || 'not-started').toUpperCase()} readOnly className="h-9 uppercase font-bold" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs font-bold">Domain</Label>
                                     <Input value={project.domain || '-'} readOnly className="h-9 font-semibold" />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs font-bold">Production URL</Label>
-                                    <Input value={project.productionUrl || project.websiteUrl || '-'} readOnly className="h-9 font-semibold text-primary" />
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label className="text-xs font-bold">Production URL (Live Link)</Label>
+                                    {project.productionUrl || project.websiteUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input value={project.productionUrl || project.websiteUrl} readOnly className="h-9 font-semibold text-primary" />
+                                            <a href={project.productionUrl || project.websiteUrl} target="_blank" rel="noreferrer" className="px-3 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-md hover:bg-primary/90 flex items-center gap-1 shrink-0">
+                                                <Globe className="h-3.5 w-3.5" /> Open Website
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <Input value="-" readOnly className="h-9 font-semibold" />
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -626,15 +693,30 @@ export function ProjectDetailPage() {
                 <TabsContent value="android" className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base font-bold flex items-center gap-2">
-                                <Smartphone className="h-5 w-5 text-emerald-500" /> Android App Tracker
-                            </CardTitle>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base font-bold flex items-center gap-2">
+                                    <Smartphone className="h-5 w-5 text-emerald-500" /> Android App Tracker
+                                </CardTitle>
+                                {['owner', 'admin', 'pm', 'developer'].includes(currentUser?.role) && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setDeliverableType('android')
+                                            setDeliverableDialogOpen(true)
+                                        }}
+                                        className="h-8 text-xs font-bold gap-1.5"
+                                    >
+                                        <Edit className="h-3.5 w-3.5" /> Edit Android Details
+                                    </Button>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent className="space-y-4 text-xs font-medium">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1">
                                     <Label className="text-xs font-bold">Android Status</Label>
-                                    <Input value={project.androidStatus || 'not-started'} readOnly className="h-9 uppercase font-bold" />
+                                    <Input value={(project.androidStatus || 'not-started').toUpperCase()} readOnly className="h-9 uppercase font-bold" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs font-bold">App Version</Label>
@@ -653,15 +735,30 @@ export function ProjectDetailPage() {
                 <TabsContent value="ios" className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base font-bold flex items-center gap-2">
-                                <Smartphone className="h-5 w-5 text-purple-500" /> iOS App Tracker
-                            </CardTitle>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base font-bold flex items-center gap-2">
+                                    <Smartphone className="h-5 w-5 text-purple-500" /> iOS App Tracker
+                                </CardTitle>
+                                {['owner', 'admin', 'pm', 'developer'].includes(currentUser?.role) && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setDeliverableType('ios')
+                                            setDeliverableDialogOpen(true)
+                                        }}
+                                        className="h-8 text-xs font-bold gap-1.5"
+                                    >
+                                        <Edit className="h-3.5 w-3.5" /> Edit iOS Details
+                                    </Button>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent className="space-y-4 text-xs font-medium">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1">
                                     <Label className="text-xs font-bold">iOS Status</Label>
-                                    <Input value={project.iosStatus || 'not-started'} readOnly className="h-9 uppercase font-bold" />
+                                    <Input value={(project.iosStatus || 'not-started').toUpperCase()} readOnly className="h-9 uppercase font-bold" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs font-bold">App Version</Label>
@@ -844,6 +941,27 @@ export function ProjectDetailPage() {
 
             {/* Project File Dialog */}
             {project && <ProjectFileDialog open={fileDialogOpen} onOpenChange={setFileDialogOpen} project={project} />}
+            {/* Project Team Dialog */}
+            {project && <ProjectTeamDialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen} project={project} />}
+            {/* Project Checkpoint Dialog */}
+            {project && (
+                <ProjectCheckpointDialog
+                    open={checkpointDialogOpen}
+                    onOpenChange={setCheckpointDialogOpen}
+                    projectId={project._id || project.id}
+                    onSuccess={fetchModuleData}
+                />
+            )}
+            {/* Project Deliverable (Website, Android, iOS) Dialog */}
+            {project && (
+                <ProjectDeliverableDialog
+                    open={deliverableDialogOpen}
+                    onOpenChange={setDeliverableDialogOpen}
+                    project={project}
+                    type={deliverableType}
+                    onSuccess={(updated) => updateProject(project.id, updated)}
+                />
+            )}
         </div>
     )
 }

@@ -8,11 +8,12 @@ import {
     Plus, Flag, Calendar, DollarSign, CheckCircle2, Clock,
     AlertCircle, Edit2, Trash2, FileText, TrendingUp,
     CreditCard, CheckCheck, AlertTriangle,
-    Sparkles, Zap, ChevronRight
+    Sparkles, Zap, ChevronRight, Layers
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { ProjectMilestoneDialog } from './project-milestone-dialog'
 import { ProjectMilestonePaymentDialog } from './project-milestone-payment-dialog'
+import { ProjectBulkMilestonesDialog } from './project-bulk-milestones-dialog'
 import { useAppStore } from '@/store'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '@/hooks/use-toast'
@@ -30,6 +31,7 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
     const { invoices, updateProject, currentUser } = useAppStore()
 
     const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
     const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
     const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null)
     const [milestoneIndex, setMilestoneIndex] = useState<number | null>(null)
@@ -118,6 +120,56 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
             toast({
                 title: 'Error',
                 description: errMsg,
+                variant: 'destructive'
+            })
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    // Save multiple milestones at once (Bulk Add)
+    const handleSaveBulkMilestones = async (newMilestones: Partial<Milestone>[]) => {
+        const projectId = project.id || (project as any)._id
+        setIsSaving(true)
+        try {
+            const formattedNew: Milestone[] = newMilestones.map((m, i) => ({
+                id: 'm_' + (Date.now() + i),
+                name: m.name || `Milestone ${i + 1}`,
+                amount: m.amount || 0,
+                paymentStatus: 'unpaid',
+                paidAmount: 0,
+                status: 'pending',
+                completed: false,
+                ...m
+            } as Milestone))
+            const updatedMilestones: Milestone[] = [...milestones, ...formattedNew]
+
+            const completedCount = updatedMilestones.filter(m => m.completed || m.status === 'completed').length
+            const newProgress = updatedMilestones.length > 0 ? Math.round((completedCount / updatedMilestones.length) * 100) : project.progress
+
+            await api.put(`/projects/${projectId}`, {
+                milestones: updatedMilestones,
+                progress: newProgress
+            })
+
+            updateProject(projectId, {
+                milestones: updatedMilestones,
+                progress: newProgress
+            })
+
+            if (onProjectUpdate) {
+                onProjectUpdate({ ...project, milestones: updatedMilestones, progress: newProgress })
+            }
+
+            toast({
+                title: 'Success! 🚀',
+                description: `${newMilestones.length} milestones created successfully.`
+            })
+        } catch (error: any) {
+            console.error('Failed to save bulk milestones', error)
+            toast({
+                title: 'Error',
+                description: error.response?.data?.message || 'Failed to save milestones.',
                 variant: 'destructive'
             })
         } finally {
@@ -569,16 +621,25 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                         </div>
 
                         {canManageMilestones && (
-                            <Button
-                                onClick={() => {
-                                    setSelectedMilestone(null)
-                                    setMilestoneIndex(null)
-                                    setIsDialogOpen(true)
-                                }}
-                                className="h-8 text-xs font-bold bg-primary text-primary-foreground shadow-xs gap-1"
-                            >
-                                <Plus className="h-3.5 w-3.5" /> Add Milestone
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    onClick={() => setIsBulkDialogOpen(true)}
+                                    variant="outline"
+                                    className="h-8 text-xs font-bold border-primary/30 text-primary hover:bg-primary/5 gap-1"
+                                >
+                                    <Layers className="h-3.5 w-3.5" /> Bulk Create
+                                </Button>
+                                <Button
+                                    onClick={() => {
+                                        setSelectedMilestone(null)
+                                        setMilestoneIndex(null)
+                                        setIsDialogOpen(true)
+                                    }}
+                                    className="h-8 text-xs font-bold bg-primary text-primary-foreground shadow-xs gap-1"
+                                >
+                                    <Plus className="h-3.5 w-3.5" /> Add Milestone
+                                </Button>
+                            </div>
                         )}
                     </div>
                 </CardHeader>
@@ -864,6 +925,15 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                 onOpenChange={setIsPaymentDialogOpen}
                 milestone={selectedMilestone}
                 onSavePayment={handleSaveMilestonePayment}
+            />
+
+            {/* Bulk Create Milestones Dialog */}
+            <ProjectBulkMilestonesDialog
+                open={isBulkDialogOpen}
+                onOpenChange={setIsBulkDialogOpen}
+                projectBudget={project.budget || 0}
+                projectDeadline={project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : ''}
+                onSave={handleSaveBulkMilestones}
             />
         </div>
     )

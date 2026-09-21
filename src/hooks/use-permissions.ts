@@ -53,7 +53,7 @@ export function usePermissions() {
     }, [currentUser])
 
     const canView = (module: string) => {
-        if (currentUser?.role === 'owner') return true
+        if (currentUser?.role === 'owner' || currentUser?.role === 'admin') return true
         if (module === 'files' && currentUser?.role === 'client') return true
         if (!permissions) return false
         if (module === 'ai_assistant') return !!permissions[module]?.use
@@ -61,25 +61,25 @@ export function usePermissions() {
     }
 
     const canCreate = (module: string) => {
-        if (currentUser?.role === 'owner') return true
+        if (currentUser?.role === 'owner' || currentUser?.role === 'admin') return true
         if (!permissions) return false
         return !!permissions[module]?.create
     }
 
     const canEdit = (module: string) => {
-        if (currentUser?.role === 'owner') return true
+        if (currentUser?.role === 'owner' || currentUser?.role === 'admin') return true
         if (!permissions) return false
         return !!permissions[module]?.edit
     }
 
     const canDelete = (module: string) => {
-        if (currentUser?.role === 'owner') return true
+        if (currentUser?.role === 'owner' || currentUser?.role === 'admin') return true
         if (!permissions) return false
         return !!permissions[module]?.delete
     }
 
     const hasPermission = (module: string, action: string) => {
-        if (currentUser?.role === 'owner') return true
+        if (currentUser?.role === 'owner' || currentUser?.role === 'admin') return true
         if (module === 'files' && action === 'upload' && currentUser?.role === 'client') return true
         if (!permissions) return false
         return !!permissions[module]?.[action]
