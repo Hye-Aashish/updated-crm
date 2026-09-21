@@ -887,6 +887,17 @@ export function ProjectsPage() {
                                                     >
                                                         <ArrowUpRight className="h-4 w-4" />
                                                     </Button>
+                                                    {canDelete('projects') && (
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="ghost" 
+                                                            onClick={() => handleDeleteProject(pid, p.name)}
+                                                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                            title="Delete Project"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

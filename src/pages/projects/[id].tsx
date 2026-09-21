@@ -28,7 +28,6 @@ import { CheckpointProofDialog } from '@/components/projects/checkpoint-proof-di
 import { ProjectMilestonesTab } from '@/components/projects/project-milestones-tab'
 import { ProjectCheckpointDialog } from '@/components/projects/project-checkpoint-dialog'
 import { ProjectDeliverableDialog } from '@/components/projects/project-deliverable-dialog'
-import { ProjectTimelineDatesDialog } from '@/components/projects/project-timeline-dates-dialog'
 
 import { mapProject, mapClient, mapUser } from '@/lib/mappers'
 
@@ -48,7 +47,6 @@ export function ProjectDetailPage() {
     const [teamDialogOpen, setTeamDialogOpen] = useState(false)
     const [checkpointDialogOpen, setCheckpointDialogOpen] = useState(false)
     const [deliverableDialogOpen, setDeliverableDialogOpen] = useState(false)
-    const [timelineDatesDialogOpen, setTimelineDatesDialogOpen] = useState(false)
     const [deliverableType, setDeliverableType] = useState<'website' | 'android' | 'ios'>('website')
 
     // Dialog & Form States
@@ -129,13 +127,20 @@ export function ProjectDetailPage() {
     const health = project.health || 'green'
 
     const handleDelete = async () => {
+        const pId = (project as any)._id || project.id
         if (window.confirm("Are you sure you want to delete this project? This cannot be undone.")) {
             try {
-                await api.delete(`/projects/${project.id}`)
+                await api.delete(`/projects/${pId}`)
                 deleteProject(project.id)
+                deleteProject(pId)
+                toast({ title: 'Project deleted', description: `"${project.name}" has been deleted.` })
                 navigate('/projects')
-            } catch (err) {
-                navigate('/projects')
+            } catch (err: any) {
+                toast({
+                    title: 'Delete failed',
+                    description: err.response?.data?.message || 'Could not delete project.',
+                    variant: 'destructive'
+                })
             }
         }
     }
@@ -498,10 +503,6 @@ export function ProjectDetailPage() {
                 <TabsContent value="timeline">
                     <ProjectTimelineView 
                         checkpoints={checkpoints} 
-                        project={project}
-                        canManage={['owner', 'admin', 'pm'].includes(currentUser?.role)}
-                        onAddCheckpoint={() => setCheckpointDialogOpen(true)}
-                        onEditTimelineDates={() => setTimelineDatesDialogOpen(true)}
                         onCheckpointClick={(cp) => {
                             if (cp.proofRequired) {
                                 setSelectedCpForProof(cp)
@@ -965,15 +966,6 @@ export function ProjectDetailPage() {
                     onOpenChange={setDeliverableDialogOpen}
                     project={project}
                     type={deliverableType}
-                    onSuccess={(updated) => updateProject(project.id, updated)}
-                />
-            )}
-            {/* Project Timeline Dates Dialog */}
-            {project && (
-                <ProjectTimelineDatesDialog
-                    open={timelineDatesDialogOpen}
-                    onOpenChange={setTimelineDatesDialogOpen}
-                    project={project}
                     onSuccess={(updated) => updateProject(project.id, updated)}
                 />
             )}

@@ -222,8 +222,8 @@ const checkPermission = (module, action) => {
     return async (req, res, next) => {
         if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
 
-        // Owners always bypass
-        if (req.user.role === 'owner') return next();
+        // Owners and Admins always bypass
+        if (req.user.role === 'owner' || req.user.role === 'admin') return next();
 
         const userRole = req.user.role;
 

@@ -591,7 +591,7 @@ exports.deleteNote = async (req, res, next) => {
         if (!project) return res.status(404).json({ message: 'Project not found' });
         const note = project.notes.id(req.params.noteId);
         if (!note) return res.status(404).json({ message: 'Note not found' });
-        if (note.createdBy !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ message: 'Not authorized to delete this note' });
+        if (note.createdBy?.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner' && req.user.role !== 'pm') return res.status(403).json({ message: 'Not authorized to delete this note' });
         project.notes.pull(req.params.noteId);
         await project.save();
         res.json(project);
@@ -624,7 +624,7 @@ exports.updateCredential = async (req, res, next) => {
         if (!project) return res.status(404).json({ message: 'Project not found' });
         const credential = project.credentials.id(req.params.credentialId);
         if (!credential) return res.status(404).json({ message: 'Credential not found' });
-        if (credential.createdBy !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ message: 'Not authorized to edit this credential' });
+        if (credential.createdBy?.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner' && req.user.role !== 'pm') return res.status(403).json({ message: 'Not authorized to edit this credential' });
         credential.title = req.body.title;
         credential.type = req.body.type;
         credential.url = req.body.url;
@@ -642,7 +642,7 @@ exports.deleteCredential = async (req, res, next) => {
         if (!project) return res.status(404).json({ message: 'Project not found' });
         const credential = project.credentials.id(req.params.credentialId);
         if (!credential) return res.status(404).json({ message: 'Credential not found' });
-        if (credential.createdBy !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ message: 'Not authorized to delete this credential' });
+        if (credential.createdBy?.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner' && req.user.role !== 'pm') return res.status(403).json({ message: 'Not authorized to delete this credential' });
         project.credentials.pull(req.params.credentialId);
         await project.save();
         res.json(project);
