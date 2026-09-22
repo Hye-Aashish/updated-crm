@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api-client'
+import { handleApiError } from '@/lib/error-handler'
 import { useAppStore } from '@/store'
 import { useToast } from '@/hooks/use-toast'
 import type { PipelineStage, LeadForm } from '@/types'
@@ -26,7 +27,7 @@ export function useLeadsData() {
             setLeadForms(formsRes.data)
         } catch (error) {
             console.error("Failed to fetch leads data", error)
-            toast({ title: "Error", description: "Failed to load pipeline data", variant: "destructive" })
+            handleApiError(error, toast, "Failed to load pipeline data")
         } finally {
             setLoading(false)
         }
@@ -45,7 +46,7 @@ export function useLeadsData() {
             toast({ description: "Lead stage updated" })
         } catch (error) {
             setLeads(previousLeads)
-            toast({ title: "Error", description: "Failed to update lead stage", variant: "destructive" })
+            handleApiError(error, toast, "Failed to update lead stage")
         }
     }
 
@@ -55,7 +56,7 @@ export function useLeadsData() {
             setLeads(leads.filter(l => l.id !== leadId))
             toast({ description: "Lead deleted successfully" })
         } catch (error) {
-            toast({ title: "Error", description: "Failed to delete lead", variant: "destructive" })
+            handleApiError(error, toast, "Failed to delete lead")
         }
     }
 
@@ -71,7 +72,7 @@ export function useLeadsData() {
             toast({ description: "Note added" })
             return updatedLead
         } catch (error: any) {
-            toast({ title: "Error", description: error?.response?.data?.message || error.message || "Failed to add note", variant: "destructive" })
+            handleApiError(error, toast, "Failed to add note")
             return null
         }
     }
@@ -85,7 +86,7 @@ export function useLeadsData() {
             return updatedLead
         } catch (error: any) {
             console.error("Log Follow-up Error:", error)
-            toast({ title: "Error", description: error?.response?.data?.message || "Failed to record follow-up", variant: "destructive" })
+            handleApiError(error, toast, "Failed to record follow-up")
             return null
         }
     }
@@ -98,7 +99,7 @@ export function useLeadsData() {
             toast({ description: "Stage order updated" })
         } catch (error) {
             console.error("Reorder stages error:", error)
-            toast({ title: "Error", description: "Failed to save stage order", variant: "destructive" })
+            handleApiError(error, toast, "Failed to save stage order")
             fetchData()
         }
     }

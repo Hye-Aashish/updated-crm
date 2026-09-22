@@ -66,9 +66,10 @@ export function LoginPage() {
             toast({ description: `Welcome back, ${userData.name}` })
             navigate('/dashboard')
         } catch (error: any) {
+            const isInvalidCreds = error.status === 401 || (error.message && error.message.toLowerCase().includes('invalid'));
             toast({
-                title: "Login Failed",
-                description: error.message || "Something went wrong",
+                title: isInvalidCreds ? "Invalid Credentials" : "Login Failed",
+                description: error.userMessage || error.message || "Invalid email or password. Please try again.",
                 variant: 'destructive'
             })
         } finally {

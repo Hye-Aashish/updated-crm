@@ -24,6 +24,7 @@ import { ProjectService } from '@/lib/services/project.service'
 import { ClientService } from '@/lib/services/client.service'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { useToast } from '@/hooks/use-toast'
+import { handleApiError } from '@/lib/error-handler'
 import { Project, ProjectStatus, ProjectHealth } from '@/types'
 
 // Quick Status Options
@@ -73,11 +74,7 @@ export function ProjectsPage() {
             setClients(backendClients)
         } catch (error) {
             console.error("Failed to fetch projects data:", error)
-            toast({
-                title: "Failed to load projects",
-                description: "Please check your network connection.",
-                variant: "destructive"
-            })
+            handleApiError(error, toast, "Failed to load projects")
         } finally {
             setLoading(false)
         }
@@ -99,11 +96,7 @@ export function ProjectsPage() {
             })
         } catch (err) {
             console.error("Failed to update project:", err)
-            toast({
-                title: "Update failed",
-                description: "Could not update project status.",
-                variant: "destructive"
-            })
+            handleApiError(err, toast, "Update failed")
         } finally {
             setUpdatingId(null)
         }
@@ -120,11 +113,7 @@ export function ProjectsPage() {
                 description: `${name} has been deleted.`
             })
         } catch (err) {
-            toast({
-                title: "Delete failed",
-                description: "Could not delete project.",
-                variant: "destructive"
-            })
+            handleApiError(err, toast, "Delete failed")
         }
     }
 
