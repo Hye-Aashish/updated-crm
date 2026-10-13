@@ -42,7 +42,7 @@ function initWhatsAppClient() {
     });
 
     client.on('qr', async (qr) => {
-        console.log('📱 [WhatsApp Client] QR Code Received! Scan it to authenticate.');
+        console.log('📱 [WhatsApp Client] QR Code refreshed (ready for pairing).');
         try {
             // Generate base64 data URI of the QR code
             currentQrData = await qrcode.toDataURL(qr);
