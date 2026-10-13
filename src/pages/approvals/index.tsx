@@ -11,7 +11,7 @@ import { SignaturePad } from '@/components/approvals/signature-pad'
 import {
     FileSignature, CheckCircle2, XCircle, Clock, Plus, ExternalLink, ShieldCheck,
     RefreshCw, Copy, Check, Search, Filter, Share2, Award, Calendar, AlertTriangle,
-    Eye, FileText, Lock
+    Eye, FileText, Lock, Trash2
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
@@ -125,6 +125,17 @@ export function ApprovalsPage() {
             fetchApprovals()
         } catch (err: any) {
             toast({ title: 'Error', description: err.response?.data?.message || 'Failed to create approval', variant: 'destructive' })
+        }
+    }
+
+    const handleDeleteApproval = async (id: string) => {
+        if (!window.confirm('Are you sure you want to delete this approval request?')) return
+        try {
+            await api.delete(`/approvals/${id}`)
+            toast({ title: 'Approval Request Deleted' })
+            fetchApprovals()
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.response?.data?.message || 'Failed to delete approval request', variant: 'destructive' })
         }
     }
 
@@ -291,7 +302,7 @@ export function ApprovalsPage() {
                                             <Badge className={`${catCfg.color} uppercase font-black text-[9px] tracking-wider`}>
                                                 {catCfg.label}
                                             </Badge>
-                                            <div>
+                                            <div className="flex items-center gap-1.5">
                                                 {item.status === 'approved' && (
                                                     <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-200 uppercase font-black text-[10px]">
                                                         <CheckCircle2 className="w-3 h-3 mr-1" /> Approved
@@ -306,6 +317,17 @@ export function ApprovalsPage() {
                                                     <Badge className="bg-rose-500/10 text-rose-600 border-rose-200 uppercase font-black text-[10px]">
                                                         <XCircle className="w-3 h-3 mr-1" /> Rejected
                                                     </Badge>
+                                                )}
+                                                {currentUser?.role !== 'client' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 text-muted-foreground hover:text-rose-600 ml-1"
+                                                        onClick={() => handleDeleteApproval(item._id)}
+                                                        title="Delete Request"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </Button>
                                                 )}
                                             </div>
                                         </div>

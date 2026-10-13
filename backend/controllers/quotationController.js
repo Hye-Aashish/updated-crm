@@ -477,6 +477,18 @@ exports.deleteTemplate = async (req, res) => {
     }
 };
 
+exports.deleteQuotation = async (req, res) => {
+    try {
+        const quotation = await Quotation.findByIdAndDelete(req.params.id);
+        if (!quotation) {
+            return res.status(404).json({ message: 'Quotation not found' });
+        }
+        res.json({ message: 'Quotation deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Quotation deletion failed', error: error.message });
+    }
+};
+
 // Public View & Approval
 exports.getQuotationPublic = async (req, res) => {
     try {

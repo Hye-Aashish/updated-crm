@@ -9,12 +9,15 @@ const leadSchema = new mongoose.Schema({
     email: String,
     phone: String,
     project: String,
+    formId: { type: mongoose.Schema.Types.ObjectId, ref: 'LeadForm' },
+    formTitle: String,
     rating: { type: Number, default: 0, min: 0, max: 5 },
     customFields: { type: Map, of: String },
     activities: [{
         content: String,
         type: { type: String, default: 'note' },
         outcome: String,
+        duration: { type: Number, default: 0 }, // call duration in seconds
         nextFollowUpDate: Date,
         reminderMinutes: Number,
         createdByName: String,
@@ -34,6 +37,18 @@ const leadSchema = new mongoose.Schema({
     aiPriority: { type: String, enum: ['red', 'yellow', 'green'], default: 'red' },
     aiPriorityReason: { type: String, default: 'No interaction history.' },
     assignedTo: { type: String }, // User ID
+    assignedToName: { type: String }, // User display name
+    assignedAt: { type: Date },
+    firstCallAttemptAt: { type: Date },
+    firstContactedAt: { type: Date },
+    qualifiedAt: { type: Date },
+    convertedAt: { type: Date },
+    closedAt: { type: Date },
+    lossReason: { type: String },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdByName: { type: String },
+    lastContactedBy: { type: String },
+    lastContactedById: { type: String },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
@@ -85,6 +100,7 @@ leadSchema.pre('findOneAndUpdate', async function() {
 });
 
 leadSchema.index({ assignedTo: 1 });
+leadSchema.index({ createdBy: 1 });
 leadSchema.index({ stage: 1 });
 leadSchema.index({ createdAt: -1 });
 

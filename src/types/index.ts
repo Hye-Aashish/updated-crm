@@ -447,8 +447,16 @@ export interface Lead {
     email?: string
     phone?: string
     project?: string
+    formId?: string
+    formTitle?: string
     rating?: number
     assignedTo?: string
+    assignedToName?: string
+    createdBy?: string
+    createdByName?: string
+    lastContactedBy?: string
+    isFallbackFollowUp?: boolean
+    absentTelecallerName?: string
     lastFollowUpDate?: Date | string
     lastFollowUpOutcome?: string
     lastNote?: string

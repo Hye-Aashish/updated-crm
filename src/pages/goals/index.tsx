@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Target, Trophy, AlertTriangle, Plus, CheckCircle2, RefreshCw, Flame, Calendar, Trash2 } from 'lucide-react'
+import { Target, Trophy, AlertTriangle, Plus, CheckCircle2, RefreshCw, Flame, Calendar, Trash2, Edit } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { formatCurrency } from '@/lib/utils'
 
@@ -16,6 +16,8 @@ export function GoalsPage() {
     const [goals, setGoals] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [createModalOpen, setCreateModalOpen] = useState(false)
+    const [editModalOpen, setEditModalOpen] = useState(false)
+    const [editingGoal, setEditingGoal] = useState<any>(null)
 
     // Form state
     const [title, setTitle] = useState('')
@@ -58,6 +60,40 @@ export function GoalsPage() {
             fetchGoals()
         } catch (err: any) {
             toast({ title: 'Error', description: err.response?.data?.message || 'Failed to create goal', variant: 'destructive' })
+        }
+    }
+
+    const handleOpenEdit = (goal: any) => {
+        setEditingGoal({
+            _id: goal._id,
+            title: goal.title,
+            category: goal.category,
+            targetValue: goal.targetValue?.toString() || '',
+            unit: goal.unit || '₹',
+            endDate: goal.endDate ? new Date(goal.endDate).toISOString().split('T')[0] : '',
+            status: goal.status || 'in-progress'
+        })
+        setEditModalOpen(true)
+    }
+
+    const handleUpdateGoal = async (e: any) => {
+        e.preventDefault()
+        if (!editingGoal) return
+        try {
+            await api.put(`/goals/${editingGoal._id}`, {
+                title: editingGoal.title,
+                category: editingGoal.category,
+                targetValue: Number(editingGoal.targetValue),
+                unit: editingGoal.unit,
+                endDate: editingGoal.endDate,
+                status: editingGoal.status
+            })
+            toast({ title: 'Goal Updated', description: 'Target details updated successfully.' })
+            setEditModalOpen(false)
+            setEditingGoal(null)
+            fetchGoals()
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.response?.data?.message || 'Failed to update goal', variant: 'destructive' })
         }
     }
 
@@ -117,9 +153,14 @@ export function GoalsPage() {
                                         </Badge>
                                         <h3 className="font-bold text-base text-foreground leading-snug">{goal.title}</h3>
                                     </div>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-600" onClick={() => handleDeleteGoal(goal._id)}>
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleOpenEdit(goal)} title="Edit Goal">
+                                            <Edit className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-600" onClick={() => handleDeleteGoal(goal._id)} title="Delete Goal">
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="flex items-baseline justify-between">
@@ -227,6 +268,100 @@ export function GoalsPage() {
                             <Button type="submit" className="rounded-xl font-bold">Set Target</Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Goal Modal */}
+            <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+                <DialogContent className="sm:max-w-md rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-black text-xl">Edit OKR Target Goal</DialogTitle>
+                        <DialogDescription className="text-xs">
+                            Update the title, category, target benchmark, and deadline.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {editingGoal && (
+                        <form onSubmit={handleUpdateGoal} className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase text-muted-foreground">Goal Title</label>
+                                <Input
+                                    value={editingGoal.title}
+                                    onChange={e => setEditingGoal({ ...editingGoal, title: e.target.value })}
+                                    required
+                                    className="rounded-xl"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase text-muted-foreground">Category</label>
+                                    <Select
+                                        value={editingGoal.category}
+                                        onValueChange={v => setEditingGoal({ ...editingGoal, category: v })}
+                                    >
+                                        <SelectTrigger className="rounded-xl">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="revenue">Revenue</SelectItem>
+                                            <SelectItem value="leads">Leads Won</SelectItem>
+                                            <SelectItem value="projects">Completed Projects</SelectItem>
+                                            <SelectItem value="tasks">Done Tasks</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase text-muted-foreground">Unit Symbol</label>
+                                    <Input
+                                        value={editingGoal.unit}
+                                        onChange={e => setEditingGoal({ ...editingGoal, unit: e.target.value })}
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase text-muted-foreground">Target Value</label>
+                                    <Input
+                                        type="number"
+                                        value={editingGoal.targetValue}
+                                        onChange={e => setEditingGoal({ ...editingGoal, targetValue: e.target.value })}
+                                        required
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase text-muted-foreground">End / Target Date</label>
+                                    <Input
+                                        type="date"
+                                        value={editingGoal.endDate}
+                                        onChange={e => setEditingGoal({ ...editingGoal, endDate: e.target.value })}
+                                        required
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase text-muted-foreground">Status</label>
+                                <Select
+                                    value={editingGoal.status}
+                                    onValueChange={v => setEditingGoal({ ...editingGoal, status: v })}
+                                >
+                                    <SelectTrigger className="rounded-xl">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="in-progress">In Progress</SelectItem>
+                                        <SelectItem value="achieved">Achieved</SelectItem>
+                                        <SelectItem value="missed">Missed</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-3">
+                                <Button type="button" variant="outline" onClick={() => setEditModalOpen(false)} className="rounded-xl">Cancel</Button>
+                                <Button type="submit" className="rounded-xl font-bold">Save Changes</Button>
+                            </div>
+                        </form>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>

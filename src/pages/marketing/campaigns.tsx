@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
     Mail, Send, Plus, CheckCircle2, RefreshCw, Sparkles, Loader2,
     Search, Copy, Trash2, Eye, Smartphone, Monitor, BarChart2,
-    TrendingUp, MousePointer, Tag
+    TrendingUp, MousePointer, Tag, Edit
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -134,6 +134,8 @@ export function CampaignsPage() {
     const [campaigns, setCampaigns] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [createModalOpen, setCreateModalOpen] = useState(false)
+    const [editModalOpen, setEditModalOpen] = useState(false)
+    const [editingCampaign, setEditingCampaign] = useState<any>(null)
     const [previewModalOpen, setPreviewModalOpen] = useState(false)
     const [testModalOpen, setTestModalOpen] = useState(false)
     const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false)
@@ -248,6 +250,44 @@ export function CampaignsPage() {
             fetchCampaigns()
         } catch (err: any) {
             toast({ title: 'Error', description: err.response?.data?.message || 'Failed to save campaign', variant: 'destructive' })
+        }
+    }
+
+    const handleOpenEdit = (item: any) => {
+        setEditingCampaign({
+            _id: item._id,
+            title: item.title,
+            subject: item.subject,
+            templateCategory: item.templateCategory || 'custom',
+            targetAudience: item.targetAudience || 'leads',
+            customEmailsInput: (item.customEmails || []).join(', '),
+            content: item.content
+        })
+        setEditModalOpen(true)
+    }
+
+    const handleUpdateCampaign = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!editingCampaign) return
+        try {
+            const customEmails = editingCampaign.targetAudience === 'custom'
+                ? editingCampaign.customEmailsInput.split(',').map((e: string) => e.trim()).filter(Boolean)
+                : []
+
+            await api.put(`/campaigns/${editingCampaign._id}`, {
+                title: editingCampaign.title,
+                subject: editingCampaign.subject,
+                templateCategory: editingCampaign.templateCategory,
+                targetAudience: editingCampaign.targetAudience,
+                customEmails,
+                content: editingCampaign.content
+            })
+            toast({ title: 'Campaign Updated', description: 'Changes saved successfully.' })
+            setEditModalOpen(false)
+            setEditingCampaign(null)
+            fetchCampaigns()
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.response?.data?.message || 'Failed to update campaign', variant: 'destructive' })
         }
     }
 
@@ -485,6 +525,17 @@ export function CampaignsPage() {
                                     </div>
 
                                     <div className="flex items-center gap-1">
+                                        {item.status === 'draft' && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                                title="Edit Campaign"
+                                                onClick={() => handleOpenEdit(item)}
+                                            >
+                                                <Edit className="w-3.5 h-3.5" />
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -648,6 +699,92 @@ export function CampaignsPage() {
                             </Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Campaign Modal */}
+            <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+                <DialogContent className="sm:max-w-2xl rounded-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="font-black text-xl flex items-center gap-2">
+                            <Edit className="w-5 h-5 text-amber-600" /> Edit Campaign Draft
+                        </DialogTitle>
+                        <DialogDescription className="text-xs">
+                            Modify subject line, audience targeting, or email body.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {editingCampaign && (
+                        <form onSubmit={handleUpdateCampaign} className="space-y-4 pt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase text-muted-foreground">Internal Title *</label>
+                                    <Input
+                                        value={editingCampaign.title}
+                                        onChange={e => setEditingCampaign({ ...editingCampaign, title: e.target.value })}
+                                        required
+                                        className="rounded-xl"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase text-muted-foreground">Target Audience</label>
+                                    <Select
+                                        value={editingCampaign.targetAudience}
+                                        onValueChange={v => setEditingCampaign({ ...editingCampaign, targetAudience: v })}
+                                    >
+                                        <SelectTrigger className="rounded-xl">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="leads">All Leads & Prospects</SelectItem>
+                                            <SelectItem value="clients">All Active Clients</SelectItem>
+                                            <SelectItem value="all_staff">All Internal Agency Staff</SelectItem>
+                                            <SelectItem value="custom">Custom Email List</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {editingCampaign.targetAudience === 'custom' && (
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase text-muted-foreground">Custom Email List (Comma Separated)</label>
+                                    <Input
+                                        value={editingCampaign.customEmailsInput}
+                                        onChange={e => setEditingCampaign({ ...editingCampaign, customEmailsInput: e.target.value })}
+                                        placeholder="john@example.com, sara@client.com"
+                                        className="rounded-xl font-mono text-xs"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase text-muted-foreground">Subject Line *</label>
+                                <Input
+                                    value={editingCampaign.subject}
+                                    onChange={e => setEditingCampaign({ ...editingCampaign, subject: e.target.value })}
+                                    required
+                                    className="rounded-xl font-medium"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase text-muted-foreground">HTML Content *</label>
+                                <textarea
+                                    value={editingCampaign.content}
+                                    onChange={e => setEditingCampaign({ ...editingCampaign, content: e.target.value })}
+                                    required
+                                    rows={10}
+                                    className="w-full p-4 rounded-2xl border bg-background font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <Button type="button" variant="outline" onClick={() => setEditModalOpen(false)} className="rounded-xl">Cancel</Button>
+                                <Button type="submit" className="rounded-xl font-bold gap-1.5">Save Changes</Button>
+                            </div>
+                        </form>
+                    )}
                 </DialogContent>
             </Dialog>
 

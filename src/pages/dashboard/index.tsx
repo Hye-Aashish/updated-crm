@@ -24,6 +24,7 @@ import { useAttendance } from '@/hooks/use-attendance'
 import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { LivePresenceBoard } from '@/components/attendance/live-presence-board'
+import { SalesDashboardSection } from '@/components/dashboard/sales-dashboard-section'
 
 export function DashboardPage() {
     const navigate = useNavigate()
@@ -992,7 +993,12 @@ export function DashboardPage() {
                 </div>
             </div>
 
-
+            {/* 4. Sales & Leads Intelligence Dashboard (Dedicated Section) */}
+            {currentUser?.role !== 'client' && (
+                <div className="pt-2 animate-in fade-in duration-500">
+                    <SalesDashboardSection />
+                </div>
+            )}
 
             {showConfirmModal && createPortal(
                 <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">

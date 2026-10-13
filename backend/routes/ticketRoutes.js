@@ -144,10 +144,13 @@ router.put('/:id', protect, checkPermission('tickets', 'edit'), async (req, res)
             return res.status(403).json({ message: 'Not authorized' });
         }
 
+        if (req.body.subject) ticket.subject = req.body.subject;
+        if (req.body.projectId !== undefined) ticket.projectId = req.body.projectId;
+        if (req.body.clientName !== undefined) ticket.clientName = req.body.clientName;
         if (req.body.status) ticket.status = req.body.status;
         if (req.body.priority) ticket.priority = req.body.priority;
         if (req.body.assignedTo) ticket.assignedTo = req.body.assignedTo;
-        if (req.body.description) ticket.description = req.body.description;
+        if (req.body.description !== undefined) ticket.description = req.body.description;
         if (req.body.discussionNote !== undefined) ticket.discussionNote = req.body.discussionNote;
         if (req.body.taskId !== undefined) ticket.taskId = req.body.taskId;
         if (req.body.taskTitle !== undefined) ticket.taskTitle = req.body.taskTitle;

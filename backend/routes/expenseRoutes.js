@@ -45,6 +45,26 @@ router.post('/', protect, checkPermission('expenses', 'create'), async (req, res
     }
 });
 
+// Update expense
+router.put('/:id', protect, checkPermission('expenses', 'edit'), async (req, res) => {
+    try {
+        const updateData = {};
+        if (req.body.date !== undefined) updateData.date = req.body.date;
+        if (req.body.amount !== undefined) updateData.amount = req.body.amount;
+        if (req.body.category !== undefined) updateData.category = req.body.category;
+        if (req.body.paymentMode !== undefined) updateData.paymentMode = req.body.paymentMode;
+        if (req.body.paidBy !== undefined) updateData.paidBy = req.body.paidBy;
+        if (req.body.note !== undefined) updateData.note = req.body.note;
+        if (req.body.receipt !== undefined) updateData.receipt = req.body.receipt;
+
+        const updatedExpense = await Expense.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+        if (!updatedExpense) return res.status(404).json({ message: 'Expense not found' });
+        res.json(updatedExpense);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
 // Delete expense
 router.delete('/:id', protect, checkPermission('expenses', 'delete'), async (req, res) => {
     try {

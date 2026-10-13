@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import {
     Phone, PhoneOff, PhoneCall, MessageSquare, Mail, Calendar,
-    CheckCircle2, XCircle, Clock, AlertTriangle, Loader2, UserCheck
+    CheckCircle2, XCircle, Clock, AlertTriangle, Loader2, UserCheck,
+    Timer, Play, Square
 } from 'lucide-react'
 import type { Lead, PipelineStage } from '@/types'
 import { addDays, setHours, setMinutes, format } from 'date-fns'
@@ -45,6 +46,32 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
     const [newStage, setNewStage] = useState<string>('')
     const [saving, setSaving] = useState<boolean>(false)
 
+    // Call Duration tracking (Minutes & Seconds + Live call timer)
+    const [durationMinutes, setDurationMinutes] = useState<number>(2)
+    const [durationSeconds, setDurationSeconds] = useState<number>(0)
+    const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false)
+    const [timerSeconds, setTimerSeconds] = useState<number>(0)
+
+    // Live Call Timer Effect
+    useEffect(() => {
+        let interval: any = null
+        if (isTimerRunning) {
+            interval = setInterval(() => {
+                setTimerSeconds((prev) => {
+                    const next = prev + 1
+                    setDurationMinutes(Math.floor(next / 60))
+                    setDurationSeconds(next % 60)
+                    return next
+                })
+            }, 1000)
+        } else {
+            if (interval) clearInterval(interval)
+        }
+        return () => {
+            if (interval) clearInterval(interval)
+        }
+    }, [isTimerRunning])
+
     // Pre-fill defaults when dialog opens or lead changes
     useEffect(() => {
         if (isOpen && lead) {
@@ -55,6 +82,10 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
             setReminderMinutes(30)
             setReminderTone('default')
             setNewStage(lead.stage || (stages[0]?.id || 'new'))
+            setDurationMinutes(2)
+            setDurationSeconds(0)
+            setIsTimerRunning(false)
+            setTimerSeconds(120)
 
             // Default next follow-up: Tomorrow 11:30 AM
             const defaultNext = setMinutes(setHours(addDays(new Date(), 1), 11), 30)
@@ -87,15 +118,34 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
         setNextDate(localIso)
     }
 
+    const setQuickDuration = (minutes: number, seconds: number = 0) => {
+        setDurationMinutes(minutes)
+        setDurationSeconds(seconds)
+        setTimerSeconds(minutes * 60 + seconds)
+        setIsTimerRunning(false)
+    }
+
+    const toggleTimer = () => {
+        if (!isTimerRunning) {
+            setIsTimerRunning(true)
+        } else {
+            setIsTimerRunning(false)
+        }
+    }
+
     const handleSubmit = async () => {
         if (!lead) return
         setSaving(true)
         try {
             const selectedOutcomeObj = OUTCOMES.find(o => o.id === outcome)
+            const totalDurationSecs = Math.max(0, (Number(durationMinutes) || 0) * 60 + (Number(durationSeconds) || 0))
+
             const payload = {
                 outcome: selectedOutcomeObj?.label || outcome,
                 note: note.trim(),
                 followUpType,
+                duration: totalDurationSecs,
+                durationSeconds: totalDurationSecs,
                 nextFollowUpDate: hasNextFollowUp && nextDate ? new Date(nextDate) : null,
                 reminderMinutes,
                 reminderTone,
@@ -154,10 +204,112 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
                     </div>
                 </div>
 
-                {/* 2. Interaction Note */}
+                {/* 2. Call Duration & Talk Time */}
+                <div className="space-y-2 p-3.5 rounded-xl bg-primary/5 border border-primary/20">
+                    <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                            <Timer className="h-3.5 w-3.5" />
+                            2. Call Duration / Talk Time
+                        </Label>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant={isTimerRunning ? "destructive" : "outline"}
+                            onClick={toggleTimer}
+                            className="h-7 text-[11px] font-bold gap-1.5 rounded-lg shadow-xs"
+                        >
+                            {isTimerRunning ? (
+                                <>
+                                    <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                                    <Square className="h-3 w-3 fill-current" />
+                                    Stop Timer ({String(Math.floor(timerSeconds / 60)).padStart(2, '0')}:{String(timerSeconds % 60).padStart(2, '0')})
+                                </>
+                            ) : (
+                                <>
+                                    <Play className="h-3 w-3 fill-current text-primary" />
+                                    Start Live Timer
+                                </>
+                            )}
+                        </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                        <div className="flex items-center gap-1.5 bg-background border rounded-lg px-2.5 py-1.5">
+                            <Input
+                                type="number"
+                                min="0"
+                                max="180"
+                                value={durationMinutes}
+                                onChange={(e) => setDurationMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                                className="h-7 w-16 p-1 text-center font-bold text-xs border-0 focus-visible:ring-0"
+                            />
+                            <span className="text-xs font-medium text-muted-foreground">Minutes</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-background border rounded-lg px-2.5 py-1.5">
+                            <Input
+                                type="number"
+                                min="0"
+                                max="59"
+                                value={durationSeconds}
+                                onChange={(e) => setDurationSeconds(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                                className="h-7 w-16 p-1 text-center font-bold text-xs border-0 focus-visible:ring-0"
+                            />
+                            <span className="text-xs font-medium text-muted-foreground">Seconds</span>
+                        </div>
+                    </div>
+
+                    {/* Quick Duration Chips */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-[10px] text-muted-foreground font-semibold">Presets:</span>
+                        <button
+                            type="button"
+                            onClick={() => setQuickDuration(0, 30)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${durationMinutes === 0 && durationSeconds === 30 ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted text-muted-foreground'}`}
+                        >
+                            30s
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setQuickDuration(1, 0)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${durationMinutes === 1 && durationSeconds === 0 ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted text-muted-foreground'}`}
+                        >
+                            1 min
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setQuickDuration(2, 0)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${durationMinutes === 2 && durationSeconds === 0 ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted text-muted-foreground'}`}
+                        >
+                            2 min
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setQuickDuration(5, 0)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${durationMinutes === 5 && durationSeconds === 0 ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted text-muted-foreground'}`}
+                        >
+                            5 min
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setQuickDuration(10, 0)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${durationMinutes === 10 && durationSeconds === 0 ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted text-muted-foreground'}`}
+                        >
+                            10 min
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setQuickDuration(15, 0)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${durationMinutes === 15 && durationSeconds === 0 ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted text-muted-foreground'}`}
+                        >
+                            15 min
+                        </button>
+                    </div>
+                </div>
+
+                {/* 3. Interaction Note */}
                 <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase tracking-wider text-primary">
-                        2. Interaction Notes
+                        3. Interaction Notes
                     </Label>
                     <Textarea
                         placeholder="e.g. Discussed pricing details. Customer requested brochure via WhatsApp..."
@@ -167,11 +319,11 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
                     />
                 </div>
 
-                {/* 3. Next Follow-up Choice */}
+                {/* 4. Next Follow-up Choice */}
                 <div className="space-y-3 pt-3 border-t border-border/40">
                     <div className="flex items-center justify-between">
                         <Label className="text-xs font-bold uppercase tracking-wider text-primary">
-                            3. Set Next Follow-up?
+                            4. Set Next Follow-up?
                         </Label>
                         <div className="flex bg-muted rounded-lg p-1 text-xs font-semibold">
                             <button

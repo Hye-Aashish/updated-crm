@@ -10,7 +10,7 @@ import {
     Clock, Calendar, UserCheck, AlertTriangle, PhoneOff, Mail, CheckCircle2, Loader2
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import type { Lead, PipelineStage } from '@/types'
+import type { Lead, PipelineStage, User } from '@/types'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { mapLead } from '@/lib/mappers'
@@ -23,6 +23,9 @@ interface LeadDetailsPanelProps {
     onOpenFollowUp?: (lead: Lead) => void
     onDelete: (leadId: string) => void
     onAddActivity: (leadId: string, content: string) => Promise<any>
+    isAdminOrOwner?: boolean
+    users?: User[]
+    onAssignLead?: (leadId: string, userId: string, userName: string) => Promise<any>
 }
 
 function ActivityItem({ activity }: { activity: any }) {
@@ -97,7 +100,17 @@ function ActivityItem({ activity }: { activity: any }) {
     )
 }
 
-export function LeadDetailsPanel({ lead, stages, onUpdate, onOpenFollowUp, onDelete, onAddActivity }: LeadDetailsPanelProps) {
+export function LeadDetailsPanel({
+    lead,
+    stages,
+    onUpdate,
+    onOpenFollowUp,
+    onDelete,
+    onAddActivity,
+    isAdminOrOwner = false,
+    users = [],
+    onAssignLead
+}: LeadDetailsPanelProps) {
     const { toast } = useToast()
     const [newActivityContent, setNewActivityContent] = useState('')
     const [reminderDate, setReminderDate] = useState('')
@@ -153,6 +166,7 @@ export function LeadDetailsPanel({ lead, stages, onUpdate, onOpenFollowUp, onDel
         const targetId = lead?.id || lead?._id
         if (!targetId) return
         try {
+            const targetUser = users.find(u => (u.id || (u as any)._id) === editForm.assignedTo)
             const payload = {
                 name: editForm.name,
                 company: editForm.company,
@@ -161,6 +175,8 @@ export function LeadDetailsPanel({ lead, stages, onUpdate, onOpenFollowUp, onDel
                 email: editForm.email,
                 phone: editForm.phone,
                 project: editForm.project,
+                assignedTo: editForm.assignedTo,
+                assignedToName: targetUser?.name || editForm.assignedToName,
                 customFields: editForm.customFields
             }
             const res = await api.put(`/leads/${targetId}`, payload)
@@ -297,7 +313,139 @@ export function LeadDetailsPanel({ lead, stages, onUpdate, onOpenFollowUp, onDel
                 </div>
             )}
 
+            {/* Absent Telecaller Coverage Notice */}
+            {lead.isFallbackFollowUp && (
+                <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200 flex items-start gap-2.5 text-xs font-sans">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div>
+                        <p className="font-bold">⚡ Absent Colleague Follow-up Coverage</p>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
+                            The assigned telecaller ({lead.absentTelecallerName || 'team member'}) has not checked in today. Please make this follow-up call so the lead is attended promptly!
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Telecaller & Attribution Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-primary/5 border border-primary/15 p-3.5 rounded-xl text-xs font-sans">
+                <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Created By</Label>
+                    <div className="flex items-center gap-1.5 font-bold text-foreground">
+                        <UserCheck className="h-3.5 w-3.5 text-primary" />
+                        <span>{lead.createdByName || 'Direct / System'}</span>
+                    </div>
+                    {lead.createdAt && (
+                        <p className="text-[10px] text-muted-foreground">
+                            {format(new Date(lead.createdAt), 'MMM d, yyyy h:mm a')}
+                        </p>
+                    )}
+                </div>
+
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Managing Agent</Label>
+                        {isAdminOrOwner && <span className="text-[9px] font-bold text-primary">Admin Control</span>}
+                    </div>
+
+                    {isAdminOrOwner && users.length > 0 ? (
+                        <Select
+                            value={lead.assignedTo || 'unassigned'}
+                            onValueChange={async (val) => {
+                                const targetId = lead.id || (lead as any)._id
+                                if (val === 'unassigned') {
+                                    if (onAssignLead) {
+                                        const res = await onAssignLead(targetId, '', 'Unassigned')
+                                        if (res) onUpdate(res)
+                                    }
+                                } else {
+                                    const u = users.find(user => (user.id || (user as any)._id) === val)
+                                    if (u && onAssignLead) {
+                                        const res = await onAssignLead(targetId, val, u.name)
+                                        if (res) onUpdate(res)
+                                    }
+                                }
+                            }}
+                        >
+                            <SelectTrigger className="h-8 rounded-lg text-xs font-bold bg-card border-border/60">
+                                <div className="flex items-center gap-1.5 truncate">
+                                    <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                                    <SelectValue placeholder="Assign telecaller..." />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl text-xs max-h-[220px]">
+                                <SelectItem value="unassigned" className="text-xs font-semibold text-amber-600">
+                                    ⚪ Pool (Unassigned)
+                                </SelectItem>
+                                {users.filter(u => u.role !== 'client').map(u => (
+                                    <SelectItem key={u.id || (u as any)._id} value={u.id || (u as any)._id} className="text-xs font-semibold">
+                                        {u.name} ({u.role})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <>
+                            <div className="font-bold text-foreground flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span>{lead.assignedToName || lead.createdByName || 'Unassigned'}</span>
+                            </div>
+                            {lead.assignedToName && lead.assignedToName !== lead.createdByName && (
+                                <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                                    🎯 Assigned by Admin
+                                </span>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Last Spoke With / Called By</Label>
+                    <div className="font-bold text-foreground flex items-center gap-1.5">
+                        <PhoneCall className="h-3.5 w-3.5 text-blue-500" />
+                        <span>{lead.lastContactedBy || (lead.lastFollowUpOutcome ? (lead.createdByName || 'Sales Team') : 'No calls yet')}</span>
+                    </div>
+                    {lead.lastFollowUpDate && (
+                        <p className="text-[10px] text-muted-foreground">
+                            {format(new Date(lead.lastFollowUpDate), 'MMM d, h:mm a')}
+                        </p>
+                    )}
+                </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">
+                {isEditing && isAdminOrOwner && users.length > 0 && (
+                    <div className="col-span-2">
+                        <Label className="text-[10px] font-bold text-primary uppercase tracking-wider">Assign to Telecaller / Agent</Label>
+                        <Select
+                            value={editForm.assignedTo || 'unassigned'}
+                            onValueChange={(val) => {
+                                if (val === 'unassigned') {
+                                    setEditForm({ ...editForm, assignedTo: '', assignedToName: 'Unassigned' })
+                                } else {
+                                    const u = users.find(user => (user.id || (user as any)._id) === val)
+                                    setEditForm({ ...editForm, assignedTo: val, assignedToName: u?.name || '' })
+                                }
+                            }}
+                        >
+                            <SelectTrigger className="h-8 rounded-lg text-xs font-bold bg-background border-border/60 mt-1">
+                                <div className="flex items-center gap-1.5 truncate">
+                                    <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                                    <SelectValue placeholder="Assign telecaller..." />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl text-xs max-h-[220px]">
+                                <SelectItem value="unassigned" className="text-xs font-semibold text-amber-600">
+                                    ⚪ Pool (Unassigned)
+                                </SelectItem>
+                                {users.filter(u => u.role !== 'client').map(u => (
+                                    <SelectItem key={u.id || (u as any)._id} value={u.id || (u as any)._id} className="text-xs font-semibold">
+                                        {u.name} ({u.role})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
                 <div>
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Contact Name</Label>
                     {isEditing ? <Input value={editForm.name || ''} onChange={e => setEditForm({...editForm, name: e.target.value})} className="h-7 text-sm font-semibold mt-1" /> : <p className="font-semibold">{lead.name}</p>}
@@ -316,7 +464,18 @@ export function LeadDetailsPanel({ lead, stages, onUpdate, onOpenFollowUp, onDel
                 </div>
                 <div>
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Source</Label>
-                    {isEditing ? <Input value={editForm.source || ''} onChange={e => setEditForm({...editForm, source: e.target.value})} className="h-7 text-sm font-semibold mt-1" /> : <div className="mt-1"><Badge variant="secondary" className="font-bold text-[10px] uppercase tracking-wide">{lead.source}</Badge></div>}
+                    {isEditing ? (
+                        <Input value={editForm.source || ''} onChange={e => setEditForm({...editForm, source: e.target.value})} className="h-7 text-sm font-semibold mt-1" />
+                    ) : (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <Badge variant="secondary" className="font-bold text-[10px] uppercase tracking-wide">{lead.source}</Badge>
+                            {(lead.formTitle || (lead.source && lead.source.startsWith('Form: '))) && (
+                                <Badge className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 font-bold text-[10px]">
+                                    📝 Form: {lead.formTitle || lead.source.replace('Form: ', '')}
+                                </Badge>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div>
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Email</Label>

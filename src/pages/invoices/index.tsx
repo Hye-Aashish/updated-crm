@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, FileText, AlertCircle, Banknote, Loader2, Mail, Send, CreditCard, MessageSquare, CheckCircle } from 'lucide-react'
+import { Plus, Search, FileText, AlertCircle, Banknote, Loader2, Mail, Send, CreditCard, MessageSquare, CheckCircle, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -408,6 +408,28 @@ export function InvoicesPage() {
                                                             <AlertCircle className="h-4 w-4" />
                                                         </Button>
                                                     </>
+                                                )}
+                                                {canDelete('invoices') && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (window.confirm(`Are you sure you want to permanently delete invoice #${invoice.invoiceNumber}? This action cannot be undone.`)) {
+                                                                try {
+                                                                    await api.delete(`/invoices/${invoice.id}`);
+                                                                    toast({ title: 'Invoice Deleted', description: 'Invoice has been removed.' });
+                                                                    setInvoices(invoices.filter(i => i.id !== invoice.id));
+                                                                } catch (err) {
+                                                                    toast({ title: 'Failed to delete invoice', variant: 'destructive' });
+                                                                }
+                                                            }
+                                                        }}
+                                                        title="Delete Invoice"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
                                                 )}
                                                 <Button
                                                     variant="ghost"

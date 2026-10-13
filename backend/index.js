@@ -92,7 +92,7 @@ app.use('/api', globalLimiter);
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10, // Only 10 login attempts per 15 min
+    max: process.env.NODE_ENV === 'production' ? 10 : 500,
     message: { message: 'Too many login attempts. Please try again after 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false
@@ -197,7 +197,9 @@ const routes = {
     approvals: require('./routes/approvalRoutes'),
     campaigns: require('./routes/campaignRoutes'),
     goals: require('./routes/goalRoutes'),
-    whatsapp: require('./routes/whatsappRoutes')
+    whatsapp: require('./routes/whatsappRoutes'),
+    hosting: require('./routes/hostingRoutes'),
+    'sales-analytics': require('./routes/salesAnalyticsRoutes')
 };
 
 Object.entries(routes).forEach(([path, handler]) => {

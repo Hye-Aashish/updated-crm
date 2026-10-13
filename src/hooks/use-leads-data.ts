@@ -4,11 +4,11 @@ import { handleApiError } from '@/lib/error-handler'
 import { useAppStore } from '@/store'
 import { useToast } from '@/hooks/use-toast'
 import type { PipelineStage, LeadForm } from '@/types'
-import { mapLead } from '@/lib/mappers'
+import { mapLead, mapUser } from '@/lib/mappers'
 
 export function useLeadsData() {
     const { toast } = useToast()
-    const { leads, setLeads } = useAppStore()
+    const { leads, setLeads, users, setUsers } = useAppStore()
     const [stages, setStages] = useState<PipelineStage[]>([])
     const [leadForms, setLeadForms] = useState<LeadForm[]>([])
     const [loading, setLoading] = useState(true)
@@ -25,6 +25,14 @@ export function useLeadsData() {
             setStages(stagesRes.data)
             setLeads(leadsRes.data.map(mapLead))
             setLeadForms(formsRes.data)
+
+            if (users.length === 0) {
+                api.get('/users').then(res => {
+                    if (Array.isArray(res.data)) {
+                        setUsers(res.data.map(mapUser))
+                    }
+                }).catch(console.error)
+            }
         } catch (error) {
             console.error("Failed to fetch leads data", error)
             handleApiError(error, toast, "Failed to load pipeline data")
@@ -47,6 +55,54 @@ export function useLeadsData() {
         } catch (error) {
             setLeads(previousLeads)
             handleApiError(error, toast, "Failed to update lead stage")
+        }
+    }
+
+    const assignLead = async (leadId: string, assignedTo: string, assignedToName: string) => {
+        const previousLeads = [...leads]
+        setLeads(leads.map(lead => lead.id === leadId ? { ...lead, assignedTo, assignedToName } : lead))
+
+        try {
+            const res = await api.put(`/leads/${leadId}`, {
+                assignedTo,
+                assignedToName
+            })
+            const updated = mapLead(res.data)
+            setLeads(leads.map(lead => lead.id === leadId ? updated : lead))
+            toast({ title: "Lead Assigned", description: `Successfully assigned to ${assignedToName}` })
+            return updated
+        } catch (error) {
+            setLeads(previousLeads)
+            handleApiError(error, toast, "Failed to assign lead")
+            return null
+        }
+    }
+
+    const bulkAssignLeads = async (leadIds: string[], newAgentId: string, newAgentName: string) => {
+        const previousLeads = [...leads]
+        setLeads(leads.map(lead => {
+            if (leadIds.includes(lead.id)) {
+                return { ...lead, assignedTo: newAgentId, assignedToName: newAgentName }
+            }
+            return lead
+        }))
+
+        try {
+            await api.post('/leads/bulk-reassign', {
+                leadIds,
+                newAgentId,
+                newAgentName
+            })
+            toast({
+                title: "Leads Assigned Successfully",
+                description: `${leadIds.length} lead(s) reassigned to ${newAgentName}`
+            })
+            fetchData()
+            return true
+        } catch (error) {
+            setLeads(previousLeads)
+            handleApiError(error, toast, "Failed to bulk reassign leads")
+            return false
         }
     }
 
@@ -113,6 +169,8 @@ export function useLeadsData() {
         setLeadForms,
         fetchData,
         updateLeadStage,
+        assignLead,
+        bulkAssignLeads,
         deleteLead,
         addActivity,
         logFollowUp,

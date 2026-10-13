@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import {
     Globe, Plus, AlertTriangle, CheckCircle2, XCircle,
-    IndianRupee, Eye, Trash2, Server, FileText
+    IndianRupee, Eye, Trash2, Server, FileText, Edit
 } from 'lucide-react'
 import { format, differenceInDays } from 'date-fns'
 
@@ -72,6 +72,7 @@ export default function DomainsPage() {
 
     // Dialogs
     const [showCreate, setShowCreate] = useState(false)
+    const [showEdit, setShowEdit] = useState<DomainRecord | null>(null)
     const [showDetail, setShowDetail] = useState<DomainRecord | null>(null)
     const [showInvoice, setShowInvoice] = useState<DomainRecord | null>(null)
     const [showRenew, setShowRenew] = useState<DomainRecord | null>(null)
@@ -81,6 +82,10 @@ export default function DomainsPage() {
     const [form, setForm] = useState({
         domainName: '', type: 'domain', provider: '', clientId: '', projectId: '',
         purchaseDate: '', expiryDate: '', amount: '', autoRenew: false, notes: ''
+    })
+    const [editForm, setEditForm] = useState({
+        domainName: '', type: 'domain', provider: '', clientId: '', projectId: '',
+        purchaseDate: '', expiryDate: '', amount: '', autoRenew: false, status: 'active', notes: ''
     })
     const [invoiceForm, setInvoiceForm] = useState({ dueDate: '', note: '', taxPercentage: '0' })
     const [renewForm, setRenewForm] = useState({ newExpiryDate: '', amount: '', note: '', generateInvoice: true, taxPercentage: '0' })
@@ -132,6 +137,45 @@ export default function DomainsPage() {
         } catch (err: any) {
             const msg = err.response?.data?.message || err.message || 'Failed to create entry'
             toast({ title: 'Error', description: msg, variant: 'destructive' })
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleOpenEdit = (item: DomainRecord) => {
+        setShowEdit(item)
+        setEditForm({
+            domainName: item.domainName,
+            type: item.type || 'domain',
+            provider: item.provider || '',
+            clientId: item.clientId?._id || '',
+            projectId: item.projectId?._id || '',
+            purchaseDate: item.purchaseDate ? new Date(item.purchaseDate).toISOString().split('T')[0] : '',
+            expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
+            amount: item.amount?.toString() || '0',
+            autoRenew: item.autoRenew || false,
+            status: item.status || 'active',
+            notes: item.notes || ''
+        })
+    }
+
+    const handleUpdateDomain = async () => {
+        if (!editForm.domainName || !editForm.provider || !editForm.clientId || !editForm.purchaseDate || !editForm.expiryDate || !editForm.amount) {
+            toast({ title: 'Validation Error', description: 'Please fill all required fields', variant: 'destructive' })
+            return
+        }
+        setSaving(true)
+        try {
+            await api.put(`/domains/${showEdit!._id}`, {
+                ...editForm,
+                amount: parseFloat(editForm.amount),
+                projectId: editForm.projectId === 'none' ? null : editForm.projectId
+            })
+            toast({ title: '✅ Updated', description: 'Domain/Service updated successfully' })
+            setShowEdit(null)
+            fetchAll()
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.response?.data?.message || 'Failed to update', variant: 'destructive' })
         } finally {
             setSaving(false)
         }
@@ -349,6 +393,9 @@ export default function DomainsPage() {
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-500" title="View Details" onClick={() => setShowDetail(item)}>
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50" title="Edit" onClick={() => handleOpenEdit(item)}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" title="Generate Invoice" onClick={() => setShowInvoice(item)}>
                                                     <FileText className="h-4 w-4" />
                                                 </Button>
@@ -544,6 +591,165 @@ export default function DomainsPage() {
                                     <strong>Notes:</strong> {showDetail.notes}
                                 </div>
                             )}
+
+                            <div className="flex justify-end gap-2 pt-2 border-t">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        const cur = showDetail;
+                                        setShowDetail(null);
+                                        handleOpenEdit(cur);
+                                    }}
+                                >
+                                    <Edit className="h-4 w-4 mr-1.5" /> Edit Record
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* ─── Edit Dialog ─── */}
+            <Dialog open={!!showEdit} onOpenChange={() => setShowEdit(null)}>
+                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Edit className="h-5 w-5 text-amber-600" /> Edit Domain / Hosting
+                        </DialogTitle>
+                    </DialogHeader>
+                    {showEdit && (
+                        <div className="space-y-4 py-2">
+                            <div className="grid grid-cols-1 gap-4">
+                                <div>
+                                    <Label>Domain Name / Title *</Label>
+                                    <Input
+                                        value={editForm.domainName}
+                                        onChange={e => setEditForm(f => ({ ...f, domainName: e.target.value }))}
+                                        className="mt-1"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label>Client *</Label>
+                                        <Select
+                                            value={editForm.clientId}
+                                            onValueChange={v => setEditForm(f => ({ ...f, clientId: v }))}
+                                        >
+                                            <SelectTrigger className="mt-1"><SelectValue placeholder="Select client" /></SelectTrigger>
+                                            <SelectContent>
+                                                {clients.map(c => <SelectItem key={c._id} value={c._id}>{c.name} — {c.company}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Project (Optional)</Label>
+                                        <Select
+                                            value={editForm.projectId || 'none'}
+                                            onValueChange={v => setEditForm(f => ({ ...f, projectId: v }))}
+                                        >
+                                            <SelectTrigger className="mt-1">
+                                                <SelectValue placeholder="Select project" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                {projects
+                                                    .filter(p => !editForm.clientId || (typeof p.clientId === 'object' ? p.clientId?._id : p.clientId) === editForm.clientId)
+                                                    .map(p => <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>)
+                                                }
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label>Service Type *</Label>
+                                        <Select value={editForm.type} onValueChange={v => setEditForm(f => ({ ...f, type: v as any }))}>
+                                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {Object.entries(typeLabel).map(([k, v]) => (
+                                                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Provider *</Label>
+                                        <Input
+                                            value={editForm.provider}
+                                            onChange={e => setEditForm(f => ({ ...f, provider: e.target.value }))}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <Label>Purchase Date *</Label>
+                                        <Input
+                                            type="date"
+                                            value={editForm.purchaseDate}
+                                            onChange={e => setEditForm(f => ({ ...f, purchaseDate: e.target.value }))}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Expiry Date *</Label>
+                                        <Input
+                                            type="date"
+                                            value={editForm.expiryDate}
+                                            onChange={e => setEditForm(f => ({ ...f, expiryDate: e.target.value }))}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Cost ({getCurrencySymbol()}) *</Label>
+                                        <Input
+                                            type="number"
+                                            value={editForm.amount}
+                                            onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label>Status</Label>
+                                    <Select value={editForm.status} onValueChange={v => setEditForm(f => ({ ...f, status: v as any }))}>
+                                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="active">Active</SelectItem>
+                                            <SelectItem value="expiring-soon">Expiring Soon</SelectItem>
+                                            <SelectItem value="expired">Expired</SelectItem>
+                                            <SelectItem value="suspended">Suspended</SelectItem>
+                                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Notes & Credentials</Label>
+                                    <Textarea
+                                        value={editForm.notes}
+                                        onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                                        rows={2}
+                                        className="mt-1"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="editAutoRenew"
+                                        checked={editForm.autoRenew}
+                                        onChange={e => setEditForm(f => ({ ...f, autoRenew: e.target.checked }))}
+                                        className="h-4 w-4 accent-indigo-600"
+                                    />
+                                    <label htmlFor="editAutoRenew" className="text-sm font-medium">Auto-renew enabled</label>
+                                </div>
+                            </div>
+                            <DialogFooter className="mt-4">
+                                <Button variant="outline" onClick={() => setShowEdit(null)}>Cancel</Button>
+                                <Button onClick={handleUpdateDomain} disabled={saving}>
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </Button>
+                            </DialogFooter>
                         </div>
                     )}
                 </DialogContent>

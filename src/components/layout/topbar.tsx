@@ -64,8 +64,28 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         const query = searchQuery.toLowerCase()
         const results: any[] = []
 
-        // Search Leads
+        // Search Leads (with strict user isolation)
+        const isAdminOrOwner = currentUser?.role === 'admin' || currentUser?.role === 'owner';
+        const currentUserId = (currentUser as any)?._id || (currentUser as any)?.id;
+        const currentUserName = currentUser?.name?.toLowerCase().trim();
+
         leads.forEach(l => {
+            if (!isAdminOrOwner) {
+                const hasAssignee = Boolean(
+                    (l.assignedTo && l.assignedTo !== 'unassigned' && String(l.assignedTo).trim() !== '') ||
+                    (l.assignedToName && l.assignedToName.toLowerCase().trim() !== 'unassigned' && l.assignedToName.trim() !== '')
+                );
+                if (hasAssignee) {
+                    const isMyAssigned = (l.assignedTo && (l.assignedTo === currentUserId || String(l.assignedTo) === String(currentUserId))) ||
+                                         (l.assignedToName && currentUserName && l.assignedToName.toLowerCase().trim() === currentUserName);
+                    if (!isMyAssigned) return;
+                } else {
+                    const isMyCreated = (l.createdBy && (l.createdBy === currentUserId || String(l.createdBy) === String(currentUserId) || (typeof l.createdBy === 'object' && (l.createdBy as any)?._id === currentUserId))) ||
+                                        (l.createdByName && currentUserName && l.createdByName.toLowerCase().trim() === currentUserName);
+                    if (!isMyCreated) return;
+                }
+            }
+
             if (l.name.toLowerCase().includes(query) || l.company.toLowerCase().includes(query)) {
                 results.push({ type: 'Lead', id: l.id, title: l.name, subtitle: l.company, link: '/leads', icon: TrendingUp })
             }

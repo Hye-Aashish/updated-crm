@@ -9,7 +9,7 @@ const { protect, checkPermission } = require('../middleware/authMiddleware');
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
 
 // Get payroll for all employees (Admin/Owner only)
-router.get('/all', protect, checkPermission('payroll', 'manage'), async (req, res) => {
+router.get(['/', '/all'], protect, checkPermission('payroll', 'manage'), async (req, res) => {
     try {
         const { month, year, workingDays } = req.query;
         const targetMonth = month ? parseInt(month) : new Date().getMonth();

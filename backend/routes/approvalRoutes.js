@@ -276,4 +276,15 @@ router.post('/:id/reject', protect, async (req, res) => {
     }
 });
 
+// DELETE approval request
+router.delete('/:id', protect, checkPermission('projects', 'edit'), async (req, res) => {
+    try {
+        const approval = await Approval.findByIdAndDelete(req.params.id);
+        if (!approval) return res.status(404).json({ message: 'Approval request not found' });
+        res.json({ message: 'Approval request deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router;

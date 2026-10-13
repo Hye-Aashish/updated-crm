@@ -1,5 +1,5 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import type { Lead } from '@/types'
+import type { Lead, User } from '@/types'
 import { LeadDetailsPanel } from './lead-details-panel'
 
 interface LeadDetailsDialogProps {
@@ -10,9 +10,23 @@ interface LeadDetailsDialogProps {
     onOpenFollowUp?: (lead: Lead) => void
     onDelete: (leadId: string) => void
     onAddActivity: (leadId: string, content: string) => Promise<any>
+    isAdminOrOwner?: boolean
+    users?: User[]
+    onAssignLead?: (leadId: string, userId: string, userName: string) => Promise<any>
 }
 
-export function LeadDetailsDialog({ lead, isOpen, onClose, onUpdate, onOpenFollowUp, onDelete, onAddActivity }: LeadDetailsDialogProps) {
+export function LeadDetailsDialog({
+    lead,
+    isOpen,
+    onClose,
+    onUpdate,
+    onOpenFollowUp,
+    onDelete,
+    onAddActivity,
+    isAdminOrOwner,
+    users,
+    onAssignLead
+}: LeadDetailsDialogProps) {
     if (!lead) return null
 
     return (
@@ -23,7 +37,10 @@ export function LeadDetailsDialog({ lead, isOpen, onClose, onUpdate, onOpenFollo
                     onUpdate={onUpdate} 
                     onOpenFollowUp={(l) => { onClose(); onOpenFollowUp?.(l); }}
                     onDelete={(id) => { onDelete(id); onClose(); }} 
-                    onAddActivity={onAddActivity} 
+                    onAddActivity={onAddActivity}
+                    isAdminOrOwner={isAdminOrOwner}
+                    users={users}
+                    onAssignLead={onAssignLead}
                 />
             </DialogContent>
         </Dialog>

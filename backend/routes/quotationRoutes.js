@@ -20,6 +20,7 @@ router.get('/', quotationController.getAllQuotations);
 router.get('/:id', quotationController.getQuotation);
 router.post('/', quotationController.createQuotation);
 router.put('/:id', quotationController.updateQuotation);
+router.delete('/:id', quotationController.deleteQuotation);
 
 // Approvals & Workflow
 router.patch('/:id/approve', quotationController.approveQuotation);

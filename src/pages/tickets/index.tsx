@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { 
     MessageSquare, Plus, Search, Trash2, User, Upload, Briefcase, 
-    MessageCircle, RefreshCw, CheckSquare, Link as LinkIcon, Calendar, Clock
+    MessageCircle, RefreshCw, CheckSquare, Calendar, Clock, Edit
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -46,6 +46,19 @@ export function TicketsPage() {
     const [projectTasks, setProjectTasks] = useState<{ _id: string, title: string, status: string }[]>([])
     const [loadingTasks, setLoadingTasks] = useState(false)
     const [submittingTask, setSubmittingTask] = useState(false)
+
+    // Edit Ticket state
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+    const [editingTicket, setEditingTicket] = useState<Ticket | null>(null)
+    const [editForm, setEditForm] = useState({
+        subject: '',
+        description: '',
+        priority: 'medium' as 'low' | 'medium' | 'high' | 'critical',
+        projectId: '',
+        assignedTo: '',
+        clientName: ''
+    })
+    const [savingEdit, setSavingEdit] = useState(false)
 
     const [taskForm, setTaskForm] = useState({
         title: '',
@@ -329,6 +342,52 @@ export function TicketsPage() {
             if (selectedTicket?._id === id) setViewTicketDialogOpen(false)
         } catch (error) {
             toast({ title: "Error", description: "Failed to delete ticket", variant: "destructive" })
+        }
+    }
+
+    // Open Edit Ticket modal
+    const handleOpenEdit = (ticket: Ticket, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation()
+        setEditingTicket(ticket)
+        setEditForm({
+            subject: ticket.subject,
+            description: ticket.description || '',
+            priority: ticket.priority || 'medium',
+            projectId: ticket.projectId || '',
+            assignedTo: ticket.assignedTo || '',
+            clientName: ticket.clientName || ''
+        })
+        setIsEditDialogOpen(true)
+    }
+
+    // Save Edit Ticket
+    const handleSaveEdit = async () => {
+        if (!editingTicket) return
+        if (!editForm.subject.trim()) {
+            toast({ title: "Required", description: "Please enter a subject", variant: "destructive" })
+            return
+        }
+        setSavingEdit(true)
+        try {
+            const res = await api.put(`/tickets/${editingTicket._id}`, {
+                subject: editForm.subject,
+                description: editForm.description,
+                priority: editForm.priority,
+                projectId: editForm.projectId || undefined,
+                assignedTo: editForm.assignedTo,
+                clientName: editForm.clientName
+            })
+            setTickets(tickets.map(t => t._id === editingTicket._id ? { ...t, ...res.data } : t))
+            if (selectedTicket?._id === editingTicket._id) {
+                setSelectedTicket({ ...selectedTicket, ...res.data })
+            }
+            toast({ title: "Success", description: "Ticket updated successfully" })
+            setIsEditDialogOpen(false)
+            setEditingTicket(null)
+        } catch (err: any) {
+            toast({ title: "Error", description: err.response?.data?.message || "Failed to update ticket", variant: "destructive" })
+        } finally {
+            setSavingEdit(false)
         }
     }
 
@@ -745,23 +804,51 @@ export function TicketsPage() {
                                             </div>
                                         </div>
 
-                                        {/* 1-Click Status Dropdown Selector */}
+                                        {/* 1-Click Status Dropdown Selector & Quick Actions */}
                                         <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase">Status:</span>
-                                            <select
-                                                className={`h-8 rounded-xl border text-xs px-3 font-bold cursor-pointer outline-none ${getStatusStyle(ticket.status)}`}
-                                                value={ticket.status}
-                                                onChange={(e) => handleStatusChange(ticket._id, e.target.value)}
-                                                disabled={currentUser?.role === 'client'}
-                                            >
-                                                <option value="open">🔵 Open</option>
-                                                <option value="in-progress">🟡 In Progress</option>
-                                                <option value="need-discussion">🟣 Need Discussion</option>
-                                                <option value="resolved">🟢 Resolved</option>
-                                                <option value="live">🚀 Live</option>
-                                                <option value="closed">⚪ Closed</option>
-                                                <option value="declined">🔴 Declined</option>
-                                            </select>
+                                            <div className="flex items-center gap-1.5 flex-1">
+                                                <span className="text-[11px] font-bold text-muted-foreground uppercase">Status:</span>
+                                                <select
+                                                    className={`h-8 rounded-xl border text-xs px-2 font-bold cursor-pointer outline-none flex-1 ${getStatusStyle(ticket.status)}`}
+                                                    value={ticket.status}
+                                                    onChange={(e) => handleStatusChange(ticket._id, e.target.value)}
+                                                    disabled={currentUser?.role === 'client'}
+                                                >
+                                                    <option value="open">🔵 Open</option>
+                                                    <option value="in-progress">🟡 In Progress</option>
+                                                    <option value="need-discussion">🟣 Need Discussion</option>
+                                                    <option value="resolved">🟢 Resolved</option>
+                                                    <option value="live">🚀 Live</option>
+                                                    <option value="closed">⚪ Closed</option>
+                                                    <option value="declined">🔴 Declined</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="flex items-center gap-0.5 shrink-0">
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                                    title="Edit Ticket"
+                                                    onClick={(e) => handleOpenEdit(ticket, e)}
+                                                >
+                                                    <Edit className="h-3.5 w-3.5" />
+                                                </Button>
+                                                {currentUser?.role !== 'client' && (
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                        title="Delete Ticket"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleDeleteTicket(ticket._id)
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -940,16 +1027,26 @@ export function TicketsPage() {
 
                             {/* Footer Actions */}
                             <div className="flex items-center justify-between pt-4 border-t">
-                                {currentUser?.role !== 'client' ? (
+                                <div className="flex items-center gap-2">
+                                    {currentUser?.role !== 'client' && (
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            className="h-8 text-xs font-bold"
+                                            onClick={() => handleDeleteTicket(selectedTicket._id)}
+                                        >
+                                            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+                                        </Button>
+                                    )}
                                     <Button
-                                        variant="destructive"
+                                        variant="outline"
                                         size="sm"
                                         className="h-8 text-xs font-bold"
-                                        onClick={() => handleDeleteTicket(selectedTicket._id)}
+                                        onClick={() => handleOpenEdit(selectedTicket)}
                                     >
-                                        <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+                                        <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit Details
                                     </Button>
-                                ) : <div />}
+                                </div>
 
                                 <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={() => setViewTicketDialogOpen(false)}>
                                     Close
@@ -1195,6 +1292,93 @@ export function TicketsPage() {
                             </div>
                         </div>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            {/* 7. Edit Ticket Dialog Modal */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                            <Edit className="h-5 w-5 text-primary" /> Edit Ticket
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4 pt-2">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-bold">Ticket Subject *</Label>
+                            <Input
+                                value={editForm.subject}
+                                onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })}
+                                placeholder="Issue title..."
+                                className="h-10 text-xs font-semibold"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-bold">Priority</Label>
+                                <select
+                                    className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+                                    value={editForm.priority}
+                                    onChange={(e) => setEditForm({ ...editForm, priority: e.target.value as any })}
+                                >
+                                    <option value="low">🌱 Low</option>
+                                    <option value="medium">⚡ Medium</option>
+                                    <option value="high">🔥 High</option>
+                                    <option value="critical">🚨 Critical</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-bold">Assigned Developer</Label>
+                                <select
+                                    className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+                                    value={editForm.assignedTo}
+                                    onChange={(e) => setEditForm({ ...editForm, assignedTo: e.target.value })}
+                                    disabled={currentUser?.role === 'client'}
+                                >
+                                    <option value="">Unassigned</option>
+                                    {users.map(u => (
+                                        <option key={u.id || (u as any)._id} value={u.name}>{u.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-bold">Project</Label>
+                            <select
+                                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+                                value={editForm.projectId}
+                                onChange={(e) => setEditForm({ ...editForm, projectId: e.target.value })}
+                            >
+                                <option value="">Select Project</option>
+                                {projects.map(p => (
+                                    <option key={p.id || (p as any)._id} value={p.id || (p as any)._id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-bold">Description</Label>
+                            <Textarea
+                                value={editForm.description}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                placeholder="Describe the issue..."
+                                className="min-h-[100px] text-xs font-normal"
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button size="sm" onClick={handleSaveEdit} disabled={savingEdit}>
+                                {savingEdit ? 'Saving...' : 'Save Changes'}
+                            </Button>
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

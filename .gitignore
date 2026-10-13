@@ -39,6 +39,7 @@ build/
 vite-error*.txt
 push-error.txt
 scratch/
+*.timestamp-*.mjs
 
 # Uploads
 backend/public/uploads/*

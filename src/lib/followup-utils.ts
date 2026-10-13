@@ -119,6 +119,20 @@ export function getLeadFollowUpInfo(reminder?: Lead['reminder'] | null): FollowU
  */
 export function sortLeadsByFollowUpPriority(leads: Lead[]): Lead[] {
     return [...leads].sort((a, b) => {
+        const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+
+        // Tier 0: Brand new fresh leads (created within last 48 hours without overdue reminder) -> TOP OF THE BOARD!
+        const nowMs = Date.now()
+        const isFreshA = createdA > 0 && (nowMs - createdA <= 48 * 60 * 60 * 1000) && (!a.reminder?.date || new Date(a.reminder.date).getTime() >= nowMs)
+        const isFreshB = createdB > 0 && (nowMs - createdB <= 48 * 60 * 60 * 1000) && (!b.reminder?.date || new Date(b.reminder.date).getTime() >= nowMs)
+
+        if (isFreshA && !isFreshB) return -1
+        if (!isFreshA && isFreshB) return 1
+        if (isFreshA && isFreshB) {
+            return createdB - createdA // Newest created lead first
+        }
+
         const infoA = getLeadFollowUpInfo(a.reminder)
         const infoB = getLeadFollowUpInfo(b.reminder)
 
@@ -140,8 +154,6 @@ export function sortLeadsByFollowUpPriority(leads: Lead[]): Lead[] {
             return dateA - dateB
         } else {
             // No follow-up: Newest created/updated first
-            const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-            const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0
             return createdB - createdA
         }
     })

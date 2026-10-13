@@ -104,6 +104,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
 
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Sales Dashboard', href: '/sales-dashboard', icon: Target },
         { name: 'User Tracker', href: '/user-tracker', icon: Activity },
         { name: 'Screen Monitoring', href: '/screen-monitoring', icon: Monitor },
         { name: 'Clients', href: '/clients', icon: Users },
@@ -161,6 +162,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         const p = permissions
         switch (item.name) {
             case 'Dashboard': return !!p.dashboard?.view
+            case 'Sales Dashboard': return !!(p.leads?.view || p.dashboard?.view)
             case 'User Tracker': return !!p.user_tracker?.view
             case 'Screen Monitoring': return !!p.screen_monitoring?.view
             case 'Clients': return !!p.clients?.view

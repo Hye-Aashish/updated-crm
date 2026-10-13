@@ -10,7 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote, Phone, Globe, CheckCircle, FileText } from 'lucide-react'
+import { ArrowLeft, Printer, Mail, Loader2, Building2, LayoutTemplate, Palette, Type, Image as ImageIcon, Ban, CreditCard, Download, Banknote, Phone, Globe, CheckCircle, FileText, Trash2 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import api from '@/lib/api-client'
 import type { Invoice, Client } from '@/types'
@@ -1304,6 +1304,26 @@ export function InvoiceDetailPage() {
                                 <Mail className="mr-2 h-4 w-4" />
                             )}
                             {sending ? 'Sending...' : 'Send Invoice'}
+                        </Button>
+                    )}
+
+                    {['admin', 'owner'].includes(currentUser?.role || '') && (
+                        <Button
+                            variant="destructive"
+                            onClick={async () => {
+                                if (window.confirm(`Are you sure you want to permanently delete invoice #${invoice.invoiceNumber}? This action cannot be undone.`)) {
+                                    try {
+                                        await api.delete(`/invoices/${invoice.id}`);
+                                        toast({ title: 'Invoice Deleted', description: 'The invoice has been removed.' });
+                                        navigate('/invoices');
+                                    } catch (err) {
+                                        toast({ title: 'Failed to delete invoice', variant: 'destructive' });
+                                    }
+                                }
+                            }}
+                            className="flex-1 lg:flex-none"
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Invoice
                         </Button>
                     )}
                 </div>

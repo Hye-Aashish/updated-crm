@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Users, UserCheck, UserX, Building2 } from 'lucide-react'
+import { Plus, Users, UserCheck, UserX, Building2, Trash2, Edit, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,11 +11,14 @@ import { ClientService } from '@/lib/services/client.service'
 import { StatsCard } from '@/components/stats-card'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { useToast } from '@/hooks/use-toast'
+import { usePermissions } from '@/hooks/use-permissions'
+import api from '@/lib/api-client'
 
 export function ClientsPage() {
     const navigate = useNavigate()
     const { toast } = useToast()
     const { clients, setClients } = useAppStore()
+    const { canEdit, canDelete } = usePermissions()
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -36,6 +39,18 @@ export function ClientsPage() {
         }
         fetchClients()
     }, [setClients])
+
+    const handleDeleteClient = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!window.confirm("Are you sure you want to delete this client? This action cannot be undone.")) return
+        try {
+            await api.delete(`/clients/${id}`)
+            setClients(clients.filter(c => c.id !== id))
+            toast({ title: "Client deleted", description: "Client has been removed successfully." })
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Failed to delete client", description: error.response?.data?.message || "Please try again." })
+        }
+    }
 
     // --- KPI Calculations ---
     const totalClients = clients.length
@@ -89,8 +104,6 @@ export function ClientsPage() {
                 <StatsCard title="Retainer" value={retainerClients} icon={Building2} color="#8b5cf6" bg="bg-purple-50" />
             </div>
 
-
-
             {clients.length === 0 && !error ? (
                 <EmptyState
                     icon={Users}
@@ -107,7 +120,7 @@ export function ClientsPage() {
                     {clients.map((client) => (
                         <Card
                             key={client.id}
-                            className="cursor-pointer hover:shadow-md transition-shadow"
+                            className="cursor-pointer hover:shadow-md transition-shadow flex flex-col justify-between"
                             onClick={() => navigate(`/clients/${client.id}`)}
                         >
                             <CardHeader>
@@ -133,10 +146,43 @@ export function ClientsPage() {
                                         <span>📞</span>
                                         <span>{client.phone}</span>
                                     </div>
-                                    <div className="mt-3 pt-3 border-t">
+                                    <div className="mt-3 pt-3 border-t flex items-center justify-between">
                                         <Badge variant="outline" className="capitalize">
                                             {client.type}
                                         </Badge>
+                                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                title="View Client"
+                                                onClick={() => navigate(`/clients/${client.id}`)}
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                            {canEdit('clients') && (
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                    title="Edit Client"
+                                                    onClick={() => navigate(`/clients/${client.id}/edit`)}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                            {canDelete('clients') && (
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                    title="Delete Client"
+                                                    onClick={(e) => handleDeleteClient(client.id, e)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </CardContent>

@@ -96,6 +96,8 @@ router.post('/public/:id/submit', async (req, res) => {
             email: submission.email,
             phone: submission.phone,
             customFields,
+            formId: form._id,
+            formTitle: form.title,
             source: `Form: ${form.title}`,
             stage: 'new',
             activities: [{

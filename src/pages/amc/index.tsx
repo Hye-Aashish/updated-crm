@@ -22,7 +22,7 @@ import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import {
     Shield, Plus, RefreshCw, FileText, AlertTriangle,
     CheckCircle2, Clock, XCircle,
-    IndianRupee, Eye, Trash2
+    IndianRupee, Eye, Trash2, Edit
 } from 'lucide-react'
 import { format, differenceInDays } from 'date-fns'
 
@@ -71,6 +71,7 @@ export default function AmcPage() {
 
     // Dialogs
     const [showCreate, setShowCreate] = useState(false)
+    const [showEdit, setShowEdit] = useState<AmcRecord | null>(null)
     const [showRenew, setShowRenew] = useState<AmcRecord | null>(null)
     const [showInvoice, setShowInvoice] = useState<AmcRecord | null>(null)
     const [showDetail, setShowDetail] = useState<AmcRecord | null>(null)
@@ -81,6 +82,11 @@ export default function AmcPage() {
         name: '', referenceId: '', clientId: '', startDate: '',
         endDate: '', amount: '', frequency: 'annually',
         services: '', description: '', notes: '', autoInvoice: false
+    })
+    const [editForm, setEditForm] = useState({
+        name: '', startDate: '', endDate: '', amount: '',
+        frequency: 'annually', services: '', description: '',
+        notes: '', autoInvoice: false, status: 'active'
     })
     const [renewForm, setRenewForm] = useState({
         newEndDate: '', amount: '', note: '', generateInvoice: true, taxPercentage: '0'
@@ -149,6 +155,51 @@ export default function AmcPage() {
         } catch (err: any) {
             const msg = err.response?.data?.message || err.message || 'Failed to create AMC'
             toast({ title: 'Error creating AMC', description: msg, variant: 'destructive' })
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleOpenEdit = (amc: AmcRecord) => {
+        setShowEdit(amc)
+        setEditForm({
+            name: amc.name,
+            startDate: amc.startDate ? new Date(amc.startDate).toISOString().split('T')[0] : '',
+            endDate: amc.endDate ? new Date(amc.endDate).toISOString().split('T')[0] : '',
+            amount: amc.amount?.toString() || '0',
+            frequency: amc.frequency || 'annually',
+            services: (amc.services || []).join(', '),
+            description: amc.description || '',
+            notes: amc.notes || '',
+            autoInvoice: amc.autoInvoice || false,
+            status: amc.status || 'active'
+        })
+    }
+
+    const handleUpdateAmc = async () => {
+        if (!editForm.name || !editForm.startDate || !editForm.endDate || !editForm.amount) {
+            toast({ title: 'Validation Error', description: 'Please fill all required fields', variant: 'destructive' })
+            return
+        }
+        setSaving(true)
+        try {
+            await api.put(`/amc/${showEdit!._id}`, {
+                name: editForm.name,
+                startDate: editForm.startDate,
+                endDate: editForm.endDate,
+                amount: parseFloat(editForm.amount),
+                frequency: editForm.frequency,
+                services: editForm.services.split(',').map((s: string) => s.trim()).filter(Boolean),
+                description: editForm.description,
+                notes: editForm.notes,
+                autoInvoice: editForm.autoInvoice,
+                status: editForm.status
+            })
+            toast({ title: '✅ AMC Updated', description: 'Contract details updated successfully' })
+            setShowEdit(null)
+            fetchAll()
+        } catch (err: any) {
+            toast({ title: 'Error updating AMC', description: err.response?.data?.message || 'Update failed', variant: 'destructive' })
         } finally {
             setSaving(false)
         }
@@ -383,6 +434,9 @@ export default function AmcPage() {
                                             <div className="flex items-center justify-end gap-1">
                                                 <Button size="icon" variant="ghost" className="h-8 w-8" title="View Details" onClick={() => setShowDetail(amc)}>
                                                     <Eye className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50" title="Edit AMC" onClick={() => handleOpenEdit(amc)}>
+                                                    <Edit className="h-4 w-4" />
                                                 </Button>
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" title="Generate Invoice" onClick={() => setShowInvoice(amc)}>
                                                     <FileText className="h-4 w-4" />
@@ -681,6 +735,154 @@ export default function AmcPage() {
                                     <strong>Notes:</strong> {showDetail.notes}
                                 </div>
                             )}
+
+                            <div className="flex justify-end gap-2 pt-2 border-t">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        const cur = showDetail;
+                                        setShowDetail(null);
+                                        handleOpenEdit(cur);
+                                    }}
+                                >
+                                    <Edit className="h-4 w-4 mr-1.5" /> Edit Contract
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* ─── Edit AMC Dialog ─── */}
+            <Dialog open={!!showEdit} onOpenChange={() => setShowEdit(null)}>
+                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Edit className="h-5 w-5 text-amber-600" /> Edit AMC Contract
+                        </DialogTitle>
+                    </DialogHeader>
+                    {showEdit && (
+                        <div className="space-y-4 py-2">
+                            <div>
+                                <Label>AMC Name *</Label>
+                                <Input
+                                    value={editForm.name}
+                                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                                    className="mt-1"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label>Start Date *</Label>
+                                    <Input
+                                        type="date"
+                                        value={editForm.startDate}
+                                        onChange={e => setEditForm(f => ({ ...f, startDate: e.target.value }))}
+                                        className="mt-1"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>End Date *</Label>
+                                    <Input
+                                        type="date"
+                                        value={editForm.endDate}
+                                        onChange={e => setEditForm(f => ({ ...f, endDate: e.target.value }))}
+                                        className="mt-1"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <Label>Amount ({getCurrencySymbol()}) *</Label>
+                                    <Input
+                                        type="number"
+                                        value={editForm.amount}
+                                        onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                                        className="mt-1"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Billing Frequency</Label>
+                                    <Select
+                                        value={editForm.frequency}
+                                        onValueChange={v => setEditForm(f => ({ ...f, frequency: v }))}
+                                    >
+                                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="monthly">Monthly</SelectItem>
+                                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                                            <SelectItem value="half-yearly">Half-Yearly</SelectItem>
+                                            <SelectItem value="annually">Annually</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Status</Label>
+                                    <Select
+                                        value={editForm.status}
+                                        onValueChange={v => setEditForm(f => ({ ...f, status: v }))}
+                                    >
+                                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="active">Active</SelectItem>
+                                            <SelectItem value="expiring-soon">Expiring Soon</SelectItem>
+                                            <SelectItem value="expired">Expired</SelectItem>
+                                            <SelectItem value="pending">Pending</SelectItem>
+                                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label>Included Services (comma-separated)</Label>
+                                <Input
+                                    placeholder="Security updates, monthly backup, 4h SLA bug fixes"
+                                    value={editForm.services}
+                                    onChange={e => setEditForm(f => ({ ...f, services: e.target.value }))}
+                                    className="mt-1"
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Description</Label>
+                                <Textarea
+                                    rows={2}
+                                    value={editForm.description}
+                                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                                    className="mt-1"
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Internal Notes</Label>
+                                <Input
+                                    value={editForm.notes}
+                                    onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                                    className="mt-1"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="editAutoInv"
+                                    checked={editForm.autoInvoice}
+                                    onChange={e => setEditForm(f => ({ ...f, autoInvoice: e.target.checked }))}
+                                    className="h-4 w-4 accent-blue-600"
+                                />
+                                <label htmlFor="editAutoInv" className="text-sm font-medium">Auto-generate invoices on renewal cycle</label>
+                            </div>
+
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setShowEdit(null)}>Cancel</Button>
+                                <Button onClick={handleUpdateAmc} disabled={saving}>
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </Button>
+                            </DialogFooter>
                         </div>
                     )}
                 </DialogContent>

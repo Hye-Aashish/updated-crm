@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import {
     Plus, Search, Download, Upload, Calendar,
     DollarSign, TrendingUp, Receipt, Zap, Wifi, Home, Code,
-    Megaphone, Globe, Car, Coffee, MoreHorizontal, Trash2
+    Megaphone, Globe, Car, Coffee, MoreHorizontal, Trash2, Edit
 } from 'lucide-react'
 import { formatCurrency, formatDate, getCurrencySymbol } from '@/lib/utils'
 import api from '@/lib/api-client'
@@ -70,6 +70,8 @@ export function ExpensesPage() {
     const { setExpenses: setGlobalExpenses, currentUser } = useAppStore()
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+    const [editingExpense, setEditingExpense] = useState<any>(null)
     const [viewExpenseDialogOpen, setViewExpenseDialogOpen] = useState(false)
     const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
@@ -89,6 +91,21 @@ export function ExpensesPage() {
     })
 
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const editFileInputRef = useRef<HTMLInputElement>(null)
+
+    const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                if (editingExpense) {
+                    setEditingExpense({ ...editingExpense, receipt: reader.result as string })
+                }
+                toast({ description: "Receipt attached" })
+            }
+            reader.readAsDataURL(file)
+        }
+    }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -207,6 +224,58 @@ export function ExpensesPage() {
         } catch (error) {
             console.error("Failed to delete expense", error)
             toast({ title: "Error", description: "Failed to delete expense", variant: "destructive" })
+        }
+    }
+
+    const handleOpenEdit = (expense: Expense, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation()
+        setEditingExpense({
+            id: expense.id,
+            date: expense.date,
+            amount: expense.amount.toString(),
+            category: expense.category,
+            paymentMode: expense.paymentMode,
+            paidBy: expense.paidBy,
+            note: expense.note || '',
+            receipt: expense.receipt || ''
+        })
+        setIsEditDialogOpen(true)
+    }
+
+    const handleUpdateExpense = async () => {
+        if (!editingExpense) return
+        if (!editingExpense.amount) {
+            toast({ title: "Missing Amount", description: "Please enter an expense amount", variant: "destructive" })
+            return
+        }
+        if (!editingExpense.category) {
+            toast({ title: "Missing Category", description: "Please select a category", variant: "destructive" })
+            return
+        }
+        const amount = parseFloat(editingExpense.amount)
+        if (isNaN(amount) || amount <= 0) {
+            toast({ title: "Invalid Amount", description: "Amount must be greater than zero", variant: "destructive" })
+            return
+        }
+
+        try {
+            const payload = {
+                date: editingExpense.date,
+                amount: parseFloat(editingExpense.amount),
+                category: editingExpense.category,
+                paymentMode: editingExpense.paymentMode,
+                paidBy: editingExpense.paidBy,
+                note: editingExpense.note,
+                receipt: editingExpense.receipt
+            }
+            await api.put(`/expenses/${editingExpense.id}`, payload)
+            setIsEditDialogOpen(false)
+            fetchData()
+            toast({ description: "Expense updated successfully" })
+        } catch (error: any) {
+            console.error("Failed to update expense", error)
+            const message = error.response?.data?.message || error.message || "Failed to update expense"
+            toast({ title: "Error", description: message, variant: "destructive" })
         }
     }
 
@@ -564,17 +633,29 @@ export function ExpensesPage() {
                                                 <div className="text-xs text-muted-foreground">{formatDate(new Date(expense.date))}</div>
                                             </div>
                                             {['owner', 'admin'].includes(currentUser?.role || '') && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="opacity-50 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteExpense(expense.id);
-                                                    }}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                <div className="flex items-center gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="opacity-70 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                        onClick={(e) => handleOpenEdit(expense, e)}
+                                                        title="Edit Expense"
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="opacity-70 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteExpense(expense.id);
+                                                        }}
+                                                        title="Delete Expense"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -664,15 +745,143 @@ export function ExpensesPage() {
                                     Close
                                 </Button>
                                 {['owner', 'admin'].includes(currentUser?.role || '') && (
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => handleDeleteExpense(selectedExpense.id)}
-                                    >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete Transaction
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                setViewExpenseDialogOpen(false);
+                                                handleOpenEdit(selectedExpense);
+                                            }}
+                                        >
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit
+                                        </Button>
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => handleDeleteExpense(selectedExpense.id)}
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete Transaction
+                                        </Button>
+                                    </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Expense Dialog */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Expense</DialogTitle>
+                    </DialogHeader>
+                    {editingExpense && (
+                        <div className="space-y-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-date">Date *</Label>
+                                    <Input
+                                        id="edit-date"
+                                        type="date"
+                                        value={editingExpense.date}
+                                        onChange={(e) => setEditingExpense({ ...editingExpense, date: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-amount">Amount ({getCurrencySymbol()}) *</Label>
+                                    <Input
+                                        id="edit-amount"
+                                        type="number"
+                                        placeholder="5000"
+                                        value={editingExpense.amount}
+                                        onChange={(e) => setEditingExpense({ ...editingExpense, amount: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-category">Category *</Label>
+                                <select
+                                    id="edit-category"
+                                    value={editingExpense.category}
+                                    onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value })}
+                                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                >
+                                    <option value="">Select category</option>
+                                    {EXPENSE_CATEGORIES.map((cat) => (
+                                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-payment-mode">Payment Mode *</Label>
+                                    <select
+                                        id="edit-payment-mode"
+                                        value={editingExpense.paymentMode}
+                                        onChange={(e) => setEditingExpense({ ...editingExpense, paymentMode: e.target.value })}
+                                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                    >
+                                        {PAYMENT_MODES.map((mode) => (
+                                            <option key={mode} value={mode}>{mode}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-paid-by">Paid By *</Label>
+                                    <select
+                                        id="edit-paid-by"
+                                        value={editingExpense.paidBy}
+                                        onChange={(e) => setEditingExpense({ ...editingExpense, paidBy: e.target.value })}
+                                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                    >
+                                        {PAID_BY_OPTIONS.map((option) => (
+                                            <option key={option} value={option}>{option}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-note">Note (Optional)</Label>
+                                <Input
+                                    id="edit-note"
+                                    placeholder="Brief description..."
+                                    value={editingExpense.note}
+                                    onChange={(e) => setEditingExpense({ ...editingExpense, note: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Attach Receipt (Optional)</Label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="file"
+                                        hidden
+                                        ref={editFileInputRef}
+                                        onChange={handleEditFileChange}
+                                        accept="image/*,application/pdf"
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full"
+                                        onClick={() => editFileInputRef.current?.click()}
+                                    >
+                                        <Upload className="mr-2 h-4 w-4" />
+                                        {editingExpense.receipt ? 'Receipt Attached (Change)' : 'Upload Receipt'}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+                                <Button onClick={handleUpdateExpense}>Save Changes</Button>
                             </div>
                         </div>
                     )}

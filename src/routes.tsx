@@ -19,6 +19,7 @@ const PublicClientOnboarding = lazy(() => import('./pages/public/client-onboardi
 
 // Dashboard Pages
 const DashboardPage = lazy(() => import('./pages/dashboard').then(m => ({ default: m.DashboardPage })))
+const SalesDashboardPage = lazy(() => import('./pages/dashboard/sales-dashboard').then(m => ({ default: m.SalesDashboardPage })))
 const AttendancePage = lazy(() => import('./pages/attendance').then(m => ({ default: m.AttendancePage })))
 const LeadsPage = lazy(() => import('./pages/leads').then(m => ({ default: m.LeadsPage })))
 const ClientsPage = lazy(() => import('./pages/clients').then(m => ({ default: m.ClientsPage })))
@@ -124,6 +125,7 @@ export function AppRoutes() {
                 <Route path="/" element={<DashboardLayout />}>
                     <Route index element={<Navigate to="/dashboard" replace />} />
                     <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="sales-dashboard" element={<PermissionGuard module="leads"><SalesDashboardPage /></PermissionGuard>} />
 
                     {/* Core Functionality */}
                     <Route path="attendance" element={<PermissionGuard module="attendance"><AttendancePage /></PermissionGuard>} />

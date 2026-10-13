@@ -3,7 +3,7 @@ import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Plus, Search, FileText, Image, FileIcon, User, HardDrive } from 'lucide-react'
+import { Plus, Search, FileText, Image, FileIcon, User, HardDrive, Trash2, Edit, ExternalLink } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
@@ -28,6 +28,13 @@ export function FilesPage() {
     const [selectedProjectId, setSelectedProjectId] = useState('')
     const [fileName, setFileName] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
+
+    // Edit File State
+    const [isEditOpen, setIsEditOpen] = useState(false)
+    const [editingFile, setEditingFile] = useState<any | null>(null)
+    const [editFileName, setEditFileName] = useState('')
+    const [editProjectId, setEditProjectId] = useState('')
+    const [isUpdating, setIsUpdating] = useState(false)
 
     useEffect(() => {
         const fetchFilesAndProjects = async () => {
@@ -147,6 +154,80 @@ export function FilesPage() {
         }
     }
 
+    // Delete file
+    const handleDeleteFile = async (fileId: string, e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!window.confirm("Are you sure you want to permanently delete this file?")) return
+        try {
+            await api.delete(`/files/${fileId}`)
+            setFiles(files.filter(f => f.id !== fileId))
+            toast({
+                title: "File Deleted",
+                description: "The file has been permanently removed.",
+                variant: "success"
+            })
+        } catch (error: any) {
+            console.error("Delete file failed", error)
+            toast({
+                title: "Delete Failed",
+                description: error.response?.data?.message || "Failed to delete file",
+                variant: "destructive"
+            })
+        }
+    }
+
+    // Open Edit modal
+    const handleOpenEdit = (targetFile: any, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setEditingFile(targetFile)
+        setEditFileName(targetFile.name)
+        setEditProjectId(targetFile.projectId || '')
+        setIsEditOpen(true)
+    }
+
+    // Submit Edit
+    const handleUpdateSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!editingFile) return
+
+        setIsUpdating(true)
+        try {
+            const res = await api.put(`/files/${editingFile.id}`, {
+                name: editFileName,
+                projectId: editProjectId || undefined
+            })
+
+            setFiles(files.map(f => f.id === editingFile.id ? {
+                ...f,
+                name: res.data.name,
+                projectId: res.data.projectId
+            } : f))
+
+            toast({
+                title: "File Updated",
+                description: "File information saved successfully.",
+                variant: "success"
+            })
+            setIsEditOpen(false)
+            setEditingFile(null)
+        } catch (error: any) {
+            console.error("Update file failed", error)
+            toast({
+                title: "Update Failed",
+                description: error.response?.data?.message || "Failed to update file",
+                variant: "destructive"
+            })
+        } finally {
+            setIsUpdating(false)
+        }
+    }
+
+    const canManageFile = (fileItem: any) => {
+        const role = currentUser?.role || ''
+        const uId = currentUser?.id || (currentUser as any)?._id
+        return ['owner', 'admin'].includes(role) || fileItem.uploadedBy === uId
+    }
+
     const allowedProjects = currentUser?.role === 'client'
         ? projects.filter(p => p.clientId === currentUser.clientId)
         : projects;
@@ -201,11 +282,12 @@ export function FilesPage() {
                             const Icon = getFileIcon(file.type)
                             const uploader = users.find(u => u.id === file.uploadedBy)
                             const project = projects.find(p => p.id === file.projectId)
+                            const manageable = canManageFile(file)
 
                             return (
                                 <Card 
                                     key={file.id} 
-                                    className="cursor-pointer hover:shadow-md transition-all group"
+                                    className="cursor-pointer hover:shadow-md transition-all group relative overflow-hidden"
                                     onClick={() => window.open(file.url, '_blank')}
                                 >
                                     <CardContent className="p-4 space-y-3">
@@ -219,6 +301,44 @@ export function FilesPage() {
                                             ) : (
                                                 <Icon className="h-12 w-12 text-muted-foreground group-hover:scale-110 transition-transform" />
                                             )}
+
+                                            {/* Quick Actions Overlay */}
+                                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-xs p-1 rounded-md shadow-xs">
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                    title="Open in new tab"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        window.open(file.url, '_blank')
+                                                    }}
+                                                >
+                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                </Button>
+                                                {manageable && (
+                                                    <>
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                                            title="Edit file details"
+                                                            onClick={(e) => handleOpenEdit(file, e)}
+                                                        >
+                                                            <Edit className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                            title="Delete file"
+                                                            onClick={(e) => handleDeleteFile(file.id, e)}
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div>
@@ -231,9 +351,30 @@ export function FilesPage() {
                                             <span>{formatDate(file.uploadedAt)}</span>
                                         </div>
 
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                            <User className="h-3 w-3" />
-                                            <span>{uploader?.name || 'Unknown User'}</span>
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                            <div className="flex items-center gap-1">
+                                                <User className="h-3 w-3" />
+                                                <span className="truncate max-w-[100px]">{uploader?.name || 'Unknown User'}</span>
+                                            </div>
+                                            {manageable && (
+                                                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleOpenEdit(file, e)}
+                                                        className="text-muted-foreground hover:text-primary transition-colors text-[11px] font-medium"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <span>•</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleDeleteFile(file.id, e)}
+                                                        className="text-muted-foreground hover:text-destructive transition-colors text-[11px] font-medium"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -301,6 +442,60 @@ export function FilesPage() {
                             </Button>
                             <Button type="submit" disabled={loading}>
                                 {loading ? 'Uploading...' : 'Upload'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit File Dialog */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <form onSubmit={handleUpdateSubmit}>
+                        <DialogHeader>
+                            <DialogTitle>Edit File Details</DialogTitle>
+                            <DialogDescription>
+                                Modify the file's display name or project association.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="editFileName" className="font-semibold">File Name *</Label>
+                                <Input
+                                    id="editFileName"
+                                    value={editFileName}
+                                    onChange={(e) => setEditFileName(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="editProjectSelect" className="font-semibold">Associated Project</Label>
+                                <select
+                                    id="editProjectSelect"
+                                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                    value={editProjectId}
+                                    onChange={(e) => setEditProjectId(e.target.value)}
+                                >
+                                    <option value="">General (No Project)</option>
+                                    {allowedProjects.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsEditOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isUpdating}>
+                                {isUpdating ? 'Saving...' : 'Save Changes'}
                             </Button>
                         </DialogFooter>
                     </form>
