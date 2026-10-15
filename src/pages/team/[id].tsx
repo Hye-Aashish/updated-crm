@@ -7,21 +7,24 @@ import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Mail, Phone, Briefcase, MapPin, User, FileText, Shield, Edit, Save } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Briefcase, MapPin, User, FileText, Shield, Edit, Save, SlidersHorizontal, Eye, Users as UsersIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { getInitials, formatDate, formatCurrency } from '@/lib/utils'
+import { LeadVisibilityModal } from '@/components/team/lead-visibility-modal'
 
 export function TeamMemberPage() {
     const { id } = useParams()
     const navigate = useNavigate()
-    const { users } = useAppStore()
+    const { users, currentUser, setUsers } = useAppStore()
+    const isAdminOrOwner = currentUser?.role === 'admin' || currentUser?.role === 'owner'
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+    const [isLeadAccessModalOpen, setIsLeadAccessModalOpen] = useState(false)
     const [editForm, setEditForm] = useState<any>({})
     const [newPassword, setNewPassword] = useState('')
     const { toast } = useToast()
@@ -322,6 +325,76 @@ export function TeamMemberPage() {
                         </CardContent>
                     </Card>
 
+                    {/* Lead Visibility Permissions Card */}
+                    <Card className="border-border/60 shadow-sm">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Eye className="h-5 w-5 text-primary" />
+                                Lead Visibility Access (लीड परमिशन)
+                            </CardTitle>
+                            {isAdminOrOwner && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-xs gap-1.5"
+                                    onClick={() => setIsLeadAccessModalOpen(true)}
+                                >
+                                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                                    Configure Access
+                                </Button>
+                            )}
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-2">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div>
+                                    <Label className="text-muted-foreground text-xs block mb-1">Current Lead View Scope</Label>
+                                    <div className="flex items-center gap-2">
+                                        {user.leadViewScope === 'all' && (
+                                            <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs font-semibold gap-1.5">
+                                                <Eye className="h-3.5 w-3.5" /> All Leads (Company-Wide)
+                                            </Badge>
+                                        )}
+                                        {user.leadViewScope === 'custom' && (
+                                            <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-xs font-semibold gap-1.5">
+                                                <UsersIcon className="h-3.5 w-3.5" /> Specific Agents ({user.allowedLeadAgents?.length || 0})
+                                            </Badge>
+                                        )}
+                                        {(!user.leadViewScope || user.leadViewScope === 'own') && (
+                                            <Badge variant="secondary" className="text-xs font-medium gap-1.5 text-muted-foreground">
+                                                <Shield className="h-3.5 w-3.5" /> Own Leads Only (Restricted)
+                                            </Badge>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    {user.leadViewScope === 'all' && 'Can view, search and follow up on leads from all team members.'}
+                                    {(!user.leadViewScope || user.leadViewScope === 'own') && 'Only sees leads created by or assigned to them.'}
+                                    {user.leadViewScope === 'custom' && 'Sees own leads plus leads belonging to selected team agents.'}
+                                </div>
+                            </div>
+
+                            {user.leadViewScope === 'custom' && user.allowedLeadAgents && user.allowedLeadAgents.length > 0 && (
+                                <div className="p-3 bg-muted/30 rounded-xl border border-dashed space-y-2">
+                                    <span className="text-xs font-semibold text-muted-foreground block">
+                                        Permitted Agents whose leads {user.name} can access:
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {user.allowedLeadAgents.map((ag: any, i: number) => {
+                                            const agName = typeof ag === 'string' 
+                                                ? (users.find(u => (u.id || (u as any)._id) === ag)?.name || 'Agent')
+                                                : (ag.name || 'Agent')
+                                            return (
+                                                <span key={i} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                                    {agName}
+                                                </span>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
                 </div>
             </div>
 
@@ -384,6 +457,22 @@ export function TeamMemberPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Lead Visibility Permission Modal */}
+            <LeadVisibilityModal
+                isOpen={isLeadAccessModalOpen}
+                onClose={() => setIsLeadAccessModalOpen(false)}
+                targetUser={user}
+                allUsers={users}
+                onSuccess={(updatedUser) => {
+                    const mapped = { ...updatedUser, id: updatedUser._id || updatedUser.id }
+                    setUser(mapped)
+                    const updatedUsers = users.map(u => 
+                        (u.id || (u as any)._id) === mapped.id ? mapped : u
+                    )
+                    setUsers(updatedUsers)
+                }}
+            />
         </div>
     )
 }

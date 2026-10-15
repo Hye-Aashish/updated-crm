@@ -64,13 +64,39 @@ export function LeadsPage() {
         return leads.filter(l => l.isFallbackFollowUp).length
     }, [leads])
 
-    // Strict Multi-User Isolation:
-    // Admin / Owner sees all leads to assign and supervise.
-    // Telecaller / Employee can STRICTLY ONLY see leads assigned to them (or unassigned leads they created).
+    // Strict Multi-User Isolation & Granular Permission Scoping:
+    // Admin / Owner or 'all' scope sees all leads to supervise.
+    // 'custom' scope sees own leads + explicitly permitted agents' leads.
+    // 'own' scope can STRICTLY ONLY see leads assigned to them (or unassigned leads they created).
     const userScopedLeads = useMemo(() => {
-        if (isAdminOrOwner) return leads;
-        const currentUserId = (currentUser as any)?._id || (currentUser as any)?.id;
+        if (isAdminOrOwner || (currentUser as any)?.leadViewScope === 'all') return leads;
+        const currentUserId = String((currentUser as any)?._id || (currentUser as any)?.id || '');
         const currentUserName = currentUser?.name?.toLowerCase().trim();
+
+        const userScope = (currentUser as any)?.leadViewScope || 'own';
+        const allowedLeadAgents = (currentUser as any)?.allowedLeadAgents || [];
+
+        if (userScope === 'custom' && allowedLeadAgents.length > 0) {
+            const allowedIds = new Set([
+                currentUserId,
+                ...allowedLeadAgents.map((a: any) => String(typeof a === 'object' ? (a._id || a.id) : a))
+            ]);
+            const allowedNames = new Set([
+                currentUserName,
+                ...allowedLeadAgents.map((a: any) => typeof a === 'object' && a.name ? a.name.toLowerCase().trim() : '').filter(Boolean)
+            ]);
+
+            return leads.filter(l => {
+                const assignedId = String(l.assignedTo || '');
+                const createdId = String((typeof l.createdBy === 'object' ? (l.createdBy as any)?._id : l.createdBy) || '');
+                const assignedName = (l.assignedToName || '').toLowerCase().trim();
+                const createdName = (l.createdByName || '').toLowerCase().trim();
+
+                return allowedIds.has(assignedId) || allowedIds.has(createdId) ||
+                       (assignedName && allowedNames.has(assignedName)) ||
+                       (createdName && allowedNames.has(createdName));
+            });
+        }
 
         return leads.filter(l => {
             const hasAssignee = Boolean(

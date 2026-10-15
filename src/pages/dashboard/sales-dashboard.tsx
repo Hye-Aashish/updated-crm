@@ -29,6 +29,7 @@ import { TelecallerDeepAnalytics } from '@/components/dashboard/telecaller-deep-
 import { SalesGrowthSuite } from '@/components/dashboard/sales-growth-suite'
 import { WebFormPerformanceSection } from '@/components/dashboard/web-form-performance-section'
 import { DailyCallingReport } from '@/components/dashboard/daily-calling-report'
+import { DayAgentCallingSection } from '@/components/dashboard/day-wise-agent-calling-section'
 import { SalesFilterBar, type SalesFilterState } from '@/components/dashboard/sales-filter-bar'
 import { SalesKpiCards } from '@/components/dashboard/sales-kpi-cards'
 import { SalesCalendar } from '@/components/dashboard/sales-calendar'
@@ -109,7 +110,7 @@ export function SalesDashboardPage() {
     }
 
     const summary = data?.summary
-    const isPersonal = !isAdminOrOwner || summary?.isPersonalView
+    const isPersonal = !isAdminOrOwner
     const agents = (data?.agents || []).filter((a: any) => 
         a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.email?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -198,7 +199,7 @@ export function SalesDashboardPage() {
                 onApply={handleApplyFilters}
                 onReset={handleResetFilters}
                 onExport={handleExportReport}
-                agents={data?.agents || []}
+                agents={data?.allAgents || data?.agents || []}
                 isPersonalView={isPersonal}
             />
 
@@ -586,9 +587,16 @@ export function SalesDashboardPage() {
                 </div>
             </div>
 
+            {/* Day-Wise Calling & Follow-up Agenda (Calendar Day Selection, New vs Follow-up, Missed Calls) */}
+            <DayAgentCallingSection
+                isPersonalView={isPersonal}
+                selectedAgentId={filters.selectedAgent}
+                onViewLeadsBoard={() => navigate('/leads')}
+            />
+
             {/* Daily Calling & Talk Time Intelligence Report (per sales person tracking) */}
             <DailyCallingReport
-                agents={data?.agents || []}
+                agents={data?.allAgents || data?.agents || []}
                 callingLogs={data?.dailyCallingLogs || []}
                 overallHourlyCalls={data?.overallHourlyCalls || {}}
                 summary={data?.summary || {}}
@@ -597,13 +605,13 @@ export function SalesDashboardPage() {
 
             {/* Sales Calendar: Month Navigation, Agenda, Scheduled Meetings & Follow-ups */}
             <SalesCalendar
-                agents={data?.agents || []}
+                agents={data?.allAgents || data?.agents || []}
                 isPersonalView={isPersonal}
             />
 
             {/* Sales Growth Engine: Agent Rankings, Leakage Radar, ROI, and Hot Deals */}
             <SalesGrowthSuite
-                agents={data?.agents || []}
+                agents={data?.allAgents || data?.agents || []}
                 sourceAnalytics={data?.sourceAnalytics || []}
                 formAnalytics={data?.formAnalytics || []}
                 leakageRadar={data?.leakageRadar}

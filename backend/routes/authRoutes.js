@@ -6,7 +6,9 @@ const { protect } = require('../middleware/authMiddleware');
 
 router.get('/me', protect, async (req, res) => {
     try {
-        const user = await User.findById(req.user._id).select('-password');
+        const user = await User.findById(req.user._id)
+            .select('-password')
+            .populate('allowedLeadAgents', 'name email role avatar');
         res.json(user);
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
@@ -28,7 +30,8 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        const user = await User.findOne({ email: email.toLowerCase().trim() })
+            .populate('allowedLeadAgents', 'name email role avatar');
         if (!user) {
             // Use generic message to prevent email enumeration
             return res.status(401).json({ message: 'Invalid email or password' });

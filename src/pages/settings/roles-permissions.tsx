@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { 
     Plus, Save, Shield, Loader2, Building2, 
-    FolderKanban, Trash2, Users, CreditCard, Globe, MessageSquare
+    FolderKanban, Trash2, Users, CreditCard, Globe, MessageSquare, Eye
 } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
+import { LeadVisibilitySettingsTab } from '@/components/team/lead-visibility-settings-tab'
 
 // Module display names mapped exactly to sidebar names
 const MODULE_LABELS: Record<string, string> = {
@@ -124,6 +125,7 @@ const ACTION_LABELS: Record<string, string> = {
 export function RolesPermissionsPage() {
     const [roles, setRoles] = useState<any[]>([])
     const [selectedRoleIndex, setSelectedRoleIndex] = useState(0)
+    const [mainTab, setMainTab] = useState<'roles' | 'lead_access'>('roles')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const { toast } = useToast()
@@ -278,21 +280,52 @@ export function RolesPermissionsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
                     <p className="text-muted-foreground mt-1">
-                        Control what each role can access across <strong>{Object.keys(MODULE_LABELS).length}</strong> modules.
+                        Control role-based access across modules and configure agent-wise lead visibility permissions.
                     </p>
                 </div>
-                <Button onClick={() => onSave(roles)} disabled={saving} className="brand-gradient border-none shadow-lg">
-                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    {saving ? 'Saving...' : 'Save All Changes'}
-                </Button>
+                {mainTab === 'roles' && (
+                    <Button onClick={() => onSave(roles)} disabled={saving} className="brand-gradient border-none shadow-lg">
+                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {saving ? 'Saving...' : 'Save All Changes'}
+                    </Button>
+                )}
             </div>
 
-            <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6 flex flex-col lg:flex-row gap-8">
+            {/* Sub-tab Navigation */}
+            <div className="flex items-center gap-2 border-b pb-3">
+                <button
+                    onClick={() => setMainTab('roles')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                        mainTab === 'roles'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                >
+                    <Shield className="h-4 w-4" />
+                    Role Matrix & Module Permissions
+                </button>
+                <button
+                    onClick={() => setMainTab('lead_access')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                        mainTab === 'lead_access'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                >
+                    <Users className="h-4 w-4" />
+                    Agent Lead Visibility (एजेंट लीड परमिशन)
+                </button>
+            </div>
+
+            {mainTab === 'lead_access' ? (
+                <LeadVisibilitySettingsTab />
+            ) : (
+                <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm">
+                    <CardContent className="p-6 flex flex-col lg:flex-row gap-8">
                     {/* Role Sidebar */}
                     <div className="w-full lg:w-56 shrink-0 space-y-4">
                         <h3 className="font-bold text-xs uppercase tracking-widest text-muted-foreground px-1">Roles</h3>
@@ -531,6 +564,7 @@ export function RolesPermissionsPage() {
                     </div>
                 </CardContent>
             </Card>
+            )}
         </div>
     )
 }

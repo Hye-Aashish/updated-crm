@@ -187,9 +187,20 @@ export function SalesFilterBar({
                 {/* Sales Agent Selector (Admin view) */}
                 {!isPersonalView && (
                     <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground">Sales Agent</span>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase text-muted-foreground">Sales Agent</span>
+                            {filters.selectedAgent && filters.selectedAgent !== 'all' && (
+                                <button
+                                    type="button"
+                                    onClick={() => onChangeFilters({ selectedAgent: 'all' })}
+                                    className="text-[9px] font-bold text-primary hover:underline flex items-center gap-0.5"
+                                >
+                                    Show All ✕
+                                </button>
+                            )}
+                        </div>
                         <Select 
-                            value={filters.selectedAgent} 
+                            value={filters.selectedAgent || 'all'} 
                             onValueChange={(v) => onChangeFilters({ selectedAgent: v })}
                         >
                             <SelectTrigger className="h-8 text-xs font-semibold rounded-xl bg-background border-border/60">
@@ -197,11 +208,14 @@ export function SalesFilterBar({
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all" className="text-xs font-semibold">All Team Members</SelectItem>
-                                {agents.map((ag) => (
-                                    <SelectItem key={ag.userId || ag.name} value={ag.userId || ag.name} className="text-xs font-semibold">
-                                        {ag.name}
-                                    </SelectItem>
-                                ))}
+                                {agents.map((ag) => {
+                                    const val = String(ag.userId || ag.name)
+                                    return (
+                                        <SelectItem key={val} value={val} className="text-xs font-semibold">
+                                            {ag.name} {ag.role ? `(${ag.role})` : ''}
+                                        </SelectItem>
+                                    )
+                                })}
                             </SelectContent>
                         </Select>
                     </div>

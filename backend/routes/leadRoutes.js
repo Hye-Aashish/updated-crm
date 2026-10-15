@@ -87,7 +87,7 @@ function getTodayMidnightUTC() {
 
 const isAuthorizedForLead = async (user, lead) => {
     if (!lead) return false;
-    if (user.role === 'admin' || user.role === 'owner') return true;
+    if (user.role === 'admin' || user.role === 'owner' || user.leadViewScope === 'all') return true;
 
     // Check if role has view_all permissions in DB
     try {
@@ -102,6 +102,12 @@ const isAuthorizedForLead = async (user, lead) => {
     const userIdStr = user._id.toString();
     const userName = (user.name || '').toLowerCase().trim();
 
+    // Custom allowed agents set
+    const allowedAgentIds = new Set([
+        userIdStr,
+        ...(Array.isArray(user.allowedLeadAgents) ? user.allowedLeadAgents.map(a => (a._id || a).toString()) : [])
+    ]);
+
     // Check if lead is assigned to someone
     const hasAssignee = Boolean(
         (lead.assignedTo && lead.assignedTo !== 'unassigned' && String(lead.assignedTo).trim() !== '') ||
@@ -109,14 +115,20 @@ const isAuthorizedForLead = async (user, lead) => {
     );
 
     if (hasAssignee) {
-        // If lead is assigned: ONLY the assigned agent has access!
-        const isAssigned = (lead.assignedTo && lead.assignedTo.toString() === userIdStr) ||
+        const leadAssigneeId = lead.assignedTo ? lead.assignedTo.toString() : '';
+        const isAssigned = allowedAgentIds.has(leadAssigneeId) ||
                            (lead.assignedToName && lead.assignedToName.toLowerCase().trim() === userName);
-        return Boolean(isAssigned);
+        if (isAssigned) return true;
+
+        if (user.leadViewScope === 'custom') {
+            return allowedAgentIds.has(leadAssigneeId);
+        }
+        return false;
     }
 
-    // If lead is unassigned: only the creator has access until assigned
-    if (lead.createdBy && lead.createdBy.toString() === userIdStr) return true;
+    // If lead is unassigned: creator or allowed agent
+    const creatorId = lead.createdBy ? lead.createdBy.toString() : '';
+    if (allowedAgentIds.has(creatorId)) return true;
     if (lead.createdByName && lead.createdByName.toLowerCase().trim() === userName) return true;
 
     return false;
@@ -130,12 +142,12 @@ router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
         const Setting = require('../models/Setting');
         const settings = await Setting.findOne({ type: 'general' });
         const userRole = settings?.roles?.find(r => r.name === req.user.role);
-        const canViewAll = userRole?.permissions?.leads?.view_all || req.user.role === 'owner' || req.user.role === 'admin';
+        const canViewAll = userRole?.permissions?.leads?.view_all || req.user.role === 'owner' || req.user.role === 'admin' || req.user.leadViewScope === 'all';
 
         let filter = {};
 
         if (canViewAll) {
-            // Admin / Owner view: optionally filter by specific telecaller/agent
+            // Admin / Owner / All-Leads view: optionally filter by specific telecaller/agent
             const { telecallerId } = req.query;
             if (telecallerId && telecallerId !== 'all') {
                 filter.$or = [
@@ -145,10 +157,34 @@ router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
                     { createdByName: telecallerId }
                 ];
             }
+        } else if (req.user.leadViewScope === 'custom' && Array.isArray(req.user.allowedLeadAgents) && req.user.allowedLeadAgents.length > 0) {
+            // Granular Agent Permission: User can view their own leads + allowed agents' leads!
+            const allowedAgentIds = [
+                req.user._id.toString(),
+                ...req.user.allowedLeadAgents.map(a => (a._id || a).toString())
+            ];
+
+            const allowedUsers = await User.find({ _id: { $in: allowedAgentIds } }).select('name').lean();
+            const allowedNames = allowedUsers.map(u => u.name).filter(Boolean);
+
+            const { telecallerId } = req.query;
+            if (telecallerId && telecallerId !== 'all') {
+                filter.$or = [
+                    { createdBy: telecallerId },
+                    { assignedTo: telecallerId },
+                    { assignedToName: telecallerId },
+                    { createdByName: telecallerId }
+                ];
+            } else {
+                filter.$or = [
+                    { assignedTo: { $in: allowedAgentIds } },
+                    { assignedToName: { $in: allowedNames } },
+                    { createdBy: { $in: allowedAgentIds } },
+                    { createdByName: { $in: allowedNames } }
+                ];
+            }
         } else {
             // Telecaller / Employee view: STRICTLY only their own leads
-            // If a lead is assigned, ONLY the assigned telecaller sees it.
-            // If unassigned, only the creator sees it.
             const currentUserIdStr = req.user._id.toString();
             const currentUserName = (req.user.name || '').trim();
 
@@ -246,7 +282,7 @@ router.get('/telecaller-analytics', protect, async (req, res) => {
         const Setting = require('../models/Setting');
         const settings = await Setting.findOne({ type: 'general' });
         const userRole = settings?.roles?.find(r => r.name === req.user.role);
-        const canViewAll = userRole?.permissions?.leads?.view_all || req.user.role === 'owner' || req.user.role === 'admin';
+        const canViewAll = userRole?.permissions?.leads?.view_all || req.user.role === 'owner' || req.user.role === 'admin' || req.user.leadViewScope === 'all';
 
         const { range = 'today', agentId, startDate: qStartDate, endDate: qEndDate } = req.query;
 
@@ -306,34 +342,58 @@ router.get('/telecaller-analytics', protect, async (req, res) => {
         // If canViewAll is false: strictly fetch current user's leads and current user only!
         const currentUserIdStr = req.user._id.toString();
         const currentUserName = (req.user.name || '').trim();
-        const leadsQuery = canViewAll ? {} : {
-            $or: [
-                { assignedTo: currentUserIdStr },
-                ...(currentUserName ? [{ assignedToName: currentUserName }] : []),
-                {
-                    $and: [
-                        {
-                            $or: [
-                                { assignedTo: null },
-                                { assignedTo: '' },
-                                { assignedTo: 'unassigned' },
-                                { assignedTo: { $exists: false } }
-                            ]
-                        },
-                        {
-                            $or: [
-                                { createdBy: req.user._id },
-                                ...(currentUserName ? [{ createdByName: currentUserName }] : [])
-                            ]
-                        }
-                    ]
-                }
-            ]
-        };
 
-        const usersQuery = canViewAll 
-            ? User.find({ role: { $in: ['employee', 'admin', 'owner', 'pm', 'developer'] } }).select('name email role avatar').lean()
-            : User.find({ _id: req.user._id }).select('name email role avatar').lean();
+        const allowedAgentIds = [
+            currentUserIdStr,
+            ...(Array.isArray(req.user.allowedLeadAgents) ? req.user.allowedLeadAgents.map(a => (a._id || a).toString()) : [])
+        ];
+        const isCustomScope = req.user.leadViewScope === 'custom' && allowedAgentIds.length > 1;
+
+        let leadsQuery = {};
+        let usersQuery;
+
+        if (canViewAll) {
+            leadsQuery = {};
+            usersQuery = User.find({ role: { $in: ['employee', 'admin', 'owner', 'pm', 'developer', 'telecaller', 'sales'] } }).select('name email role avatar').lean();
+        } else if (isCustomScope) {
+            const allowedUsers = await User.find({ _id: { $in: allowedAgentIds } }).select('name').lean();
+            const allowedNames = allowedUsers.map(u => u.name).filter(Boolean);
+            leadsQuery = {
+                $or: [
+                    { assignedTo: { $in: allowedAgentIds } },
+                    { assignedToName: { $in: allowedNames } },
+                    { createdBy: { $in: allowedAgentIds } },
+                    { createdByName: { $in: allowedNames } }
+                ]
+            };
+            usersQuery = User.find({ _id: { $in: allowedAgentIds } }).select('name email role avatar').lean();
+        } else {
+            leadsQuery = {
+                $or: [
+                    { assignedTo: currentUserIdStr },
+                    ...(currentUserName ? [{ assignedToName: currentUserName }] : []),
+                    {
+                        $and: [
+                            {
+                                $or: [
+                                    { assignedTo: null },
+                                    { assignedTo: '' },
+                                    { assignedTo: 'unassigned' },
+                                    { assignedTo: { $exists: false } }
+                                ]
+                            },
+                            {
+                                $or: [
+                                    { createdBy: req.user._id },
+                                    ...(currentUserName ? [{ createdByName: currentUserName }] : [])
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            };
+            usersQuery = User.find({ _id: req.user._id }).select('name email role avatar').lean();
+        }
 
         const [allLeads, allUsers, allLeadForms] = await Promise.all([
             Lead.find(leadsQuery).lean(),
@@ -857,7 +917,7 @@ router.get('/telecaller-analytics', protect, async (req, res) => {
             staleLeadsCount: staleLeadsList.length,
             unassignedLeadsCount: unassignedLeadsList.length,
             dateRange: range,
-            isPersonalView: !canViewAll || isAgentFiltered
+            isPersonalView: !canViewAll
         };
 
         // Filter dailyCallingLogs if specific agent is selected
@@ -870,9 +930,20 @@ router.get('/telecaller-analytics', protect, async (req, res) => {
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             .slice(0, 150);
 
+        // Complete list of all agents for filters and dropdowns (never filtered out)
+        const allAgentsList = rankedAgents.map(a => ({
+            userId: a.userId,
+            name: a.name,
+            email: a.email,
+            role: a.role,
+            avatar: a.avatar,
+            totalAssignedLeads: a.totalAssignedLeads
+        }));
+
         res.json({
             summary,
             agents: filteredAgents,
+            allAgents: allAgentsList,
             dailyCallingLogs: sortedCallingLogs,
             overallHourlyCalls,
             sourceAnalytics,
@@ -886,6 +957,268 @@ router.get('/telecaller-analytics', protect, async (req, res) => {
         });
     } catch (err) {
         console.error('Telecaller Analytics Error:', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// GET /day-agent-calling - Admin day-wise calendar calling report (New Calls, Follow-ups, Missed Calls)
+router.get('/day-agent-calling', protect, async (req, res) => {
+    try {
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const userRole = settings?.roles?.find(r => r.name === req.user.role);
+        const canViewAll = userRole?.permissions?.leads?.view_all || req.user.role === 'owner' || req.user.role === 'admin' || req.user.leadViewScope === 'all';
+
+        const { date = new Date().toISOString().split('T')[0], agentId } = req.query;
+
+        // Normalize date bounds for target day
+        const [yStr, mStr, dStr] = date.split('-');
+        const dayStart = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr), 0, 0, 0, 0);
+        const dayEnd = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr), 23, 59, 59, 999);
+
+        const allowedAgentIds = [
+            req.user._id.toString(),
+            ...(Array.isArray(req.user.allowedLeadAgents) ? req.user.allowedLeadAgents.map(a => (a._id || a).toString()) : [])
+        ];
+        const isCustomScope = req.user.leadViewScope === 'custom' && allowedAgentIds.length > 1;
+
+        // Fetch team agents and leads
+        const usersQuery = canViewAll
+            ? User.find({ role: { $ne: 'client' } }).select('name email role avatar').lean()
+            : isCustomScope
+                ? User.find({ _id: { $in: allowedAgentIds } }).select('name email role avatar').lean()
+                : User.find({ _id: req.user._id }).select('name email role avatar').lean();
+
+        const leadsQuery = canViewAll ? {} : isCustomScope ? {
+            $or: [
+                { assignedTo: { $in: allowedAgentIds } },
+                { createdBy: { $in: allowedAgentIds } }
+            ]
+        } : {
+            $or: [
+                { assignedTo: req.user._id.toString() },
+                { assignedToName: req.user.name },
+                { createdBy: req.user._id }
+            ]
+        };
+
+        const [allUsers, allLeads] = await Promise.all([
+            usersQuery,
+            Lead.find(leadsQuery).lean()
+        ]);
+
+        const agentsMap = new Map();
+        allUsers.forEach(u => {
+            agentsMap.set(u.name, {
+                userId: u._id.toString(),
+                name: u.name,
+                email: u.email,
+                role: u.role,
+                avatar: u.avatar,
+                totalAssignedLeads: 0,
+                newCallsCount: 0,
+                followupCallsCount: 0,
+                totalCallsDone: 0,
+                callsNotDoneCount: 0,
+                followupsTakenCount: 0,
+                totalDurationSeconds: 0,
+                newCallsList: [],
+                followupCallsList: [],
+                pendingCallsList: [],
+                scheduledFollowupsList: []
+            });
+        });
+
+        const getAgent = (name, fallbackId) => {
+            if (!name) name = 'Unassigned';
+            if (!agentsMap.has(name)) {
+                agentsMap.set(name, {
+                    userId: fallbackId || name,
+                    name: name,
+                    email: '',
+                    role: 'telecaller',
+                    avatar: '',
+                    totalAssignedLeads: 0,
+                    newCallsCount: 0,
+                    followupCallsCount: 0,
+                    totalCallsDone: 0,
+                    callsNotDoneCount: 0,
+                    followupsTakenCount: 0,
+                    totalDurationSeconds: 0,
+                    newCallsList: [],
+                    followupCallsList: [],
+                    pendingCallsList: [],
+                    scheduledFollowupsList: []
+                });
+            }
+            return agentsMap.get(name);
+        };
+
+        allLeads.forEach(lead => {
+            const managingName = lead.assignedToName || lead.createdByName || 'Unassigned';
+            const assignedAgent = getAgent(managingName, lead.assignedTo || lead.createdBy?.toString());
+            assignedAgent.totalAssignedLeads++;
+
+            const activities = Array.isArray(lead.activities) ? lead.activities : [];
+
+            // Day activities by any agent
+            const dayActivities = activities.filter(act => {
+                if (!act.createdAt) return false;
+                const d = new Date(act.createdAt);
+                return d >= dayStart && d <= dayEnd;
+            });
+
+            // Activities prior to selected day
+            const priorActivities = activities.filter(act => {
+                if (!act.createdAt) return false;
+                return new Date(act.createdAt) < dayStart && act.type !== 'system';
+            });
+
+            const leadCreatedOnDay = lead.createdAt && new Date(lead.createdAt) >= dayStart && new Date(lead.createdAt) <= dayEnd;
+            const hadInteractionOnDay = dayActivities.length > 0;
+
+            if (hadInteractionOnDay || leadCreatedOnDay) {
+                const callerName = (dayActivities[0] && dayActivities[0].createdByName) || managingName;
+                const activeAgent = getAgent(callerName);
+
+                // User logic:
+                // If lead newly added OR first time status update/note on that day -> Count as 1 New Call
+                // If lead already had prior conversation note/status update -> Count as Follow-up
+                if (priorActivities.length === 0) {
+                    activeAgent.newCallsCount++;
+                    activeAgent.totalCallsDone++;
+
+                    const dur = dayActivities.reduce((sum, a) => sum + (Number(a.duration) || 0), 0);
+                    activeAgent.totalDurationSeconds += dur;
+
+                    activeAgent.newCallsList.push({
+                        id: lead._id,
+                        name: lead.name,
+                        company: lead.company,
+                        phone: lead.phone,
+                        stage: lead.stage,
+                        value: lead.value || 0,
+                        outcome: (dayActivities[0] && (dayActivities[0].outcome || dayActivities[0].content)) || (leadCreatedOnDay ? 'Fresh Lead Added' : 'First Call Made'),
+                        time: (dayActivities[0] && dayActivities[0].createdAt) || lead.createdAt,
+                        note: (dayActivities[0] && dayActivities[0].content) || 'Lead created / first conversation initiated'
+                    });
+                } else {
+                    const count = Math.max(1, dayActivities.length);
+                    activeAgent.followupCallsCount += count;
+                    activeAgent.totalCallsDone += count;
+
+                    const dur = dayActivities.reduce((sum, a) => sum + (Number(a.duration) || 0), 0);
+                    activeAgent.totalDurationSeconds += dur;
+
+                    activeAgent.followupCallsList.push({
+                        id: lead._id,
+                        name: lead.name,
+                        company: lead.company,
+                        phone: lead.phone,
+                        stage: lead.stage,
+                        value: lead.value || 0,
+                        outcome: (dayActivities[0] && (dayActivities[0].outcome || dayActivities[0].content)) || 'Follow-up Call',
+                        previousNote: priorActivities[priorActivities.length - 1]?.content || 'Prior interaction exists',
+                        currentNote: (dayActivities[0] && dayActivities[0].content) || 'Follow-up conversation logged',
+                        time: (dayActivities[0] && dayActivities[0].createdAt) || new Date()
+                    });
+                }
+
+                // Follow-ups taken / next scheduled
+                dayActivities.forEach(act => {
+                    if (act.nextFollowUpDate) {
+                        activeAgent.followupsTakenCount++;
+                        activeAgent.scheduledFollowupsList.push({
+                            id: lead._id,
+                            name: lead.name,
+                            company: lead.company,
+                            phone: lead.phone,
+                            scheduledFor: act.nextFollowUpDate,
+                            note: act.content || act.outcome || 'Next call scheduled'
+                        });
+                    }
+                });
+            }
+
+            // Calls Not Done:
+            // 1. Scheduled follow-up was due on this date, but no call was logged
+            // 2. Fresh lead assigned on/before this date, but 0 calls or updates attempted
+            const reminderDate = lead.reminder?.date ? new Date(lead.reminder.date) : null;
+            const reminderDueOnDay = reminderDate && reminderDate >= dayStart && reminderDate <= dayEnd;
+            const hadReminderMissed = reminderDueOnDay && !hadInteractionOnDay;
+            const isFreshUncalled = activities.length === 0 && (!lead.createdAt || new Date(lead.createdAt) <= dayEnd);
+
+            if (hadReminderMissed) {
+                assignedAgent.callsNotDoneCount++;
+                assignedAgent.pendingCallsList.push({
+                    id: lead._id,
+                    name: lead.name,
+                    company: lead.company,
+                    phone: lead.phone,
+                    stage: lead.stage,
+                    value: lead.value || 0,
+                    reason: 'Scheduled follow-up due on this date was not done',
+                    reminderDate: lead.reminder.date
+                });
+            } else if (isFreshUncalled) {
+                assignedAgent.callsNotDoneCount++;
+                assignedAgent.pendingCallsList.push({
+                    id: lead._id,
+                    name: lead.name,
+                    company: lead.company,
+                    phone: lead.phone,
+                    stage: lead.stage,
+                    value: lead.value || 0,
+                    reason: 'Fresh assigned lead - No call or update logged yet',
+                    assignedAt: lead.assignedAt || lead.createdAt
+                });
+            }
+        });
+
+        const formatDuration = (seconds) => {
+            if (!seconds || seconds <= 0) return '0s';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const hrs = Math.floor(mins / 60);
+            const remMins = mins % 60;
+            if (hrs > 0) return `${hrs}h ${remMins}m`;
+            if (mins > 0) return `${mins}m ${secs}s`;
+            return `${secs}s`;
+        };
+
+        let agentsList = Array.from(agentsMap.values()).map(a => ({
+            ...a,
+            durationFormatted: formatDuration(a.totalDurationSeconds)
+        }));
+
+        if (agentId && agentId !== 'all') {
+            agentsList = agentsList.filter(a => a.userId === agentId || a.name === agentId);
+        }
+
+        const summary = {
+            date,
+            totalCallsDone: agentsList.reduce((sum, a) => sum + a.totalCallsDone, 0),
+            newCallsCount: agentsList.reduce((sum, a) => sum + a.newCallsCount, 0),
+            followupCallsCount: agentsList.reduce((sum, a) => sum + a.followupCallsCount, 0),
+            callsNotDoneCount: agentsList.reduce((sum, a) => sum + a.callsNotDoneCount, 0),
+            followupsTakenCount: agentsList.reduce((sum, a) => sum + a.followupsTakenCount, 0),
+            activeAgentsCount: agentsList.filter(a => a.totalCallsDone > 0).length,
+            totalAgentsCount: agentsList.length
+        };
+
+        res.json({
+            date,
+            summary,
+            agents: agentsList,
+            allAgents: Array.from(agentsMap.values()).map(a => ({
+                userId: a.userId,
+                name: a.name,
+                role: a.role,
+                avatar: a.avatar
+            }))
+        });
+    } catch (err) {
+        console.error('Day Agent Calling Report Error:', err);
         res.status(500).json({ message: err.message });
     }
 });
@@ -990,16 +1323,31 @@ router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) =
         }
 
         const isReassigned = safeData.assignedTo !== undefined && String(safeData.assignedTo || '') !== String(lead.assignedTo || '');
+        const isStageChanged = safeData.stage && safeData.stage !== lead.stage;
         const updateQuery = { $set: safeData };
+        const newActivities = [];
         if (isReassigned) {
-            updateQuery.$push = {
-                activities: {
-                    content: `Lead assigned to ${safeData.assignedToName || 'Unassigned'} by ${req.user.name}`,
-                    type: 'system',
-                    createdByName: req.user.name,
-                    createdAt: new Date()
-                }
-            };
+            newActivities.push({
+                content: `Lead assigned to ${safeData.assignedToName || 'Unassigned'} by ${req.user.name}`,
+                type: 'system',
+                createdByName: req.user.name,
+                createdAt: new Date()
+            });
+        }
+        if (isStageChanged) {
+            newActivities.push({
+                content: `Status updated from "${lead.stage || 'new'}" to "${safeData.stage}"`,
+                type: 'status_change',
+                outcome: safeData.stage,
+                createdByName: req.user.name,
+                createdAt: new Date()
+            });
+            safeData.lastContactedBy = req.user.name;
+            safeData.lastContactedById = req.user._id.toString();
+            if (!lead.firstContactedAt) safeData.firstContactedAt = new Date();
+        }
+        if (newActivities.length > 0) {
+            updateQuery.$push = { activities: { $each: newActivities } };
         }
 
         const updatedLead = await Lead.findByIdAndUpdate(req.params.id, updateQuery, { new: true });

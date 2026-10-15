@@ -32,6 +32,15 @@ const userSchema = new mongoose.Schema({
     documentPan: { type: String },
     documentOfferLetter: { type: String },
     salary: { type: Number },
+    leadViewScope: {
+        type: String,
+        enum: ['own', 'all', 'custom'],
+        default: 'own'
+    },
+    allowedLeadAgents: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
     createdAt: { type: Date, default: Date.now }
 });
 

@@ -12,11 +12,11 @@ router.get('/', protect, async (req, res) => {
 
         if (userRole === 'admin' || userRole === 'owner') {
             // Full data for admins
-            const users = await query.select('-password');
+            const users = await query.select('-password').populate('allowedLeadAgents', 'name email role avatar');
             res.json(users);
         } else if (userRole !== 'client') {
             // Limited data for other staff for assignment purposes
-            const users = await query.select('name email role avatar designation department');
+            const users = await query.select('name email role avatar designation department leadViewScope allowedLeadAgents');
             res.json(users);
         } else if (userRole === 'client') {
             // Clients can see users who are part of their projects
@@ -102,7 +102,7 @@ router.put('/:id', protect, async (req, res) => {
         const adminEditFields = [...selfEditFields, 'email', 'role', 'department', 'designation',
             'salary', 'employeeId', 'salutation', 'joiningDate', 'reportingTo',
             'aadharNumber', 'panNumber', 'documentAadhar', 'documentPan',
-            'documentOfferLetter', 'clientId'];
+            'documentOfferLetter', 'clientId', 'leadViewScope', 'allowedLeadAgents'];
 
         const allowedFields = isAdmin ? adminEditFields : selfEditFields;
 
@@ -120,12 +120,43 @@ router.put('/:id', protect, async (req, res) => {
 
         await user.save();
 
-        const userResponse = user.toObject();
-        delete userResponse.password;
+        const userResponse = await User.findById(user._id)
+            .select('-password')
+            .populate('allowedLeadAgents', 'name email role avatar');
         res.json(userResponse);
     } catch (err) {
         console.error("Update User Error:", err);
         res.status(400).json({ message: err.message });
+    }
+});
+
+// PUT /:id/lead-access - Admin configures agent's lead visibility (all, own, or specific agents)
+router.put('/:id/lead-access', protect, authorize('admin', 'owner'), async (req, res) => {
+    try {
+        const { leadViewScope = 'own', allowedLeadAgents = [] } = req.body;
+        if (!['own', 'all', 'custom'].includes(leadViewScope)) {
+            return res.status(400).json({ message: 'Invalid leadViewScope. Must be "own", "all", or "custom".' });
+        }
+
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        user.leadViewScope = leadViewScope;
+        user.allowedLeadAgents = leadViewScope === 'custom' ? allowedLeadAgents : [];
+
+        await user.save();
+
+        const updatedUser = await User.findById(user._id)
+            .select('-password')
+            .populate('allowedLeadAgents', 'name email role avatar');
+
+        res.json({
+            message: `Lead visibility permissions updated to "${leadViewScope}"`,
+            user: updatedUser
+        });
+    } catch (err) {
+        console.error("Update Lead Access Error:", err);
+        res.status(500).json({ message: err.message });
     }
 });
 

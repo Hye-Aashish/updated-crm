@@ -32,6 +32,10 @@ export interface User {
     documentOfferLetter?: string
     salary?: string
 
+    // Lead Visibility Permissions
+    leadViewScope?: 'own' | 'all' | 'custom'
+    allowedLeadAgents?: (string | { id?: string; _id?: string; name?: string; email?: string; role?: string; avatar?: string })[]
+
     createdAt?: Date
 }
 

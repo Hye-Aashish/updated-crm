@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
     Plus, Mail, Phone, Briefcase, CheckSquare, Users, Code,
-    Clock, CheckCircle, Trash2, Upload, MoreHorizontal, FileText
+    Clock, CheckCircle, Trash2, Upload, MoreHorizontal, FileText, SlidersHorizontal, Eye
 } from 'lucide-react'
 import { getInitials } from '@/lib/utils'
 import {
@@ -34,6 +34,7 @@ import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
 import { AttendanceSheet } from '@/components/attendance/attendance-sheet'
+import { LeadVisibilityModal } from '@/components/team/lead-visibility-modal'
 
 export function TeamPage() {
     const { canCreate, canDelete } = usePermissions()
@@ -47,6 +48,8 @@ export function TeamPage() {
     const [activeTab, setActiveTab] = useState<'members' | 'attendance'>('members')
     const [isAddUserOpen, setIsAddUserOpen] = useState(false)
     const [userToDelete, setUserToDelete] = useState<string | null>(null)
+    const [leadAccessUser, setLeadAccessUser] = useState<any>(null)
+    const [isLeadAccessModalOpen, setIsLeadAccessModalOpen] = useState(false)
 
     // Form State with ALL fields
     const [newUser, setNewUser] = useState({
@@ -505,6 +508,11 @@ export function TeamPage() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent>
                                                         <DropdownMenuItem onClick={() => navigate(`/team/${user.id}`)}>View Profile</DropdownMenuItem>
+                                                        {current && ['admin', 'owner'].includes(current.role) && (
+                                                            <DropdownMenuItem onClick={() => { setLeadAccessUser(user); setIsLeadAccessModalOpen(true); }}>
+                                                                <SlidersHorizontal className="mr-2 h-4 w-4 text-primary" /> Lead Visibility Access
+                                                            </DropdownMenuItem>
+                                                        )}
                                                         {canDelete('team') && (
                                                             <DropdownMenuItem className="text-red-600" onClick={() => setUserToDelete(user.id)}>
                                                                 <Trash2 className="mr-2 h-4 w-4" /> Release
@@ -526,8 +534,20 @@ export function TeamPage() {
                                             </Avatar>
                                             <div>
                                                 <h3 className="font-semibold text-lg">{user.name}</h3>
-                                                <Badge variant={roleColors[user.role] || 'outline'} className="mt-2 capitalize">{user.role}</Badge>
-                                                {user.designation && <div className="text-xs text-muted-foreground mt-1">{user.designation}</div>}
+                                                <div className="flex items-center gap-1.5 mt-2 justify-center flex-wrap">
+                                                    <Badge variant={roleColors[user.role] || 'outline'} className="capitalize">{user.role}</Badge>
+                                                    {user.leadViewScope === 'all' && (
+                                                        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] font-semibold">
+                                                            All Leads
+                                                        </Badge>
+                                                    )}
+                                                    {user.leadViewScope === 'custom' && (
+                                                        <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-[10px] font-semibold">
+                                                            Custom Leads ({user.allowedLeadAgents?.length || 0})
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                {user.designation && <div className="text-xs text-muted-foreground mt-1.5">{user.designation}</div>}
                                             </div>
                                             <div className="w-full space-y-2 pt-4 border-t text-sm">
                                                 <div className="flex items-center justify-between">
@@ -578,6 +598,25 @@ export function TeamPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Lead Visibility Permission Modal */}
+            <LeadVisibilityModal
+                isOpen={isLeadAccessModalOpen}
+                onClose={() => {
+                    setIsLeadAccessModalOpen(false)
+                    setLeadAccessUser(null)
+                }}
+                targetUser={leadAccessUser}
+                allUsers={users}
+                onSuccess={(updatedUser) => {
+                    const updatedUsers = users.map(u => 
+                        (u.id || (u as any)._id) === (updatedUser._id || updatedUser.id)
+                            ? { ...u, ...updatedUser, id: updatedUser._id || u.id }
+                            : u
+                    )
+                    setUsers(updatedUsers)
+                }}
+            />
         </div>
     )
 }
