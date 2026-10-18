@@ -103,11 +103,9 @@ export function TeamMemberPage() {
     if (id === 'new') return <div className="p-8">Please use the 'Add Member' button on the Team page.</div>
     if (!user) return <div className="p-8">User not found</div>
 
-    const current = useAppStore.getState().currentUser
-    const isAdminOrOwner = current && ['admin', 'owner'].includes(current.role)
-    const isSelf = current && current.id === id
+    const isSelf = currentUser && currentUser.id === id
 
-    if (current && !isAdminOrOwner && !isSelf) {
+    if (currentUser && !isAdminOrOwner && !isSelf) {
         return (
             <div className="p-8 max-w-md mx-auto text-center space-y-4 border rounded-lg bg-card shadow mt-10">
                 <Shield className="h-12 w-12 text-destructive mx-auto" />
