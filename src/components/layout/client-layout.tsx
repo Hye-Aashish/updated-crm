@@ -73,20 +73,19 @@ export function ClientLayout() {
             />
 
             <div className={cn("flex-1 flex flex-col h-full transition-all duration-300 ease-in-out relative overflow-hidden")}>
-                <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border/40 bg-background/80 backdrop-blur-md px-4 md:px-6 shadow-sm shrink-0">
+                <header className="sticky top-0 z-30 flex h-14 items-center border-b border-border/60 bg-background/90 backdrop-blur-md px-3 sm:px-5 shadow-2xs shrink-0">
                     <div className="flex-1 min-w-0">
                         <Topbar onMenuClick={() => setMobileOpen(true)} />
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-y-auto p-4 md:p-8 w-full scroll-smooth bg-slate-50/30">
-                    <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 md:pb-20">
+                <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 w-full max-w-full scroll-smooth pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
+                    <div className="mx-auto max-w-7xl w-full min-w-0 animate-in fade-in duration-300">
                         <Outlet />
                     </div>
                 </main>
 
-                {/* Mobile Bottom Navigation */}
-                <BottomNav onMenuClick={() => setMobileOpen(true)} />
+                <BottomNav />
             </div>
         </div>
     )

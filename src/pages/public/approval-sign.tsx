@@ -11,6 +11,7 @@ import {
     FileSignature, CheckCircle2, XCircle, Clock, ShieldCheck,
     ExternalLink, FileText, Calendar, Building2, User, Lock, AlertTriangle
 } from 'lucide-react'
+import { appAlert } from '@/lib/app-dialog'
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -62,7 +63,7 @@ export default function PublicApprovalSignPage() {
             })
             setApproval(res.data.approval)
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Failed to submit signature')
+            await appAlert(err.response?.data?.message || 'Failed to submit signature')
         } finally {
             setSigning(false)
         }
@@ -80,7 +81,7 @@ export default function PublicApprovalSignPage() {
             setApproval(res.data.approval)
             setRejectModalOpen(false)
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Failed to reject request')
+            await appAlert(err.response?.data?.message || 'Failed to reject request')
         } finally {
             setRejecting(false)
         }

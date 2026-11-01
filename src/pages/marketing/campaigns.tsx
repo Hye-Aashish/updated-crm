@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 // ── PRE-BUILT HTML EMAIL TEMPLATES ───────────────────────────────────────────
 const EMAIL_TEMPLATES = [
     {
@@ -331,7 +333,7 @@ export function CampaignsPage() {
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this campaign?')) return
+        if (!await appConfirm('Are you sure you want to delete this campaign?')) return
         try {
             await api.delete(`/campaigns/${id}`)
             toast({ title: 'Campaign Deleted' })

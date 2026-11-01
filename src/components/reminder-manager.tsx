@@ -59,6 +59,42 @@ export function ReminderManager() {
         }
     }, [])
 
+    // 1b. Calendar event reminders (poll every 30s)
+    useEffect(() => {
+        let alive = true
+        const pollCalendar = async () => {
+            if (!localStorage.getItem('token')) return
+            try {
+                const res = await api.get('/calendar/reminders/due')
+                const due = res.data?.due || []
+                if (!alive) return
+                const notifiedKeys = getNotifiedKeys()
+                due.forEach((ev: any) => {
+                    const key = `cal-${ev._id}-${ev.startAt}`
+                    if (notifiedKeys.has(key)) return
+                    saveNotifiedKey(key)
+                    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => {})
+                    toast({
+                        title: `Meeting reminder: ${ev.title}`,
+                        description: [
+                            ev.clientName ? `Client: ${ev.clientName}` : null,
+                            ev.ownerName ? `With: ${ev.ownerName}` : null,
+                            new Date(ev.startAt).toLocaleString()
+                        ].filter(Boolean).join(' · ')
+                    })
+                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                        new Notification(`Meeting: ${ev.title}`, {
+                            body: ev.clientName ? `Client ${ev.clientName}` : 'Starting soon'
+                        })
+                    }
+                })
+            } catch { /* ignore */ }
+        }
+        pollCalendar()
+        const interval = setInterval(pollCalendar, 30000)
+        return () => { alive = false; clearInterval(interval) }
+    }, [toast])
+
     // 2. Check Lead Reminders and Brand-New System Notifications
     useEffect(() => {
         const checkReminders = () => {

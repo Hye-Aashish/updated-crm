@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 interface ExpiryAlert {
     id: string
     type: string
@@ -167,7 +169,7 @@ export default function ExpiryAlertsPage() {
             toast({ title: 'No critical alerts', description: 'No expired or critical items to send reminders for.' })
             return
         }
-        if (!confirm(`Send reminders for ${criticalAlerts.length} critical/expired items?`)) return
+        if (!await appConfirm(`Send reminders for ${criticalAlerts.length} critical/expired items?`)) return
 
         setBulkSending(true)
         try {

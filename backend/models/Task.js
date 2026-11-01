@@ -27,6 +27,17 @@ const taskSchema = new mongoose.Schema({
         text: String,
         completed: { type: Boolean, default: false }
     }],
+    // Additive productivity fields
+    parentId: { type: String, index: true }, // subtask parent
+    starred: { type: Boolean, default: false },
+    slaDueAt: { type: Date },
+    recurrence: {
+        enabled: { type: Boolean, default: false },
+        frequency: { type: String, enum: ['daily', 'weekly', 'monthly', 'none'], default: 'none' },
+        interval: { type: Number, default: 1 },
+        nextRunAt: Date,
+        templateTitle: String
+    },
     // Timer tracking fields
     isTimerRunning: { type: Boolean, default: false },
     lastStartTime: { type: Number },
@@ -45,5 +56,7 @@ taskSchema.index({ assigneeId: 1 });
 taskSchema.index({ creatorId: 1 });
 taskSchema.index({ status: 1 });
 taskSchema.index({ createdAt: -1 });
+taskSchema.index({ starred: 1 });
+taskSchema.index({ 'recurrence.nextRunAt': 1 });
 
 module.exports = mongoose.model('Task', taskSchema);

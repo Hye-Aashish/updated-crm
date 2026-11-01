@@ -12,12 +12,12 @@ interface StatsCardProps {
 export function StatsCard({ title, value, icon: Icon, color, bg }: StatsCardProps) {
     return (
         <Card className="border-l-4 shadow-sm" style={{ borderLeftColor: color }}>
-            <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                    <p className="text-sm font-medium text-muted-foreground">{title}</p>
-                    <h3 className="text-2xl font-bold mt-1">{value}</h3>
+            <CardContent className="p-4 flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground whitespace-nowrap truncate">{title}</p>
+                    <h3 className="text-2xl font-bold mt-1 whitespace-nowrap">{value}</h3>
                 </div>
-                <div className={`p-2 rounded-lg ${bg}`}>
+                <div className={`p-2 rounded-lg ${bg} shrink-0`}>
                     <Icon className="h-5 w-5" style={{ color: color }} />
                 </div>
             </CardContent>

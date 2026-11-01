@@ -137,6 +137,117 @@ const isAuthorizedForLead = async (user, lead) => {
 // --- LEADS ROUTES ---
 
 // GET all leads
+// Duplicate detection (must be before /:id)
+router.get('/duplicates', protect, checkPermission('leads', 'view'), async (req, res) => {
+    try {
+        const { email, phone, excludeId } = req.query;
+        if (!email && !phone) return res.json({ duplicates: [] });
+
+        const or = [];
+        if (email) or.push({ email: new RegExp(`^${String(email).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+        if (phone) {
+            const digits = String(phone).replace(/\D/g, '');
+            if (digits.length >= 7) or.push({ phone: new RegExp(digits.slice(-10) + '$') });
+        }
+        const filter = { archived: { $ne: true }, $or: or };
+        if (excludeId) filter._id = { $ne: excludeId };
+
+        const duplicates = await Lead.find(filter).select('name company email phone stage value assignedToName createdAt').limit(20);
+        res.json({ duplicates });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Merge duplicate into primary (soft-archive duplicate)
+router.post('/merge', protect, checkPermission('leads', 'edit'), async (req, res) => {
+    try {
+        const { primaryId, duplicateId } = req.body;
+        if (!primaryId || !duplicateId) return res.status(400).json({ message: 'primaryId and duplicateId required' });
+        if (primaryId === duplicateId) return res.status(400).json({ message: 'Cannot merge a lead into itself' });
+
+        const primary = await Lead.findById(primaryId);
+        const duplicate = await Lead.findById(duplicateId);
+        if (!primary || !duplicate) return res.status(404).json({ message: 'Lead not found' });
+
+        const mergedActivities = [
+            ...(primary.activities || []),
+            ...(duplicate.activities || []),
+            {
+                content: `Merged duplicate lead "${duplicate.company || duplicate.name}" into this lead`,
+                type: 'system',
+                createdByName: req.user.name,
+                createdAt: new Date()
+            }
+        ];
+        primary.activities = mergedActivities;
+        if (!primary.email && duplicate.email) primary.email = duplicate.email;
+        if (!primary.phone && duplicate.phone) primary.phone = duplicate.phone;
+        if ((primary.value || 0) < (duplicate.value || 0)) primary.value = duplicate.value;
+        if (duplicate.tags?.length) {
+            primary.tags = Array.from(new Set([...(primary.tags || []), ...duplicate.tags]));
+        }
+        if (!primary.referredBy && duplicate.referredBy) primary.referredBy = duplicate.referredBy;
+        await primary.save();
+
+        duplicate.archived = true;
+        duplicate.mergedInto = primary._id;
+        duplicate.activities.push({
+            content: `Archived after merge into ${primary.company || primary.name}`,
+            type: 'system',
+            createdByName: req.user.name,
+            createdAt: new Date()
+        });
+        await duplicate.save();
+
+        res.json({ primary, duplicate });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Lead timeline: activities + sales call logs
+router.get('/:id/timeline', protect, checkPermission('leads', 'view'), async (req, res) => {
+    try {
+        const lead = await Lead.findById(req.params.id);
+        if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+        const SalesCallLog = require('../models/SalesCallLog');
+        const callLogs = await SalesCallLog.find({
+            $or: [
+                { leadId: lead._id.toString() },
+                { leadId: lead._id },
+                ...(lead.phone ? [{ phone: lead.phone }] : [])
+            ]
+        }).sort({ createdAt: -1 }).limit(50).lean().catch(() => []);
+
+        const activityItems = (lead.activities || []).map(a => ({
+            kind: 'activity',
+            at: a.createdAt,
+            type: a.type,
+            content: a.content,
+            outcome: a.outcome,
+            createdByName: a.createdByName
+        }));
+        const callItems = (callLogs || []).map(c => ({
+            kind: 'call',
+            at: c.createdAt || c.startedAt,
+            type: 'call',
+            content: c.notes || c.outcome || 'Call logged',
+            outcome: c.outcome || c.status,
+            duration: c.duration,
+            createdByName: c.agentName || c.userName
+        }));
+
+        const timeline = [...activityItems, ...callItems]
+            .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
+
+        res.json({ timeline, leadId: lead._id });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
     try {
         const Setting = require('../models/Setting');
@@ -144,7 +255,7 @@ router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
         const userRole = settings?.roles?.find(r => r.name === req.user.role);
         const canViewAll = userRole?.permissions?.leads?.view_all || req.user.role === 'owner' || req.user.role === 'admin' || req.user.leadViewScope === 'all';
 
-        let filter = {};
+        let filter = { archived: { $ne: true } };
 
         if (canViewAll) {
             // Admin / Owner / All-Leads view: optionally filter by specific telecaller/agent
@@ -1305,7 +1416,8 @@ router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) =
         // Whitelist allowed update fields
         const allowedFields = ['name', 'company', 'email', 'phone', 'value', 'source', 'stage',
             'assignedTo', 'assignedToName', 'notes', 'customFields', 'reminder', 'tags', 'website', 'address',
-            'industry', 'designation', 'description', 'lostReason', 'project'];
+            'industry', 'designation', 'description', 'lostReason', 'project',
+            'referredBy', 'partnerId', 'partnerName'];
         const safeData = {};
         allowedFields.forEach(f => { if (req.body[f] !== undefined) safeData[f] = req.body[f]; });
 
@@ -1351,6 +1463,16 @@ router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) =
         }
 
         const updatedLead = await Lead.findByIdAndUpdate(req.params.id, updateQuery, { new: true });
+
+        // Pipeline automation (additive; no-op if no rules)
+        if (isStageChanged && updatedLead) {
+            try {
+                const { runPipelineRulesOnStageChange } = require('../services/pipelineAutomation');
+                await runPipelineRulesOnStageChange(updatedLead, safeData.stage, req.user);
+            } catch (autoErr) {
+                console.error('[PipelineAutomation]', autoErr.message);
+            }
+        }
 
         // Notify newly assigned telecaller if not self
         if (isReassigned && safeData.assignedTo && String(safeData.assignedTo) !== req.user._id.toString()) {

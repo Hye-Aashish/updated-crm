@@ -5,6 +5,7 @@ const Client = require('../models/Client');
 const Project = require('../models/Project');
 const sendEmail = require('../utils/sendEmail');
 const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
+const { assertInvoiceAccess } = require('../utils/assertAccess');
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -47,7 +48,8 @@ router.get('/public/:id', async (req, res) => {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
-        const client = await Client.findById(invoice.clientId).select('name email company phone address');
+        // Public view: minimal client fields only (no phone/address dump)
+        const client = await Client.findById(invoice.clientId).select('name company');
         let project = null;
         if (invoice.projectId) {
             project = await Project.findById(invoice.projectId).select('name');
@@ -60,7 +62,18 @@ router.get('/public/:id', async (req, res) => {
         }
 
         res.json({
-            ...invoice._doc,
+            _id: invoice._id,
+            invoiceNumber: invoice.invoiceNumber,
+            status: invoice.status,
+            currency: invoice.currency,
+            lineItems: invoice.lineItems,
+            subtotal: invoice.subtotal,
+            tax: invoice.tax,
+            total: invoice.total,
+            amountPaid: invoice.amountPaid,
+            date: invoice.date,
+            dueDate: invoice.dueDate,
+            termsAndConditions: invoice.termsAndConditions,
             client,
             project,
             isPublicView: true
@@ -71,10 +84,13 @@ router.get('/public/:id', async (req, res) => {
 });
 
 // GET single invoice (Authenticated)
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', protect, checkPermission('invoices', 'view'), async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+        const access = await assertInvoiceAccess(req, invoice);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         // Get Client & Project details to return with invoice
         const client = await Client.findById(invoice.clientId);
@@ -270,8 +286,11 @@ router.put('/:id', protect, checkPermission('invoices', 'edit'), async (req, res
 // DELETE an invoice
 router.delete('/:id', protect, checkPermission('invoices', 'delete'), async (req, res) => {
     try {
-        const deletedInvoice = await Invoice.findByIdAndDelete(req.params.id);
-        if (!deletedInvoice) return res.status(404).json({ message: 'Invoice not found' });
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+        const access = await assertInvoiceAccess(req, invoice);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        await Invoice.findByIdAndDelete(req.params.id);
         res.json({ message: 'Invoice deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -279,10 +298,12 @@ router.delete('/:id', protect, checkPermission('invoices', 'delete'), async (req
 });
 
 // SEND invoice via Email (with PDF attachment)
-router.post('/:id/send', protect, async (req, res) => {
+router.post('/:id/send', protect, checkPermission('invoices', 'edit'), async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+        const access = await assertInvoiceAccess(req, invoice);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         const client = await Client.findById(invoice.clientId);
         if (!client || !client.email) {
@@ -481,27 +502,78 @@ router.post('/:id/payment-session', async (req, res) => {
     }
 });
 
-// Record MANUAL payment (Admin/Owner only)
+// Record MANUAL payment (Admin/Owner only) — full pay (unchanged behavior)
 router.post('/:id/manual-payment', protect, checkPermission('invoices', 'mark_paid'), async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+        const access = await assertInvoiceAccess(req, invoice);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         invoice.status = 'paid';
         invoice.paidDate = new Date();
+        invoice.amountPaid = invoice.total;
+        invoice.payments = invoice.payments || [];
+        invoice.payments.push({
+            amount: invoice.total,
+            method: 'manual-full',
+            note: req.body?.note || 'Marked paid manually',
+            paidAt: new Date(),
+            recordedBy: req.user._id.toString()
+        });
         await invoice.save();
 
-        res.json({ success: true, message: 'Invoice marked as paid manually' });
+        res.json({ success: true, message: 'Invoice marked as paid manually', invoice });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Additive partial payment (does not replace manual-payment)
+router.post('/:id/payments', protect, checkPermission('invoices', 'mark_paid'), async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+        const access = await assertInvoiceAccess(req, invoice);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        if (invoice.status === 'paid') return res.status(400).json({ message: 'Invoice already paid' });
+        if (invoice.status === 'cancelled') return res.status(400).json({ message: 'Invoice cancelled' });
+
+        const amount = Number(req.body.amount || 0);
+        if (!(amount > 0)) return res.status(400).json({ message: 'amount must be > 0' });
+
+        invoice.payments = invoice.payments || [];
+        invoice.payments.push({
+            amount,
+            method: req.body.method || 'manual',
+            note: req.body.note || '',
+            paidAt: req.body.paidAt ? new Date(req.body.paidAt) : new Date(),
+            recordedBy: req.user._id.toString()
+        });
+        invoice.amountPaid = (invoice.amountPaid || 0) + amount;
+
+        if (invoice.amountPaid >= invoice.total) {
+            invoice.status = 'paid';
+            invoice.paidDate = new Date();
+            invoice.amountPaid = invoice.total;
+        } else {
+            invoice.status = 'partially-paid';
+        }
+        invoice.updatedAt = new Date();
+        await invoice.save();
+        res.json(invoice);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 // Verify Payment Status manually (Useful when Webhooks fail or for local dev)
-router.get('/:id/verify-payment', protect, async (req, res) => {
+router.get('/:id/verify-payment', protect, checkPermission('invoices', 'view'), async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+        const access = await assertInvoiceAccess(req, invoice);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         if (!invoice.cashfreeOrderId) return res.status(400).json({ message: 'No payment order found for this invoice' });
 
         // Fetch Settings for Cashfree credentials

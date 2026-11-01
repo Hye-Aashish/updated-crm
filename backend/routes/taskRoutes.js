@@ -21,12 +21,74 @@ const updateProjectProgress = async (projectId) => {
     }
 };
 
+// My Day — assignee=me + due today/overdue + starred (parents only on board elsewhere)
+router.get('/my-day', protect, async (req, res) => {
+    try {
+        const userId = req.user._id.toString();
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date();
+        end.setHours(23, 59, 59, 999);
+
+        const tasks = await Task.find({
+            parentId: { $in: [null, undefined, ''] },
+            status: { $nin: ['done', 'completed'] },
+            $or: [
+                { assigneeId: userId, dueDate: { $lte: end } },
+                { assigneeId: userId, starred: true },
+                { creatorId: userId, dueDate: { $lte: end } },
+                { creatorId: userId, starred: true }
+            ]
+        }).sort({ dueDate: 1, priority: -1 });
+
+        res.json(tasks);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Subtasks for a parent
+router.get('/:id/subtasks', protect, async (req, res) => {
+    try {
+        const subtasks = await Task.find({ parentId: req.params.id }).sort({ createdAt: 1 });
+        res.json(subtasks);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+router.post('/:id/subtasks', protect, async (req, res) => {
+    try {
+        const parent = await Task.findById(req.params.id);
+        if (!parent) return res.status(404).json({ message: 'Parent task not found' });
+        const sub = await Task.create({
+            title: req.body.title || 'Subtask',
+            description: req.body.description || '',
+            projectId: parent.projectId,
+            status: 'todo',
+            priority: req.body.priority || parent.priority || 'medium',
+            assigneeId: req.body.assigneeId || parent.assigneeId,
+            dueDate: req.body.dueDate || parent.dueDate,
+            parentId: parent._id.toString(),
+            creatorId: req.user._id.toString(),
+            checklist: []
+        });
+        res.status(201).json(sub);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
 // GET all tasks (optional filter by projectId)
 router.get('/', protect, async (req, res) => {
     try {
         const filter = {};
         if (req.query.projectId) filter.projectId = req.query.projectId;
         if (req.query.assigneeId) filter.assigneeId = req.query.assigneeId;
+        // Board default: hide subtasks unless explicitly requested
+        if (req.query.includeSubtasks !== 'true') {
+            filter.$or = [{ parentId: { $exists: false } }, { parentId: null }, { parentId: '' }];
+        }
 
         // RBAC Logic
         const user = req.user;
@@ -263,6 +325,17 @@ router.post('/', protect, async (req, res) => {
             ...req.body,
             creatorId: req.user._id.toString()
         };
+        if (!taskData.slaDueAt && taskData.priority) {
+            const hours = { urgent: 8, high: 24, medium: 72, low: 168 }[taskData.priority] || 72;
+            taskData.slaDueAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+        }
+        if (taskData.recurrence?.enabled && taskData.recurrence?.frequency && taskData.recurrence.frequency !== 'none') {
+            const next = new Date();
+            if (taskData.recurrence.frequency === 'daily') next.setDate(next.getDate() + (taskData.recurrence.interval || 1));
+            else if (taskData.recurrence.frequency === 'weekly') next.setDate(next.getDate() + 7 * (taskData.recurrence.interval || 1));
+            else if (taskData.recurrence.frequency === 'monthly') next.setMonth(next.getMonth() + (taskData.recurrence.interval || 1));
+            taskData.recurrence.nextRunAt = next;
+        }
         const task = new Task(taskData);
         const newTask = await task.save();
         await updateProjectProgress(newTask.projectId);
@@ -445,12 +518,44 @@ router.put('/:id', protect, async (req, res) => {
             console.error('Task activity update error:', actErr);
         }
 
+        // SLA defaults by priority (additive)
+        if (req.body.priority && !req.body.slaDueAt && !task.slaDueAt) {
+            const hours = { urgent: 8, high: 24, medium: 72, low: 168 }[req.body.priority] || 72;
+            req.body.slaDueAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+        }
+
         const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true
         });
         // Recalculate progress for the project
         await updateProjectProgress(updatedTask.projectId);
+
+        // @mentions in description → in-app notifications
+        try {
+            const text = `${req.body.description || ''} ${req.body.title || ''}`;
+            const mentions = [...text.matchAll(/@([A-Za-z][A-Za-z0-9._ -]{1,40})/g)].map(m => m[1].trim());
+            if (mentions.length) {
+                const User = require('../models/User');
+                const Notification = require('../models/Notification');
+                const users = await User.find({ role: { $ne: 'client' } }).select('name');
+                for (const mention of mentions) {
+                    const match = users.find(u => u.name && u.name.toLowerCase().includes(mention.toLowerCase()));
+                    if (match && String(match._id) !== String(req.user._id)) {
+                        await Notification.create({
+                            userId: match._id.toString(),
+                            title: 'You were mentioned in a task',
+                            message: `${req.user.name} mentioned you in "${updatedTask.title}"`,
+                            type: 'task_mention',
+                            relatedId: updatedTask._id.toString()
+                        });
+                    }
+                }
+            }
+        } catch (mErr) {
+            console.error('Mention notify error:', mErr.message);
+        }
+
         res.json(updatedTask);
     } catch (err) {
         res.status(400).json({ message: err.message });

@@ -2,10 +2,12 @@ import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from './routes'
 import { ThemeProvider } from './components/theme-provider'
 import { Toaster } from './components/ui/toaster'
+import { ConfirmProvider } from './components/confirm-provider'
 
 import { ReminderManager } from './components/reminder-manager'
 import { useEmployeeMonitor } from './hooks/use-employee-monitor'
 import { BreakCheck, BreakOverlay } from './components/analytics/break-ui'
+import { PwaInstallBanner } from './components/pwa-install-banner'
 
 function App() {
     const { 
@@ -18,21 +20,24 @@ function App() {
 
     return (
         <ThemeProvider defaultTheme="light" storageKey="nexprism-theme">
-            <BrowserRouter>
-                {/* Break Management Components (Visible only in Electron) */}
-                <BreakCheck 
-                    open={breakCheck} 
-                    onStartBreak={handleStartBreak} 
-                    onClose={() => setBreakCheck(false)} 
-                />
-                <BreakOverlay 
-                    open={isOnBreak} 
-                    onResume={handleResumeWork} 
+            <ConfirmProvider>
+                <BrowserRouter>
+                    {/* Break Management Components (Visible only in Electron) */}
+                    <BreakCheck 
+                        open={breakCheck} 
+                        onStartBreak={handleStartBreak} 
+                        onClose={() => setBreakCheck(false)} 
                     />
-                <ReminderManager />
-                <AppRoutes />
-                <Toaster />
-            </BrowserRouter>
+                    <BreakOverlay 
+                        open={isOnBreak} 
+                        onResume={handleResumeWork} 
+                        />
+                    <ReminderManager />
+                    <PwaInstallBanner />
+                    <AppRoutes />
+                    <Toaster />
+                </BrowserRouter>
+            </ConfirmProvider>
         </ThemeProvider>
     )
 }

@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const User = require('./models/User');
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://anshulsharma6163_db_user:tyiNAlFUFKOFoPC7@cluster0.edg3afe.mongodb.net/CRM?appName=Cluster0&authSource=admin';
+const MONGO_URI = process.env.MONGO_URI;
+if (!MONGO_URI) { console.error('MONGO_URI required'); process.exit(1); };
 
 mongoose.connect(MONGO_URI).then(async () => {
     try {

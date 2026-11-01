@@ -25,13 +25,13 @@ export function KpiCard({ title, value, icon: Icon, trend, onClick, className }:
             onClick={onClick}
         >
             <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-                        <h3 className="text-2xl font-bold mt-2">{value}</h3>
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-muted-foreground whitespace-nowrap truncate">{title}</p>
+                        <h3 className="text-2xl font-bold mt-2 whitespace-nowrap">{value}</h3>
                         {trend && (
                             <p className={cn(
-                                'text-xs mt-2 flex items-center gap-1',
+                                'text-xs mt-2 flex items-center gap-1 whitespace-nowrap',
                                 trend.isPositive ? 'text-green-600' : 'text-red-600'
                             )}>
                                 <span>{trend.isPositive ? '↑' : '↓'}</span>
@@ -40,7 +40,7 @@ export function KpiCard({ title, value, icon: Icon, trend, onClick, className }:
                             </p>
                         )}
                     </div>
-                    <div className="rounded-full bg-primary/10 p-3">
+                    <div className="rounded-full bg-primary/10 p-3 shrink-0">
                         <Icon className="h-6 w-6 text-primary" />
                     </div>
                 </div>

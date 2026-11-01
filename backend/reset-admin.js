@@ -2,7 +2,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('./models/User');
 
-mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://aashishofficial123_db_user:AV445S3k0brlHEPu@cluster0.q0seg1w.mongodb.net/CRM_DB?appName=Cluster0').then(async () => {
+mongoose.connect(process.env.MONGO_URI || (() => { throw new Error("MONGO_URI required"); })()).then(async () => {
     try {
         const admin = await User.findOne({ email: 'admin@example.com' });
         if (admin) {

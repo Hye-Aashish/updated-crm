@@ -1199,15 +1199,15 @@ export function TasksPage() {
 
             {/* Content Area */}
             {view === 'kanban' ? (
-                <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 min-w-0">
-                    <div className="flex h-full gap-4 p-1">
+                <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 min-w-0 -mx-1 px-1 snap-x snap-mandatory">
+                    <div className="flex h-full gap-3 sm:gap-4 p-1">
                         {statuses.map((status) => {
                             const statusTasks = tasks.filter(t => t.status === status.id)
 
                             return (
                                 <div
                                     key={status.id}
-                                    className="w-[280px] flex-shrink-0 flex flex-col h-full bg-muted/30 rounded-lg border"
+                                    className="w-[78vw] max-w-[280px] sm:w-[280px] flex-shrink-0 flex flex-col h-full bg-muted/30 rounded-lg border snap-center"
                                     onDragOver={(e) => currentUser?.role !== 'client' && handleDragOver(e)}
                                     onDrop={() => currentUser?.role !== 'client' && handleDrop(status.id)}
                                 >

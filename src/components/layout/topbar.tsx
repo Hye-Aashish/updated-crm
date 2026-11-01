@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import {
     Bell, Menu, Moon, Search, Sun, Plus,
-    DollarSign, Zap, Code, Megaphone, Wifi, Car, LogOut, Loader2
+    DollarSign, Zap, Code, Megaphone, Wifi, Car, LogOut, Loader2, Mic
 } from 'lucide-react'
+import { saveDraft, loadDraft, clearDraft } from '@/lib/offline-drafts'
+import { isSpeechSupported, startVoiceInput } from '@/lib/voice-input'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { Input } from '../ui/input'
@@ -47,6 +49,10 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     const navigate = useNavigate()
     const { currentUser, notifications, markNotificationRead, markAllNotificationsRead, leads, projects, tasks, clients } = useAppStore()
 
+    useEffect(() => {
+        document.documentElement.removeAttribute('data-bg-theme')
+        localStorage.removeItem('nexcrm-bg-theme')
+    }, [])
 
     // Global Search State
     const [searchQuery, setSearchQuery] = useState('')
@@ -144,12 +150,19 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     })
     const amountInputRef = useRef<HTMLInputElement>(null)
 
-    // Auto-focus amount field when dialog opens
+    // Auto-focus amount field when dialog opens + restore offline draft
     useEffect(() => {
         if (isExpenseDialogOpen && amountInputRef.current) {
             setTimeout(() => amountInputRef.current?.focus(), 100)
+            const draft = loadDraft<typeof expense>('expense-quick')
+            if (draft && (draft.amount || draft.note)) setExpense(prev => ({ ...prev, ...draft }))
         }
     }, [isExpenseDialogOpen])
+
+    useEffect(() => {
+        if (!isExpenseDialogOpen) return
+        saveDraft('expense-quick', expense)
+    }, [expense, isExpenseDialogOpen])
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -198,6 +211,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                 variant: 'success'
             })
             setLastCategory(expense.category)
+            clearDraft('expense-quick')
             setIsExpenseDialogOpen(false)
             resetForm()
         } catch (error: any) {
@@ -232,6 +246,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                 variant: 'success'
             })
             setLastCategory(expense.category)
+            clearDraft('expense-quick')
             resetForm()
             setTimeout(() => amountInputRef.current?.focus(), 100)
         } catch (error: any) {
@@ -259,7 +274,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     }
 
     return (
-        <div className="flex w-full items-center justify-between gap-4 relative">
+        <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:gap-4 relative">
             {/* Mobile Search Overlay */}
             {showMobileSearch && (
                 <div className="absolute inset-0 z-50 flex items-center bg-background/95 backdrop-blur-xl px-2 gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -593,13 +608,32 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                             <Label htmlFor="quick-note" className="text-right">
                                 Note
                             </Label>
-                            <Input
-                                id="quick-note"
-                                value={expense.note}
-                                onChange={(e) => setExpense({ ...expense, note: e.target.value })}
-                                className="col-span-3"
-                                placeholder="Optional description..."
-                            />
+                            <div className="col-span-3 flex gap-2">
+                                <Input
+                                    id="quick-note"
+                                    value={expense.note}
+                                    onChange={(e) => setExpense({ ...expense, note: e.target.value })}
+                                    className="flex-1"
+                                    placeholder="Optional description..."
+                                />
+                                {isSpeechSupported() && (
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="shrink-0"
+                                        title="Voice note"
+                                        onClick={() => {
+                                            startVoiceInput(
+                                                (text) => setExpense(prev => ({ ...prev, note: prev.note ? `${prev.note} ${text}` : text })),
+                                                (err) => toast({ title: 'Voice', description: err, variant: 'destructive' })
+                                            )
+                                        }}
+                                    >
+                                        <Mic className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
 

@@ -28,6 +28,8 @@ import OnboardingFormCustomizer from './form-customizer'
 import OfferLetterDialog from './offer-letter-dialog'
 import OfferApprovalDialog from './offer-approval-dialog'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 export function OfferLettersPage() {
     const { toast } = useToast()
     const { currentUser } = useAppStore()
@@ -125,7 +127,7 @@ export function OfferLettersPage() {
     }
 
     const handleConvertToEmployee = async (candidateId: string) => {
-        if (!confirm('Are you sure you want to convert this candidate into an active CRM Employee account?')) return
+        if (!await appConfirm('Are you sure you want to convert this candidate into an active CRM Employee account?')) return
         try {
             const res = await api.post(`/candidates/${candidateId}/convert-to-employee`)
             toast({
@@ -143,7 +145,7 @@ export function OfferLettersPage() {
     }
 
     const handleDeleteCandidate = async (candidateId: string) => {
-        if (!confirm('Are you sure you want to delete this candidate record?')) return
+        if (!await appConfirm('Are you sure you want to delete this candidate record?')) return
         try {
             await api.delete(`/candidates/${candidateId}`)
             toast({ title: 'Deleted', description: 'Candidate record removed' })

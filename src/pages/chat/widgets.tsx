@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Copy, Plus } from 'lucide-react';
 import api from '@/lib/api-client';
 
+import { appAlert } from '@/lib/app-dialog'
+
 export const ChatWidgetsPage = () => {
     const [widgets, setWidgets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -49,10 +51,10 @@ export const ChatWidgetsPage = () => {
         }
     };
 
-    const copyScript = (token: string) => {
+    const copyScript = async (token: string) => {
         const script = `<script src="${API_BASE}/public/widget.js?token=${token}"></script>`;
         navigator.clipboard.writeText(script);
-        alert('Script copied to clipboard!');
+        await appAlert('Script copied to clipboard!');
     };
 
     return (

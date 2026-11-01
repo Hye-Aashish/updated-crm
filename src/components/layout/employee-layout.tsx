@@ -4,8 +4,6 @@ import { EmployeeSidebar } from './employee-sidebar'
 import { Topbar } from './topbar'
 import { BottomNav } from './bottom-nav'
 import { cn } from '@/lib/utils'
-import { Menu } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
 
@@ -56,9 +54,8 @@ export function EmployeeLayout() {
     }
 
     return (
-        <div className="h-[100dvh] bg-gray-50/90 dark:bg-zinc-900 overflow-hidden flex flex-col">
+        <div className="flex h-[100dvh] bg-background overflow-hidden w-full font-sans antialiased">
             <ChatNotificationListener />
-            {/* Employee Sidebar */}
             <EmployeeSidebar
                 collapsed={collapsed}
                 setCollapsed={setCollapsed}
@@ -66,32 +63,20 @@ export function EmployeeLayout() {
                 setMobileOpen={setMobileOpen}
             />
 
-            {/* Main Content Wrapper */}
-            <div
-                className={cn(
-                    "flex-1 flex flex-col transition-all duration-300 ease-in-out h-full overflow-hidden",
-                    collapsed ? "lg:ml-20" : "lg:ml-64"
-                )}
-            >
-                {/* Topbar */}
-                <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm">
-                    {/* Mobile Menu Trigger */}
-                    <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)}>
-                        <Menu className="h-5 w-5" />
-                    </Button>
-
-                    <div className="flex-1">
+            <div className={cn("flex-1 flex flex-col h-full transition-all duration-300 ease-in-out relative overflow-hidden")}>
+                <header className="sticky top-0 z-30 flex h-14 items-center border-b border-border/60 bg-background/90 backdrop-blur-md px-3 sm:px-5 shadow-2xs shrink-0">
+                    <div className="flex-1 min-w-0">
                         <Topbar onMenuClick={() => setMobileOpen(true)} />
                     </div>
                 </header>
 
-                {/* Page Content */}
-                <main className="flex-1 p-6 overflow-x-hidden pb-24 md:pb-6">
-                    <Outlet />
+                <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 w-full max-w-full scroll-smooth pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
+                    <div className="mx-auto max-w-[1560px] w-full min-w-0">
+                        <Outlet />
+                    </div>
                 </main>
 
-                {/* Mobile Bottom Navigation */}
-                <BottomNav onMenuClick={() => setMobileOpen(true)} />
+                <BottomNav />
             </div>
         </div>
     )

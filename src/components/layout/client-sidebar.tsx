@@ -8,10 +8,11 @@ import {
     ChevronLeft,
     ChevronRight,
     LogOut,
-    FolderOpen
+    FolderOpen,
+    Sparkles,
+    User
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { useState, useEffect } from 'react'
@@ -27,24 +28,32 @@ interface SidebarProps {
 export function ClientSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: SidebarProps) {
     const location = useLocation()
     const navigate = useNavigate()
-    const { currentUser } = useAppStore()
+    const { currentUser, settings } = useAppStore()
     const [permissions, setPermissions] = useState<any>(null)
     const [logo, setLogo] = useState<string | null>(null)
     const [companyName, setCompanyName] = useState('Client Portal')
 
+    const applySettings = (data: any) => {
+        const cp = data?.companyProfile
+        if (cp) {
+            setLogo(cp.logo || null)
+            if (cp.name) setCompanyName(cp.name)
+        }
+        if (currentUser?.role && data?.roles) {
+            const role = data.roles.find((r: any) => r.name === currentUser.role)
+            if (role) setPermissions(role.permissions)
+        }
+    }
+
     useEffect(() => {
+        if (settings) {
+            applySettings(settings)
+            return
+        }
         api.get('/settings').then(res => {
-            const cp = res.data?.companyProfile
-            if (cp) {
-                if (cp.logo) setLogo(cp.logo)
-                if (cp.name) setCompanyName(cp.name)
-            }
-            if (currentUser?.role && res.data.roles) {
-                const role = res.data.roles.find((r: any) => r.name === currentUser.role)
-                if (role) setPermissions(role.permissions)
-            }
+            applySettings(res.data)
         }).catch(err => console.error("Logo/Permissions fetch error", err))
-    }, [currentUser])
+    }, [currentUser, settings])
 
     const navItems = [
         { name: 'Dashboard', href: '/client/dashboard', icon: LayoutDashboard },
@@ -74,133 +83,263 @@ export function ClientSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOp
         }
     })
 
+    const handleLogout = async () => {
+        try {
+            await api.post('/time-entries/stop-running')
+        } catch (err) {
+            console.error('Logout timer stop failed', err)
+        } finally {
+            localStorage.removeItem('token')
+            navigate('/login')
+        }
+    }
+
     return (
         <>
-            {/* Mobile Sidebar */}
+            {/* Mobile Sidebar Overlay */}
             {mobileOpen && (
-                <div className="fixed inset-0 z-[100] flex" onClick={() => setMobileOpen(false)}>
-                    <div className="fixed inset-0 bg-black/50" />
-                    <div className="relative flex w-64 flex-col bg-card shadow-xl transition-transform" onClick={e => e.stopPropagation()}>
-                        <div className="flex h-16 shrink-0 items-center px-4 border-b">
+                <div 
+                    className="fixed inset-0 z-[100] flex bg-black/50 backdrop-blur-sm transition-opacity" 
+                    onClick={() => setMobileOpen(false)}
+                >
+                    <div 
+                        className="relative flex w-72 flex-col bg-card/95 backdrop-blur-xl border-r border-border/50 shadow-2xl transition-transform" 
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Mobile Brand Header */}
+                        <div className={cn("flex h-16 shrink-0 items-center px-4 border-b border-border/40 gap-3 min-w-0", logo && "justify-center")}>
                             {logo ? (
-                                <img src={logo} alt="Logo" className="max-h-8 w-auto object-contain" />
+                                <img src={logo} alt={companyName} className="max-h-10 w-auto max-w-[180px] object-contain" />
                             ) : (
-                                <span className="text-lg font-bold text-primary">{companyName}</span>
+                                <>
+                                    <div className="clay-icon h-9 w-9 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary/80 flex items-center justify-center text-white font-extrabold text-sm shrink-0 shadow-sm">
+                                        {companyName.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <span className="font-extrabold text-sm text-foreground tracking-tight truncate block leading-snug">
+                                            {companyName}
+                                        </span>
+                                        <span className="clay-badge text-[9px] font-extrabold tracking-wider uppercase px-2 py-0.5 bg-primary/10 text-primary border-primary/20 inline-block leading-tight">
+                                            Client Suite
+                                        </span>
+                                    </div>
+                                </>
                             )}
                         </div>
-                        <div className="flex-1 overflow-y-auto py-4">
-                            <nav className="grid gap-1 px-2">
-                                {filteredItems.map((item, index) => {
-                                    const isActive = location.pathname === item.href
-                                    return (
-                                        <Link
-                                            key={index}
-                                            to={item.href}
-                                            onClick={() => setMobileOpen(false)}
-                                            className={cn(
-                                                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                                                isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                            )}
-                                        >
-                                            <item.icon className="h-4 w-4" />
-                                            {item.name}
-                                        </Link>
-                                    )
-                                })}
-                            </nav>
+
+                        {/* Mobile Nav Links */}
+                        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1.5">
+                            {filteredItems.map((item, index) => {
+                                const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)
+                                const Icon = item.icon
+                                return (
+                                    <Link
+                                        key={index}
+                                        to={item.href}
+                                        onClick={() => setMobileOpen(false)}
+                                        className={cn(
+                                            "flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-xs font-bold transition-all",
+                                            isActive
+                                                ? "clay-nav-active text-white shadow-md"
+                                                : "text-muted-foreground hover:text-foreground hover:bg-card/80 hover:shadow-xs"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "clay-icon h-8 w-8 rounded-xl flex items-center justify-center shrink-0",
+                                            isActive ? "bg-white/20 text-white" : "bg-muted/50 text-muted-foreground"
+                                        )}>
+                                            <Icon className="h-4 w-4" />
+                                        </div>
+                                        <span className="truncate flex-1">{item.name}</span>
+                                        {isActive && (
+                                            <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0 shadow-xs" />
+                                        )}
+                                    </Link>
+                                )
+                            })}
+                        </div>
+
+                        {/* Mobile Profile Footer */}
+                        <div className="p-3 border-t border-border/40 bg-card/40">
+                            <div className="clay-card p-2.5 rounded-2xl flex items-center gap-2.5 bg-card/90">
+                                <div className="relative shrink-0">
+                                    <div className="clay-icon h-9 w-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-extrabold text-xs">
+                                        {currentUser?.name?.charAt(0) || 'C'}
+                                    </div>
+                                    <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-extrabold text-foreground truncate leading-tight">
+                                        {currentUser?.name}
+                                    </p>
+                                    <span className="clay-badge text-[9px] font-bold uppercase px-1.5 py-0.2 bg-muted text-muted-foreground truncate leading-tight mt-0.5 inline-block">
+                                        Client
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={handleLogout}
+                                    className="clay-btn h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all shrink-0 active:scale-95 shadow-xs"
+                                    title="Logout"
+                                >
+                                    <LogOut className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Desktop Sidebar */}
-            <div className={cn(
-                "hidden border-r bg-card lg:flex flex-col transition-all duration-300 h-full shadow-lg",
-                collapsed ? "w-[70px]" : "w-64"
-            )}>
-                <div className="flex h-16 shrink-0 items-center px-4 border-b gap-2 justify-between">
-                    {!collapsed && (
-                        <div className="flex items-center gap-2 overflow-hidden">
-                            <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                C
+            {/* Desktop Claymorphic Sidebar */}
+            <aside 
+                className={cn(
+                    "hidden border-r border-border/50 bg-card/95 backdrop-blur-xl lg:flex flex-col transition-all duration-300 h-full relative z-20 shadow-xs select-none",
+                    collapsed ? "w-[72px]" : "w-64"
+                )}
+            >
+                {/* Desktop Brand Header */}
+                <div className="flex h-16 shrink-0 items-center px-3.5 border-b border-border/40 gap-2 justify-between overflow-hidden bg-card/50">
+                    {!collapsed ? (
+                        <div className={cn("flex items-center gap-2.5 min-w-0 flex-1", logo && "justify-center")}>
+                            {logo ? (
+                                <img src={logo} alt={companyName} className="max-h-10 w-auto max-w-[180px] object-contain" />
+                            ) : (
+                                <>
+                                    <div className="clay-icon h-9 w-9 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary/80 flex items-center justify-center text-white font-extrabold text-sm shrink-0 shadow-sm">
+                                        {companyName.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <span className="font-extrabold text-sm text-foreground tracking-tight truncate block leading-snug">
+                                            {companyName}
+                                        </span>
+                                        <span className="clay-badge text-[9px] font-extrabold tracking-wider uppercase px-2 py-0.5 bg-primary/10 text-primary border-primary/20 inline-block leading-tight">
+                                            Client Portal
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="w-full flex justify-center">
+                            <div className="clay-icon h-9 w-9 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary/80 flex items-center justify-center text-white font-extrabold text-sm shadow-sm" title={companyName}>
+                                {companyName.charAt(0)}
                             </div>
-                            <span className="font-bold text-lg truncate">Client Portal</span>
                         </div>
                     )}
-                    <Button variant="ghost" size="icon" onClick={() => setCollapsed(!collapsed)}>
-                        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                    </Button>
+
+                    {!collapsed && (
+                        <button
+                            onClick={() => setCollapsed(!collapsed)}
+                            className="clay-btn h-8 w-8 rounded-xl bg-card hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all shrink-0 active:scale-95 shadow-xs"
+                            title="Collapse sidebar"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </button>
+                    )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto py-6">
-                    <nav className="grid gap-1 px-3">
-                        {filteredItems.map((item, index) => {
-                            const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)
-                            return (
-                                <Link
-                                    key={index}
-                                    to={item.href}
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all relative group",
-                                        isActive
-                                            ? "bg-primary/10 text-primary shadow-sm"
-                                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                        collapsed && "justify-center px-2"
-                                    )}
-                                    title={collapsed ? item.name : undefined}
-                                >
-                                    <item.icon className={cn(
-                                        "h-5 w-5 flex-shrink-0 transition-colors",
-                                        isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                                    )} />
-                                    {!collapsed && <span className={cn("truncate", isActive && "font-bold")}>{item.name}</span>}
-                                </Link>
-                            )
-                        })}
-                    </nav>
+                {/* Collapsed Toggle Button below header */}
+                {collapsed && (
+                    <div className="flex justify-center py-2 border-b border-border/30 bg-muted/20">
+                        <button
+                            onClick={() => setCollapsed(!collapsed)}
+                            className="clay-btn h-7 w-7 rounded-lg bg-card hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                            title="Expand sidebar"
+                        >
+                            <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                )}
+
+                {/* Navigation Links */}
+                <div className="flex-1 overflow-y-auto py-4 px-2.5 space-y-1.5 scrollbar-thin scrollbar-thumb-muted-foreground/20">
+                    {filteredItems.map((item, index) => {
+                        const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)
+                        const Icon = item.icon
+                        return (
+                            <Link
+                                key={index}
+                                to={item.href}
+                                className={cn(
+                                    "flex items-center gap-3 rounded-2xl transition-all duration-200 group relative",
+                                    collapsed ? "justify-center h-10 w-10 mx-auto p-0" : "px-3 py-2 text-xs",
+                                    isActive
+                                        ? "clay-nav-active text-white font-bold shadow-md"
+                                        : "text-foreground/80 hover:text-foreground hover:bg-card/80 hover:shadow-xs font-semibold"
+                                )}
+                                title={collapsed ? item.name : undefined}
+                            >
+                                <div className={cn(
+                                    "clay-icon flex items-center justify-center shrink-0 transition-all",
+                                    collapsed ? "h-9 w-9 rounded-xl" : "h-7.5 w-7.5 rounded-lg",
+                                    isActive 
+                                        ? "bg-white/20 text-white shadow-none" 
+                                        : "bg-muted/40 text-muted-foreground group-hover:text-primary group-hover:bg-primary/10"
+                                )}>
+                                    <Icon className={cn(collapsed ? "h-4 w-4" : "h-3.5 w-3.5")} />
+                                </div>
+
+                                {!collapsed && (
+                                    <span className={cn(
+                                        "truncate tracking-tight flex-1",
+                                        isActive ? "text-white" : "text-foreground/80 group-hover:text-foreground"
+                                    )}>
+                                        {item.name}
+                                    </span>
+                                )}
+
+                                {isActive && !collapsed && (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0 shadow-xs" />
+                                )}
+                            </Link>
+                        )
+                    })}
                 </div>
 
-                <div className="p-4 border-t bg-muted/20">
-                    <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-                        {!collapsed ? (
-                            <>
-                                <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-black text-xs">
+                {/* Desktop User Profile Capsule Footer */}
+                <div className="p-2.5 border-t border-border/40 bg-card/40">
+                    {!collapsed ? (
+                        <div className="clay-card p-2.5 rounded-2xl flex items-center gap-2.5 bg-card/90">
+                            <div className="relative shrink-0">
+                                <div className="clay-icon h-9 w-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-extrabold text-xs">
                                     {currentUser?.name?.charAt(0) || 'C'}
                                 </div>
-                                <div className="overflow-hidden flex-1">
-                                    <p className="text-sm font-bold truncate">{currentUser?.name}</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Customer</p>
+                                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-extrabold text-foreground truncate leading-tight">
+                                    {currentUser?.name}
+                                </p>
+                                <span className="clay-badge text-[9px] font-bold uppercase px-1.5 py-0.2 bg-muted text-muted-foreground truncate leading-tight mt-0.5 inline-block">
+                                    Client
+                                </span>
+                            </div>
+                            <button
+                                onClick={handleLogout}
+                                className="clay-btn h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all shrink-0 active:scale-95 shadow-xs"
+                                title="Logout"
+                            >
+                                <LogOut className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2 items-center py-1">
+                            <div className="relative">
+                                <div className="clay-icon h-9 w-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-extrabold text-xs" title={currentUser?.name}>
+                                    {currentUser?.name?.charAt(0) || 'C'}
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={async () => {
-                                    try {
-                                        await api.post('/time-entries/stop-running')
-                                    } catch (err) {
-                                        console.error('Logout timer stop failed', err)
-                                    } finally {
-                                        localStorage.removeItem('token');
-                                        navigate('/login');
-                                    }
-                                }}>
-                                    <LogOut className="h-4 w-4 text-rose-500" />
-                                </Button>
-                            </>
-                        ) : (
-                            <Button variant="ghost" size="icon" onClick={async () => {
-                                try {
-                                    await api.post('/time-entries/stop-running')
-                                } catch (err) {
-                                    console.error('Logout timer stop failed', err)
-                                } finally {
-                                    localStorage.removeItem('token');
-                                    navigate('/login');
-                                }
-                            }}>
-                                <LogOut className="h-4 w-4 text-rose-500" />
-                            </Button>
-                        )}
-                    </div>
+                                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" />
+                            </div>
+                            <button
+                                onClick={handleLogout}
+                                className="clay-btn h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                                title="Logout"
+                            >
+                                <LogOut className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </aside>
         </>
     )
 }

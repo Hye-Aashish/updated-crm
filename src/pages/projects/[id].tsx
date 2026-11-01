@@ -31,6 +31,8 @@ import { ProjectDeliverableDialog } from '@/components/projects/project-delivera
 
 import { mapProject, mapClient, mapUser } from '@/lib/mappers'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 export function ProjectDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
@@ -128,7 +130,7 @@ export function ProjectDetailPage() {
 
     const handleDelete = async () => {
         const pId = (project as any)._id || project.id
-        if (window.confirm("Are you sure you want to delete this project? This cannot be undone.")) {
+        if (await appConfirm("Are you sure you want to delete this project? This cannot be undone.")) {
             try {
                 await api.delete(`/projects/${pId}`)
                 deleteProject(project.id)
@@ -193,7 +195,7 @@ export function ProjectDetailPage() {
     }
 
     const handleDeleteCheckpoint = async (cpId: string) => {
-        if (!window.confirm("Are you sure you want to delete this checkpoint?")) return
+        if (!await appConfirm("Are you sure you want to delete this checkpoint?")) return
         const pId = project._id || project.id
         try {
             await api.delete(`/projects/${pId}/checkpoints/${cpId}`)

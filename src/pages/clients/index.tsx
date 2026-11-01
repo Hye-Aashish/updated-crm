@@ -1,9 +1,20 @@
 import { useState, useEffect } from 'react'
-import { Plus, Users, UserCheck, UserX, Building2, Trash2, Edit, Eye } from 'lucide-react'
+import {
+    Plus, Users, UserCheck, UserX, Building2, Trash2, Edit, Eye,
+    Sparkles, Search, Copy, Check, ExternalLink, Globe, Clock, CheckCircle2, MessageCircle
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription
+} from '@/components/ui/dialog'
+import { ClientOnboardingDialog } from '@/components/clients/client-onboarding-dialog'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { EmptyState } from '@/components/empty-state'
@@ -13,6 +24,10 @@ import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { usePermissions } from '@/hooks/use-permissions'
 import api from '@/lib/api-client'
+import type { Client } from '@/types'
+import { ClientHealthBadge } from '@/components/clients/client-health-badge'
+
+import { appConfirm } from '@/lib/app-dialog'
 
 export function ClientsPage() {
     const navigate = useNavigate()
@@ -21,6 +36,10 @@ export function ClientsPage() {
     const { canEdit, canDelete } = usePermissions()
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
+    const [selectedClientForOnboarding, setSelectedClientForOnboarding] = useState<Client | null>(null)
+    const [clientSearchQuery, setClientSearchQuery] = useState('')
+    const [copiedGeneralLink, setCopiedGeneralLink] = useState(false)
 
     // Fetch Clients
     useEffect(() => {
@@ -42,7 +61,7 @@ export function ClientsPage() {
 
     const handleDeleteClient = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation()
-        if (!window.confirm("Are you sure you want to delete this client? This action cannot be undone.")) return
+        if (!await appConfirm("Are you sure you want to delete this client? This action cannot be undone.")) return
         try {
             await api.delete(`/clients/${id}`)
             setClients(clients.filter(c => c.id !== id))
@@ -79,19 +98,19 @@ export function ClientsPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
                     <p className="text-muted-foreground mt-1">Manage your client relationships and contacts.</p>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                    <Button variant="outline" onClick={() => {
-                        const url = `${window.location.origin}/client-onboarding`;
-                        navigator.clipboard.writeText(url);
-                        toast({
-                            title: "Link Copied",
-                            description: "Client onboarding link copied to clipboard.",
-                        });
-                    }}>
-                        Copy Onboarding Link
+                <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap">
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsGenerateModalOpen(true)}
+                        className="clay-btn bg-card hover:bg-muted text-foreground font-extrabold text-xs h-10 px-4 rounded-xl border border-border/60 gap-1.5 shadow-xs"
+                    >
+                        <Sparkles className="h-4 w-4 text-primary" /> Generate Form
                     </Button>
-                    <Button onClick={() => navigate('/clients/new')}>
-                        <Plus className="mr-2 h-4 w-4" /> Add Client
+                    <Button
+                        onClick={() => navigate('/clients/new')}
+                        className="clay-btn bg-primary hover:bg-primary/95 text-white font-extrabold text-xs h-10 px-4 rounded-xl shadow-md gap-1.5"
+                    >
+                        <Plus className="h-4 w-4" /> Add Client
                     </Button>
                 </div>
             </div>
@@ -131,9 +150,12 @@ export function ClientsPage() {
                                             {client.company}
                                         </p>
                                     </div>
-                                    <Badge variant={client.status === 'active' ? 'default' : 'secondary'}>
-                                        {client.status}
-                                    </Badge>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <Badge variant={client.status === 'active' ? 'default' : 'secondary'}>
+                                            {client.status}
+                                        </Badge>
+                                        <ClientHealthBadge clientId={client.id} />
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -151,6 +173,15 @@ export function ClientsPage() {
                                             {client.type}
                                         </Badge>
                                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-8 w-8 text-primary hover:bg-primary/10"
+                                                title="Generate / Configure Onboarding Form"
+                                                onClick={() => setSelectedClientForOnboarding(client)}
+                                            >
+                                                <Sparkles className="h-4 w-4" />
+                                            </Button>
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
@@ -189,6 +220,171 @@ export function ClientsPage() {
                         </Card>
                     ))}
                 </div>
+            )}
+
+            {/* Generate Onboarding Form Dialog */}
+            <Dialog open={isGenerateModalOpen} onOpenChange={setIsGenerateModalOpen}>
+                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-6 rounded-3xl">
+                    <DialogHeader className="space-y-1.5">
+                        <div className="flex items-center gap-2.5">
+                            <div className="clay-icon h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                                <Sparkles className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-xl font-extrabold text-foreground">
+                                    Generate Client Onboarding Form
+                                </DialogTitle>
+                                <DialogDescription className="text-xs text-muted-foreground font-medium">
+                                    Select a client to create a custom tailored intake form, or share the general intake link.
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="space-y-5 pt-3">
+                        {/* Option A: General Public Intake Link */}
+                        <div className="clay-card p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                                    <Globe className="h-3.5 w-3.5" /> General New Client Intake Link
+                                </span>
+                                <Badge className="clay-badge text-[10px] font-bold bg-primary/10 text-primary border-0">
+                                    For Any New Prospect
+                                </Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground font-medium leading-relaxed">
+                                Share this generic link with prospective clients who haven't been added to the CRM yet. When they fill it, a new client profile is automatically registered.
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    readOnly
+                                    value={`${window.location.origin}/client-onboarding`}
+                                    className="text-xs font-mono bg-card h-8 rounded-lg select-all flex-1"
+                                />
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/client-onboarding`
+                                        navigator.clipboard.writeText(url)
+                                        setCopiedGeneralLink(true)
+                                        toast({ title: 'Link Copied', description: url })
+                                        setTimeout(() => setCopiedGeneralLink(false), 2000)
+                                    }}
+                                    className="clay-btn h-8 px-3 text-xs font-bold gap-1 shrink-0"
+                                >
+                                    {copiedGeneralLink ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                                    {copiedGeneralLink ? 'Copied' : 'Copy'}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => window.open(`${window.location.origin}/client-onboarding`, '_blank')}
+                                    className="clay-btn h-8 px-3 text-xs font-bold gap-1 shrink-0"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" /> Preview
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Option B: Tailored Form for Existing Client */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                    <Users className="h-3.5 w-3.5 text-primary" /> Tailor Form for an Existing Client
+                                </span>
+                                <span className="text-[11px] text-muted-foreground font-medium">
+                                    {clients.length} Registered Clients
+                                </span>
+                            </div>
+
+                            {/* Search Client */}
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                    value={clientSearchQuery}
+                                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                                    placeholder="Search client by name or company..."
+                                    className="text-xs pl-8 h-9 rounded-xl"
+                                />
+                            </div>
+
+                            {/* Client List */}
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                                {clients
+                                    .filter(c =>
+                                        c.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                                        c.company?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                                    )
+                                    .map(c => {
+                                        const isCompleted = c.onboardingStatus === 'completed'
+                                        const isSent = c.onboardingStatus === 'sent'
+
+                                        return (
+                                            <div
+                                                key={c.id}
+                                                className="clay-card p-3 rounded-2xl bg-card border border-border/40 hover:border-border/80 transition-all flex items-center justify-between gap-3"
+                                            >
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-extrabold text-xs text-foreground truncate">{c.name}</span>
+                                                        {c.company && (
+                                                            <span className="text-[11px] text-muted-foreground truncate">({c.company})</span>
+                                                        )}
+                                                        {isCompleted ? (
+                                                            <Badge className="clay-badge bg-emerald-500/15 text-emerald-600 border-0 text-[10px] px-1.5 py-0 h-4">
+                                                                Done
+                                                            </Badge>
+                                                        ) : isSent ? (
+                                                            <Badge className="clay-badge bg-blue-500/15 text-blue-600 border-0 text-[10px] px-1.5 py-0 h-4">
+                                                                Link Sent
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge className="clay-badge bg-muted text-muted-foreground border-0 text-[10px] px-1.5 py-0 h-4">
+                                                                Not Sent
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                                                        {c.email || c.phone || 'No direct contact'}
+                                                    </p>
+                                                </div>
+
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setIsGenerateModalOpen(false)
+                                                        setSelectedClientForOnboarding(c)
+                                                    }}
+                                                    className="clay-btn bg-primary hover:bg-primary/95 text-white font-extrabold text-xs h-8 px-3 rounded-xl gap-1 shrink-0 shadow-xs"
+                                                >
+                                                    <Sparkles className="h-3 w-3" />
+                                                    {c.onboardingToken ? 'Manage Form' : 'Generate Form'}
+                                                </Button>
+                                            </div>
+                                        )
+                                    })
+                                }
+                                {clients.length === 0 && (
+                                    <p className="text-center text-xs text-muted-foreground italic py-4">No clients registered yet.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Individual Client Onboarding Customizer Dialog */}
+            {selectedClientForOnboarding && (
+                <ClientOnboardingDialog
+                    client={selectedClientForOnboarding}
+                    isOpen={!!selectedClientForOnboarding}
+                    onClose={() => setSelectedClientForOnboarding(null)}
+                    onUpdated={(updated) => {
+                        setClients(clients.map(c => c.id === updated.id ? { ...c, ...updated } : c))
+                        setSelectedClientForOnboarding(updated)
+                    }}
+                />
             )}
         </div>
     )

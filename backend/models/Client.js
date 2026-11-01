@@ -19,6 +19,8 @@ const clientSchema = new mongoose.Schema({
     // Business Details
     industry: { type: String },
     city: { type: String },
+    state: { type: String },
+    country: { type: String },
     website: { type: String },
     gstNumber: { type: String },
     address: { type: String },
@@ -34,7 +36,34 @@ const clientSchema = new mongoose.Schema({
     followUpDate: { type: Date },
     assignedTo: { type: String }, // User ID
 
+    // Dynamic Client Onboarding Hub
+    onboardingToken: { type: String, sparse: true, index: true },
+    onboardingStatus: {
+        type: String,
+        enum: ['not_sent', 'sent', 'completed'],
+        default: 'not_sent'
+    },
+    onboardingSentAt: { type: Date },
+    onboardingCompletedAt: { type: Date },
+    customOnboardingConfig: { type: mongoose.Schema.Types.Mixed, default: null },
+    onboardingData: { type: mongoose.Schema.Types.Mixed, default: {} },
+    onboardingFiles: [
+        {
+            fieldId: { type: String },
+            fieldName: { type: String },
+            fileName: { type: String },
+            fileUrl: { type: String },
+            uploadedAt: { type: Date, default: Date.now }
+        }
+    ],
+
     notes: { type: String },
+    // Additive CRM fields
+    referredBy: { type: String },
+    partnerId: { type: String },
+    partnerName: { type: String },
+    healthScore: { type: Number, min: 0, max: 100 },
+    healthUpdatedAt: { type: Date },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

@@ -49,6 +49,13 @@ const leadSchema = new mongoose.Schema({
     createdByName: { type: String },
     lastContactedBy: { type: String },
     lastContactedById: { type: String },
+    // Additive CRM fields
+    referredBy: { type: String },
+    partnerId: { type: String },
+    partnerName: { type: String },
+    archived: { type: Boolean, default: false },
+    mergedInto: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead' },
+    sequenceEnrollmentId: { type: mongoose.Schema.Types.ObjectId },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

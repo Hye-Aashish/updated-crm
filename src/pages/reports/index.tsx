@@ -767,15 +767,26 @@ function SupportSection({ data }: { data: any }) {
 
             <Card className="border-none shadow-sm overflow-hidden bg-slate-900 text-white">
                 <CardHeader>
-                    <CardTitle className="text-white">Customer Satisfaction (CSAT)</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="text-white text-base font-extrabold">Customer Satisfaction (CSAT)</CardTitle>
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            92% Positive
+                        </span>
+                    </div>
+                    <CardDescription className="text-slate-400 text-xs">Real-time user feedback distribution</CardDescription>
                 </CardHeader>
-                <CardContent className="flex items-center justify-around h-[250px]">
+                <CardContent className="flex items-end justify-around h-[220px] pb-6 pt-2">
                     {feedbackData.map((f: any, i: number) => (
-                        <div key={i} className="flex flex-col items-center gap-2">
-                            <div className="w-12 bg-white/10 rounded-t-xl hover:bg-white/20 transition-all flex items-end justify-center p-1" style={{ height: `${f.value * 2}px` }}>
-                                <div className="w-full rounded-t-lg" style={{ height: '100%', backgroundColor: f.fill }} />
+                        <div key={i} className="flex flex-col items-center gap-2 group">
+                            <span className="text-xs font-extrabold text-white opacity-90 group-hover:opacity-100 transition-opacity">
+                                {f.value}%
+                            </span>
+                            <div className="w-12 bg-white/10 rounded-t-xl hover:bg-white/20 transition-all flex items-end justify-center p-1" style={{ height: `${Math.max(16, f.value * 2)}px` }}>
+                                <div className="w-full rounded-t-lg transition-all" style={{ height: '100%', backgroundColor: f.fill }} />
                             </div>
-                            <span className="text-[10px] font-bold uppercase rotate-45 mt-4 origin-left whitespace-nowrap">{f.name}</span>
+                            <span className="text-[10px] font-extrabold uppercase text-slate-300 mt-2 text-center whitespace-nowrap">
+                                {f.name}
+                            </span>
                         </div>
                     ))}
                 </CardContent>

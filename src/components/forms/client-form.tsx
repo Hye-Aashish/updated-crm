@@ -29,6 +29,8 @@ import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api-client'
 import { useAppStore } from '@/store'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 // --- Data Lists (Static for now, can be moved to DB later) ---
 const industries = [
     "Real Estate", "Coaching / Education", "Ecommerce", "Clinic / Healthcare",
@@ -253,8 +255,8 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
     // Handle Services Checkbox Logic
 
 
-    const handleCancel = () => {
-        if (window.confirm("Are you sure you want to discard changes?")) {
+    const handleCancel = async () => {
+        if (await appConfirm("Are you sure you want to discard changes?")) {
             navigate('/clients')
         }
     }

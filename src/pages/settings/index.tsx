@@ -26,6 +26,8 @@ import { useAppStore } from '@/store'
 import { EmployeeSettingsPage } from '../employee-settings'
 import { formatCurrency } from '@/lib/utils'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 function hexToHSL(hex: string) {
     let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (!result) return null;
@@ -466,7 +468,7 @@ function UsersRolesTab() {
     }
 
     const handleDelete = async (id: string, name: string) => {
-        if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
+        if (!await appConfirm(`Are you sure you want to delete ${name}?`)) return;
         try {
             await api.delete(`/users/${id}`)
             fetchUsers()
@@ -1137,7 +1139,7 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
         return protectedNames.includes((roleName || '').toLowerCase())
     }
 
-    const handleDeleteRole = (idx: number) => {
+    const handleDeleteRole = async (idx: number) => {
         const roleToDelete = roles[idx]
         if (!roleToDelete) return
         const roleLabel = roleToDelete.label || roleToDelete.name
@@ -1151,7 +1153,7 @@ function RolesPermissionsTab({ data, onSave, saving }: any) {
             return
         }
 
-        if (!window.confirm(`Are you sure you want to delete the role "${roleLabel}"?`)) return
+        if (!await appConfirm(`Are you sure you want to delete the role "${roleLabel}"?`)) return
 
         const newRoles = roles.filter((_, i) => i !== idx)
         setRoles(newRoles)

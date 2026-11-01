@@ -15,6 +15,8 @@ import {
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
+import { appConfirm, appAlert } from '@/lib/app-dialog'
+
 interface OfferLetterDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -193,9 +195,9 @@ export function OfferLetterDialog({ open, onOpenChange, candidate, onSaved }: Of
         setFormData({ ...formData, sections: updated })
     }
 
-    const handleAddCustomClause = () => {
+    const handleAddCustomClause = async () => {
         if (!newClauseTitle.trim() || !newClauseContent.trim()) {
-            alert('Please enter both Clause Title and Content')
+            await appAlert('Please enter both Clause Title and Content')
             return
         }
         const newSec = {
@@ -213,8 +215,8 @@ export function OfferLetterDialog({ open, onOpenChange, candidate, onSaved }: Of
         toast({ title: 'Clause Added', description: `Added "${newSec.title}" to agreement.` })
     }
 
-    const resetToDefaultTemplate = () => {
-        if (!confirm('Reset all clauses and text back to the exact Nexprism official sample template?')) return
+    const resetToDefaultTemplate = async () => {
+        if (!await appConfirm('Reset all clauses and text back to the exact Nexprism official sample template?')) return
         setFormData((prev: any) => ({
             ...prev,
             letterHeading: 'EMPLOYEEMENT AGREEMENT',

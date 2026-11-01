@@ -1,6 +1,8 @@
 import { LiveMonitor } from '@/components/analytics/live-monitor';
 import { Monitor } from 'lucide-react';
 
+import { appAlert } from '@/lib/app-dialog'
+
 const ScreenMonitoringPage = () => {
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -20,7 +22,7 @@ const ScreenMonitoringPage = () => {
                         </div>
                         <button 
                             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-md flex items-center gap-2"
-                            onClick={() => alert('Download guide: \n1. Run "npm run build:electron" on your computer.\n2. Go to "dist-electron" folder.\n3. Share the "Nexprism Employee Monitor Setup.exe" with your employees.')}
+                            onClick={() => { void appAlert('Download guide: \n1. Run "npm run build:electron" on your computer.\n2. Go to "dist-electron" folder.\n3. Share the "Nexprism Employee Monitor Setup.exe" with your employees.') }}
                         >
                             <Monitor className="h-4 w-4" /> Download Employee App
                         </button>

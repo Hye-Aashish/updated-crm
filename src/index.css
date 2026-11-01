@@ -4,77 +4,66 @@
 
 @layer base {
   :root {
-    /* Professional Light Theme - Clean, Corporate, High Legibility */
-    --background: 210 40% 98%;
-    /* Slate 50 */
-    --foreground: 222.2 84% 4.9%;
-    /* Slate 950 */
+    /* Platinum Pearl — default canvas (#F4F4F8) */
+    --background: 240 12% 96.5%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 221.2 83.2% 53.3%;
-    /* Blue 600 - Trustworthy & classic */
-    --primary-foreground: 210 40% 98%;
+    --primary: 224 84% 56%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 10% 92%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 240 10% 92%;
+    --muted-foreground: 217 19% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 240 10% 92%;
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 350 85% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --border: 240 10% 88%;
+    --input: 240 10% 89%;
+    --ring: 224 84% 56%;
 
-    --radius: 0.75rem;
-    /* Classic Modern 12px */
+    --radius: 1.25rem;
   }
 
   .dark {
-    /* Professional Dark Theme - Deep Slate, Not Absolute Black */
-    --background: 222.2 47% 11.2%;
-    /* Slate 950 - Rich Deep Navy/Black */
-    --foreground: 0 0% 100%;
-    /* Pure White */
+    --background: 240 20% 9%;
+    --foreground: 210 40% 98%;
 
-    --card: 217.2 32.6% 17.5%;
-    /* Slate 900 */
-    --card-foreground: 0 0% 100%;
+    --card: 240 16% 14%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 47% 11.2%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 240 16% 14%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 217.2 91.2% 59.8%;
-    /* Blue 500 - Visible on dark */
+    --primary: 224 88% 62%;
     --primary-foreground: 0 0% 100%;
-    /* Force White Text on Buttons */
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 240 16% 18%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 210 40% 98%;
-    /* Very Bright Slate */
+    --muted: 240 16% 18%;
+    --muted-foreground: 215 20% 68%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 240 16% 20%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 350 75% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --border: 240 14% 22%;
+    --input: 240 16% 18%;
+    --ring: 224 88% 62%;
   }
 }
 
@@ -92,25 +81,24 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
     font-feature-settings: "cv02", "cv05", "cv08", "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
-    letter-spacing: -0.011em;
+    letter-spacing: -0.015em;
     overflow-x: hidden;
     width: 100%;
+    background-color: hsl(var(--background));
+    transition: background-color 0.25s ease;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: 'Outfit', sans-serif;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
     letter-spacing: -0.02em;
+    font-weight: 700;
+    line-height: 1.25;
   }
 
-  /* Sleek Professional Scrollbar */
+  /* Sleek Clay Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -121,93 +109,234 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50 transition-colors;
+    @apply bg-muted-foreground/25 rounded-full hover:bg-muted-foreground/45 transition-colors;
+    box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.4);
   }
 }
 
-@layer utilities {
+/* ==========================================================================
+   Claymorphism Design System Components
+   Soft, 3D, inflated pillowy depth with dual inner + outer shadows
+   ========================================================================== */
+@layer components {
+  /* 1. Main Clay Card Surface */
+  .clay-card {
+    background-color: hsl(var(--card));
+    border-radius: 1.25rem;
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 
+      6px 12px 24px -4px rgba(18, 30, 60, 0.07),
+      2px 4px 8px -2px rgba(18, 30, 60, 0.04),
+      inset -3px -3px 7px rgba(18, 30, 60, 0.04),
+      inset 3px 3px 7px rgba(255, 255, 255, 0.95);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .clay-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      8px 18px 30px -4px rgba(18, 30, 60, 0.1),
+      2px 6px 12px -2px rgba(18, 30, 60, 0.06),
+      inset -3px -3px 7px rgba(18, 30, 60, 0.04),
+      inset 3px 3px 7px rgba(255, 255, 255, 1);
+  }
+
+  .dark .clay-card {
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 
+      8px 16px 28px -4px rgba(0, 0, 0, 0.45),
+      2px 4px 10px rgba(0, 0, 0, 0.3),
+      inset -3px -3px 8px rgba(0, 0, 0, 0.4),
+      inset 2px 2px 6px rgba(255, 255, 255, 0.08);
+  }
+
+  .dark .clay-card:hover {
+    box-shadow: 
+      10px 20px 34px -4px rgba(0, 0, 0, 0.55),
+      inset -3px -3px 8px rgba(0, 0, 0, 0.4),
+      inset 2px 2px 6px rgba(255, 255, 255, 0.12);
+  }
+
+  /* Automatic dark/colored card styling: prevent bright white border & white inset glow from washing out dark cards */
+  .clay-card[class*="text-white"],
+  .clay-card[class*="bg-slate-"],
+  .clay-card[class*="bg-gray-"],
+  .clay-card[class*="bg-zinc-"],
+  .clay-card[class*="bg-black"],
+  .clay-card[class*="bg-indigo-"],
+  .clay-card[class*="bg-emerald-"],
+  .clay-card[class*="bg-blue-6"],
+  .clay-card[class*="bg-purple-"] {
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 
+      6px 12px 24px -4px rgba(0, 0, 0, 0.35),
+      inset 2px 2px 5px rgba(255, 255, 255, 0.12),
+      inset -2px -2px 5px rgba(0, 0, 0, 0.3);
+  }
+
+  /* 2. Clay Icon Container */
+  .clay-icon {
+    border-radius: 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 
+      3px 6px 12px rgba(18, 30, 60, 0.07),
+      inset -2px -2px 4px rgba(18, 30, 60, 0.05),
+      inset 2px 2px 5px rgba(255, 255, 255, 0.9);
+    transition: transform 0.2s ease;
+  }
+  .dark .clay-icon {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 
+      4px 8px 14px rgba(0, 0, 0, 0.35),
+      inset -2px -2px 5px rgba(0, 0, 0, 0.4),
+      inset 2px 2px 4px rgba(255, 255, 255, 0.1);
+  }
+
+  /* 3. Clay Button / Action Control */
+  .clay-btn {
+    border-radius: 0.875rem;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 
+      4px 8px 16px -2px rgba(18, 30, 60, 0.14),
+      inset -2px -2px 5px rgba(0, 0, 0, 0.15),
+      inset 2px 2px 5px rgba(255, 255, 255, 0.45);
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .clay-btn:hover {
+    transform: translateY(-1.5px) scale(1.01);
+    box-shadow: 
+      6px 12px 20px -2px rgba(18, 30, 60, 0.18),
+      inset -2px -2px 5px rgba(0, 0, 0, 0.15),
+      inset 2px 2px 5px rgba(255, 255, 255, 0.55);
+  }
+  .clay-btn:active {
+    transform: scale(0.96);
+    box-shadow: 
+      2px 4px 8px rgba(0, 0, 0, 0.12),
+      inset 2px 2px 6px rgba(0, 0, 0, 0.25);
+  }
+
+  /* 4. Clay Badge / Capsule */
+  .clay-badge {
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    line-height: 1.35;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    box-shadow: 
+      2px 4px 8px rgba(18, 30, 60, 0.05),
+      inset -1.5px -1.5px 3px rgba(18, 30, 60, 0.05),
+      inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.85);
+  }
+  .dark .clay-badge {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    box-shadow: 
+      2px 4px 8px rgba(0, 0, 0, 0.3),
+      inset -1.5px -1.5px 3px rgba(0, 0, 0, 0.3),
+      inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.1);
+  }
+
+  /* 5. Inset Debossed Input/Surface */
+  .clay-inset {
+    border-radius: 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 
+      inset 3px 3px 6px rgba(18, 30, 60, 0.06),
+      inset -2px -2px 5px rgba(255, 255, 255, 0.9),
+      0 1px 2px rgba(0, 0, 0, 0.02);
+  }
+  .dark .clay-inset {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 
+      inset 3px 3px 7px rgba(0, 0, 0, 0.4),
+      inset -2px -2px 5px rgba(255, 255, 255, 0.05);
+  }
+
+  /* 6. Clay Active Navigation Pill (High contrast electric primary gradient) */
+  .clay-nav-active {
+    background: linear-gradient(135deg, hsl(225 84% 56%), hsl(225 84% 48%)) !important;
+    color: #ffffff !important;
+    border-radius: 0.875rem !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 
+      0 6px 16px -2px rgba(58, 111, 248, 0.4),
+      inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.45),
+      inset -1.5px -1.5px 3px rgba(0, 0, 0, 0.15) !important;
+  }
+  .dark .clay-nav-active {
+    background: linear-gradient(135deg, hsl(225 88% 62%), hsl(225 88% 54%)) !important;
+    color: #ffffff !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 
+      0 6px 20px -2px rgba(58, 111, 248, 0.5),
+      inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.3),
+      inset -1.5px -1.5px 3px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* 6. Auto-distributing Dynamic Card Grids - eliminates blank gaps when cards are removed */
+  .clay-grid-auto {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: 0.875rem;
+    width: 100%;
+  }
+
+  .clay-grid-auto-sm {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .clay-grid-auto-lg {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 1.25rem;
+    width: 100%;
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
 
-  /* Glassmorphism Utility for occasional premium feel */
-  .glass {
-    @apply bg-background/80 backdrop-blur-md border-b border-border/50;
+  /* Mobile shell helpers */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  /* Standardized Dashboard Card for Consistency */
-  .dashboard-card {
-    @apply bg-card border border-border/50 rounded-2xl transition-all duration-300;
-    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05);
+  .mobile-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
-  .dashboard-card:hover {
-    @apply border-primary/20;
-    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+  .mobile-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
 
-  .dashboard-card-header {
-    @apply p-5 border-b border-border/20 flex items-center justify-between;
-  }
-
-  .dashboard-card-title {
-    @apply text-sm font-bold flex items-center gap-2.5 text-foreground/90;
-    font-family: 'Outfit', sans-serif;
-    letter-spacing: -0.02em;
-  }
-
-  .dashboard-card-content {
-    @apply p-5;
-  }
-
-  /* Premium Utilities */
-  .glass-panel {
-    @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/20 dark:border-white/5;
-  }
-
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-br from-primary via-blue-500 to-indigo-600;
-  }
-
-  .brand-gradient {
-    @apply bg-gradient-to-br from-primary via-blue-600 to-indigo-700;
-  }
-
-  .shimmer {
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-    background-size: 200% 100%;
-    animation: shimmer 2s infinite linear;
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: -200% 0;
+  @media (max-width: 767px) {
+    .mobile-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
-    100% {
-      background-position: 200% 0;
+    .mobile-table-wrap table {
+      min-width: 640px;
     }
-  }
 
-  .status-dot {
-    @apply h-2 w-2 rounded-full inline-block mr-2;
-  }
-
-  /* Custom Scrollbar Utility */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-gray-200 rounded-full hover:bg-gray-300 transition-colors;
+    /* Prefer stacked headers on small screens when pages use flex toolbars */
+    .page-toolbar {
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
   }
 }

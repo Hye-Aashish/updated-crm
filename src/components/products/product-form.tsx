@@ -18,14 +18,28 @@ interface ProductFormProps {
 export function ProductForm({ initialData, onSuccess, onCancel }: ProductFormProps) {
     const { toast } = useToast()
     const [isLoading, setIsLoading] = useState(false)
+    const [isCustomCategory, setIsCustomCategory] = useState(false)
     const [formData, setFormData] = useState({
         name: initialData?.name || '',
+        category: initialData?.category || 'Web Development',
         description: initialData?.description || '',
         basePrice: initialData?.basePrice || 0,
         status: initialData?.status || 'active',
         features: initialData?.features || []
     })
     const [newFeature, setNewFeature] = useState('')
+
+    const categoryPresets = [
+        'Web Development',
+        'Mobile App Development',
+        'SaaS & CRM Platform',
+        'E-Commerce Solution',
+        'UI/UX & Branding',
+        'SEO & Digital Marketing',
+        'Cloud & DevOps',
+        'Custom Software',
+        'Other'
+    ]
 
     const handleAddFeature = () => {
         if (!newFeature.trim()) return
@@ -78,6 +92,40 @@ export function ProductForm({ initialData, onSuccess, onCancel }: ProductFormPro
                     onChange={e => setFormData({ ...formData, name: e.target.value })} 
                     placeholder="e.g. CRM Software, SEO Package"
                 />
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="category">Category <span className="text-destructive">*</span></Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Select 
+                        value={categoryPresets.includes(formData.category) ? formData.category : 'Other'} 
+                        onValueChange={(val) => {
+                            if (val === 'Other') {
+                                setIsCustomCategory(true)
+                            } else {
+                                setIsCustomCategory(false)
+                                setFormData(prev => ({ ...prev, category: val }))
+                            }
+                        }}
+                    >
+                        <SelectTrigger id="category">
+                            <SelectValue placeholder="Select Category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {categoryPresets.map((cat) => (
+                                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {(isCustomCategory || !categoryPresets.includes(formData.category)) && (
+                        <Input 
+                            value={formData.category} 
+                            onChange={e => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                            placeholder="Enter custom category..."
+                            autoFocus
+                        />
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

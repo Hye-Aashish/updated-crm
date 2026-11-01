@@ -2,7 +2,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Expense = require('./models/Expense');
 
-mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://aashishofficial123_db_user:AV445S3k0brlHEPu@cluster0.q0seg1w.mongodb.net/CRM_DB?appName=Cluster0').then(async () => {
+mongoose.connect(process.env.MONGO_URI || (() => { throw new Error("MONGO_URI required"); })()).then(async () => {
     try {
         const count = await Expense.countDocuments();
         console.log(`Total expenses in DB: ${count}`);

@@ -29,6 +29,8 @@ import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
 import type { Invoice } from '@/types'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 export function InvoicesPage() {
     const navigate = useNavigate()
     const { canCreate, canEdit, canDelete } = usePermissions()
@@ -354,7 +356,7 @@ export function InvoicesPage() {
                                                                 className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                                                                 onClick={async (e) => {
                                                                     e.stopPropagation();
-                                                                    if (window.confirm('Mark this invoice as Paid?')) {
+                                                                    if (await appConfirm('Mark this invoice as Paid?')) {
                                                                         try {
                                                                             await api.post(`/invoices/${invoice.id}/manual-payment`);
                                                                             toast({ title: 'Invoice Paid', description: 'Invoice marked as paid.', variant: 'success' as any });
@@ -393,7 +395,7 @@ export function InvoicesPage() {
                                                             className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                                                             onClick={async (e) => {
                                                                 e.stopPropagation();
-                                                                if (window.confirm('Are you sure you want to cancel this invoice?')) {
+                                                                if (await appConfirm('Are you sure you want to cancel this invoice?')) {
                                                                     try {
                                                                         await api.put(`/invoices/${invoice.id}`, { status: 'cancelled' });
                                                                         toast({ title: 'Invoice Cancelled', description: 'The invoice has been cancelled.', variant: 'default' });
@@ -416,7 +418,7 @@ export function InvoicesPage() {
                                                         className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
                                                         onClick={async (e) => {
                                                             e.stopPropagation();
-                                                            if (window.confirm(`Are you sure you want to permanently delete invoice #${invoice.invoiceNumber}? This action cannot be undone.`)) {
+                                                            if (await appConfirm(`Are you sure you want to permanently delete invoice #${invoice.invoiceNumber}? This action cannot be undone.`)) {
                                                                 try {
                                                                     await api.delete(`/invoices/${invoice.id}`);
                                                                     toast({ title: 'Invoice Deleted', description: 'Invoice has been removed.' });

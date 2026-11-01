@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 export function FilesPage() {
     const { files, setFiles, users, projects, setProjects, currentUser, addFile } = useAppStore()
     const { toast } = useToast()
@@ -157,7 +159,7 @@ export function FilesPage() {
     // Delete file
     const handleDeleteFile = async (fileId: string, e: React.MouseEvent) => {
         e.stopPropagation()
-        if (!window.confirm("Are you sure you want to permanently delete this file?")) return
+        if (!await appConfirm("Are you sure you want to permanently delete this file?")) return
         try {
             await api.delete(`/files/${fileId}`)
             setFiles(files.filter(f => f.id !== fileId))

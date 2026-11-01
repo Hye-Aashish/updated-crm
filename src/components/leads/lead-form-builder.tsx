@@ -15,6 +15,8 @@ import api from '@/lib/api-client'
 import type { LeadForm, Lead } from '@/types'
 import React from 'react'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 interface LeadFormBuilderProps {
     isOpen: boolean
     onClose: () => void
@@ -164,7 +166,7 @@ export function LeadFormBuilder({
     }
 
     const handleDeleteForm = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this form?')) return
+        if (!await appConfirm('Are you sure you want to delete this form?')) return
         try {
             await api.delete(`/lead-forms/${id}`)
             setLeadForms(leadForms.filter(f => (f as any)._id !== id))

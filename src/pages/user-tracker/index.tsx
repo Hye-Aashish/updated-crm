@@ -44,6 +44,8 @@ import { GeoMapChart } from '@/components/analytics/geo-map';
 import { HeatmapViewer } from '@/components/analytics/heatmap-viewer';
 
 
+import { appAlert } from '@/lib/app-dialog'
+
 const UserTrackerPage = () => {
     const [summary, setSummary] = useState<any>(null);
     const [activeTab, setActiveTab] = useState('live'); // live | history
@@ -158,9 +160,9 @@ const UserTrackerPage = () => {
                                 size="sm"
                                 variant="secondary"
                                 className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => {
+                                onClick={async () => {
                                     navigator.clipboard.writeText(`<script src="${TRACKER_URL}"></script>`);
-                                    alert('Copied to clipboard!');
+                                    await appAlert('Copied to clipboard!');
                                 }}
                             >
                                 Copy

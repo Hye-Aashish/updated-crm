@@ -6,7 +6,8 @@ const Attendance = require('./models/Attendance');
 const User = require('./models/User');
 
 async function run() {
-    const uri = 'mongodb+srv://aashishofficial123_db_user:AV445S3k0brlHEPu@cluster0.q0seg1w.mongodb.net/CRM_DB?appName=Cluster0';
+    const uri = process.env.MONGO_URI;
+    if (!uri) { console.error('MONGO_URI required'); process.exit(1); };
     await mongoose.connect(uri);
     console.log('Connected to DB');
 

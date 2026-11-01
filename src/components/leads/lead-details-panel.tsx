@@ -240,8 +240,53 @@ export function LeadDetailsPanel({
         }
     }
 
+    const [duplicates, setDuplicates] = useState<any[]>([])
+    const [timeline, setTimeline] = useState<any[] | null>(null)
+    const [sequences, setSequences] = useState<any[]>([])
+    const [referredBy, setReferredBy] = useState((lead as any).referredBy || '')
+
+    useEffect(() => {
+        const id = lead?.id || (lead as any)?._id
+        if (!id) return
+        setReferredBy((lead as any).referredBy || '')
+        api.get('/leads/duplicates', { params: { email: lead.email, phone: lead.phone, excludeId: id } })
+            .then(res => setDuplicates(res.data?.duplicates || []))
+            .catch(() => setDuplicates([]))
+        api.get(`/leads/${id}/timeline`)
+            .then(res => setTimeline(res.data?.timeline || []))
+            .catch(() => setTimeline(null))
+        api.get('/sales-automation/sequences').then(res => setSequences(res.data || [])).catch(() => setSequences([]))
+    }, [lead?.id, (lead as any)?._id, lead.email, lead.phone])
+
+    const mergeDuplicate = async (dupId: string) => {
+        const primaryId = lead?.id || (lead as any)?._id
+        if (!primaryId) return
+        try {
+            const res = await api.post('/leads/merge', { primaryId, duplicateId: dupId })
+            onUpdate(mapLead(res.data.primary))
+            setDuplicates(d => d.filter(x => x._id !== dupId))
+            toast({ description: 'Duplicate merged & archived' })
+        } catch (e: any) {
+            toast({ title: 'Merge failed', description: e.message, variant: 'destructive' })
+        }
+    }
+
     return (
         <div className="space-y-6">
+            {duplicates.length > 0 && (
+                <div className="rounded-xl border border-amber-300/50 bg-amber-50/80 dark:bg-amber-950/30 p-3 space-y-2">
+                    <p className="text-xs font-extrabold text-amber-800 dark:text-amber-200 flex items-center gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Possible duplicates ({duplicates.length})
+                    </p>
+                    {duplicates.map(d => (
+                        <div key={d._id} className="flex items-center justify-between gap-2 text-xs">
+                            <span className="truncate font-semibold">{d.company || d.name} · {d.email || d.phone}</span>
+                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => mergeDuplicate(d._id)}>Merge</Button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             <div className="flex flex-row items-center justify-between border-b pb-4 gap-2">
                 <div className="flex flex-col">
                     <h2 className="text-xl font-bold flex items-center gap-2">
@@ -550,6 +595,50 @@ export function LeadDetailsPanel({
                     />
                 </div>
             </div>
+
+            {/* Referral + sequence enrollment */}
+            <div className="space-y-3 pt-4 border-t">
+                <h4 className="font-bold text-sm">Referral / Partner</h4>
+                <div className="flex gap-2">
+                    <Input
+                        value={referredBy}
+                        onChange={e => setReferredBy(e.target.value)}
+                        placeholder="Referred by"
+                        className="h-9 text-xs"
+                    />
+                    <Button size="sm" variant="outline" className="h-9 shrink-0" onClick={async () => {
+                        const id = lead?.id || (lead as any)?._id
+                        const res = await api.put(`/leads/${id}`, { referredBy })
+                        onUpdate(mapLead(res.data))
+                        toast({ description: 'Referral saved' })
+                    }}>Save</Button>
+                </div>
+                {sequences.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        {sequences.slice(0, 4).map((s: any) => (
+                            <Button key={s._id} size="sm" variant="secondary" className="h-7 text-[10px]" onClick={async () => {
+                                const id = lead?.id || (lead as any)?._id
+                                await api.post(`/sales-automation/sequences/${s._id}/enroll/${id}`)
+                                toast({ description: `Enrolled in ${s.name}` })
+                            }}>Enroll: {s.name}</Button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {timeline && timeline.length > 0 && (
+                <div className="space-y-2 pt-4 border-t">
+                    <h4 className="font-bold text-sm">Call + Activity Timeline</h4>
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                        {timeline.slice(0, 12).map((item, idx) => (
+                            <div key={idx} className="text-[11px] p-2 rounded-lg border bg-muted/20 flex justify-between gap-2">
+                                <span className="truncate"><Badge variant="outline" className="text-[9px] mr-1">{item.kind}</Badge>{item.content}</span>
+                                <span className="text-muted-foreground shrink-0">{item.at ? format(new Date(item.at), 'MMM d') : ''}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Next Follow-up Quick Setter */}
             <div className="space-y-4 pt-4 border-t">

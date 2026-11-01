@@ -56,15 +56,33 @@ export interface Client {
     // Extended fields
     industry?: string
     city?: string
+    state?: string
+    country?: string
     website?: string
     gstNumber?: string
     leadSource?: string
     budget?: string
     paymentModel?: string
     deadline?: Date
+    expectedDeadline?: Date | string
     assignedTo?: string
     followUpDate?: Date
     services?: string[] // Added
+
+    // Onboarding fields
+    onboardingToken?: string
+    onboardingStatus?: 'not_sent' | 'sent' | 'completed'
+    onboardingSentAt?: Date | string
+    onboardingCompletedAt?: Date | string
+    customOnboardingConfig?: any
+    onboardingData?: Record<string, any>
+    onboardingFiles?: Array<{
+        fieldId?: string
+        fieldName?: string
+        fileName: string
+        fileUrl: string
+        uploadedAt?: Date | string
+    }>
 
     notes?: string
     createdAt: Date

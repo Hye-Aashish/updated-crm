@@ -16,9 +16,10 @@ import api from '@/lib/api-client'
 import { VisitorSessionsTimeline } from '@/components/contacts/visitor-sessions-timeline'
 import { ClientProductForm } from '@/components/clients/client-product-dialog'
 import { ClientProductManagerDialog } from '@/components/clients/client-product-manager-dialog'
+import { ClientOnboardingDialog } from '@/components/clients/client-onboarding-dialog'
 import { usePermissions } from '@/hooks/use-permissions'
 import { Progress } from '@/components/ui/progress'
-import { Package, Plus, FolderOpen } from 'lucide-react'
+import { Package, Plus, FolderOpen, Copy, Share2, MessageCircle, Download, CheckCircle2, FileCheck, RefreshCw, Globe, Send, User, Building2 } from 'lucide-react'
 import type { ClientProduct } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -31,6 +32,8 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+
+import { appConfirm } from '@/lib/app-dialog'
 
 export function ClientDetailPage() {
     const { id } = useParams()
@@ -54,6 +57,20 @@ export function ClientDetailPage() {
     const [editingClientProduct, setEditingClientProduct] = useState<ClientProduct | undefined>(undefined)
     const [selectedManagerCP, setSelectedManagerCP] = useState<ClientProduct | null>(null)
     const [isManagerOpen, setIsManagerOpen] = useState(false)
+
+    // Client Onboarding State
+    const [isOnboardingDialogOpen, setIsOnboardingDialogOpen] = useState(false)
+    const [copiedOnboardingLink, setCopiedOnboardingLink] = useState(false)
+
+    // Always fetch latest client data including onboarding details on load
+    useEffect(() => {
+        if (id) {
+            api.get(`/clients/${id}`).then(res => {
+                const fetched = { ...res.data, id: res.data._id || res.data.id }
+                setClients(clients.map(c => c.id === id ? { ...c, ...fetched } : c))
+            }).catch(err => console.error("Client fetch error", err))
+        }
+    }, [id])
 
     // Fetch users if store is empty
     useEffect(() => {
@@ -123,7 +140,7 @@ export function ClientDetailPage() {
 
     const handleDisablePortal = async () => {
         if (!clientUser) return
-        if (!window.confirm("Are you sure you want to disable login portal access for this client? This will delete their login user account.")) {
+        if (!await appConfirm("Are you sure you want to disable login portal access for this client? This will delete their login user account.")) {
             return
         }
         try {
@@ -138,7 +155,7 @@ export function ClientDetailPage() {
 
     const handleDelete = async () => {
         if (!client) return
-        if (window.confirm("Are you sure you want to delete this client? This action cannot be undone.")) {
+        if (await appConfirm("Are you sure you want to delete this client? This action cannot be undone.")) {
             try {
                 await api.delete(`/clients/${client.id}`)
                 deleteClient(client.id)
@@ -207,7 +224,7 @@ export function ClientDetailPage() {
     }
 
     const handleDeleteProduct = async (cpId: string) => {
-        if (!window.confirm("Are you sure you want to remove this product from the client?")) return
+        if (!await appConfirm("Are you sure you want to remove this product from the client?")) return
         try {
             await api.delete(`/client-products/${cpId}`)
             setClientProducts(clientProducts.filter(cp => cp.id !== cpId))
@@ -273,6 +290,38 @@ export function ClientDetailPage() {
             case 'inactive': return 'bg-gray-500 hover:bg-gray-600'
             case 'new': return 'bg-blue-500 hover:bg-blue-600'
             default: return 'bg-blue-500 hover:bg-blue-600'
+        }
+    }
+
+    const onboardingPublicUrl = client?.onboardingToken
+        ? `${window.location.origin}/client-onboarding/${client.onboardingToken}`
+        : ''
+
+    const handleCopyOnboardingLink = () => {
+        if (!onboardingPublicUrl) return
+        navigator.clipboard.writeText(onboardingPublicUrl)
+        setCopiedOnboardingLink(true)
+        toast({ title: 'Link Copied', description: onboardingPublicUrl })
+        setTimeout(() => setCopiedOnboardingLink(false), 2500)
+    }
+
+    const handleWhatsAppInvite = () => {
+        if (!onboardingPublicUrl || !client) return
+        const text = `Hello ${client.name},\n\nPlease fill out your onboarding form so we can configure your account and begin your project:\n${onboardingPublicUrl}\n\nThank you!`
+        const waUrl = `https://wa.me/${(client.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`
+        window.open(waUrl, '_blank')
+    }
+
+    const handleResetOnboarding = async () => {
+        if (!client) return
+        if (!await appConfirm("Reopen onboarding form for this client? They will be able to resubmit their details.")) return
+        try {
+            const res = await api.post(`/clients/${client.id}/onboarding/reset`, { status: 'sent' })
+            const updated = res.data.client || { ...client, onboardingStatus: 'sent' }
+            setClients(clients.map(c => c.id === client.id ? { ...c, ...updated } : c))
+            toast({ title: 'Onboarding Reopened', description: 'Client can now resubmit their form.' })
+        } catch (err) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to reset onboarding.' })
         }
     }
 
@@ -359,8 +408,22 @@ export function ClientDetailPage() {
 
             {/* Main Content Tabs */}
             <Tabs defaultValue="overview" className="space-y-4">
-                <TabsList>
+                <TabsList className="flex flex-wrap h-auto gap-1">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="onboarding" className="gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        Onboarding
+                        {client.onboardingStatus === 'completed' && (
+                            <Badge className="clay-badge ml-1 bg-emerald-500/15 text-emerald-600 border-0 text-[10px] px-1.5 py-0 h-4">
+                                Done
+                            </Badge>
+                        )}
+                        {client.onboardingStatus === 'sent' && (
+                            <Badge className="clay-badge ml-1 bg-blue-500/15 text-blue-600 border-0 text-[10px] px-1.5 py-0 h-4">
+                                Sent
+                            </Badge>
+                        )}
+                    </TabsTrigger>
                     <TabsTrigger value="projects">Projects ({clientProjects.length})</TabsTrigger>
                     <TabsTrigger value="invoices">Invoices ({clientInvoices.length})</TabsTrigger>
                     <TabsTrigger value="products">Products</TabsTrigger>
@@ -910,6 +973,314 @@ export function ClientDetailPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                <TabsContent value="onboarding" className="space-y-6">
+                    {/* Hero Status Banner */}
+                    <Card className="p-6 rounded-3xl border border-border/40 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className={`clay-icon h-12 w-12 rounded-2xl flex items-center justify-center ${
+                                    client.onboardingStatus === 'completed'
+                                        ? 'bg-emerald-500/15 text-emerald-600'
+                                        : client.onboardingStatus === 'sent'
+                                        ? 'bg-blue-500/15 text-blue-600'
+                                        : 'bg-primary/10 text-primary'
+                                }`}>
+                                    {client.onboardingStatus === 'completed' ? (
+                                        <CheckCircle2 className="h-6 w-6" />
+                                    ) : client.onboardingStatus === 'sent' ? (
+                                        <Clock className="h-6 w-6" />
+                                    ) : (
+                                        <Sparkles className="h-6 w-6" />
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="text-lg font-black text-foreground">
+                                            {client.onboardingStatus === 'completed'
+                                                ? 'Client Onboarding Completed'
+                                                : client.onboardingStatus === 'sent'
+                                                ? 'Onboarding Form Sent - Awaiting Client Response'
+                                                : 'Client Onboarding Not Initiated'}
+                                        </h2>
+                                        {client.onboardingStatus === 'completed' ? (
+                                            <Badge className="clay-badge bg-emerald-500/15 text-emerald-600 font-bold px-2 py-0.5">
+                                                Active / Synced
+                                            </Badge>
+                                        ) : client.onboardingStatus === 'sent' ? (
+                                            <Badge className="clay-badge bg-blue-500/15 text-blue-600 font-bold px-2 py-0.5">
+                                                Link Active
+                                            </Badge>
+                                        ) : (
+                                            <Badge className="clay-badge bg-muted text-muted-foreground font-bold px-2 py-0.5">
+                                                Pending Form
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                                        {client.onboardingStatus === 'completed'
+                                            ? `Form successfully submitted by client on ${client.onboardingCompletedAt ? new Date(client.onboardingCompletedAt).toLocaleString() : 'recently'}. All details synced below.`
+                                            : client.onboardingStatus === 'sent'
+                                            ? `Form generated and link issued on ${client.onboardingSentAt ? new Date(client.onboardingSentAt).toLocaleDateString() : 'recently'}. Client can fill it anytime.`
+                                            : 'Create a tailored onboarding questionnaire for this client to collect brand assets, business details, and technical scope.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <Button
+                                    onClick={() => setIsOnboardingDialogOpen(true)}
+                                    className="clay-btn bg-primary hover:bg-primary/95 text-white font-extrabold text-xs h-9 px-4 rounded-xl shadow-md gap-1.5"
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    {client.onboardingToken ? 'Configure Questions' : 'Generate Onboarding Form'}
+                                </Button>
+                                {client.onboardingStatus === 'completed' && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleResetOnboarding}
+                                        className="clay-btn text-xs font-bold h-9 rounded-xl gap-1.5"
+                                        title="Allow client to resubmit"
+                                    >
+                                        <RefreshCw className="h-3.5 w-3.5" /> Re-open Form
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Shareable Link Bar (if token exists) */}
+                        {onboardingPublicUrl && (
+                            <div className="clay-inset p-3 rounded-2xl bg-muted/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground shrink-0 flex items-center gap-1">
+                                        <Globe className="h-3.5 w-3.5 text-primary" /> Public URL:
+                                    </span>
+                                    <Input
+                                        readOnly
+                                        value={onboardingPublicUrl}
+                                        className="text-xs font-mono h-8 bg-card select-all rounded-lg flex-1"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleCopyOnboardingLink}
+                                        className="clay-btn h-8 px-3 text-xs font-bold gap-1 rounded-xl"
+                                    >
+                                        {copiedOnboardingLink ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                                        {copiedOnboardingLink ? 'Copied' : 'Copy'}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => window.open(onboardingPublicUrl, '_blank')}
+                                        className="clay-btn h-8 px-3 text-xs font-bold gap-1 rounded-xl"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" /> Preview
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleWhatsAppInvite}
+                                        className="clay-btn bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3 text-xs font-bold gap-1 rounded-xl"
+                                    >
+                                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Standard Client Business Details Sync View */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Legal & Business */}
+                        <Card className="p-5 rounded-3xl space-y-4">
+                            <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+                                <Building2 className="h-4 w-4 text-primary" />
+                                <h3 className="text-sm font-extrabold text-foreground uppercase tracking-wider">Business & Tax Profile</h3>
+                            </div>
+                            <div className="space-y-3 text-xs">
+                                <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                                    <span className="text-muted-foreground font-semibold">Company / Brand</span>
+                                    <span className="font-extrabold text-foreground">{client.company || client.name}</span>
+                                </div>
+                                <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                                    <span className="text-muted-foreground font-semibold">Industry</span>
+                                    <span className="font-extrabold text-foreground">{client.industry || 'N/A'}</span>
+                                </div>
+                                <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                                    <span className="text-muted-foreground font-semibold">Official Website</span>
+                                    {client.website ? (
+                                        <a href={client.website} target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold flex items-center gap-1">
+                                            {client.website} <ExternalLink className="h-3 w-3" />
+                                        </a>
+                                    ) : (
+                                        <span className="text-muted-foreground">Not Provided</span>
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                                    <span className="text-muted-foreground font-semibold">GSTIN / Tax ID</span>
+                                    <span className="font-mono font-extrabold text-foreground">{client.gstNumber || 'N/A'}</span>
+                                </div>
+                                <div className="flex items-start justify-between">
+                                    <span className="text-muted-foreground font-semibold shrink-0 pr-3">Billing Address</span>
+                                    <span className="text-right text-foreground font-medium">{client.address ? `${client.address}, ${client.city || ''}` : 'N/A'}</span>
+                                </div>
+                            </div>
+                        </Card>
+
+                        {/* Project Scope & Investment */}
+                        <Card className="p-5 rounded-3xl space-y-4">
+                            <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+                                <Sparkles className="h-4 w-4 text-primary" />
+                                <h3 className="text-sm font-extrabold text-foreground uppercase tracking-wider">Project Scope & Timeline</h3>
+                            </div>
+                            <div className="space-y-3 text-xs">
+                                <div className="pb-2 border-b border-border/30 space-y-1.5">
+                                    <span className="text-muted-foreground font-semibold block">Requested Services</span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {client.services && client.services.length > 0 ? (
+                                            client.services.map((s, i) => (
+                                                <Badge key={i} className="clay-badge bg-primary/10 text-primary font-bold text-[11px] px-2.5 py-0.5">
+                                                    {s}
+                                                </Badge>
+                                            ))
+                                        ) : (
+                                            <span className="text-muted-foreground italic">None specified yet</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                                    <span className="text-muted-foreground font-semibold">Estimated Budget</span>
+                                    <span className="font-black text-foreground text-sm">{client.budget || 'N/A'}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground font-semibold">Target Completion Date</span>
+                                    <span className="font-bold text-foreground">
+                                        {client.expectedDeadline ? new Date(client.expectedDeadline).toLocaleDateString() : 'Flexible / TBD'}
+                                    </span>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+
+                    {/* Custom Tailored Questionnaire Answers */}
+                    <Card className="p-6 rounded-3xl space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                            <div className="flex items-center gap-2.5">
+                                <div className="clay-icon h-8 w-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">
+                                        Client Intake Questionnaire Responses
+                                    </h3>
+                                    <p className="text-[11px] text-muted-foreground">Detailed responses submitted by {client.name}</p>
+                                </div>
+                            </div>
+                            <Badge className="clay-badge text-[10px] font-bold px-2 py-0.5">
+                                {client.onboardingData ? Object.keys(client.onboardingData).length : 0} Questions Answered
+                            </Badge>
+                        </div>
+
+                        {client.onboardingData && Object.keys(client.onboardingData).length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                {Object.entries(client.onboardingData).map(([key, value]) => {
+                                    // Try to match field label from config if available
+                                    const fieldConfig = client.customOnboardingConfig?.customFields?.find((f: any) => f.id === key)
+                                    const label = fieldConfig?.label || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+
+                                    // Don't show file URLs as raw text here if already in files section
+                                    const isFileUrl = typeof value === 'string' && (value.startsWith('/public/uploads') || value.startsWith('http'))
+
+                                    return (
+                                        <div key={key} className="clay-inset p-3.5 rounded-2xl bg-card/60 space-y-1.5 border border-border/30">
+                                            <span className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider block">
+                                                {label}
+                                            </span>
+                                            {isFileUrl ? (
+                                                <a
+                                                    href={value}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
+                                                >
+                                                    <Download className="h-3.5 w-3.5" /> View Uploaded Attachment
+                                                </a>
+                                            ) : (
+                                                <p className="text-xs font-semibold text-foreground whitespace-pre-wrap leading-relaxed">
+                                                    {String(value) || <span className="text-muted-foreground italic">No response</span>}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 space-y-2">
+                                <p className="text-xs text-muted-foreground italic">
+                                    {client.onboardingStatus === 'sent'
+                                        ? 'Waiting for client to submit the questionnaire responses.'
+                                        : 'No questionnaire responses yet. Configure questions and send the link to the client.'}
+                                </p>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Client Uploaded Files & Assets */}
+                    <Card className="p-6 rounded-3xl space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                            <div className="flex items-center gap-2.5">
+                                <div className="clay-icon h-8 w-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                                    <FileCheck className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">
+                                        Client Brand Assets & Documents
+                                    </h3>
+                                    <p className="text-[11px] text-muted-foreground">Files, logos, and guidelines uploaded by client</p>
+                                </div>
+                            </div>
+                            <Badge className="clay-badge text-[10px] font-bold px-2 py-0.5">
+                                {client.onboardingFiles?.length || 0} Files
+                            </Badge>
+                        </div>
+
+                        {client.onboardingFiles && client.onboardingFiles.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                {client.onboardingFiles.map((file, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="clay-card p-3.5 rounded-2xl bg-card border border-border/40 flex items-center justify-between gap-3 hover:shadow-sm transition-all"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-extrabold text-foreground truncate" title={file.fileName}>
+                                                {file.fileName}
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground truncate font-medium">
+                                                {file.fieldName || 'Client Attachment'}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => window.open(file.fileUrl, '_blank')}
+                                            className="h-8 w-8 p-0 rounded-xl text-primary hover:bg-primary/10 shrink-0"
+                                            title="Download / View File"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-6 text-xs text-muted-foreground italic">
+                                No files or assets uploaded by client yet.
+                            </div>
+                        )}
+                    </Card>
+                </TabsContent>
             </Tabs>
 
             {/* Create Portal Access Dialog */}
@@ -1008,6 +1379,18 @@ export function ClientDetailPage() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Client Onboarding Form Customizer & Generator Dialog */}
+            {client && (
+                <ClientOnboardingDialog
+                    client={client}
+                    isOpen={isOnboardingDialogOpen}
+                    onClose={() => setIsOnboardingDialogOpen(false)}
+                    onUpdated={(updated) => {
+                        setClients(clients.map(c => c.id === updated.id ? { ...c, ...updated } : c))
+                    }}
+                />
+            )}
         </div>
     )
 }

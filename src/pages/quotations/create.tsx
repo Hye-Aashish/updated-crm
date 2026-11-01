@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Sparkles, UploadCloud, Loader2, FileText, Trash2 } from 'lucide-react';
 import api from '@/lib/api-client';
 
+import { appAlert } from '@/lib/app-dialog'
+
 export default function QuotationBuilder() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -49,7 +51,7 @@ export default function QuotationBuilder() {
             setFormData({ ...formData, attachmentUrl: res.data.url });
         } catch (err) {
             console.error(err);
-            alert('Upload failed');
+            await appAlert('Upload failed');
         } finally {
             setUploadingAttachment(false);
         }
@@ -57,7 +59,7 @@ export default function QuotationBuilder() {
 
     const handleSubmit = async (statusOverride?: string) => {
         if (!formData.clientName) {
-            alert('Please provide a Name');
+            await appAlert('Please provide a Name');
             return;
         }
 
@@ -74,7 +76,7 @@ export default function QuotationBuilder() {
         } catch (error: any) {
             console.error(error);
             const msg = error.response?.data?.error || error.response?.data?.message || 'Error saving quotation';
-            alert(msg);
+            await appAlert(msg);
         } finally {
             setLoading(false);
         }

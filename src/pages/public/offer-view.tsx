@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 
+import { appAlert } from '@/lib/app-dialog'
+
 export function PublicOfferView() {
     const { token } = useParams<{ token: string }>()
     const [loading, setLoading] = useState(true)
@@ -52,7 +54,7 @@ export function PublicOfferView() {
                 setShowDeclineModal(false)
             }
         } catch (err: any) {
-            alert('Action failed: ' + (err.response?.data?.message || err.message))
+            await appAlert('Action failed: ' + (err.response?.data?.message || err.message))
         } finally {
             setActionLoading(false)
         }
@@ -73,7 +75,7 @@ export function PublicOfferView() {
             a.click()
             document.body.removeChild(a)
         } catch (err: any) {
-            alert('Failed to download PDF: ' + (err.response?.data?.message || err.message))
+            await appAlert('Failed to download PDF: ' + (err.response?.data?.message || err.message))
         } finally {
             setDownloadingPdf(false)
         }

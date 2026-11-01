@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 
+import { appAlert } from '@/lib/app-dialog'
+
 export function PublicCandidateForm() {
     const { token } = useParams<{ token: string }>()
     const [loading, setLoading] = useState(true)
@@ -132,7 +134,7 @@ export function PublicCandidateForm() {
                 })
             }
         } catch (err: any) {
-            alert('File upload failed: ' + (err.response?.data?.message || err.message))
+            await appAlert('File upload failed: ' + (err.response?.data?.message || err.message))
         } finally {
             setUploadingDocId(null)
         }
@@ -150,7 +152,7 @@ export function PublicCandidateForm() {
 
             if (missingDocs.length > 0) {
                 setActiveTab('documents')
-                alert(`Please upload the required document(s): ${missingDocs.map((d: any) => d.name).join(', ')}`)
+                await appAlert(`Please upload the required document(s): ${missingDocs.map((d: any) => d.name).join(', ')}`)
                 setSubmitting(false)
                 return
             }

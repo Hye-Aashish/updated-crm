@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Trash2, Edit2, Send, X } from 'lucide-react'
 import { mapProject } from '@/lib/mappers'
 
+import { appConfirm, appAlert } from '@/lib/app-dialog'
+
 export function ProjectNotes({ projectId }: { projectId: string }) {
     const { projects, setProjects, currentUser } = useAppStore()
     const project = projects.find(p => p.id === projectId)
@@ -27,7 +29,7 @@ export function ProjectNotes({ projectId }: { projectId: string }) {
             setNoteText('')
         } catch (error) {
             console.error('Failed to add note', error)
-            alert('Failed to add note.')
+            await appAlert('Failed to add note.')
         } finally {
             setIsSubmitting(false)
         }
@@ -43,20 +45,20 @@ export function ProjectNotes({ projectId }: { projectId: string }) {
             setNoteText('')
         } catch (error) {
             console.error('Failed to update note', error)
-            alert('Failed to update note.')
+            await appAlert('Failed to update note.')
         } finally {
             setIsSubmitting(false)
         }
     }
 
     const handleDeleteNote = async (noteId: string) => {
-        if (!window.confirm('Are you sure you want to delete this note?')) return
+        if (!await appConfirm('Are you sure you want to delete this note?')) return
         try {
             const res = await api.delete(`/projects/${projectId}/notes/${noteId}`)
             setProjects(projects.map(p => p.id === projectId ? mapProject(res.data) : p))
         } catch (error) {
             console.error('Failed to delete note', error)
-            alert('Failed to delete note.')
+            await appAlert('Failed to delete note.')
         }
     }
 

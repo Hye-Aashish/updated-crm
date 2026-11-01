@@ -10,7 +10,7 @@ if (!fs.existsSync(uploadDir)) {
 
 // Allowed file extensions whitelist
 const ALLOWED_EXTENSIONS = [
-    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',    // Images
+    '.jpg', '.jpeg', '.png', '.gif', '.webp',              // Images (SVG blocked — stored XSS risk)
     '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', // Documents
     '.csv', '.txt', '.rtf',                                // Text
     '.zip', '.rar', '.7z',                                 // Archives
@@ -19,7 +19,7 @@ const ALLOWED_EXTENSIONS = [
 
 // Allowed MIME types whitelist
 const ALLOWED_MIMES = [
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
     'application/pdf',
     'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

@@ -110,6 +110,8 @@ app.use('/api/tracking', publicEndpointLimiter);
 app.use('/api/lead-forms/public', publicEndpointLimiter);
 app.use('/api/candidates/public', publicEndpointLimiter);
 app.use('/api/whatsapp/webhook', publicEndpointLimiter);
+app.use('/api/invoices/public', publicEndpointLimiter);
+app.use('/api/clients/public', publicEndpointLimiter);
 
 // 3. Body parser with limits
 app.use(express.json({ limit: '10mb' }));
@@ -199,7 +201,12 @@ const routes = {
     goals: require('./routes/goalRoutes'),
     whatsapp: require('./routes/whatsappRoutes'),
     hosting: require('./routes/hostingRoutes'),
-    'sales-analytics': require('./routes/salesAnalyticsRoutes')
+    'sales-analytics': require('./routes/salesAnalyticsRoutes'),
+    'sales-automation': require('./routes/salesAutomationRoutes'),
+    'credit-notes': require('./routes/creditNoteRoutes'),
+    'vendor-bills': require('./routes/vendorBillRoutes'),
+    'finance-reports': require('./routes/financeReportRoutes'),
+    calendar: require('./routes/calendarRoutes')
 };
 
 Object.entries(routes).forEach(([path, handler]) => {
@@ -208,6 +215,7 @@ Object.entries(routes).forEach(([path, handler]) => {
 
 // Serve static widget file
 app.use('/public', express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 app.get('/', (req, res) => res.send('Nexprism CRM API v1.0 - Operational'));
 

@@ -27,6 +27,8 @@ import { useToast } from '@/hooks/use-toast'
 import { handleApiError } from '@/lib/error-handler'
 import { Project, ProjectStatus, ProjectHealth } from '@/types'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 // Quick Status Options
 const STATUS_OPTIONS: { value: ProjectStatus; label: string; color: string; icon: any }[] = [
     { value: 'planning', label: 'Planning', color: 'bg-purple-500/10 text-purple-700 border-purple-500/30', icon: Clock },
@@ -104,7 +106,7 @@ export function ProjectsPage() {
 
     // Quick Delete
     const handleDeleteProject = async (projectId: string, name: string) => {
-        if (!confirm(`Are you sure you want to delete "${name}"?`)) return
+        if (!await appConfirm(`Are you sure you want to delete "${name}"?`)) return
         try {
             await ProjectService.delete(projectId)
             setProjects(projects.filter(p => (p.id !== projectId && p._id !== projectId)))
@@ -685,13 +687,13 @@ export function ProjectsPage() {
 
             {/* VIEW 2: KANBAN BOARD VIEW */}
             {view === 'kanban' && filteredProjects.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
+                <div className="flex md:grid md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-1 px-1 snap-x snap-mandatory">
                     {STATUS_OPTIONS.map((col) => {
                         const colProjects = filteredProjects.filter(p => p.status === col.value)
                         const ColIcon = col.icon
 
                         return (
-                            <div key={col.value} className="bg-muted/40 p-3 rounded-2xl border border-border/60 flex flex-col min-w-[260px]">
+                            <div key={col.value} className="bg-muted/40 p-3 rounded-2xl border border-border/60 flex flex-col w-[78vw] max-w-[280px] md:w-auto md:max-w-none md:min-w-0 shrink-0 md:shrink snap-center">
                                 {/* Column Header */}
                                 <div className="flex items-center justify-between mb-3 px-1">
                                     <div className="flex items-center gap-2">

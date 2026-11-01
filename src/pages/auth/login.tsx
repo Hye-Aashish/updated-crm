@@ -8,7 +8,10 @@ import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Fingerprint } from 'lucide-react'
+import { hasWebAuthnCredential, registerWebAuthnUnlock, unlockWithWebAuthn } from '@/lib/webauthn-unlock'
+
+import { appConfirm } from '@/lib/app-dialog'
 
 export function LoginPage() {
     const navigate = useNavigate()
@@ -64,6 +67,11 @@ export function LoginPage() {
             }
 
             toast({ description: `Welcome back, ${userData.name}` })
+            try {
+                if (window.PublicKeyCredential && !hasWebAuthnCredential() && await appConfirm('Enable device quick-unlock for next time? (optional)')) {
+                    await registerWebAuthnUnlock(userData._id || userData.id || userData.email, userData.name || userData.email)
+                }
+            } catch { /* optional — never block login */ }
             navigate('/dashboard')
         } catch (error: any) {
             const isInvalidCreds = error.status === 401 || (error.message && error.message.toLowerCase().includes('invalid'));
@@ -313,6 +321,23 @@ export function LoginPage() {
                                             <span className="mr-2 h-4 w-4 animate-spin border-2 border-current border-t-transparent rounded-full" />
                                         ) : "Sign In"}
                                     </Button>
+                                    {hasWebAuthnCredential() && localStorage.getItem('token') && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full h-11 rounded-xl"
+                                            onClick={async () => {
+                                                try {
+                                                    await unlockWithWebAuthn()
+                                                    navigate('/dashboard')
+                                                } catch {
+                                                    toast({ title: 'Unlock failed', description: 'Use password login', variant: 'destructive' })
+                                                }
+                                            }}
+                                        >
+                                            <Fingerprint className="h-4 w-4 mr-2" /> Unlock with device
+                                        </Button>
+                                    )}
                                 </form>
                             </CardContent>
                         </Card>

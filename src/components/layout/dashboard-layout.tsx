@@ -69,19 +69,17 @@ export function DashboardLayout() {
         }
     }, [authLoading, currentUser, leads.length, setLeads])
 
-
-
     if (authLoading) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-background space-y-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-                <p className="text-sm font-medium text-muted-foreground animate-pulse">Authenticating...</p>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+                <p className="text-xs font-semibold text-muted-foreground animate-pulse">Authenticating workspace...</p>
             </div>
         )
     }
 
     return (
-        <div className="flex h-[100dvh] bg-background overflow-hidden w-full font-sans">
+        <div className="flex h-[100dvh] bg-background overflow-hidden w-full font-sans antialiased relative selection:bg-primary/20 selection:text-primary">
             <ChatNotificationListener />
             {/* Sidebar with shared state */}
             <Sidebar
@@ -97,16 +95,16 @@ export function DashboardLayout() {
                     "flex-1 flex flex-col h-full transition-all duration-300 ease-in-out relative overflow-hidden"
                 )}
             >
-                {/* Topbar */}
-                <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border/40 bg-background/80 backdrop-blur-md px-4 md:px-6 shadow-sm shrink-0">
+                {/* Slim Header Topbar */}
+                <header className="sticky top-0 z-30 flex h-14 items-center border-b border-border/60 bg-background/90 backdrop-blur-md px-3 sm:px-5 shadow-2xs shrink-0">
                     <div className="flex-1 min-w-0">
                         <Topbar onMenuClick={() => setMobileOpen(true)} />
                     </div>
                 </header>
 
-                {/* Page Content */}
-                <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-8 w-full scroll-smooth">
-                    <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Page Content — extra bottom pad clears fixed mobile bottom nav */}
+                <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-5 w-full max-w-full scroll-smooth custom-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-5">
+                    <div className="mx-auto max-w-[1560px] w-full min-w-0 animate-in fade-in duration-300">
                         <Outlet />
                     </div>
                 </main>
@@ -115,7 +113,7 @@ export function DashboardLayout() {
                 <QuickNotesWidget />
 
                 {/* Mobile Bottom Navigation */}
-                <BottomNav onMenuClick={() => setMobileOpen(true)} />
+                <BottomNav />
             </div>
         </div>
     )

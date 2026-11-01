@@ -18,6 +18,8 @@ import { useToast } from '@/hooks/use-toast'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import type { ProjectTemplate } from '@/types'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 export function ProjectTemplatesPage() {
     const { toast } = useToast()
     const [templates, setTemplates] = useState<ProjectTemplate[]>([])
@@ -156,7 +158,7 @@ export function ProjectTemplatesPage() {
     }
 
     const handleDeleteTemplate = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this template?')) return
+        if (!await appConfirm('Are you sure you want to delete this template?')) return
         try {
             await api.delete(`/project-templates/${id}`)
             setTemplates(templates.filter(t => ((t as any)._id || t.id) !== id))

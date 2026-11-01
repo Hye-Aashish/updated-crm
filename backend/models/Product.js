@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema({
     name: { type: String, required: true },
+    category: { type: String, default: 'General', trim: true },
     description: { type: String },
     features: [{ type: String }],
     basePrice: { type: Number, required: true, default: 0 },
@@ -15,6 +16,7 @@ const productSchema = new mongoose.Schema({
 });
 
 productSchema.index({ name: 1 });
+productSchema.index({ category: 1 });
 productSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Product', productSchema);

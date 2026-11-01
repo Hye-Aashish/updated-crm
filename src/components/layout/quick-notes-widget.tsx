@@ -114,12 +114,12 @@ export function QuickNotesWidget() {
 
     return (
         <div
-            className="fixed bottom-6 right-6 z-50 font-sans"
+            className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 md:right-6 z-40 font-sans"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
             {showCard ? (
-                <div className="w-80 sm:w-96 bg-card border border-border shadow-2xl rounded-2xl overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 backdrop-blur-xl">
+                <div className="w-[min(22rem,calc(100vw-1.5rem))] sm:w-96 bg-card border border-border shadow-2xl rounded-2xl overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 backdrop-blur-xl">
                     {/* Card Header */}
                     <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-500/15 via-primary/10 to-transparent border-b">
                         <div className="flex items-center gap-2">

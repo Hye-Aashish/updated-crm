@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Trash2, Edit2, Plus, Eye, EyeOff, ExternalLink, Copy } from 'lucide-react'
 import { mapProject } from '@/lib/mappers'
 
+import { appConfirm, appAlert } from '@/lib/app-dialog'
+
 const CREDENTIAL_TYPES = [
     { value: 'website', label: 'Website' },
     { value: 'application', label: 'Application' },
@@ -76,7 +78,7 @@ export function ProjectCredentials({ projectId }: { projectId: string }) {
             resetForm()
         } catch (error) {
             console.error('Failed to save credential', error)
-            alert('Failed to save credential.')
+            await appAlert('Failed to save credential.')
         } finally {
             setIsSubmitting(false)
         }
@@ -97,20 +99,20 @@ export function ProjectCredentials({ projectId }: { projectId: string }) {
             setFormData(prev => ({ ...prev, url: res.data.url }))
         } catch (error) {
             console.error('File upload failed', error)
-            alert('Failed to upload the application file.')
+            await appAlert('Failed to upload the application file.')
         } finally {
             setIsSubmitting(false)
         }
     }
 
     const handleDelete = async (credId: string) => {
-        if (!window.confirm('Are you sure you want to delete this credential?')) return
+        if (!await appConfirm('Are you sure you want to delete this credential?')) return
         try {
             const res = await api.delete(`/projects/${projectId}/credentials/${credId}`)
             setProjects(projects.map(p => p.id === projectId ? mapProject(res.data) : p))
         } catch (error) {
             console.error('Failed to delete credential', error)
-            alert('Failed to delete credential.')
+            await appAlert('Failed to delete credential.')
         }
     }
 

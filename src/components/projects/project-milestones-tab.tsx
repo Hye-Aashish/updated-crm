@@ -20,6 +20,8 @@ import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
 import type { Project, Milestone } from '@/types'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 interface ProjectMilestonesTabProps {
     project: Project
     onProjectUpdate?: (updatedProject: Project) => void
@@ -315,7 +317,7 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
     // Delete milestone
     const handleDeleteMilestone = async (index: number) => {
         const projectId = project.id || (project as any)._id
-        if (!window.confirm('Are you sure you want to remove this milestone?')) return
+        if (!await appConfirm('Are you sure you want to remove this milestone?')) return
         try {
             const updatedMilestones = milestones.filter((_, i) => i !== index)
             const completedCount = updatedMilestones.filter(m => m.completed).length

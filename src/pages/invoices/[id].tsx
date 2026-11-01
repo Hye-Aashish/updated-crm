@@ -17,6 +17,8 @@ import type { Invoice, Client } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 type InvoiceTemplate = 'corporate' | 'creative' | 'elegant' | 'modern' | 'minimal' | 'classic'
 
 const COLOR_PRESETS = [
@@ -48,6 +50,10 @@ export function InvoiceDetailPage() {
     const [paying, setPaying] = useState(false)
     const [watermarkType, setWatermarkType] = useState<'none' | 'logo' | 'text'>('logo')
     const [watermarkText, setWatermarkText] = useState('PAID')
+    const [partialAmount, setPartialAmount] = useState('')
+    const [partialNote, setPartialNote] = useState('')
+    const [recordingPayment, setRecordingPayment] = useState(false)
+    const [budgetInfo, setBudgetInfo] = useState<any>(null)
 
     useEffect(() => {
         const fetchInvoiceData = async () => {
@@ -86,13 +92,21 @@ export function InvoiceDetailPage() {
                     subtotal: invData.subtotal,
                     tax: invData.tax,
                     total: invData.total,
+                    amountPaid: invData.amountPaid || 0,
+                    payments: invData.payments || [],
                     termsAndConditions: invData.termsAndConditions,
                     billingInfo: invData.billingInfo,
                     currency: invData.currency || 'INR',
                     createdAt: new Date(invData.createdAt),
                     updatedAt: new Date(invData.updatedAt),
-                }
+                } as any
                 setInvoice(mappedInvoice)
+
+                if (mappedInvoice.projectId) {
+                    api.get(`/finance-reports/budget/${mappedInvoice.projectId}`)
+                        .then(r => setBudgetInfo(r.data))
+                        .catch(() => setBudgetInfo(null))
+                }
 
                 // Use pre-populated client/project if available (e.g. from public view)
                 if (invData.client) {
@@ -160,7 +174,7 @@ export function InvoiceDetailPage() {
         }
     }, [id])
     const handleMarkPaid = async () => {
-        if (!window.confirm('Mark this invoice as Paid manually?')) return;
+        if (!await appConfirm('Mark this invoice as Paid manually?')) return;
         setPaying(true);
         try {
             await api.post(`/invoices/${id}/manual-payment`);
@@ -1135,7 +1149,7 @@ export function InvoiceDetailPage() {
 
     const handleMarkAsPaid = async () => {
         if (!invoice) return;
-        if (!window.confirm("Are you sure you want to mark this invoice as PAID manually? This will reconcile the balance without an online transaction.")) return;
+        if (!await appConfirm("Are you sure you want to mark this invoice as PAID manually? This will reconcile the balance without an online transaction.")) return;
 
         try {
             await api.post(`/invoices/${id}/manual-payment`)
@@ -1285,6 +1299,7 @@ export function InvoiceDetailPage() {
                         <Button
                             variant="secondary"
                             onClick={handleMarkAsPaid}
+                            data-mark-paid
                             className="flex-1 lg:flex-none"
                         >
                             <Banknote className="mr-2 h-4 w-4" /> Mark as Paid
@@ -1311,7 +1326,7 @@ export function InvoiceDetailPage() {
                         <Button
                             variant="destructive"
                             onClick={async () => {
-                                if (window.confirm(`Are you sure you want to permanently delete invoice #${invoice.invoiceNumber}? This action cannot be undone.`)) {
+                                if (await appConfirm(`Are you sure you want to permanently delete invoice #${invoice.invoiceNumber}? This action cannot be undone.`)) {
                                     try {
                                         await api.delete(`/invoices/${invoice.id}`);
                                         toast({ title: 'Invoice Deleted', description: 'The invoice has been removed.' });
@@ -1328,6 +1343,74 @@ export function InvoiceDetailPage() {
                     )}
                 </div>
             </div>
+
+            {['admin', 'owner'].includes(currentUser?.role || '') && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+                <Card className="border-border/60">
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <p className="text-sm font-extrabold">Partial payment</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Paid {formatCurrency((invoice as any).amountPaid || 0)} / {formatCurrency(invoice.total)} · Balance {formatCurrency(Math.max(0, invoice.total - ((invoice as any).amountPaid || 0)))}
+                                </p>
+                            </div>
+                            {budgetInfo && (
+                                <p className="text-[11px] text-muted-foreground">
+                                    Project budget {formatCurrency(budgetInfo.budget)} · billed {formatCurrency(budgetInfo.billed)}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Input type="number" placeholder="Amount" value={partialAmount} onChange={e => setPartialAmount(e.target.value)} className="h-9" />
+                            <Input placeholder="Note" value={partialNote} onChange={e => setPartialNote(e.target.value)} className="h-9" />
+                            <Button
+                                disabled={recordingPayment || !(Number(partialAmount) > 0)}
+                                className="h-9 shrink-0"
+                                onClick={async () => {
+                                    setRecordingPayment(true)
+                                    try {
+                                        const res = await api.post(`/invoices/${id}/payments`, {
+                                            amount: Number(partialAmount),
+                                            note: partialNote,
+                                            method: 'manual'
+                                        })
+                                        const invData = res.data
+                                        setInvoice({
+                                            ...invoice,
+                                            ...invData,
+                                            id: invData._id || invoice.id,
+                                            status: invData.status,
+                                            amountPaid: invData.amountPaid,
+                                            payments: invData.payments,
+                                            date: new Date(invData.date || invoice.date),
+                                            dueDate: new Date(invData.dueDate || invoice.dueDate),
+                                        } as any)
+                                        setPartialAmount('')
+                                        setPartialNote('')
+                                        toast({ title: 'Payment recorded', variant: 'success' as any })
+                                    } catch (e: any) {
+                                        toast({ title: 'Payment failed', description: e.message, variant: 'destructive' })
+                                    } finally {
+                                        setRecordingPayment(false)
+                                    }
+                                }}
+                            >
+                                {recordingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Record'}
+                            </Button>
+                        </div>
+                        {Array.isArray((invoice as any).payments) && (invoice as any).payments.length > 0 && (
+                            <div className="text-[11px] space-y-1 max-h-28 overflow-y-auto">
+                                {(invoice as any).payments.slice().reverse().map((p: any, i: number) => (
+                                    <div key={i} className="flex justify-between border-b border-border/40 py-1">
+                                        <span>{formatCurrency(p.amount)} · {p.method}{p.note ? ` · ${p.note}` : ''}</span>
+                                        <span className="text-muted-foreground">{p.paidAt ? formatDate(p.paidAt) : ''}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             <div className={`transition-all duration-500 ease-in-out`}>
                 {template === 'corporate' && <CorporateTemplate />}

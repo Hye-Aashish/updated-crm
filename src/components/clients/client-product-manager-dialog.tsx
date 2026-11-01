@@ -23,6 +23,8 @@ import { ProjectMilestoneDialog } from '../projects/project-milestone-dialog'
 import { ProjectMilestonePaymentDialog } from '../projects/project-milestone-payment-dialog'
 import type { ClientProduct, ClientProductTask, Milestone } from '@/types'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 interface ClientProductManagerDialogProps {
     clientProduct: ClientProduct
     onUpdate: (updated: ClientProduct) => void
@@ -274,7 +276,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
     }
 
     const handleDeleteMilestone = async (index: number) => {
-        if (!window.confirm('Remove this milestone?')) return
+        if (!await appConfirm('Remove this milestone?')) return
         try {
             const updatedMilestones = milestones.filter((_, i) => i !== index)
             const completedCount = updatedMilestones.filter(m => m.completed).length
@@ -345,7 +347,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
     }
 
     const handleDeleteTask = async (taskId: string) => {
-        if (!window.confirm('Are you sure you want to delete this task?')) return
+        if (!await appConfirm('Are you sure you want to delete this task?')) return
         try {
             const res = await api.delete(`/client-products/${id}/tasks/${taskId}`)
             setCp(res.data)
@@ -387,7 +389,7 @@ export function ClientProductManagerDialog({ clientProduct, onUpdate, onClose }:
     }
 
     const handleDeletePayment = async (paymentId: string) => {
-        if (!window.confirm('Are you sure you want to remove this payment entry? This will adjust the balance.')) return
+        if (!await appConfirm('Are you sure you want to remove this payment entry? This will adjust the balance.')) return
         try {
             const res = await api.delete(`/client-products/${id}/payments/${paymentId}`)
             setCp(res.data)

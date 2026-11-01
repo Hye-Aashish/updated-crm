@@ -13,6 +13,8 @@ import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 type Ticket = {
     _id: string
     subject: string
@@ -334,7 +336,7 @@ export function TicketsPage() {
 
     // Delete Ticket
     const handleDeleteTicket = async (id: string) => {
-        if (!window.confirm("Are you sure you want to delete this ticket?")) return
+        if (!await appConfirm("Are you sure you want to delete this ticket?")) return
         try {
             await api.delete(`/tickets/${id}`)
             setTickets(tickets.filter(t => t._id !== id))

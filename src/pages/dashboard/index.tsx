@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import api from '@/lib/api-client'
 import { mapLead, mapProject, mapInvoice, mapExpense, mapTask, mapUser } from '@/lib/mappers'
@@ -8,33 +8,39 @@ import { Button } from '@/components/ui/button'
 import {
     CheckSquare, Clock, Briefcase, Banknote, TrendingUp, AlertCircle, PlayCircle,
     StopCircle, Target, Layers, Wallet, CreditCard, Coffee, ArrowUpRight, Zap, LayoutDashboard,
-    CheckCircle, MessageSquare, Rocket, FileText, Users, Shield, Globe, Server, XCircle, BellRing
+    CheckCircle, MessageSquare, Rocket, FileText, Globe, Server, XCircle, BellRing,
+    Plus, Activity, ShieldCheck, Calendar, Sparkles
 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { formatCurrency, getInitials } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Cell, PieChart, Pie
 } from 'recharts'
 import { Card } from '@/components/ui/card'
-import { WelcomeAnimation } from '@/components/welcome-animation'
 import { useAttendance } from '@/hooks/use-attendance'
 import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { LivePresenceBoard } from '@/components/attendance/live-presence-board'
 import { SalesDashboardSection } from '@/components/dashboard/sales-dashboard-section'
+import { UpcomingScheduleWidget } from '@/components/calendar/upcoming-schedule-widget'
+
+type DashboardTab = 'all' | 'finance' | 'work' | 'operations'
+
+const FUNNEL_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'] as const
 
 export function DashboardPage() {
     const navigate = useNavigate()
-    const { currentUser, leads, setLeads, setExpenses, setProjects, setInvoices, setTasks, invoices, setTickets, users } = useAppStore()
+    const { currentUser, leads, setLeads, setExpenses, setProjects, setInvoices, setTasks, invoices, setTickets } = useAppStore()
     const [settings, setSettings] = useState<any>(null)
-    const [todayAttendance, setTodayAttendance] = useState<any[]>([])
+    const [, setTodayAttendance] = useState<any[]>([])
     const [amcStats, setAmcStats] = useState<any>(null)
     const [domainStats, setDomainStats] = useState<any>(null)
     const [expirySummary, setExpirySummary] = useState<any>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [activeTab, setActiveTab] = useState<DashboardTab>('all')
+
     const userId = currentUser?.id || (currentUser as any)?._id
 
     // Confirm modal states
@@ -78,7 +84,23 @@ export function DashboardPage() {
         relevantInvoices
     } = useDashboardMetrics(settings)
 
-    const isAdmin = ['admin', 'owner'].includes(currentUser.role)
+    const isAdmin = ['admin', 'owner'].includes(currentUser?.role)
+
+    // Stable Greeting & Formatted Date (avoids 1-second interval re-render thrashing)
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours()
+        if (hour < 12) return 'Good morning'
+        if (hour < 17) return 'Good afternoon'
+        return 'Good evening'
+    }, [])
+
+    const formattedDate = useMemo(() => {
+        return new Date().toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        })
+    }, [])
 
     // Data Fetching
     useEffect(() => {
@@ -110,123 +132,225 @@ export function DashboardPage() {
             }
         }
         loadInitialData()
-    }, [setLeads, setExpenses, setProjects, setInvoices, setTasks])
+    }, [setLeads, setExpenses, setProjects, setInvoices, setTasks, setTickets])
 
-    // Loading state guard
+    // Loading guard
     if (!currentUser || isLoading) {
         return <PageSkeleton />
     }
 
+    // 🎨 Claymorphic 3D Pillowy StatCard Component - Optimized for Zero Text Clipping
     const StatCard = ({ label, value, trend, icon: Icon, color, bg, onClick, className }: any) => {
         return (
             <div
-                className={`group relative bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/20 p-5 rounded-2xl transition-all duration-300 hover:shadow-md active:scale-[0.99] cursor-pointer overflow-hidden ${className || ''}`}
                 onClick={onClick}
+                className={`group clay-card p-4 sm:p-4.5 flex flex-col justify-between cursor-pointer select-none active:scale-[0.98] transition-all min-h-[124px] ${className || ''}`}
             >
-                <div className="flex justify-between items-start mb-4 relative z-10">
-                    <div className={`p-2.5 rounded-xl ${bg} ${color} shadow-sm group-hover:scale-110 transition-transform duration-500`}>
-                        <Icon className="h-5 w-5 stroke-[2px]" />
+                {/* Top Row: Icon + Trend Badge */}
+                <div className="flex items-center justify-between gap-2">
+                    <div className={`clay-icon p-2 rounded-xl ${bg} ${color} shrink-0 group-hover:scale-105 transition-transform duration-300`}>
+                        <Icon className="h-4 w-4 sm:h-4.5 sm:w-4.5 stroke-[2.4px]" />
                     </div>
                     {trend && (
-                        <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg border ${!trend.includes('-') ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-700 bg-rose-50 border-rose-100'}`}>
+                        <span 
+                            className={`clay-badge text-[10px] sm:text-[11px] font-bold px-2 py-0.5 shrink-0 whitespace-nowrap ${
+                                !trend.includes('-') && !trend.includes('Overdue')
+                                    ? 'text-emerald-700 bg-emerald-100/90 dark:text-emerald-300 dark:bg-emerald-950/70'
+                                    : 'text-rose-700 bg-rose-100/90 dark:text-rose-300 dark:bg-rose-950/70'
+                            }`}
+                            title={trend}
+                        >
                             {trend}
-                        </div>
+                        </span>
                     )}
                 </div>
-                
-                <div className="relative z-10">
-                    <p className="text-[9px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-1">{label}</p>
-                    <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground leading-none min-w-0 flex-1">
-                            {value}
-                        </h3>
-                        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-primary transition-all" />
+
+                {/* Middle Row: Full width label on a clean single line with zero awkward wrapping */}
+                <div className="min-w-0 mt-2 mb-1">
+                    <p 
+                        className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider leading-snug whitespace-nowrap truncate"
+                        title={label}
+                    >
+                        {label}
+                    </p>
+                </div>
+
+                {/* Bottom Row: Fully visible metric value + Arrow pill */}
+                <div className="flex items-baseline justify-between gap-1.5 pt-0.5">
+                    <span 
+                        className="text-lg sm:text-xl xl:text-2xl font-extrabold tracking-tight text-foreground whitespace-nowrap overflow-visible leading-tight tabular-nums"
+                        title={typeof value === 'string' || typeof value === 'number' ? String(value) : undefined}
+                    >
+                        {value}
+                    </span>
+                    <div className="h-6 w-6 rounded-full bg-muted/60 flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
                     </div>
                 </div>
             </div>
         )
     }
 
-    const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
+    // 🌟 AutoGrid: Dynamically arranges remaining cards to fill 100% width with ZERO empty gaps
+    const AutoGrid = ({ 
+        children, 
+        className = '', 
+        minWidth = '175px',
+        gap = 'gap-3.5'
+    }: { 
+        children: React.ReactNode, 
+        className?: string, 
+        minWidth?: string,
+        gap?: string
+    }) => {
+        const validChildren = (Array.isArray(children) ? children : [children])
+            .flat(Infinity)
+            .filter(Boolean);
+        if (validChildren.length === 0) return null;
+
+        return (
+            <div 
+                className={`w-full ${gap} ${className}`}
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minWidth}), 1fr))`
+                }}
+            >
+                {validChildren}
+            </div>
+        );
+    };
+
+    // 🌟 Intelligent Dynamic Column Layout:
+    // If secondary column has no active cards (or if admin hid them),
+    // main column automatically expands to full width (lg:col-span-12) with ZERO dead background space!
+    const hasClientPortal = currentUser?.role === 'client';
+    const hasFollowups = isAdmin && (activeTab === 'all' || activeTab === 'finance');
+    const hasInvoicesWidget = currentUser?.role !== 'employee' && (activeTab === 'all' || activeTab === 'finance');
+    const hasFunnel = currentLayout.includes('funnel') && !hiddenSubItems.includes('funnel') && currentUser?.role !== 'client' && (activeTab === 'all' || activeTab === 'finance');
+    const hasHealth = currentLayout.includes('health') && !hiddenSubItems.includes('health') && currentUser?.role !== 'client' && (activeTab === 'all' || activeTab === 'work');
+    const hasDeadlines = currentLayout.includes('deadlines') && !hiddenSubItems.includes('deadlines') && (activeTab === 'all' || activeTab === 'work');
+    const hasActivity = currentLayout.includes('activity') && !hiddenSubItems.includes('activity') && (activeTab === 'all' || activeTab === 'operations');
+
+    const hasSecondaryWidgets = hasClientPortal || hasFollowups || hasInvoicesWidget || hasFunnel || hasHealth || hasDeadlines || hasActivity;
 
     return (
-        <div className="w-full max-w-[1600px] px-3 sm:px-6 md:px-8 mx-auto space-y-4 md:space-y-6 pb-20 md:pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans selection:bg-primary/10">
+        <div className="w-full max-w-[1600px] mx-auto space-y-4 sm:space-y-5 pb-4 sm:pb-8 font-sans min-w-0">
 
-            {/* 1. Header & Command Hub */}
+            {/* 1. Claymorphic Executive Command & Attendance Hub */}
             {(currentLayout.includes('hero') || currentLayout.includes('session')) && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-stretch">
-                    {/* Brand Hero */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                    
+                    {/* Executive Clay Greeting Banner */}
                     {currentLayout.includes('hero') && (
-                        <div className={`${currentLayout.includes('session') ? 'xl:col-span-8' : 'xl:col-span-12'} bg-gradient-to-br from-slate-950 via-[#0a0f1e] to-[#0d122b] rounded-3xl p-6 text-white relative overflow-hidden shadow-2xl group border border-white/5`}>
-                            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full -mr-48 -mt-48 blur-[120px] animate-pulse" />
-                            <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-600/10 rounded-full -ml-20 -mb-20 blur-[100px]" />
+                        <div className={`${currentLayout.includes('session') && currentUser.role !== 'client' ? 'lg:col-span-8' : 'lg:col-span-12'} clay-card p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden`}>
+                            {/* Decorative Clay Accent Glow */}
+                            <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+                            <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/10 rounded-full blur-2xl pointer-events-none -ml-20 -mb-20" />
 
-                            <div className="relative z-10 h-full flex flex-col justify-between">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                    <div className="flex items-center gap-5">
-                                        <div className="h-12 w-12 rounded-2xl bg-white/5 backdrop-blur-xl flex items-center justify-center border border-white/10 shadow-inner group-hover:rotate-12 transition-transform duration-700">
-                                            <WelcomeAnimation />
+                            <div className="relative z-10 space-y-5">
+                                {/* Top Header: Avatar + Greeting + Quick Action Clay Buttons */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/40">
+                                    <div className="flex items-center gap-3.5">
+                                        <div className="clay-icon h-12 w-12 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent flex items-center justify-center shrink-0 text-primary">
+                                            <Sparkles className="h-6 w-6" />
                                         </div>
                                         <div>
-                                            <div className="flex items-center gap-3">
-                                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{customLabels.hero || 'Dashboard'}</h1>
-                                                <Badge className="bg-primary hover:bg-primary border-none text-[9px] h-5 px-2 font-bold tracking-widest uppercase">System Active</Badge>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground">
+                                                    {greeting}, {currentUser.name.split(' ')[0]}
+                                                </h1>
+                                                <Badge className="clay-badge bg-primary/15 text-primary border-primary/20 text-[10px] font-bold px-2.5 py-0.5 tracking-wider uppercase">
+                                                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse mr-1.5 inline-block" />
+                                                    {customLabels.hero || 'Live Workspace'}
+                                                </Badge>
                                             </div>
-                                            {!hiddenSubItems.includes('welcome_msg') && (
-                                                <p className="text-slate-400 font-medium mt-1 text-sm">Welcome back, <span className="text-white font-bold">{currentUser.name}</span>. Here's your workspace today.</p>
-                                            )}
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
+                                                <Calendar className="h-3.5 w-3.5 text-primary" />
+                                                <span>{formattedDate}</span>
+                                                <span>•</span>
+                                                <span>Enterprise Claymorphic Dashboard</span>
+                                            </p>
                                         </div>
                                     </div>
 
+                                    {/* Clay Action Buttons */}
+                                    {isAdmin && (
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <Button 
+                                                size="sm" 
+                                                onClick={() => navigate('/leads')}
+                                                className="clay-btn bg-primary hover:bg-primary/95 text-white h-9 px-3.5 rounded-xl text-xs font-bold gap-1.5 shadow-md"
+                                            >
+                                                <Plus className="h-4 w-4" /> New Lead
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => navigate('/projects/new')}
+                                                className="clay-card h-9 px-3.5 rounded-xl text-xs font-bold gap-1.5 hover:border-primary/40 text-foreground"
+                                            >
+                                                <Briefcase className="h-4 w-4 text-primary" /> Project
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => navigate('/invoices/new')}
+                                                className="clay-card h-9 px-3.5 rounded-xl text-xs font-bold gap-1.5 hover:border-emerald-500/40 text-foreground"
+                                            >
+                                                <Banknote className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Invoice
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
 
+                                {/* Bottom Strip: Clay Inset Metric Pills */}
                                 {!hiddenSubItems.includes('mini_stats') && (
-                                    <div className="mt-6 pt-6 border-t border-white/5">
-                                        {['owner', 'admin'].includes(currentUser.role) ? (
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        {isAdmin ? (
+                                            <AutoGrid minWidth="140px" gap="gap-3">
                                                 {[
-                                                    { label: 'Revenue Net', value: formatCurrency(netProfit), color: 'from-emerald-400 to-teal-500', onClick: () => navigate('/invoices') },
-                                                    { label: 'Project Success', value: `${winRate}%`, color: 'from-blue-400 to-indigo-500', onClick: () => navigate('/projects') },
-                                                    { label: 'Active Projects', value: inProgressProjects, color: 'from-indigo-400 to-purple-500', onClick: () => navigate('/projects?status=in-progress') },
-                                                    { label: 'Project Portfolio', value: formatCurrency(totalProjectCost || 0), color: 'from-rose-400 to-orange-500', onClick: () => navigate('/projects') },
-                                                ].map((item, i) => (
-                                                    <div key={i} className="group/item relative p-3 sm:p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer" onClick={item.onClick}>
-                                                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">{item.label}</span>
-                                                        <p className="text-lg sm:text-xl font-bold tracking-tight text-white">{item.value}</p>
+                                                    { label: 'Net Profit', value: formatCurrency(netProfit), color: 'text-emerald-600 dark:text-emerald-400', path: '/invoices' },
+                                                    { label: 'Win Rate', value: `${winRate}%`, color: 'text-blue-600 dark:text-blue-400', path: '/projects' },
+                                                    { label: 'Active Projects', value: inProgressProjects, color: 'text-violet-600 dark:text-violet-400', path: '/projects?status=in-progress' },
+                                                    { label: 'Total Portfolio', value: formatCurrency(totalProjectCost || 0), color: 'text-amber-600 dark:text-amber-400', path: '/projects' },
+                                                ].map((stat, i) => (
+                                                    <div 
+                                                        key={i} 
+                                                        onClick={() => navigate(stat.path)}
+                                                        className="clay-inset p-3 bg-muted/40 hover:bg-muted/70 transition-all duration-200 cursor-pointer flex items-center justify-between group/pill"
+                                                    >
+                                                        <div className="min-w-0 pr-1.5 flex-1">
+                                                            <span 
+                                                                className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground block leading-tight break-words line-clamp-1" 
+                                                                title={stat.label}
+                                                            >
+                                                                {stat.label}
+                                                            </span>
+                                                            <span className={`text-sm sm:text-base font-extrabold tracking-tight block leading-snug mt-0.5 tabular-nums ${stat.color}`}>
+                                                                {stat.value}
+                                                            </span>
+                                                        </div>
+                                                        <div className="h-5 w-5 rounded-full bg-background/80 flex items-center justify-center shrink-0 group-hover/pill:scale-110 transition-transform">
+                                                            <ArrowUpRight className="h-3 w-3 text-muted-foreground/50 group-hover/pill:text-primary transition-colors" />
+                                                        </div>
                                                     </div>
                                                 ))}
-                                            </div>
+                                            </AutoGrid>
                                         ) : currentUser.role !== 'client' ? (
-                                            <div className="grid grid-cols-1 gap-4">
-                                                {/* Full-width Compact Performance HUD */}
-                                                <div className="bg-white/5 border border-white/10 rounded-[1.5rem] p-4 relative overflow-hidden group/hud">
-                                                    <div className="flex items-center justify-between mb-4 relative z-10">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-8 w-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary border border-primary/20">
-                                                                <Zap className="h-4 w-4 fill-primary/20 animate-pulse" />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-primary/80">Performance HUD</p>
-                                                                <h4 className="text-lg font-bold text-white leading-none mt-0.5">Efficiency Score</h4>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className="text-2xl md:text-xl font-bold text-white tabular-nums tracking-tight">{myPerformanceScore ?? 0}<span className="text-xs text-slate-500 ml-1">/100</span></span>
-                                                        </div>
+                                            <div className="clay-inset p-3.5 bg-muted/40 flex items-center justify-between gap-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="clay-icon h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                                        <Zap className="h-4.5 w-4.5" />
                                                     </div>
-
-                                                    <div className="space-y-2 relative z-10">
-                                                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
-                                                            <div
-                                                                className="h-full bg-gradient-to-r from-indigo-500 via-primary to-emerald-400 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(var(--primary),0.5)]"
-                                                                style={{ width: `${Math.max(2, myPerformanceScore ?? 0)}%` }}
-                                                            />
-                                                        </div>
-                                                        <div className="flex justify-between items-center text-[8px] font-bold uppercase tracking-widest text-slate-500 px-1">
-                                                            <span className="flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" /> Live</span>
-                                                            <span className="text-primary/70">Stable Engine</span>
-                                                        </div>
+                                                    <div>
+                                                        <span className="text-xs font-bold text-foreground block">Efficiency Benchmark</span>
+                                                        <span className="text-[10px] text-muted-foreground font-semibold">Active productivity score</span>
                                                     </div>
+                                                </div>
+                                                <div className="flex items-center gap-3 flex-1 max-w-xs">
+                                                    <Progress value={Math.max(5, myPerformanceScore ?? 0)} className="h-2 rounded-full bg-background" />
+                                                    <span className="text-sm font-extrabold text-primary tabular-nums">{myPerformanceScore ?? 0}%</span>
                                                 </div>
                                             </div>
                                         ) : null}
@@ -236,65 +360,79 @@ export function DashboardPage() {
                         </div>
                     )}
 
-                    {/* Session Hub */}
+                    {/* Clay Shift Session Card */}
                     {currentLayout.includes('session') && currentUser?.role !== 'client' && (
-                        <div className={`${currentLayout.includes('hero') ? 'xl:col-span-4' : 'xl:col-span-12'} bg-card border border-border/40 rounded-3xl p-4 sm:p-6 flex flex-col justify-between shadow-xl relative overflow-hidden group/session`}>
-                            <div className="flex justify-between items-start relative z-10">
-                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{customLabels.session || 'Live Session'}</p>
-                                    <h2 className="text-xl md:text-xl font-bold tabular-nums tracking-tight">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
+                        <div className={`${currentLayout.includes('hero') ? 'lg:col-span-4' : 'lg:col-span-12'} clay-card p-5 sm:p-6 flex flex-col justify-between`}>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-[10px] font-bold text-primary uppercase tracking-wider block">Shift Session</span>
+                                    <h2 className="text-xl font-extrabold font-mono tracking-tight text-foreground mt-0.5">
+                                        {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                    </h2>
                                 </div>
-                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${(attendanceStatus === 'out' || attendanceStatus === 'checked-out')
-                                    ? 'bg-slate-500/10 text-slate-600 border-slate-500/20'
-                                    : attendanceStatus === 'break'
-                                        ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                        : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                                    }`}>
-                                    <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${(attendanceStatus === 'out' || attendanceStatus === 'checked-out')
-                                        ? 'bg-slate-400'
+                                <div className={`clay-badge flex items-center gap-1.5 px-3 py-1 text-xs font-bold ${
+                                    (attendanceStatus === 'out' || attendanceStatus === 'checked-out')
+                                        ? 'bg-muted text-muted-foreground'
                                         : attendanceStatus === 'break'
-                                            ? 'bg-amber-500'
-                                            : 'bg-emerald-500'
-                                        }`} />
+                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                }`}>
+                                    <span className={`h-2 w-2 rounded-full ${
+                                        (attendanceStatus === 'out' || attendanceStatus === 'checked-out')
+                                            ? 'bg-muted-foreground/40'
+                                            : attendanceStatus === 'break'
+                                                ? 'bg-amber-500 animate-pulse'
+                                                : 'bg-emerald-500 animate-pulse'
+                                    }`} />
                                     {(attendanceStatus === 'out' || attendanceStatus === 'checked-out') ? 'Offline' : attendanceStatus === 'break' ? 'On Break' : 'Online'}
                                 </div>
                             </div>
 
+                            {/* Clay Inset Shift Progress */}
                             {!hiddenSubItems.includes('timer') && (
-                                <div className="mt-8 space-y-4 relative z-10">
-                                    <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-                                        <div className="flex items-center gap-2"><Clock className="h-3 w-3" /> Duration</div>
-                                        <span className="text-foreground font-bold tabular-nums">{formatElapsedTime(elapsedTime)}</span>
+                                <div className="my-4 clay-inset p-3 bg-muted/40 space-y-1.5">
+                                    <div className="flex items-center justify-between text-xs font-bold text-muted-foreground">
+                                        <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-primary" /> Active Working Time</span>
+                                        <span className="font-mono font-extrabold text-foreground">{formatElapsedTime(elapsedTime)}</span>
                                     </div>
-                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                        <div className="h-full brand-gradient shimmer rounded-full transition-all duration-1000" style={{ width: (attendanceStatus === 'out' || attendanceStatus === 'checked-out') ? '0%' : '75%' }} />
-                                    </div>
+                                    <Progress 
+                                        value={(attendanceStatus === 'out' || attendanceStatus === 'checked-out') ? 0 : Math.min(100, Math.round((elapsedTime / 28800) * 100))} 
+                                        className="h-2 rounded-full bg-background" 
+                                    />
                                 </div>
                             )}
 
+                            {/* Clay Tactile Session Actions */}
                             {!hiddenSubItems.includes('clock_actions') && (
-                                <div className="mt-8 grid grid-cols-1 gap-3 relative z-10">
+                                <div>
                                     {attendanceStatus === 'out' ? (
-                                        <Button onClick={handleClockIn} className="w-full h-16 rounded-[1.5rem] brand-gradient text-white font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_30px_-10px_rgba(37,99,235,0.4)]">
-                                            <PlayCircle className="h-5 w-5 mr-3" />
-                                            CLOCK IN START SESSION
+                                        <Button 
+                                            onClick={handleClockIn} 
+                                            className="w-full h-11 rounded-2xl clay-btn bg-primary hover:bg-primary/95 text-white font-extrabold text-xs gap-2 shadow-lg active:scale-95 transition-all"
+                                        >
+                                            <PlayCircle className="h-4 w-4" /> CLOCK IN SESSION
                                         </Button>
                                     ) : (attendanceStatus === 'checked-out' || attendanceStatus === 'half-day') ? (
-                                        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-[1.5rem] p-6 text-center animate-in zoom-in-95 duration-500">
-                                            <div className="h-12 w-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                                <CheckCircle className="h-6 w-6 text-emerald-600" />
-                                            </div>
-                                            <h4 className="text-emerald-900 font-bold text-sm uppercase tracking-tight">Shift Completed</h4>
-                                            <p className="text-emerald-600/60 text-[10px] font-bold mt-1 uppercase tracking-widest">Great work today, {currentUser.name.split(' ')[0]}!</p>
+                                        <div className="clay-card p-3 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-500/20 text-center">
+                                            <span className="text-emerald-700 dark:text-emerald-300 font-extrabold text-xs">✓ Shift Completed Successfully</span>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Button variant="outline" onClick={() => triggerConfirm('break')} className={`h-16 rounded-[1.5rem] font-bold text-xs border-2 shadow-sm ${attendanceStatus === 'break' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'hover:border-primary/40'}`}>
-                                                <Coffee className="h-4 w-4 mr-2" />
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <Button 
+                                                variant="outline" 
+                                                onClick={() => triggerConfirm('break')} 
+                                                className={`h-11 rounded-2xl font-extrabold text-xs clay-card ${attendanceStatus === 'break' ? 'border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : 'text-foreground'}`}
+                                            >
+                                                <Coffee className="h-4 w-4 mr-1.5" />
                                                 {attendanceStatus === 'break' ? 'RESUME' : 'BREAK'}
                                             </Button>
-                                            <Button variant="destructive" onClick={() => triggerConfirm('clock-out')} className="h-16 rounded-[1.5rem] font-bold text-xs shadow-[0_15px_30px_-10px_rgba(244,63,94,0.3)]" disabled={attendanceStatus === 'break'}>
-                                                <StopCircle className="h-4 w-4 mr-2" />
+                                            <Button 
+                                                variant="destructive" 
+                                                onClick={() => triggerConfirm('clock-out')} 
+                                                className="h-11 rounded-2xl font-extrabold text-xs clay-btn bg-rose-600 hover:bg-rose-700 text-white shadow-md" 
+                                                disabled={attendanceStatus === 'break'}
+                                            >
+                                                <StopCircle className="h-4 w-4 mr-1.5" />
                                                 CLOCK OUT
                                             </Button>
                                         </div>
@@ -306,17 +444,101 @@ export function DashboardPage() {
                 </div>
             )}
 
-            {/* 2. Top Stats - Financials */}
-            {currentLayout.includes('financials') && (
-                <div className="space-y-3 animate-in fade-in duration-500">
-                    <div className="flex items-center justify-between px-2">
-                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{customLabels.financials || 'Financial Overview'}</h3>
+            {/* 2. Clay Segmented Filter Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div className="clay-inset p-1 bg-muted/60 flex items-center gap-1 w-fit">
+                    {[
+                        { id: 'all', label: 'All View', icon: LayoutDashboard },
+                        { id: 'finance', label: 'Financials', icon: Banknote },
+                        { id: 'work', label: 'Work & Projects', icon: Briefcase },
+                        { id: 'operations', label: 'Operations & Assets', icon: Activity },
+                    ].map(tab => {
+                        const Icon = tab.icon
+                        const isActive = activeTab === tab.id
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as DashboardTab)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    isActive
+                                        ? 'clay-card bg-card text-primary shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                <Icon className="h-3.5 w-3.5" />
+                                <span>{tab.label}</span>
+                            </button>
+                        )
+                    })}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold px-1">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span>Real-Time 3D Analytics Stream</span>
+                </div>
+            </div>
+
+            {/* My Calendar — upcoming meetings for every logged-in user */}
+            {currentUser?.role !== 'client' && (activeTab === 'all' || activeTab === 'work') && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <UpcomingScheduleWidget basePath="/calendar" title="My Upcoming Schedule" />
+                </div>
+            )}
+
+            {/* 3. Clay Financial Overview Stat Cards */}
+            {currentLayout.includes('financials') && (activeTab === 'all' || activeTab === 'finance') && (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <Banknote className="h-4 w-4 text-primary" />
+                            {customLabels.financials || 'Financial Overview'}
+                        </span>
                     </div>
-                    <div className={isAdmin ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"}>
-                        {!hiddenSubItems.includes('revenue') && <StatCard label={currentUser.role === 'client' ? 'Total Paid' : 'Total Revenue'} value={formatCurrency(totalRevenue)} trend={revenueTrend} icon={Banknote} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/invoices')} />}
-                        {!hiddenSubItems.includes('expenses') && currentUser.role !== 'client' && <StatCard label="Total Expenses" value={formatCurrency(totalExpenses)} trend={expenseTrend} icon={Wallet} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/expenses')} />}
-                        {!hiddenSubItems.includes('profit') && currentUser.role !== 'client' && <StatCard label="Net Profit" value={formatCurrency(netProfit)} trend={revenueTrend} icon={TrendingUp} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/invoices')} />}
-                        {!hiddenSubItems.includes('outstanding') && <StatCard label={currentUser.role === 'client' ? 'Pending Payment' : 'Outstanding'} value={formatCurrency(outstandingInvoices)} trend={`${(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').length} Invoices`} icon={CreditCard} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/invoices')} />}
+                    <AutoGrid minWidth="180px" gap="gap-3.5">
+                        {!hiddenSubItems.includes('revenue') && (
+                            <StatCard 
+                                label={currentUser.role === 'client' ? 'Total Paid' : 'Total Revenue'} 
+                                value={formatCurrency(totalRevenue)} 
+                                trend={revenueTrend} 
+                                icon={Banknote} 
+                                color="text-emerald-600 dark:text-emerald-400" 
+                                bg="bg-emerald-100 dark:bg-emerald-950/50" 
+                                onClick={() => navigate('/invoices')} 
+                            />
+                        )}
+                        {!hiddenSubItems.includes('expenses') && currentUser.role !== 'client' && (
+                            <StatCard 
+                                label="Total Expenses" 
+                                value={formatCurrency(totalExpenses)} 
+                                trend={expenseTrend} 
+                                icon={Wallet} 
+                                color="text-rose-600 dark:text-rose-400" 
+                                bg="bg-rose-100 dark:bg-rose-950/50" 
+                                onClick={() => navigate('/expenses')} 
+                            />
+                        )}
+                        {!hiddenSubItems.includes('profit') && currentUser.role !== 'client' && (
+                            <StatCard 
+                                label="Net Profit" 
+                                value={formatCurrency(netProfit)} 
+                                trend={revenueTrend} 
+                                icon={TrendingUp} 
+                                color="text-blue-600 dark:text-blue-400" 
+                                bg="bg-blue-100 dark:bg-blue-950/50" 
+                                onClick={() => navigate('/invoices')} 
+                            />
+                        )}
+                        {!hiddenSubItems.includes('outstanding') && (
+                            <StatCard 
+                                label={currentUser.role === 'client' ? 'Pending Payment' : 'Outstanding'} 
+                                value={formatCurrency(outstandingInvoices)} 
+                                trend={`${(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').length} Invoices`} 
+                                icon={CreditCard} 
+                                color="text-amber-600 dark:text-amber-400" 
+                                bg="bg-amber-100 dark:bg-amber-950/50" 
+                                onClick={() => navigate('/invoices')} 
+                            />
+                        )}
                         {isAdmin && (
                             <>
                                 <StatCard 
@@ -324,722 +546,675 @@ export function DashboardPage() {
                                     value={formatCurrency(totalProjectCost || 0)} 
                                     trend={`${(relevantProjects || []).length} Projects`} 
                                     icon={Briefcase} 
-                                    color="text-indigo-600" 
-                                    bg="bg-indigo-100" 
+                                    color="text-indigo-600 dark:text-indigo-400" 
+                                    bg="bg-indigo-100 dark:bg-indigo-950/50" 
                                     onClick={() => navigate('/projects')} 
                                 />
                                 <StatCard 
-                                    label="Amount Received" 
+                                    label="Collected Amount" 
                                     value={formatCurrency(projectRevenueReceived || 0)} 
                                     trend={`${(totalProjectCost || 0) > 0 ? Math.round(((projectRevenueReceived || 0) / (totalProjectCost || 1)) * 100) : 0}% Collected`} 
                                     icon={CheckCircle} 
-                                    color="text-purple-600" 
-                                    bg="bg-purple-100" 
+                                    color="text-purple-600 dark:text-purple-400" 
+                                    bg="bg-purple-100 dark:bg-purple-950/50" 
                                     onClick={() => navigate('/invoices?status=paid')} 
                                 />
                             </>
                         )}
-                    </div>
+                    </AutoGrid>
                 </div>
             )}
 
-            {/* 3. Operational Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* 4. Team Live Presence Board - Dedicated Full Width Enterprise Suite */}
+            {currentLayout.includes('team_live') && (currentUser.role === 'admin' || currentUser.role === 'owner') && (activeTab === 'all' || activeTab === 'operations') && (
+                <div className="w-full">
+                    <LivePresenceBoard
+                        title="Team Live Presence & Real-Time Activity"
+                        description="Real-time monitoring: Active working members, break timers, and attendance durations."
+                        defaultView="cards"
+                    />
+                </div>
+            )}
 
-                {/* 1. Full-Width Premium Intelligence Hub */}
-                {currentLayout.includes('amc') && (currentUser.role === 'admin' || currentUser.role === 'owner') && (
-                    <div className="lg:col-span-12">
-                         <div className="bg-card border border-border/40 rounded-3xl p-4 sm:p-6 relative overflow-hidden group/amc">
-                                    <div className="flex items-center justify-between mb-8 px-2 relative z-10">
-                                        <div className="flex items-center gap-4">
-                                            <div className="h-12 w-12 rounded-2xl bg-primary/5 flex items-center justify-center group-hover/amc:scale-105 transition-all duration-700 border border-primary/10">
-                                                <Shield className="h-6 w-6 text-primary stroke-[2px]" />
+            {/* 5. Financial Velocity & Cash Flow - Full Width Dedicated Analytics Suite */}
+            {currentLayout.includes('analytics') && !hiddenSubItems.includes('analytics') && currentUser.role !== 'client' && (activeTab === 'all' || activeTab === 'finance') && (
+                <Card className="p-5 sm:p-6 space-y-4 w-full">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                            <div className="clay-icon h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                <TrendingUp className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">{customLabels.analytics || 'Financial Velocity & Cash Flow'}</h3>
+                                <p className="text-[11px] text-muted-foreground font-medium">Revenue and expense cycle visualization</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs font-bold">
+                            <div className="clay-badge px-2.5 py-1 bg-primary/10 flex items-center gap-1.5 text-primary">
+                                <span className="h-2 w-2 rounded-full bg-primary" />
+                                <span>Revenue</span>
+                            </div>
+                            <div className="clay-badge px-2.5 py-1 bg-rose-500/10 flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                                <span className="h-2 w-2 rounded-full bg-rose-500" />
+                                <span>Expenses</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="h-[270px] w-full pt-2">
+                        <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                            <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="hsl(var(--border) / 0.5)" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }} />
+                                <Tooltip contentStyle={{ borderRadius: '16px', border: '1.5px solid rgba(255,255,255,0.7)', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', background: 'hsl(var(--card))', fontSize: '12px', fontWeight: 700 }} />
+                                {!hiddenSubItems.includes('revenue_trend') && <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#velocityGrad)" isAnimationActive={false} />}
+                                {!hiddenSubItems.includes('expense_trend') && <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} strokeDasharray="5 5" fillOpacity={0} isAnimationActive={false} />}
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+            )}
+
+            {/* 6. Task Progress Hub - Full Width */}
+            {currentLayout.includes('tasks') && !hiddenSubItems.includes('tasks') && (activeTab === 'all' || activeTab === 'work') && (
+                <Card className="p-5 sm:p-6 space-y-4 w-full">
+                    <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                            <div className="clay-icon h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                <CheckSquare className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">{customLabels.tasks || 'Task Progress Hub'}</h3>
+                                <p className="text-[11px] text-muted-foreground font-medium">Distribution across task statuses</p>
+                            </div>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-8 rounded-xl text-xs font-bold px-3"
+                            onClick={() => navigate('/tasks')}
+                        >
+                            All Tasks <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                    <AutoGrid minWidth="160px" gap="gap-3">
+                        {!hiddenSubItems.includes('todo') && (
+                            <StatCard label="To Do" value={todoTasks} icon={Layers} color="text-slate-600 dark:text-slate-400" bg="bg-slate-100 dark:bg-slate-900" onClick={() => navigate('/tasks?status=todo')} />
+                        )}
+                        {!hiddenSubItems.includes('in_progress') && (
+                            <StatCard label="In Progress" value={inProgressTasks} icon={PlayCircle} color="text-blue-600 dark:text-blue-400" bg="bg-blue-100 dark:bg-blue-950/50" onClick={() => navigate('/tasks?status=in-progress')} />
+                        )}
+                        {!hiddenSubItems.includes('review') && (
+                            <StatCard label="Review" value={reviewTasks} icon={Target} color="text-amber-600 dark:text-amber-400" bg="bg-amber-100 dark:bg-amber-950/50" onClick={() => navigate('/tasks?status=review')} />
+                        )}
+                        {!hiddenSubItems.includes('done') && (
+                            <StatCard label="Completed" value={doneTasks} icon={CheckSquare} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950/50" onClick={() => navigate('/tasks?status=done')} />
+                        )}
+                    </AutoGrid>
+                </Card>
+            )}
+
+            {/* 7. Projects Portfolio - Full Width */}
+            {currentLayout.includes('projects_overview') && !hiddenSubItems.includes('projects_overview') && (activeTab === 'all' || activeTab === 'work') && (
+                currentUser.role === 'client' ? (
+                    <div className="space-y-3.5 w-full">
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                <Rocket className="h-4 w-4 text-primary" />
+                                Active Project Tracking
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            {relevantProjects.filter(p => p.status !== 'completed').map((project: any) => (
+                                <Card key={project.id || project._id} className="p-4 sm:p-5 space-y-3">
+                                    <div className="flex items-start justify-between">
+                                        <div className="min-w-0 pr-2">
+                                            <h4 className="font-extrabold text-base text-foreground break-words leading-snug line-clamp-2" title={project.name}>{project.name}</h4>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <Badge className="clay-badge text-[10px] font-bold uppercase">{project.type || 'Standard'}</Badge>
+                                                <span className="text-xs text-muted-foreground font-semibold">Due: {new Date(project.dueDate).toLocaleDateString()}</span>
                                             </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold tracking-tight text-foreground">{customLabels.amc || 'AMC Monitoring'}</h3>
-                                                <p className="text-[10px] font-bold uppercase text-muted-foreground/60 tracking-widest mt-1">Status Overview</p>
-                                            </div>
+                                        </div>
+                                        <div className="clay-icon h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                            <Briefcase className="h-4.5 w-4.5" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-bold">
+                                            <span className="text-muted-foreground">Milestone Progress</span>
+                                            <span className="text-primary">{project.progress || 0}%</span>
+                                        </div>
+                                        <Progress value={project.progress || 0} className="h-2 rounded-full bg-background" />
+                                    </div>
+                                    <div className="flex items-center justify-between pt-3 border-t border-border/40 text-xs">
+                                        <div>
+                                            <span className="text-muted-foreground block text-[10px] font-bold uppercase">Budget</span>
+                                            <span className="font-extrabold text-foreground">{formatCurrency(project.budget || 0)}</span>
                                         </div>
                                         <Button 
                                             variant="ghost" 
-                                            className="bg-muted/30 hover:bg-muted text-[10px] font-bold uppercase tracking-widest h-10 px-5 rounded-xl border border-border/20" 
-                                            onClick={() => navigate('/amc')}
+                                            size="sm" 
+                                            className="h-8 text-xs font-bold rounded-xl" 
+                                            onClick={() => navigate(`/projects/${project.id || project._id}`)}
                                         >
-                                            Manage <ArrowUpRight className="ml-2 h-3.5 w-3.5" />
+                                            Details <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
                                         </Button>
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-                                        <StatCard label="Active AMCs" value={amcStats?.active || 0} icon={Shield} color="text-blue-600" bg="bg-blue-50" onClick={() => navigate('/amc')} />
-                                        <StatCard label="Expiring Soon" value={amcStats?.expiringSoon || 0} icon={AlertCircle} color="text-amber-600" bg="bg-amber-50" onClick={() => navigate('/amc?filter=expiring')} />
-                                        <StatCard label="Expired" value={amcStats?.expired || 0} icon={XCircle} color="text-rose-600" bg="bg-rose-50" onClick={() => navigate('/amc?filter=expired')} />
-                                        <StatCard label="Portfolio" value={formatCurrency(amcStats?.totalRevenue || 0)} icon={Banknote} color="text-emerald-600" bg="bg-emerald-50" onClick={() => navigate('/amc')} />
-                                    </div>
-                                </div>
+                                </Card>
+                            ))}
+                        </div>
                     </div>
-                )}
-
-                {/* Primary Intelligence Area (8) */}
-                <div className="lg:col-span-8 space-y-6">
-                    {(sectionOrder || []).map((sectionId: string) => {
-                        if (!currentLayout.includes(sectionId)) return null;
-
-                        // Render Main Sections
-                        if (sectionId === 'tasks') {
-                            return (
-                                <div key={sectionId} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                                    <div className="flex items-center justify-between mb-8 px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                                                <CheckSquare className="h-5 w-5 text-primary" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold tracking-tight">{customLabels.tasks || 'Task Center'}</h3>
-                                                <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-0.5">Distribution across status</p>
-                                            </div>
-                                        </div>
-                                        <Badge className="bg-primary/10 text-primary border-none text-[10px] px-3 font-bold underline decoration-primary/20 underline-offset-4">LIVE ENGINE</Badge>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        {!hiddenSubItems.includes('todo') && (
-                                            <StatCard label="To Do" value={todoTasks} icon={Layers} color="text-slate-600" bg="bg-slate-100" onClick={() => navigate('/tasks?status=todo')} />
-                                        )}
-                                        {!hiddenSubItems.includes('in_progress') && (
-                                            <StatCard label="Progress" value={inProgressTasks} icon={PlayCircle} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/tasks?status=in-progress')} />
-                                        )}
-                                        {!hiddenSubItems.includes('review') && (
-                                            <StatCard label="Review" value={reviewTasks} icon={Target} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/tasks?status=review')} />
-                                        )}
-                                        {!hiddenSubItems.includes('done') && (
-                                            <StatCard label="Done" value={doneTasks} icon={CheckSquare} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/tasks?status=done')} />
-                                        )}
-                                    </div>
+                ) : (
+                    <Card className="p-5 sm:p-6 space-y-4 w-full">
+                        <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                            <div className="flex items-center gap-3">
+                                <div className="clay-icon h-9 w-9 rounded-xl bg-indigo-100 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                    <Briefcase className="h-5 w-5" />
                                 </div>
-                            )
-                        }
-
-                        if (sectionId === 'team_live' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
-                            return (
-                                <LivePresenceBoard
-                                    key={sectionId}
-                                    title="Team Live Presence & Real-Time Activity"
-                                    description="Real-time monitoring: who has joined, active working durations, who is on break, and live break timers."
-                                    defaultView="cards"
-                                />
-                            );
-                        }
-
-                        if (sectionId === 'projects_overview') {
-                            if (currentUser.role === 'client') {
-                                return (
-                                    <div key={sectionId} className="space-y-4">
-                                        <div className="flex items-center justify-between px-2">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                                                    <Rocket className="h-5 w-5 text-primary" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-xl font-bold tracking-tight">Active Project Tracking</h3>
-                                                    <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mt-0.5">Real-time delivery progress</p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            {relevantProjects.filter(p => p.status !== 'completed').map((project: any) => (
-                                                <Card key={project.id || project._id} className="relative overflow-hidden border-2 border-primary/5 bg-card/40 backdrop-blur-xl group hover:border-primary/20 transition-all duration-500 rounded-2xl p-6 shadow-sm">
-                                                    <div className="flex items-start justify-between mb-6">
-                                                        <div className="space-y-1">
-                                                            <h4 className="font-bold text-lg text-foreground tracking-tight group-hover:text-primary transition-colors">{project.name}</h4>
-                                                            <div className="flex items-center gap-2">
-                                                                <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wider bg-primary/5 text-primary border-primary/20">{project.type || 'Standard'}</Badge>
-                                                                <span className="text-[10px] font-bold text-muted-foreground">• Due {new Date(project.dueDate).toLocaleDateString()}</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:rotate-12 transition-transform">
-                                                            <Briefcase className="h-5 w-5" />
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="space-y-4">
-                                                        <div className="grid grid-cols-2 gap-4 pb-2">
-                                                            <div>
-                                                                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Project Budget</p>
-                                                                <p className="text-sm font-bold">{formatCurrency(project.budget || 0)}</p>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 mb-1">Paid Status</p>
-                                                                <p className="text-sm font-bold text-emerald-600">
-                                                                    {formatCurrency((invoices || []).filter(i => i.projectId === (project.id || project._id) && i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0))}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="space-y-2">
-                                                            <div className="flex justify-between items-end">
-                                                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Delivery Milestone</span>
-                                                                <span className="text-sm font-bold text-primary">{project.progress || 0}%</span>
-                                                            </div>
-                                                            <Progress value={project.progress || 0} className="h-2.5 bg-muted rounded-full" />
-                                                        </div>
-
-                                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-muted/50">
-                                                            <div className="flex items-center gap-3">
-                                                                <Avatar className="h-8 w-8 border-2 border-primary/10 shadow-sm">
-                                                                    <AvatarImage src="/avatars/pm.png" />
-                                                                    <AvatarFallback className="bg-primary/5 text-primary text-[10px] font-bold">PM</AvatarFallback>
-                                                                </Avatar>
-                                                                <div className="min-w-0">
-                                                                    <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Project Manager</p>
-                                                                    <p className="text-[10px] font-bold truncate">Nexprism Team</p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex justify-end items-center">
-                                                                <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-widest hover:bg-primary/5 group/btn" onClick={() => navigate(`/projects/${project.id || project._id}`)}>
-                                                                    Project Docs <ArrowUpRight className="ml-2 h-3 w-3 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </Card>
-                                            ))}
-                                            {relevantProjects.filter(p => p.status !== 'completed').length === 0 && (
-                                                <div className="md:col-span-2 py-12 text-center border-2 border-dashed border-muted rounded-2xl bg-muted/5">
-                                                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground opacity-40">No active projects currently being tracked</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )
-                            }
-                            return (
-                                <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-2xl p-6 bg-indigo-50/10">
-                                    <div className="flex items-center justify-between mb-8 px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
-                                                <Briefcase className="h-6 w-6 text-indigo-600" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-bold tracking-tight text-indigo-900">{customLabels.projects_overview || (['owner', 'admin'].includes(currentUser.role) ? 'Projects Portfolio' : 'Projects Assigned to Me')}</h3>
-                                                <p className="text-xs font-bold uppercase text-indigo-500 tracking-widest mt-0.5">Project status overview</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <StatCard label="Planning" value={planningProjects} icon={Layers} color="text-slate-600" bg="bg-slate-100" onClick={() => navigate('/projects?status=planning')} />
-                                        <StatCard label="Active" value={inProgressProjects} icon={PlayCircle} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/projects?status=in-progress')} />
-                                        <StatCard label="On Hold" value={onHoldProjects} icon={StopCircle} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/projects?status=on-hold')} />
-                                        <StatCard label="Completed" value={completedProjects} icon={CheckCircle} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/projects?status=completed')} />
-                                    </div>
-                                </div>
-                            )
-                        }
-
-                        if (sectionId === 'analytics') {
-                            if (currentUser.role === 'client') return null;
-                            return (
-                                <div key={sectionId} className="bg-card border border-border/40 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-left-4 duration-500">
-                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                                                <LayoutDashboard className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-lg font-bold tracking-tight">{customLabels.analytics || 'Financial Velocity'}</h3>
-                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Performance tracking across current cycle</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="h-[380px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={revenueData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                                                <defs>
-                                                    <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
-                                                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid strokeDasharray="6 6" vertical={false} stroke="hsl(var(--border))" />
-                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} dy={15} />
-                                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} />
-                                                <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', background: 'hsl(var(--card))', fontSize: '12px', fontWeight: 'bold' }} />
-                                                {!hiddenSubItems.includes('revenue_trend') && <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={5} fill="url(#velocityGrad)" />}
-                                                {!hiddenSubItems.includes('expense_trend') && <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={3} strokeDasharray="10 10" fillOpacity={0} />}
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
-                            )
-                        }
-
-                        if (sectionId === 'support_tickets') {
-                            return (
-                                <div key={sectionId} className="mb-12 border-2 border-rose-500/20 rounded-2xl p-6 bg-rose-50/10">
-                                    <div className="flex items-center justify-between mb-8 px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-12 w-12 rounded-2xl bg-rose-500/20 flex items-center justify-center">
-                                                <MessageSquare className="h-6 w-6 text-rose-600" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-bold tracking-tight text-rose-900">{customLabels.support_tickets || 'Support Tickets'}</h3>
-                                                <p className="text-xs font-bold uppercase text-rose-500 tracking-widest mt-0.5">Customer issues snapshot</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {!hiddenSubItems.includes('open') && (
-                                            <StatCard label="Open Tickets" value={openTickets} icon={AlertCircle} color="text-blue-600" bg="bg-blue-100" onClick={() => navigate('/tickets?status=open')} />
-                                        )}
-                                        {!hiddenSubItems.includes('critical') && (
-                                            <StatCard label="Critical/High" value={criticalTickets} icon={Clock} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/tickets?priority=critical')} />
-                                        )}
-                                        {!hiddenSubItems.includes('resolved') && (
-                                            <StatCard label="Resolved" value={resolvedTickets} icon={CheckCircle} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/tickets?status=resolved')} />
-                                        )}
-                                    </div>
-                                </div>
-                            )
-                        }
-
-                        if (sectionId === 'expiry_alerts' && (currentUser.role === 'admin' || currentUser.role === 'owner') && expirySummary?.totalAlerts > 0) {
-                            return (
-                                <div key={sectionId} className="mb-12 border-2 border-amber-500/20 rounded-2xl p-6 bg-amber-50/10">
-                                    <div className="flex items-center justify-between mb-8 px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-12 w-12 rounded-2xl bg-amber-500/20 flex items-center justify-center">
-                                                <Zap className="h-6 w-6 text-amber-600" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-bold tracking-tight text-amber-900">Expiry Monitoring</h3>
-                                                <p className="text-xs font-bold uppercase text-amber-500 tracking-widest mt-0.5">Critical renewals & overdue items</p>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            onClick={() => navigate('/expiry-alerts')}
-                                            className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold uppercase tracking-widest h-8 px-4 rounded-xl shadow-lg shadow-amber-200"
-                                        >
-                                            Take Action <ArrowUpRight className="ml-2 h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <StatCard
-                                            label="Expired Items"
-                                            value={expirySummary?.expired || 0}
-                                            icon={XCircle}
-                                            color="text-red-600"
-                                            bg="bg-red-100"
-                                            onClick={() => navigate('/expiry-alerts?filter=expired')}
-                                            className={expirySummary?.expired > 0 ? "border-red-200 animate-pulse" : ""}
-                                        />
-                                        <StatCard
-                                            label="Critical (7 Days)"
-                                            value={expirySummary?.critical || 0}
-                                            icon={AlertCircle}
-                                            color="text-amber-600"
-                                            bg="bg-amber-100"
-                                            onClick={() => navigate('/expiry-alerts?filter=critical')}
-                                        />
-                                        <StatCard
-                                            label="Overdue Invoices"
-                                            value={expirySummary?.invoiceAlerts || 0}
-                                            icon={FileText}
-                                            color="text-rose-600"
-                                            bg="bg-rose-100"
-                                            onClick={() => navigate('/expiry-alerts?type=invoice')}
-                                        />
-                                        <StatCard
-                                            label="Total Alerts"
-                                            value={expirySummary?.totalAlerts || 0}
-                                            icon={BellRing}
-                                            color="text-blue-600"
-                                            bg="bg-blue-100"
-                                            onClick={() => navigate('/expiry-alerts')}
-                                        />
-                                    </div>
-                                </div>
-                            )
-                        }
-
-
-                        if (sectionId === 'domains' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
-                            return (
-                                <div key={sectionId} className="mb-12 border-2 border-indigo-500/20 rounded-2xl p-6 bg-indigo-50/10">
-                                    <div className="flex items-center justify-between mb-8 px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
-                                                <Globe className="h-6 w-6 text-indigo-600" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-bold tracking-tight text-indigo-900">{customLabels.domains || 'Asset Lifecycle'}</h3>
-                                                <p className="text-xs font-bold uppercase text-indigo-500 tracking-widest mt-0.5">Domain & Hosting tracking</p>
-                                            </div>
-                                        </div>
-                                        <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase tracking-widest h-8" onClick={() => navigate('/domains')}>
-                                            Manage Assets <ArrowUpRight className="ml-2 h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <StatCard label="Total Assets" value={domainStats?.total || 0} icon={Globe} color="text-indigo-600" bg="bg-indigo-100" onClick={() => navigate('/domains')} />
-                                        <StatCard label="Expiring" value={domainStats?.expiringSoon || 0} icon={Clock} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/domains?filter=expiring')} />
-                                        <StatCard label="Active SSL" value={domainStats?.activeSsl || 0} icon={Shield} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/domains')} />
-                                        <StatCard label="Pending" value={domainStats?.pendingRenewal || 0} icon={AlertCircle} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/domains')} />
-                                    </div>
-                                </div>
-                            )
-                        }
-
-                        if (sectionId === 'hosting' && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
-                            return (
-                                <div key={sectionId} className="mb-12 border-2 border-orange-500/20 rounded-2xl p-6 bg-orange-50/10">
-                                    <div className="flex items-center justify-between mb-8 px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-12 w-12 rounded-2xl bg-orange-500/20 flex items-center justify-center">
-                                                <Server className="h-6 w-6 text-orange-600" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-bold tracking-tight text-orange-900">Hosting Management</h3>
-                                                <p className="text-xs font-bold uppercase text-orange-500 tracking-widest mt-0.5">Server resources & uptime</p>
-                                            </div>
-                                        </div>
-                                        <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase tracking-widest h-8" onClick={() => navigate('/hosting')}>
-                                            Server List <ArrowUpRight className="ml-2 h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <StatCard label="Total Servers" value={domainStats?.totalServers || 0} icon={Server} color="text-orange-600" bg="bg-orange-100" onClick={() => navigate('/hosting')} />
-                                        <StatCard label="Expiring" value={domainStats?.hostingExpiring || 0} icon={Clock} color="text-amber-600" bg="bg-amber-100" onClick={() => navigate('/hosting')} />
-                                        <StatCard label="Disk Usage" value="82%" icon={Shield} color="text-emerald-600" bg="bg-emerald-100" onClick={() => navigate('/hosting')} />
-                                        <StatCard label="Suspended" value={0} icon={AlertCircle} color="text-rose-600" bg="bg-rose-100" onClick={() => navigate('/hosting')} />
-                                    </div>
-                                </div>
-                            )
-                        }
-
-
-
-                        return null;
-                    })}
-                </div>
-
-                {/* Secondary Sidebar Area */}
-                <div className="lg:col-span-4 space-y-6">
-                    {currentUser.role === 'client' && (
-                        <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 shadow-sm group">
-                            <h3 className="text-xs font-bold uppercase tracking-[0.2em] flex items-center gap-2 mb-8 text-primary">
-                                <Zap className="h-4 w-4 fill-primary/20 animate-pulse" />
-                                Client Quick Control
-                            </h3>
-                            <div className="space-y-3">
-                                <Button className="w-full h-14 rounded-2xl brand-gradient text-white font-bold text-xs hover:scale-[1.02] shadow-lg shadow-primary/20" onClick={() => navigate('/invoices')}>
-                                    <Banknote className="mr-2 h-4 w-4" /> PAY LATEST INVOICE
-                                </Button>
-                                <Button variant="outline" className="w-full h-14 rounded-2xl font-bold text-xs hover:bg-card border-2" onClick={() => navigate('/tickets')}>
-                                    <MessageSquare className="mr-2 h-4 w-4 text-primary" /> RAISE SUPPORT TICKET
-                                </Button>
-                                <Button variant="outline" className="w-full h-14 rounded-2xl font-bold text-xs hover:bg-card border-2" onClick={() => navigate('/chat')}>
-                                    <Coffee className="mr-2 h-4 w-4 text-emerald-500" /> START COLLABORATION
-                                </Button>
-                            </div>
-                            <div className="mt-8 pt-6 border-t border-primary/10">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-10 w-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
-                                        <Target className="h-5 w-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Managed by</p>
-                                        <p className="text-xs font-bold">Senior Account Lead</p>
-                                    </div>
+                                <div>
+                                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">{customLabels.projects_overview || (isAdmin ? 'Projects Portfolio' : 'Assigned Projects')}</h3>
+                                    <p className="text-[11px] text-muted-foreground font-medium">Delivery lifecycle overview</p>
                                 </div>
                             </div>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-xs font-bold h-8 rounded-xl px-3" 
+                                onClick={() => navigate('/projects')}
+                            >
+                                View All <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                            </Button>
                         </div>
-                    )}
+                        <AutoGrid minWidth="160px" gap="gap-3">
+                            <StatCard label="Planning" value={planningProjects} icon={Layers} color="text-slate-600 dark:text-slate-400" bg="bg-slate-100 dark:bg-slate-900" onClick={() => navigate('/projects?status=planning')} />
+                            <StatCard label="Active" value={inProgressProjects} icon={PlayCircle} color="text-blue-600 dark:text-blue-400" bg="bg-blue-100 dark:bg-blue-950/50" onClick={() => navigate('/projects?status=in-progress')} />
+                            <StatCard label="On Hold" value={onHoldProjects} icon={StopCircle} color="text-amber-600 dark:text-amber-400" bg="bg-amber-100 dark:bg-amber-950/50" onClick={() => navigate('/projects?status=on-hold')} />
+                            <StatCard label="Completed" value={completedProjects} icon={CheckCircle} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950/50" onClick={() => navigate('/projects?status=completed')} />
+                        </AutoGrid>
+                    </Card>
+                )
+            )}
 
-                    {/* Admin Upcoming Lead Follow-ups */}
-                    {['admin', 'owner'].includes(currentUser.role) && (
-                        <div className="bg-card border border-border/40 rounded-3xl p-5 shadow-sm space-y-4">
-                            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 text-primary">
-                                <Clock className="h-3.5 w-3.5" />
-                                Upcoming Follow-ups
-                            </h3>
-                            
-                            <div className="space-y-3">
-                                {leads
-                                    .filter(l => l.reminder && l.reminder.date && !l.reminder.completed && new Date(l.reminder.date) > new Date())
-                                    .sort((a, b) => new Date(a.reminder.date).getTime() - new Date(b.reminder.date).getTime())
-                                    .slice(0, 5)
-                                    .map(lead => {
-                                        const date = new Date(lead.reminder.date);
-                                        const diffMs = date.getTime() - Date.now();
-                                        const diffMins = Math.round(diffMs / 60000);
-                                        let countdownText = '';
-                                        if (diffMins < 60) countdownText = `in ${diffMins}m`;
-                                        else if (diffMins < 1440) countdownText = `in ${Math.round(diffMins/60)}h`;
-                                        else countdownText = `in ${Math.round(diffMins/1440)}d`;
-
-                                        return (
-                                            <div 
-                                                key={lead.id} 
-                                                onClick={() => navigate('/leads')} 
-                                                className="flex items-center justify-between p-3 rounded-2xl bg-muted/20 border border-border/30 hover:border-primary/20 cursor-pointer group transition-all"
-                                            >
-                                                <div className="flex items-center gap-2.5 min-w-0">
-                                                    <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                                        lead.aiPriority === 'green' ? 'bg-emerald-500' : lead.aiPriority === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'
-                                                    }`} />
-                                                    <div className="min-w-0">
-                                                        <p className="font-bold text-xs text-foreground truncate group-hover:text-primary transition-colors">{lead.company}</p>
-                                                        <p className="text-[9px] text-muted-foreground truncate">{lead.name}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right shrink-0">
-                                                    <p className="text-[10px] font-bold text-foreground">{countdownText}</p>
-                                                    <p className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground">{date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                }
-                                {leads.filter(l => l.reminder && l.reminder.date && !l.reminder.completed && new Date(l.reminder.date) > new Date()).length === 0 && (
-                                    <p className="text-xs text-muted-foreground italic text-center py-6">No upcoming follow-ups scheduled.</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                     {/* 4. Smart Sidebar HUD */}
-                    {currentUser.role !== 'client' && (
-                        <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden group/hud">
-                            <div className="relative z-10">
-                                <p className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-40 mb-1">System Status</p>
-                                <h3 className="text-xl font-bold tracking-tight mb-4 text-white">Pulse</h3>
-                                
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                                        <p className="text-[8px] font-bold uppercase opacity-40">Uptime</p>
-                                        <p className="text-lg font-bold">99.9%</p>
-                                    </div>
-                                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                                        <p className="text-[8px] font-bold uppercase opacity-40">Health</p>
-                                        <p className="text-lg font-bold">Stable</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Pending Actions for Client or Admin */}
-                    {(currentUser.role !== 'employee') && (
-                        <Card className="bg-card border border-border/40 rounded-3xl p-6 shadow-sm">
-                            <h3 className="text-[9px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 mb-4 text-muted-foreground">
-                                <FileText className="h-3.5 w-3.5" />
-                                {currentUser.role === 'client' ? 'Pending' : 'Invoices'}
-                            </h3>
-                            <div className="space-y-3">
-                                {(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').slice(0, 3).map((inv: any) => (
-                                    <div key={inv.id || inv._id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/40 hover:border-primary/20 transition-all cursor-pointer" onClick={() => navigate(`/invoices/${inv.id || inv._id}`)}>
-                                        <div className="min-w-0">
-                                            <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">#{inv.invoiceNumber}</p>
-                                            <p className="font-bold text-xs">{formatCurrency(inv.total)}</p>
-                                        </div>
-                                        <Badge className={`${inv.status === 'overdue' ? 'bg-rose-500/10 text-rose-600' : 'bg-amber-500/10 text-amber-600'} border-none text-[8px] font-bold py-0 h-4`}>
-                                            {inv.status}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    )}
-
-                    <div className="space-y-6">
-                        {(sectionOrder || []).map((sectionId: string) => {
-                        if (!currentLayout.includes(sectionId)) return null;
-
-                        // Render Sidebar Sections
-                        if (sectionId === 'funnel') {
-                            if (currentUser.role === 'client') return null;
-                            return (
-                                <div key={sectionId} className="bg-slate-900 rounded-2xl p-6 text-white shadow-2xl relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-[80px]" />
-                                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] flex items-center gap-2 mb-8 pr-12 leading-relaxed">
-                                        <Target className="h-4 w-4 text-primary" />
-                                        {customLabels.funnel || 'Business Conversion Pipeline'}
-                                    </h3>
-                                    <div className="h-[220px] relative">
-                                        {!hiddenSubItems.includes('conversion') && (
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie data={leadStatusData} dataKey="value" innerRadius={65} outerRadius={85} paddingAngle={8} stroke="none">
-                                                        {leadStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                                                    </Pie>
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        )}
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                            <span className="text-xl font-bold">{leads.length}</span>
-                                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-50">{leads.length === 1 ? 'Opportunity' : 'Opportunities'}</span>
-                                        </div>
-                                    </div>
-                                    {!hiddenSubItems.includes('velocity') && (
-                                        <div className="mt-8 space-y-3">
-                                            {leadStatusData.slice(0, 4).map((item, i) => (
-                                                <div key={i} className="flex justify-between items-center text-[11px] font-bold group/item">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                                                        <span className="opacity-60 group-hover/item:opacity-100 transition-opacity uppercase tracking-widest">{item.name}</span>
-                                                    </div>
-                                                    <span className="font-bold">{item.value}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        }
-
-                        if (sectionId === 'health') {
-                            if (currentUser.role === 'client') return null;
-                            return (
-                                <div key={sectionId} className="bg-card border border-border/40 rounded-2xl p-6 shadow-sm">
-                                    <div className="flex items-center gap-3 mb-8">
-                                        <Zap className="h-5 w-5 text-primary" />
-                                        <h3 className="text-sm font-bold uppercase tracking-[0.1em]">{customLabels.health || 'Metric Pulse'}</h3>
-                                    </div>
-                                    <div className="space-y-6">
-                                        {healthMetrics.map((m, i) => {
-                                            const itemKey = m.label.toLowerCase().includes('success') ? 'success_rate' : 'throughput'
-                                            if (hiddenSubItems.includes(itemKey)) return null
-                                            return (
-                                                <div key={i} className="space-y-3">
-                                                    <div className="flex justify-between items-end">
-                                                        <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">{m.label}</span>
-                                                        <span className="text-sm font-bold text-primary">{m.value}%</span>
-                                                    </div>
-                                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                                        <div className={`h-full ${m.color} rounded-full shimmer transition-all duration-1000`} style={{ width: `${m.value}%` }} />
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            )
-                        }
-
-                        if (sectionId === 'deadlines') {
-                            return (
-                                <div key={sectionId} className="bg-rose-500/5 rounded-2xl p-6 border border-rose-500/10">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <AlertCircle className="h-5 w-5 text-rose-500" />
-                                        <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-rose-600">{customLabels.deadlines || 'Urgent Tasks'}</h3>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {!hiddenSubItems.includes('overdue') && relevantTasks.filter(t => t.status !== 'done').slice(0, 3).map((t, i) => (
-                                            <div
-                                                key={i}
-                                                onClick={() => navigate('/tasks')}
-                                                className="bg-card/50 p-4 rounded-2xl border border-rose-500/10 hover:bg-card transition-all cursor-pointer group shadow-sm"
-                                            >
-                                                <span className="text-xs font-bold font-sans line-clamp-1 block mb-1">{t.title}</span>
-                                                <div className="flex items-center justify-between">
-                                                    <Badge className="bg-rose-500/10 text-rose-600 border-none text-[8px] px-2 py-0 font-bold h-4">OVERDUE</Badge>
-                                                    <ArrowUpRight className="h-3 w-3 text-rose-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {relevantTasks.filter(t => t.status !== 'done').length === 0 && (
-                                            <div className="py-6 text-center text-[10px] font-bold text-muted-foreground uppercase opacity-50">Zero incidents reported</div>
-                                        )}
-                                    </div>
-                                </div>
-                            )
-                        }
-
-                        if (sectionId === 'activity') {
-                            return (
-                                <div key={sectionId} className="bg-slate-50/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6 shadow-sm">
-                                    <div className="flex items-center justify-between mb-8">
-                                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                            {customLabels.activity || 'Network Stream'}
-                                        </h3>
-                                        <Badge variant="outline" className="text-[8px] font-bold border-muted-foreground/30 text-muted-foreground uppercase py-0 h-4">Live</Badge>
-                                    </div>
-                                    <div className="space-y-6">
-                                        {!hiddenSubItems.includes('system_logs') && recentActivities.slice(0, 5).map((log, i) => (
-                                            <div key={i} className="flex gap-4 items-start group">
-                                                <div className={`h-10 w-10 rounded-xl ${log.bg} ${log.color} flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform duration-300`}>
-                                                    <log.icon className="h-4.5 w-4.5" />
-                                                </div>
-                                                <div className="flex flex-col min-w-0 flex-1 border-b border-border/10 pb-4 group-last:border-0 last:pb-0">
-                                                    <span className="text-xs font-bold text-foreground truncate tracking-tight group-hover:text-primary transition-colors cursor-default">{log.action}</span>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">{log.user}</span>
-                                                        <span className="h-0.5 w-0.5 rounded-full bg-muted-foreground/30" />
-                                                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60 tracking-tight">{log.time}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <Button variant="ghost" className="w-full mt-6 text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors h-10 border-t border-border/10 pt-6">
-                                        VIEW FULL ACTIVITY LOG
+            {/* 8. Operational Intelligence & Activity Feeds Hub - Auto-distributing Grid */}
+            {hasSecondaryWidgets && (
+                <div className="space-y-3 w-full">
+                    <div className="flex items-center justify-between px-1">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            Operational Intelligence & Live Feeds
+                        </span>
+                    </div>
+                    <AutoGrid minWidth="320px" gap="gap-5">
+                        {/* Client Quick Portal */}
+                        {currentUser.role === 'client' && (
+                            <Card className="p-5 space-y-3">
+                                <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-primary">
+                                    <Sparkles className="h-4 w-4" /> Client Quick Portal
+                                </span>
+                                <div className="space-y-2.5">
+                                    <Button className="w-full h-10 rounded-2xl clay-btn bg-primary text-white font-extrabold text-xs shadow-md gap-2" onClick={() => navigate('/invoices')}>
+                                        <Banknote className="h-4 w-4" /> Pay Latest Invoice
+                                    </Button>
+                                    <Button variant="outline" className="w-full h-10 rounded-2xl font-extrabold text-xs gap-2" onClick={() => navigate('/tickets')}>
+                                        <MessageSquare className="h-4 w-4 text-primary" /> Raise Support Ticket
+                                    </Button>
+                                    <Button variant="outline" className="w-full h-10 rounded-2xl font-extrabold text-xs gap-2" onClick={() => navigate('/chat')}>
+                                        <Coffee className="h-4 w-4 text-emerald-500" /> Message Team
                                     </Button>
                                 </div>
-                            )
-                        }
+                            </Card>
+                        )}
 
-                        return null;
-                    })}
-                    </div>
+                        {/* Upcoming Lead Follow-ups */}
+                        {isAdmin && (activeTab === 'all' || activeTab === 'finance') && (
+                            <Card className="p-4 sm:p-5 space-y-3">
+                                <div className="flex items-center justify-between pb-2.5 border-b border-border/40">
+                                    <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-foreground">
+                                        <Clock className="h-4 w-4 text-primary" />
+                                        Upcoming Follow-ups
+                                    </span>
+                                    <Badge className="clay-badge text-[10px] font-bold px-2">{leads.filter(l => l.reminder && l.reminder.date && !l.reminder.completed && new Date(l.reminder.date) > new Date()).length} pending</Badge>
+                                </div>
+                                <div className="space-y-2">
+                                    {leads
+                                        .filter(l => l.reminder && l.reminder.date && !l.reminder.completed && new Date(l.reminder.date) > new Date())
+                                        .sort((a, b) => new Date(a.reminder.date).getTime() - new Date(b.reminder.date).getTime())
+                                        .slice(0, 4)
+                                        .map(lead => {
+                                            const date = new Date(lead.reminder.date);
+                                            const diffMs = date.getTime() - Date.now();
+                                            const diffMins = Math.round(diffMs / 60000);
+                                            let countdownText = '';
+                                            if (diffMins < 60) countdownText = `in ${diffMins}m`;
+                                            else if (diffMins < 1440) countdownText = `in ${Math.round(diffMins/60)}h`;
+                                            else countdownText = `in ${Math.round(diffMins/1440)}d`;
+
+                                            return (
+                                                <div 
+                                                    key={lead.id} 
+                                                    onClick={() => navigate('/leads')} 
+                                                    className="clay-inset p-2.5 bg-muted/40 hover:bg-muted/70 transition-all cursor-pointer flex items-center justify-between group"
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                            lead.aiPriority === 'green' ? 'bg-emerald-500' : lead.aiPriority === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'
+                                                        }`} />
+                                                        <div className="min-w-0 pr-1">
+                                                            <p className="font-extrabold text-xs text-foreground truncate leading-snug group-hover:text-primary transition-colors" title={lead.company}>{lead.company}</p>
+                                                            <p className="text-[10px] text-muted-foreground truncate leading-snug font-semibold" title={lead.name}>{lead.name}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="text-xs font-extrabold text-foreground block">{countdownText}</span>
+                                                        <span className="text-[10px] text-muted-foreground font-semibold">{date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    }
+                                    {leads.filter(l => l.reminder && l.reminder.date && !l.reminder.completed && new Date(l.reminder.date) > new Date()).length === 0 && (
+                                        <p className="text-xs text-muted-foreground italic text-center py-3">No upcoming follow-ups scheduled.</p>
+                                    )}
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* Pending Invoices Widget */}
+                        {currentUser.role !== 'employee' && (activeTab === 'all' || activeTab === 'finance') && (
+                            <Card className="p-4 sm:p-5 space-y-3">
+                                <div className="flex items-center justify-between pb-2.5 border-b border-border/40">
+                                    <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-foreground">
+                                        <FileText className="h-4 w-4 text-primary" />
+                                        {currentUser.role === 'client' ? 'Pending Invoices' : 'Unpaid Invoices'}
+                                    </span>
+                                    <Button variant="ghost" size="sm" className="h-7 text-xs font-bold px-2 rounded-lg" onClick={() => navigate('/invoices')}>
+                                        All <ArrowUpRight className="ml-1 h-3 w-3" />
+                                    </Button>
+                                </div>
+                                <div className="space-y-2">
+                                    {(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').slice(0, 3).map((inv: any) => (
+                                        <div 
+                                            key={inv.id || inv._id} 
+                                            className="clay-inset p-2.5 bg-muted/40 hover:bg-muted/70 transition-all cursor-pointer flex items-center justify-between" 
+                                            onClick={() => navigate(`/invoices/${inv.id || inv._id}`)}
+                                        >
+                                            <div className="min-w-0">
+                                                <span className="text-[10px] font-bold text-muted-foreground uppercase block">#{inv.invoiceNumber}</span>
+                                                <span className="font-extrabold text-xs text-foreground">{formatCurrency(inv.total)}</span>
+                                            </div>
+                                            <Badge className={`clay-badge ${inv.status === 'overdue' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'} text-[10px] font-bold py-0.5`}>
+                                                {inv.status}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                    {(relevantInvoices || []).filter((i: any) => i.status === 'pending' || i.status === 'overdue').length === 0 && (
+                                        <p className="text-xs text-muted-foreground italic text-center py-3">No unpaid invoices.</p>
+                                    )}
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* Opportunity Funnel */}
+                        {currentLayout.includes('funnel') && !hiddenSubItems.includes('funnel') && currentUser.role !== 'client' && (activeTab === 'all' || activeTab === 'finance') && (
+                            <Card className="p-5 space-y-3">
+                                <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-foreground">
+                                    <Target className="h-4 w-4 text-primary" />
+                                    {customLabels.funnel || 'Opportunity Funnel'}
+                                </span>
+                                <div className="h-[180px] relative">
+                                    {!hiddenSubItems.includes('conversion') && (
+                                        <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                            <PieChart>
+                                                <Pie 
+                                                    data={leadStatusData} 
+                                                    dataKey="value" 
+                                                    innerRadius={55} 
+                                                    outerRadius={75} 
+                                                    paddingAngle={leadStatusData.length > 1 ? 6 : 0} 
+                                                    stroke="none"
+                                                    isAnimationActive={false}
+                                                >
+                                                    {leadStatusData.map((_, i) => <Cell key={i} fill={FUNNEL_COLORS[i % FUNNEL_COLORS.length]} />)}
+                                                </Pie>
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span className="text-2xl font-extrabold text-foreground">{leads.length}</span>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{leads.length === 1 ? 'Lead' : 'Leads'}</span>
+                                    </div>
+                                </div>
+                                {!hiddenSubItems.includes('velocity') && (
+                                    <div className="mt-2 space-y-1.5 border-t border-border/40 pt-3">
+                                        {leadStatusData.slice(0, 4).map((item, i) => (
+                                            <div key={i} className="flex justify-between items-center text-xs font-semibold">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: FUNNEL_COLORS[i % FUNNEL_COLORS.length] }} />
+                                                    <span className="text-muted-foreground uppercase text-[11px]">{item.name}</span>
+                                                </div>
+                                                <span className="font-extrabold text-foreground">{item.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </Card>
+                        )}
+
+                        {/* Metric Pulse */}
+                        {currentLayout.includes('health') && !hiddenSubItems.includes('health') && currentUser.role !== 'client' && (activeTab === 'all' || activeTab === 'work') && (
+                            <Card className="p-5 space-y-3.5">
+                                <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-foreground">
+                                    <Zap className="h-4 w-4 text-primary" />
+                                    {customLabels.health || 'Metric Pulse'}
+                                </span>
+                                <div className="space-y-3">
+                                    {healthMetrics.map((m, i) => {
+                                        const itemKey = m.label.toLowerCase().includes('success') ? 'success_rate' : 'throughput'
+                                        if (hiddenSubItems.includes(itemKey)) return null
+                                        return (
+                                            <div key={i} className="space-y-1">
+                                                <div className="flex justify-between text-xs font-bold">
+                                                    <span className="text-muted-foreground">{m.label}</span>
+                                                    <span className="text-primary font-extrabold">{m.value}%</span>
+                                                </div>
+                                                <Progress value={m.value} className="h-2 rounded-full bg-background" />
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* Urgent Deadlines */}
+                        {currentLayout.includes('deadlines') && !hiddenSubItems.includes('deadlines') && (activeTab === 'all' || activeTab === 'work') && (
+                            <Card className="p-4 sm:p-5 space-y-3 border-rose-300/40 bg-rose-50/50 dark:bg-rose-950/20">
+                                <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                                    <AlertCircle className="h-4 w-4 text-rose-500" />
+                                    {customLabels.deadlines || 'Urgent Deadlines'}
+                                </span>
+                                <div className="space-y-2">
+                                    {!hiddenSubItems.includes('overdue') && relevantTasks.filter(t => t.status !== 'done').slice(0, 3).map((t, i) => (
+                                        <div
+                                            key={i}
+                                            onClick={() => navigate('/tasks')}
+                                            className="clay-card p-3 bg-card hover:bg-card/90 transition-all cursor-pointer flex items-center justify-between"
+                                        >
+                                            <span className="text-xs font-bold line-clamp-1 flex-1 mr-2 leading-snug" title={t.title}>{t.title}</span>
+                                            <Badge className="clay-badge bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 text-[9px] font-extrabold px-1.5 py-0.5">DUE</Badge>
+                                        </div>
+                                    ))}
+                                    {relevantTasks.filter(t => t.status !== 'done').length === 0 && (
+                                        <p className="text-xs text-muted-foreground italic text-center py-2.5">No overdue tasks.</p>
+                                    )}
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* Live Activity Feed */}
+                        {currentLayout.includes('activity') && !hiddenSubItems.includes('activity') && (activeTab === 'all' || activeTab === 'operations') && (
+                            <Card className="p-5 space-y-3.5">
+                                <div className="flex items-center justify-between pb-2.5 border-b border-border/40">
+                                    <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-foreground">
+                                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        {customLabels.activity || 'Activity Stream'}
+                                    </span>
+                                    <Badge className="clay-badge text-[9px] font-bold px-2">Live</Badge>
+                                </div>
+                                <div className="space-y-3">
+                                    {!hiddenSubItems.includes('system_logs') && recentActivities.slice(0, 5).map((log, i) => (
+                                        <div key={i} className="flex gap-3 items-start group">
+                                            <div className={`clay-icon h-8 w-8 rounded-xl ${log.bg} ${log.color} flex items-center justify-center shrink-0`}>
+                                                <log.icon className="h-4 w-4" />
+                                            </div>
+                                            <div className="flex flex-col min-w-0 flex-1 border-b border-border/30 pb-2.5 group-last:border-0 last:pb-0">
+                                                <span className="text-xs font-bold text-foreground line-clamp-1 break-words leading-snug group-hover:text-primary transition-colors" title={log.action}>{log.action}</span>
+                                                <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground font-semibold">
+                                                    <span>{log.user}</span>
+                                                    <span>•</span>
+                                                    <span>{log.time}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        )}
+                    </AutoGrid>
                 </div>
-            </div>
+            )}
 
-            {/* 4. Sales & Leads Intelligence Dashboard (Dedicated Section) */}
-            {currentUser?.role !== 'client' && (
-                <div className="pt-2 animate-in fade-in duration-500">
+            {/* 9. AMC Monitoring - Full Width */}
+            {currentLayout.includes('amc') && (currentUser.role === 'admin' || currentUser.role === 'owner') && (activeTab === 'all' || activeTab === 'operations') && (
+                <Card className="p-5 sm:p-6 space-y-4 w-full">
+                    <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                            <div className="clay-icon h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                <ShieldCheck className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">{customLabels.amc || 'AMC Monitoring & Maintenance'}</h3>
+                                <p className="text-[11px] text-muted-foreground font-medium">Contract lifecycle tracking</p>
+                            </div>
+                        </div>
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-8 rounded-xl text-xs font-bold px-3"
+                            onClick={() => navigate('/amc')}
+                        >
+                            Manage <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                    <AutoGrid minWidth="160px" gap="gap-3">
+                        <StatCard label="Active AMCs" value={amcStats?.active || 0} icon={ShieldCheck} color="text-blue-600 dark:text-blue-400" bg="bg-blue-100 dark:bg-blue-950/50" onClick={() => navigate('/amc')} />
+                        <StatCard label="Expiring Soon" value={amcStats?.expiringSoon || 0} icon={AlertCircle} color="text-amber-600 dark:text-amber-400" bg="bg-amber-100 dark:bg-amber-950/50" onClick={() => navigate('/amc?filter=expiring')} />
+                        <StatCard label="Expired" value={amcStats?.expired || 0} icon={XCircle} color="text-rose-600 dark:text-rose-400" bg="bg-rose-100 dark:bg-rose-950/50" onClick={() => navigate('/amc?filter=expired')} />
+                        <StatCard label="Portfolio" value={formatCurrency(amcStats?.totalRevenue || 0)} icon={Banknote} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950/50" onClick={() => navigate('/amc')} />
+                    </AutoGrid>
+                </Card>
+            )}
+
+            {/* 10. Critical Expiry Alerts - Full Width */}
+            {currentLayout.includes('expiry_alerts') && (currentUser.role === 'admin' || currentUser.role === 'owner') && expirySummary?.totalAlerts > 0 && (activeTab === 'all' || activeTab === 'operations') && (
+                <Card className="p-5 sm:p-6 space-y-4 w-full">
+                    <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                            <div className="clay-icon h-9 w-9 rounded-xl bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                                <BellRing className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">Critical Expiry & Renewals</h3>
+                                <p className="text-[11px] text-muted-foreground font-medium">Expiring services & invoices</p>
+                            </div>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={() => navigate('/expiry-alerts')}
+                            className="clay-btn bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold h-8 rounded-xl px-3.5 shadow-md"
+                        >
+                            Take Action <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                    <AutoGrid minWidth="160px" gap="gap-3">
+                        <StatCard
+                            label="Expired"
+                            value={expirySummary?.expired || 0}
+                            icon={XCircle}
+                            color="text-red-600 dark:text-red-400"
+                            bg="bg-red-100 dark:bg-red-950/50"
+                            onClick={() => navigate('/expiry-alerts?filter=expired')}
+                            className={expirySummary?.expired > 0 ? "border-red-400/50" : ""}
+                        />
+                        <StatCard
+                            label="Critical (7 Days)"
+                            value={expirySummary?.critical || 0}
+                            icon={AlertCircle}
+                            color="text-amber-600 dark:text-amber-400"
+                            bg="bg-amber-100 dark:bg-amber-950/50"
+                            onClick={() => navigate('/expiry-alerts?filter=critical')}
+                        />
+                        <StatCard
+                            label="Overdue Invoices"
+                            value={expirySummary?.invoiceAlerts || 0}
+                            icon={FileText}
+                            color="text-rose-600 dark:text-rose-400"
+                            bg="bg-rose-100 dark:bg-rose-950/50"
+                            onClick={() => navigate('/expiry-alerts?type=invoice')}
+                        />
+                        <StatCard
+                            label="Total Alerts"
+                            value={expirySummary?.totalAlerts || 0}
+                            icon={BellRing}
+                            color="text-blue-600 dark:text-blue-400"
+                            bg="bg-blue-100 dark:bg-blue-950/50"
+                            onClick={() => navigate('/expiry-alerts')}
+                        />
+                    </AutoGrid>
+                </Card>
+            )}
+
+            {/* 11. Domain & Asset Tracking - Full Width */}
+            {currentLayout.includes('domains') && (currentUser.role === 'admin' || currentUser.role === 'owner') && (activeTab === 'all' || activeTab === 'operations') && (
+                <Card className="p-5 sm:p-6 space-y-4 w-full">
+                    <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                            <div className="clay-icon h-9 w-9 rounded-xl bg-indigo-100 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                <Globe className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">{customLabels.domains || 'Domain & Asset Tracking'}</h3>
+                                <p className="text-[11px] text-muted-foreground font-medium">Domain lifecycle and SSL security</p>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="sm" className="text-xs font-bold h-8 rounded-xl px-3" onClick={() => navigate('/domains')}>
+                            Manage <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                    <AutoGrid minWidth="160px" gap="gap-3">
+                        <StatCard label="Total Assets" value={domainStats?.total || 0} icon={Globe} color="text-indigo-600 dark:text-indigo-400" bg="bg-indigo-100 dark:bg-indigo-950/50" onClick={() => navigate('/domains')} />
+                        <StatCard label="Expiring Soon" value={domainStats?.expiringSoon || 0} icon={Clock} color="text-amber-600 dark:text-amber-400" bg="bg-amber-100 dark:bg-amber-950/50" onClick={() => navigate('/domains?filter=expiring')} />
+                        <StatCard label="Active SSL" value={domainStats?.activeSsl || 0} icon={ShieldCheck} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950/50" onClick={() => navigate('/domains')} />
+                        <StatCard label="Pending Renewal" value={domainStats?.pendingRenewal || 0} icon={AlertCircle} color="text-rose-600 dark:text-rose-400" bg="bg-rose-100 dark:bg-rose-950/50" onClick={() => navigate('/domains')} />
+                    </AutoGrid>
+                </Card>
+            )}
+
+            {/* 12. Hosting Infrastructure - Full Width */}
+            {currentLayout.includes('hosting') && (currentUser.role === 'admin' || currentUser.role === 'owner') && (activeTab === 'all' || activeTab === 'operations') && (
+                <Card className="p-5 sm:p-6 space-y-4 w-full">
+                    <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                            <div className="clay-icon h-9 w-9 rounded-xl bg-orange-100 dark:bg-orange-950/50 flex items-center justify-center text-orange-600 dark:text-orange-400">
+                                <Server className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">Hosting Infrastructure</h3>
+                                <p className="text-[11px] text-muted-foreground font-medium">Server availability & resource limits</p>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="sm" className="text-xs font-bold h-8 rounded-xl px-3" onClick={() => navigate('/hosting')}>
+                            Servers <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                    <AutoGrid minWidth="160px" gap="gap-3">
+                        <StatCard label="Total Servers" value={domainStats?.totalServers || 0} icon={Server} color="text-orange-600 dark:text-orange-400" bg="bg-orange-100 dark:bg-orange-950/50" onClick={() => navigate('/hosting')} />
+                        <StatCard label="Expiring" value={domainStats?.hostingExpiring || 0} icon={Clock} color="text-amber-600 dark:text-amber-400" bg="bg-amber-100 dark:bg-amber-950/50" onClick={() => navigate('/hosting')} />
+                        <StatCard label="Disk Usage" value="82%" icon={ShieldCheck} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950/50" onClick={() => navigate('/hosting')} />
+                        <StatCard label="Suspended" value={0} icon={AlertCircle} color="text-rose-600 dark:text-rose-400" bg="bg-rose-100 dark:bg-rose-950/50" onClick={() => navigate('/hosting')} />
+                    </AutoGrid>
+                </Card>
+            )}
+
+            {/* 13. Support Tickets - Full Width */}
+            {currentLayout.includes('support_tickets') && !hiddenSubItems.includes('support_tickets') && (activeTab === 'all' || activeTab === 'operations') && (
+                <Card className="p-5 sm:p-6 space-y-4 w-full">
+                    <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                            <div className="clay-icon h-9 w-9 rounded-xl bg-rose-100 dark:bg-rose-950/50 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                <MessageSquare className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">{customLabels.support_tickets || 'Support Tickets'}</h3>
+                                <p className="text-[11px] text-muted-foreground font-medium">Issue resolution pipeline</p>
+                            </div>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 rounded-xl text-xs font-bold px-3" 
+                            onClick={() => navigate('/tickets')}
+                        >
+                            Tickets <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                    <AutoGrid minWidth="160px" gap="gap-3">
+                        {!hiddenSubItems.includes('open') && (
+                            <StatCard label="Open" value={openTickets} icon={AlertCircle} color="text-blue-600 dark:text-blue-400" bg="bg-blue-100 dark:bg-blue-950/50" onClick={() => navigate('/tickets?status=open')} />
+                        )}
+                        {!hiddenSubItems.includes('critical') && (
+                            <StatCard label="Critical/High" value={criticalTickets} icon={Clock} color="text-rose-600 dark:text-rose-400" bg="bg-rose-100 dark:bg-rose-950/50" onClick={() => navigate('/tickets?priority=critical')} />
+                        )}
+                        {!hiddenSubItems.includes('resolved') && (
+                            <StatCard label="Resolved" value={resolvedTickets} icon={CheckCircle} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950/50" onClick={() => navigate('/tickets?status=resolved')} />
+                        )}
+                    </AutoGrid>
+                </Card>
+            )}
+
+            {/* 5. Sales & Leads Intelligence Dedicated Section */}
+            {currentUser?.role !== 'client' && (activeTab === 'all' || activeTab === 'finance') && (
+                <div className="pt-2">
                     <SalesDashboardSection />
                 </div>
             )}
 
+            {/* Clay Confirmation Modals for Break & Clock Out */}
             {showConfirmModal && createPortal(
-                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-card border border-border/85 w-full max-w-sm rounded-[2rem] pt-5 pb-6 px-6 shadow-2xl relative overflow-hidden flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="clay-card w-full max-w-sm p-6 relative flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
                         {confirmAction === 'break' ? (
                             <>
-                                <div className="h-16 w-16 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mb-4">
-                                    <Coffee className="h-8 w-8 animate-pulse" />
+                                <div className="clay-icon h-14 w-14 rounded-2xl bg-amber-100 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center mb-4">
+                                    <Coffee className="h-7 w-7" />
                                 </div>
-                                <h3 className="text-xl font-bold tracking-tight text-foreground mb-2">
+                                <h3 className="text-lg font-extrabold text-foreground mb-1">
                                     {attendanceStatus === 'break' ? 'Resume Session?' : 'Take a Break?'}
                                 </h3>
-                                <p className="text-xs text-muted-foreground leading-relaxed px-2 mb-6">
+                                <p className="text-xs text-muted-foreground leading-relaxed px-2 mb-6 font-medium">
                                     {attendanceStatus === 'break'
-                                        ? 'Are you ready to resume your active work session timer?'
-                                        : 'Are you sure you want to take a break? This will pause your active session timer.'}
+                                        ? 'Ready to resume your active work session timer?'
+                                        : 'Take a break? This will temporarily pause your shift timer.'}
                                 </p>
                                 <div className="flex items-center gap-3 w-full">
-                                    <Button variant="outline" className="flex-1 h-12 rounded-2xl font-bold text-xs" onClick={() => setShowConfirmModal(false)}>
+                                    <Button variant="outline" className="flex-1 h-10 rounded-xl font-bold text-xs" onClick={() => setShowConfirmModal(false)}>
                                         Cancel
                                     </Button>
-                                    <Button className="flex-1 h-12 rounded-2xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white" onClick={executeConfirm}>
-                                        Yes, Confirm
+                                    <Button className="flex-1 h-10 rounded-xl font-bold text-xs clay-btn bg-amber-500 hover:bg-amber-600 text-white shadow-md" onClick={executeConfirm}>
+                                        Confirm
                                     </Button>
                                 </div>
                             </>
                         ) : (
                             <>
-                                <div className="h-16 w-16 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mb-4">
-                                    <StopCircle className="h-8 w-8 animate-pulse" />
+                                <div className="clay-icon h-14 w-14 rounded-2xl bg-rose-100 dark:bg-rose-950/50 text-rose-600 flex items-center justify-center mb-4">
+                                    <StopCircle className="h-7 w-7" />
                                 </div>
-                                <h3 className="text-xl font-bold tracking-tight text-foreground mb-2">Clock Out?</h3>
-                                <p className="text-xs text-muted-foreground leading-relaxed px-2 mb-6">
-                                    Are you sure you want to clock out? This will end your session today and submit your logged hours.
+                                <h3 className="text-lg font-extrabold text-foreground mb-1">End Work Shift?</h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed px-2 mb-6 font-medium">
+                                    Clock out for today? This will submit your logged session duration.
                                 </p>
                                 <div className="flex items-center gap-3 w-full">
-                                    <Button variant="outline" className="flex-1 h-12 rounded-2xl font-bold text-xs" onClick={() => setShowConfirmModal(false)}>
+                                    <Button variant="outline" className="flex-1 h-10 rounded-xl font-bold text-xs" onClick={() => setShowConfirmModal(false)}>
                                         Cancel
                                     </Button>
-                                    <Button className="flex-1 h-12 rounded-2xl font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-500/20" onClick={executeConfirm}>
-                                        Yes, Clock Out
+                                    <Button className="flex-1 h-10 rounded-xl font-bold text-xs clay-btn bg-rose-600 hover:bg-rose-700 text-white shadow-md" onClick={executeConfirm}>
+                                        Clock Out
                                     </Button>
                                 </div>
                             </>

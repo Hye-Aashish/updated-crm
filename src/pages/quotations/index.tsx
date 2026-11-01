@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
 import api from '@/lib/api-client';
 
+import { appConfirm } from '@/lib/app-dialog'
+
 interface Quotation {
     _id: string;
     quotationNumber: string;
@@ -45,7 +47,7 @@ export default function QuotationsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this quotation?')) return;
+        if (!await appConfirm('Are you sure you want to delete this quotation?')) return;
 
         try {
             await api.delete(`/quotations/${id}`);

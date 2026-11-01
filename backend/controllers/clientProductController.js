@@ -54,7 +54,7 @@ exports.getAllClientProducts = async (req, res) => {
 
         const clientProducts = await ClientProduct.find(query)
             .populate('client', 'name email company status phone')
-            .populate('product', 'name description basePrice features')
+            .populate('product', 'name description basePrice features category status')
             .populate('assignedTo', 'name email avatar role')
             .populate('tasks.assignedTo', 'name email avatar')
             .populate('paymentHistory.recordedBy', 'name email')

@@ -12,6 +12,8 @@ import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { LeadVisibilitySettingsTab } from '@/components/team/lead-visibility-settings-tab'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 // Module display names mapped exactly to sidebar names
 const MODULE_LABELS: Record<string, string> = {
     dashboard: 'Dashboard',
@@ -229,7 +231,7 @@ export function RolesPermissionsPage() {
             return
         }
 
-        if (!window.confirm(`Are you sure you want to delete the role "${roleLabel}"?`)) return
+        if (!await appConfirm(`Are you sure you want to delete the role "${roleLabel}"?`)) return
 
         const newRoles = roles.filter((_, i) => i !== idx)
         setRoles(newRoles)

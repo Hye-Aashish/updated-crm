@@ -4,7 +4,8 @@ const User = require('./models/User');
 
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://anshulsharma6163_db_user:tyiNAlFUFKOFoPC7@cluster0.edg3afe.mongodb.net/CRM?appName=Cluster0&authSource=admin';
+const MONGO_URI = process.env.MONGO_URI;
+if (!MONGO_URI) { console.error('MONGO_URI required'); process.exit(1); };
 
 mongoose.connect(MONGO_URI, { family: 4 }).then(async () => {
     try {

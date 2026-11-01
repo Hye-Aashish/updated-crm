@@ -204,59 +204,67 @@ export function LivePresenceBoard({
     }
 
     return (
-        <div className={`space-y-6 ${className}`}>
+        <div className={`space-y-5 w-full ${className}`}>
             {/* Header with Title and Quick Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <div className="flex items-center gap-2">
-                        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <div className="flex items-center gap-3">
+                        <div className="clay-icon h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                             <Activity className="h-5 w-5 animate-pulse" />
                         </div>
                         <div>
-                            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                            <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
                                 {title}
                             </h2>
-                            <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 font-medium">{description}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-end sm:self-auto">
-                    <div className="text-right hidden md:block mr-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                            Live Time (IST)
+                <div className="flex items-center gap-2.5 self-end sm:self-auto flex-wrap">
+                    <div className="clay-inset px-3 py-1.5 bg-muted/40 hidden md:flex items-center gap-2 mr-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Live Time (IST):
                         </span>
-                        <span className="text-xs font-mono font-bold text-foreground">
+                        <span className="text-xs font-mono font-extrabold text-foreground">
                             {format(currentTime, 'hh:mm:ss a')}
                         </span>
                     </div>
 
                     {/* View Switcher */}
-                    <div className="flex items-center rounded-lg border bg-muted/30 p-0.5 shadow-xs">
+                    <div className="clay-inset p-1 bg-muted/40 flex items-center gap-1">
                         <Button
                             variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
                             size="sm"
-                            className="h-8 px-2.5 text-xs font-medium"
+                            className={`h-8 px-3 text-xs font-bold rounded-xl transition-all ${
+                                viewMode === 'cards'
+                                    ? 'clay-card bg-card text-primary shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
                             onClick={() => setViewMode('cards')}
                             title="Grid Card View"
                         >
-                            <LayoutGrid className="h-3.5 w-3.5 mr-1" /> Cards
+                            <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> Cards
                         </Button>
                         <Button
                             variant={viewMode === 'table' ? 'secondary' : 'ghost'}
                             size="sm"
-                            className="h-8 px-2.5 text-xs font-medium"
+                            className={`h-8 px-3 text-xs font-bold rounded-xl transition-all ${
+                                viewMode === 'table'
+                                    ? 'clay-card bg-card text-primary shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
                             onClick={() => setViewMode('table')}
                             title="Table View"
                         >
-                            <TableIcon className="h-3.5 w-3.5 mr-1" /> Table
+                            <TableIcon className="h-3.5 w-3.5 mr-1.5" /> Table
                         </Button>
                     </div>
 
                     <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 text-xs font-medium"
+                        className="h-8 text-xs font-bold rounded-xl clay-card"
                         onClick={() => fetchLivePresence(true)}
                         disabled={refreshing}
                     >
@@ -266,30 +274,30 @@ export function LivePresenceBoard({
                 </div>
             </div>
 
-            {/* 4 Interactive Summary Status KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* 4 Interactive Summary Status KPI Cards - Spans full 100% width */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 w-full">
                 {/* 1. Working Now */}
                 <div
                     onClick={() => setStatusFilter(statusFilter === 'working' ? 'all' : 'working')}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer shadow-xs ${
+                    className={`clay-card p-4 sm:p-5 rounded-2xl transition-all cursor-pointer ${
                         statusFilter === 'working'
-                            ? 'ring-2 ring-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300'
-                            : 'bg-card hover:border-emerald-300/80'
+                            ? 'ring-2 ring-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-400/80 shadow-md'
+                            : 'hover:border-emerald-300/80'
                     }`}
                 >
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                    <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
                             Working Now
                         </span>
-                        <Badge variant="outline" className="bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 text-[10px] px-2 py-0">
+                        <Badge className="clay-badge bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] px-2 py-0.5 font-bold whitespace-nowrap shrink-0">
                             Active
                         </Badge>
                     </div>
-                    <div className="text-2xl sm:text-3xl font-extrabold text-foreground mt-2 tabular-nums">
+                    <div className="text-2xl sm:text-3xl font-extrabold text-foreground mt-2 tabular-nums whitespace-nowrap">
                         {summary.working}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5 whitespace-nowrap truncate">
                         Clocked in & active on shift
                     </p>
                 </div>
@@ -297,25 +305,25 @@ export function LivePresenceBoard({
                 {/* 2. On Break */}
                 <div
                     onClick={() => setStatusFilter(statusFilter === 'on-break' ? 'all' : 'on-break')}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer shadow-xs ${
+                    className={`clay-card p-4 sm:p-5 rounded-2xl transition-all cursor-pointer ${
                         statusFilter === 'on-break'
-                            ? 'ring-2 ring-amber-500 bg-amber-50/80 dark:bg-amber-950/40 border-amber-300'
-                            : 'bg-card hover:border-amber-300/80'
+                            ? 'ring-2 ring-amber-500 bg-amber-50/80 dark:bg-amber-950/40 border-amber-400/80 shadow-md'
+                            : 'hover:border-amber-300/80'
                     }`}
                 >
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-                            <Coffee className="h-3.5 w-3.5 text-amber-600 animate-bounce" />
+                    <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-300 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                            <Coffee className="h-3.5 w-3.5 text-amber-600 animate-bounce shrink-0" />
                             On Break
                         </span>
-                        <Badge variant="outline" className="bg-amber-100/70 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-200 text-[10px] px-2 py-0 font-bold">
+                        <Badge className="clay-badge bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] px-2 py-0.5 font-bold whitespace-nowrap shrink-0">
                             Away
                         </Badge>
                     </div>
-                    <div className="text-2xl sm:text-3xl font-extrabold text-amber-700 dark:text-amber-400 mt-2 tabular-nums">
+                    <div className="text-2xl sm:text-3xl font-extrabold text-amber-700 dark:text-amber-400 mt-2 tabular-nums whitespace-nowrap">
                         {summary.onBreak}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5 whitespace-nowrap truncate">
                         Currently paused on break
                     </p>
                 </div>
@@ -323,25 +331,25 @@ export function LivePresenceBoard({
                 {/* 3. Shift Completed */}
                 <div
                     onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer shadow-xs ${
+                    className={`clay-card p-4 sm:p-5 rounded-2xl transition-all cursor-pointer ${
                         statusFilter === 'completed'
-                            ? 'ring-2 ring-blue-500 bg-blue-50/80 dark:bg-blue-950/40 border-blue-300'
-                            : 'bg-card hover:border-blue-300/80'
+                            ? 'ring-2 ring-blue-500 bg-blue-50/80 dark:bg-blue-950/40 border-blue-400/80 shadow-md'
+                            : 'hover:border-blue-300/80'
                     }`}
                 >
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
+                    <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                             Shift Done
                         </span>
-                        <Badge variant="outline" className="bg-blue-100/70 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-200 text-[10px] px-2 py-0">
+                        <Badge className="clay-badge bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 text-[10px] px-2 py-0.5 font-bold whitespace-nowrap shrink-0">
                             Out
                         </Badge>
                     </div>
-                    <div className="text-2xl sm:text-3xl font-extrabold text-blue-700 dark:text-blue-400 mt-2 tabular-nums">
+                    <div className="text-2xl sm:text-3xl font-extrabold text-blue-700 dark:text-blue-400 mt-2 tabular-nums whitespace-nowrap">
                         {summary.completed}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5 whitespace-nowrap truncate">
                         Clocked out today
                     </p>
                 </div>
@@ -349,39 +357,39 @@ export function LivePresenceBoard({
                 {/* 4. Not Joined Yet */}
                 <div
                     onClick={() => setStatusFilter(statusFilter === 'not-joined' ? 'all' : 'not-joined')}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer shadow-xs ${
+                    className={`clay-card p-4 sm:p-5 rounded-2xl transition-all cursor-pointer ${
                         statusFilter === 'not-joined'
-                            ? 'ring-2 ring-rose-500 bg-rose-50/80 dark:bg-rose-950/40 border-rose-300'
-                            : 'bg-card hover:border-slate-300/80'
+                            ? 'ring-2 ring-rose-500 bg-rose-50/80 dark:bg-rose-950/40 border-rose-400/80 shadow-md'
+                            : 'hover:border-slate-300/80'
                     }`}
                 >
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                            <XCircle className="h-3.5 w-3.5 text-rose-500" />
+                    <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                            <XCircle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
                             Not Joined
                         </span>
-                        <Badge variant="outline" className="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-400 border-slate-200 text-[10px] px-2 py-0">
+                        <Badge className="clay-badge bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-400 text-[10px] px-2 py-0.5 font-bold whitespace-nowrap shrink-0">
                             Offline
                         </Badge>
                     </div>
-                    <div className="text-2xl sm:text-3xl font-extrabold text-foreground mt-2 tabular-nums">
+                    <div className="text-2xl sm:text-3xl font-extrabold text-foreground mt-2 tabular-nums whitespace-nowrap">
                         {summary.notJoined}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5 whitespace-nowrap truncate">
                         No clock-in recorded yet
                     </p>
                 </div>
             </div>
 
             {/* Filter Bar & Search */}
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-card p-3 rounded-xl border shadow-xs">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between clay-card p-3 sm:p-4 rounded-2xl w-full">
                 <div className="relative w-full sm:w-80">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                         placeholder="Search employee, designation, dept..."
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        className="pl-9 text-xs h-9 bg-muted/20"
+                        className="pl-9 text-xs h-9 bg-muted/30 rounded-xl font-medium border-border/60"
                     />
                 </div>
 
@@ -389,7 +397,11 @@ export function LivePresenceBoard({
                     <Button
                         variant={statusFilter === 'all' ? 'default' : 'ghost'}
                         size="sm"
-                        className="h-8 text-xs font-semibold px-3"
+                        className={`h-8 text-xs font-bold px-3 rounded-xl transition-all ${
+                            statusFilter === 'all'
+                                ? 'clay-btn bg-primary text-white shadow-xs'
+                                : 'text-foreground hover:bg-muted/60'
+                        }`}
                         onClick={() => setStatusFilter('all')}
                     >
                         All Staff ({summary.totalStaff})
@@ -397,7 +409,11 @@ export function LivePresenceBoard({
                     <Button
                         variant={statusFilter === 'working' ? 'default' : 'ghost'}
                         size="sm"
-                        className="h-8 text-xs font-semibold px-2.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
+                        className={`h-8 text-xs font-bold px-2.5 rounded-xl transition-all ${
+                            statusFilter === 'working'
+                                ? 'clay-btn bg-emerald-600 text-white shadow-xs'
+                                : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
+                        }`}
                         onClick={() => setStatusFilter('working')}
                     >
                         🟢 Working ({summary.working})
@@ -405,7 +421,11 @@ export function LivePresenceBoard({
                     <Button
                         variant={statusFilter === 'on-break' ? 'default' : 'ghost'}
                         size="sm"
-                        className="h-8 text-xs font-semibold px-2.5 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50"
+                        className={`h-8 text-xs font-bold px-2.5 rounded-xl transition-all ${
+                            statusFilter === 'on-break'
+                                ? 'clay-btn bg-amber-500 text-white shadow-xs'
+                                : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50'
+                        }`}
                         onClick={() => setStatusFilter('on-break')}
                     >
                         🟡 On Break ({summary.onBreak})
@@ -413,7 +433,11 @@ export function LivePresenceBoard({
                     <Button
                         variant={statusFilter === 'completed' ? 'default' : 'ghost'}
                         size="sm"
-                        className="h-8 text-xs font-semibold px-2.5 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50"
+                        className={`h-8 text-xs font-bold px-2.5 rounded-xl transition-all ${
+                            statusFilter === 'completed'
+                                ? 'clay-btn bg-blue-600 text-white shadow-xs'
+                                : 'text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50'
+                        }`}
                         onClick={() => setStatusFilter('completed')}
                     >
                         🔵 Done ({summary.completed})
@@ -421,7 +445,11 @@ export function LivePresenceBoard({
                     <Button
                         variant={statusFilter === 'not-joined' ? 'default' : 'ghost'}
                         size="sm"
-                        className="h-8 text-xs font-semibold px-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                        className={`h-8 text-xs font-bold px-2.5 rounded-xl transition-all ${
+                            statusFilter === 'not-joined'
+                                ? 'clay-btn bg-rose-600 text-white shadow-xs'
+                                : 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50'
+                        }`}
                         onClick={() => setStatusFilter('not-joined')}
                     >
                         ⚪ Not Joined ({summary.notJoined})
@@ -443,7 +471,7 @@ export function LivePresenceBoard({
                 </div>
             ) : viewMode === 'cards' ? (
                 /* ── CARDS VIEW ────────────────────────────────────────────── */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
                     {filteredMembers.map(member => {
                         const isWorking = member.status === 'working'
                         const isOnBreak = member.status === 'on-break'
@@ -456,13 +484,13 @@ export function LivePresenceBoard({
                         return (
                             <Card
                                 key={member.id}
-                                className={`overflow-hidden transition-all duration-300 hover:shadow-md border ${
+                                className={`clay-card rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-lg ${
                                     isOnBreak
-                                        ? 'border-amber-300 dark:border-amber-900/60 bg-amber-50/20 dark:bg-amber-950/10'
+                                        ? 'border-amber-400/60 bg-amber-50/20 dark:bg-amber-950/10'
                                         : isWorking
-                                        ? 'border-emerald-200 dark:border-emerald-900/40 bg-card hover:border-emerald-300'
+                                        ? 'border-emerald-400/50 bg-card hover:border-emerald-500'
                                         : isDone
-                                        ? 'border-blue-200 dark:border-blue-900/40 bg-card'
+                                        ? 'border-blue-400/40 bg-card'
                                         : 'border-border/60 bg-muted/10 opacity-80 hover:opacity-100'
                                 }`}
                             >
@@ -508,24 +536,24 @@ export function LivePresenceBoard({
                                         </div>
 
                                         {/* Status Badge */}
-                                        <div>
+                                        <div className="shrink-0">
                                             {isWorking && (
-                                                <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 shadow-xs">
+                                                <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 shadow-xs whitespace-nowrap shrink-0">
                                                     🟢 Working
                                                 </Badge>
                                             )}
                                             {isOnBreak && (
-                                                <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-2 py-0.5 shadow-xs font-bold animate-pulse">
+                                                <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-2 py-0.5 shadow-xs font-bold animate-pulse whitespace-nowrap shrink-0">
                                                     ☕ On Break
                                                 </Badge>
                                             )}
                                             {isDone && (
-                                                <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5 shadow-xs">
+                                                <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5 shadow-xs whitespace-nowrap shrink-0">
                                                     ✅ Shift Done
                                                 </Badge>
                                             )}
                                             {isNotJoined && (
-                                                <Badge variant="outline" className="text-muted-foreground text-[10px] px-2 py-0.5">
+                                                <Badge variant="outline" className="text-muted-foreground text-[10px] px-2 py-0.5 whitespace-nowrap shrink-0">
                                                     ⚪ Not Joined
                                                 </Badge>
                                             )}
@@ -638,7 +666,7 @@ export function LivePresenceBoard({
                 </div>
             ) : (
                 /* ── TABLE VIEW ────────────────────────────────────────────── */
-                <Card>
+                <Card className="clay-card rounded-2xl overflow-hidden border">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <Table>

@@ -119,109 +119,145 @@ export function SalesDashboardSection({ className }: SalesDashboardProps) {
                 <div className="absolute left-1/3 bottom-0 h-32 w-32 bg-indigo-500/20 blur-3xl rounded-full pointer-events-none" />
             </div>
 
-            {/* Top 6 KPI Metric Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+            {/* Top 6 KPI Metric Cards - Claymorphic with Zero Text Clipping & Auto-Distributing Grid */}
+            <div 
+                className="w-full gap-3.5"
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))'
+                }}
+            >
                 {/* 1. Total Leads */}
-                <Card 
-                    className="p-4 rounded-2xl border border-border/50 bg-card hover:border-primary/40 transition-all cursor-pointer shadow-xs group"
+                <div 
+                    className="clay-card p-4 rounded-2xl cursor-pointer group select-none active:scale-[0.98] transition-all flex flex-col justify-between min-h-[120px]"
                     onClick={() => navigate('/leads')}
                 >
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Leads</span>
-                        <div className="h-7 w-7 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                    <div className="flex items-center justify-between">
+                        <div className="clay-icon h-7 w-7 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
                             <Users className="h-3.5 w-3.5" />
                         </div>
+                        <span className="clay-badge text-[9px] font-bold px-1.5 py-0.5 bg-blue-500/10 text-blue-600">Leads</span>
                     </div>
-                    <div className="text-2xl font-extrabold text-foreground group-hover:text-primary transition-colors">
-                        {summary?.totalLeads ?? 0}
+                    <div className="mt-2.5">
+                        <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider block leading-snug line-clamp-1" title="Total Leads">
+                            Total Leads
+                        </span>
+                        <div className="text-xl sm:text-2xl font-extrabold text-foreground group-hover:text-primary transition-colors leading-tight mt-0.5 tabular-nums">
+                            {summary?.totalLeads ?? 0}
+                        </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground block mt-1">
+                    <span className="text-[10px] text-muted-foreground block mt-1 leading-none font-medium">
                         New: <strong className="text-blue-600">{summary?.newLeads ?? 0}</strong>
                     </span>
-                </Card>
+                </div>
 
                 {/* 2. Calls Made */}
-                <Card className="p-4 rounded-2xl border border-border/50 bg-card shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Calls Made</span>
-                        <div className="h-7 w-7 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                <div className="clay-card p-4 rounded-2xl flex flex-col justify-between min-h-[120px]">
+                    <div className="flex items-center justify-between">
+                        <div className="clay-icon h-7 w-7 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
                             <PhoneCall className="h-3.5 w-3.5" />
                         </div>
+                        <span className="clay-badge text-[9px] font-bold px-1.5 py-0.5 bg-indigo-500/10 text-indigo-600">Calls</span>
                     </div>
-                    <div className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">
-                        {summary?.totalCalls ?? 0}
+                    <div className="mt-2.5">
+                        <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider block leading-snug line-clamp-1" title="Calls Made">
+                            Calls Made
+                        </span>
+                        <div className="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 leading-tight mt-0.5 tabular-nums">
+                            {summary?.totalCalls ?? 0}
+                        </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground block mt-1">
+                    <span className="text-[10px] text-muted-foreground block mt-1 leading-none font-medium">
                         Today: <strong className="text-foreground">{summary?.totalCallsToday ?? 0}</strong>
                     </span>
-                </Card>
+                </div>
 
                 {/* 3. Spoke With (Unique Leads) */}
-                <Card className="p-4 rounded-2xl border border-border/50 bg-card shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Spoke With</span>
-                        <div className="h-7 w-7 rounded-xl bg-sky-500/10 text-sky-600 flex items-center justify-center">
+                <div className="clay-card p-4 rounded-2xl flex flex-col justify-between min-h-[120px]">
+                    <div className="flex items-center justify-between">
+                        <div className="clay-icon h-7 w-7 rounded-xl bg-sky-500/10 text-sky-600 flex items-center justify-center shrink-0">
                             <PhoneForwarded className="h-3.5 w-3.5" />
                         </div>
+                        <span className="clay-badge text-[9px] font-bold px-1.5 py-0.5 bg-sky-500/10 text-sky-600">Connect</span>
                     </div>
-                    <div className="text-2xl font-extrabold text-sky-600 dark:text-sky-400">
-                        {summary?.totalUniqueContacted ?? 0}
+                    <div className="mt-2.5">
+                        <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider block leading-snug line-clamp-1" title="Spoke With">
+                            Spoke With
+                        </span>
+                        <div className="text-xl sm:text-2xl font-extrabold text-sky-600 dark:text-sky-400 leading-tight mt-0.5 tabular-nums">
+                            {summary?.totalUniqueContacted ?? 0}
+                        </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground block mt-1">
+                    <span className="text-[10px] text-muted-foreground block mt-1 leading-none font-medium">
                         Unique Contacts
                     </span>
-                </Card>
+                </div>
 
                 {/* 4. Meetings Booked */}
-                <Card className="p-4 rounded-2xl border border-border/50 bg-card shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Meetings Booked</span>
-                        <div className="h-7 w-7 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                <div className="clay-card p-4 rounded-2xl flex flex-col justify-between min-h-[120px]">
+                    <div className="flex items-center justify-between">
+                        <div className="clay-icon h-7 w-7 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
                             <CalendarCheck className="h-3.5 w-3.5" />
                         </div>
+                        <span className="clay-badge text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/10 text-amber-600">Meetings</span>
                     </div>
-                    <div className="text-2xl font-extrabold text-amber-600 dark:text-amber-400">
-                        {summary?.totalMeetings ?? 0}
+                    <div className="mt-2.5">
+                        <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider block leading-snug line-clamp-1" title="Meetings Booked">
+                            Meetings Booked
+                        </span>
+                        <div className="text-xl sm:text-2xl font-extrabold text-amber-600 dark:text-amber-400 leading-tight mt-0.5 tabular-nums">
+                            {summary?.totalMeetings ?? 0}
+                        </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground block mt-1">
+                    <span className="text-[10px] text-muted-foreground block mt-1 leading-none font-medium">
                         Pending: <strong className="text-amber-600">{summary?.pendingMeetings ?? 0}</strong>
                     </span>
-                </Card>
+                </div>
 
                 {/* 5. Closed / Won Deals */}
-                <Card className="p-4 rounded-2xl border border-border/50 bg-card shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Deals Won</span>
-                        <div className="h-7 w-7 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                <div className="clay-card p-4 rounded-2xl flex flex-col justify-between min-h-[120px]">
+                    <div className="flex items-center justify-between">
+                        <div className="clay-icon h-7 w-7 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
                             <Trophy className="h-3.5 w-3.5" />
                         </div>
+                        <span className="clay-badge text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600">Won</span>
                     </div>
-                    <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                        {summary?.totalDealsWon ?? 0}
-                    </div>
-                    <span className="text-[10px] text-emerald-600 font-bold block mt-1 truncate" title={formatCurrency(summary?.totalRevenueWon ?? 0)}>
-                        {formatCurrency(summary?.totalRevenueWon ?? 0)}
-                    </span>
-                </Card>
-
-                {/* 6. Pending & Overdue Follow-ups */}
-                <Card 
-                    className="p-4 rounded-2xl border border-border/50 bg-card shadow-xs cursor-pointer hover:border-red-400/40 transition-all"
-                    onClick={() => navigate('/leads')}
-                >
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Overdue Calls</span>
-                        <div className="h-7 w-7 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
-                            <AlertTriangle className="h-3.5 w-3.5" />
+                    <div className="mt-2.5">
+                        <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider block leading-snug line-clamp-1" title="Deals Won">
+                            Deals Won
+                        </span>
+                        <div className="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight mt-0.5 tabular-nums">
+                            {summary?.totalDealsWon ?? 0}
                         </div>
                     </div>
-                    <div className="text-2xl font-extrabold text-rose-600 dark:text-rose-400">
-                        {summary?.totalOverdueFollowups ?? 0}
-                    </div>
-                    <span className="text-[10px] text-muted-foreground block mt-1">
-                        Total Pending: <strong className="text-foreground">{summary?.totalPendingFollowups ?? 0}</strong>
+                    <span className="text-[10px] text-emerald-600 font-bold block mt-1 leading-none whitespace-nowrap overflow-visible" title={formatCurrency(summary?.totalRevenueWon ?? 0)}>
+                        {formatCurrency(summary?.totalRevenueWon ?? 0)}
                     </span>
-                </Card>
+                </div>
+
+                {/* 6. Pending & Overdue Follow-ups */}
+                <div 
+                    className="clay-card p-4 rounded-2xl cursor-pointer group select-none active:scale-[0.98] transition-all hover:border-red-400/40 flex flex-col justify-between min-h-[120px]"
+                    onClick={() => navigate('/leads')}
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="clay-icon h-7 w-7 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="clay-badge text-[9px] font-bold px-1.5 py-0.5 bg-rose-500/10 text-rose-600">Overdue</span>
+                    </div>
+                    <div className="mt-2.5">
+                        <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider block leading-snug line-clamp-1" title="Overdue Calls">
+                            Overdue Calls
+                        </span>
+                        <div className="text-xl sm:text-2xl font-extrabold text-rose-600 dark:text-rose-400 leading-tight mt-0.5 tabular-nums">
+                            {summary?.totalOverdueFollowups ?? 0}
+                        </div>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground block mt-1 leading-none font-medium">
+                        Pending: <strong className="text-foreground">{summary?.totalPendingFollowups ?? 0}</strong>
+                    </span>
+                </div>
             </div>
 
             {/* Agent Performance Leaderboard & Detailed Grid */}

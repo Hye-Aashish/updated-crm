@@ -23,7 +23,11 @@ import {
     BellRing,
     Brain,
     FileSignature,
-    Trophy
+    Trophy,
+    Package,
+    Server,
+    Sparkles,
+    Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -66,7 +70,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: SidebarProps) {
     const location = useLocation()
     const navigate = useNavigate()
-    const { currentUser } = useAppStore()
+    const { currentUser, settings } = useAppStore()
     const [logo, setLogo] = useState<string | null>(null)
     const [icon, setIcon] = useState<string | null>(null)
     const [companyName, setCompanyName] = useState('Nexprism')
@@ -74,69 +78,92 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
     const [logoDims, setLogoDims] = useState({ width: 'auto', height: '32px' })
     const [permissions, setPermissions] = useState<any>(null)
 
-    useEffect(() => {
-        api.get('/settings').then(res => {
-            const cp = res.data?.companyProfile
-            if (cp) {
-                if (cp.logo) setLogo(cp.logo)
-                if (cp.icon) setIcon(cp.icon)
-                if (cp.name) setCompanyName(cp.name)
-                if (cp.logoWidth) setLogoDims(prev => ({ ...prev, width: cp.logoWidth }))
-                if (cp.logoHeight) setLogoDims(prev => ({ ...prev, height: cp.logoHeight }))
-                if (cp.themeColor) {
-                    const hsl = hexToHSL(cp.themeColor)
-                    if (hsl) document.documentElement.style.setProperty('--primary', hsl)
-                }
+    const applyCompanyProfile = (cp: any, rolesData?: any) => {
+        if (cp) {
+            setLogo(cp.logo || null)
+            setIcon(cp.icon || null)
+            if (cp.name) setCompanyName(cp.name)
+            setLogoDims({
+                width: cp.logoWidth || 'auto',
+                height: cp.logoHeight || '32px',
+            })
+            if (cp.themeColor) {
+                const hsl = hexToHSL(cp.themeColor)
+                if (hsl) document.documentElement.style.setProperty('--primary', hsl)
             }
+        }
 
-            // Permissions Logic
-            if (currentUser?.role && currentUser.role !== 'owner' && res.data.roles) {
-                const userRole = (currentUser.role || '').toLowerCase().replace(/[\s_]+/g, '');
-                const role = res.data.roles.find((r: any) => {
-                    const rName = (r.name || '').toLowerCase().replace(/[\s_]+/g, '');
-                    const rLabel = (r.label || '').toLowerCase().replace(/[\s_]+/g, '');
-                    return rName === userRole || rLabel === userRole;
-                });
-                if (role) setPermissions(role.permissions || {});
-            }
+        if (currentUser?.role && currentUser.role !== 'owner' && rolesData) {
+            const userRole = (currentUser.role || '').toLowerCase().replace(/[\s_]+/g, '');
+            const role = rolesData.find((r: any) => {
+                const rName = (r.name || '').toLowerCase().replace(/[\s_]+/g, '');
+                const rLabel = (r.label || '').toLowerCase().replace(/[\s_]+/g, '');
+                return rName === userRole || rLabel === userRole;
+            });
+            if (role) setPermissions(role.permissions || {});
+        }
+    }
+
+    useEffect(() => {
+        if (settings?.companyProfile) {
+            applyCompanyProfile(settings.companyProfile, settings.roles)
+            return
+        }
+        api.get('/settings').then(res => {
+            applyCompanyProfile(res.data?.companyProfile, res.data?.roles)
         }).catch(err => console.error("Logo fetch error", err))
-    }, [currentUser])
+    }, [currentUser, settings])
 
     const navItems = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Sales Dashboard', href: '/sales-dashboard', icon: Target },
-        { name: 'User Tracker', href: '/user-tracker', icon: Activity },
-        { name: 'Screen Monitoring', href: '/screen-monitoring', icon: Monitor },
-        { name: 'Clients', href: '/clients', icon: Users },
-        { name: 'Projects', href: '/projects', icon: Briefcase },
-        { name: 'Digital Products', href: '/products', icon: Briefcase }, // Can use a better icon like Package later
-        { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-        { name: 'Team', href: '/team?tab=members', icon: Users },
-        { name: 'Capacity Planning', href: '/team/capacity', icon: BarChart },
-        { name: 'Approvals', href: '/approvals', icon: FileSignature },
-        { name: 'Email Campaigns', href: '/campaigns', icon: MessageSquare },
-        { name: 'Goals & OKRs', href: '/goals', icon: Trophy },
-        { name: 'Offer Letters', href: '/offer-letters', icon: Shield },
-        { name: 'Attendance', href: '/attendance', icon: Clock }, // Updated link
-        { name: 'Time Tracking', href: '/time', icon: Clock },
-        { name: 'Invoices', href: '/invoices', icon: FileText },
-        { name: 'AMC', href: '/amc', icon: Shield },
-        { name: 'Domains', href: '/domains', icon: Globe },
-        { name: 'Expiry Alerts', href: '/expiry-alerts', icon: BellRing },
-        { name: 'Hosting', href: '/hosting', icon: LayoutDashboard },
-        { name: 'Quotations', href: '/quotations', icon: FileText },
-        { name: 'Leads', href: '/leads', icon: Target },
-        { name: 'Expenses', href: '/expenses', icon: Wallet },
-        { name: 'Payroll', href: '/salary', icon: Wallet },
-        { name: 'Support Tickets', href: '/tickets', icon: LifeBuoy },
-        { name: 'Project Chat', href: '/project-chat', icon: MessageCircle },
-        { name: 'Live Chat', href: '/chat', icon: MessageSquare },
-        { name: 'Reports', href: '/reports', icon: BarChart },
-        { name: 'Files', href: '/files', icon: FolderOpen },
-        { name: 'AI Assistant', href: '/ai-assistant', icon: Brain },
-        { name: 'Roles & Permissions', href: '/settings/roles', icon: Shield },
-        { name: 'Settings', href: '/settings', icon: Settings },
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, category: 'Executive' },
+        { name: 'My Calendar', href: '/calendar', icon: Clock, category: 'Executive' },
+        { name: 'Sales Dashboard', href: '/sales-dashboard', icon: Target, category: 'Executive' },
+        { name: 'User Tracker', href: '/user-tracker', icon: Activity, category: 'Executive' },
+        { name: 'Screen Monitoring', href: '/screen-monitoring', icon: Monitor, category: 'Executive' },
+
+        { name: 'Clients', href: '/clients', icon: Users, category: 'Work & Clients' },
+        { name: 'Projects', href: '/projects', icon: Briefcase, category: 'Work & Clients' },
+        { name: 'Digital Products', href: '/products', icon: Package, category: 'Work & Clients' },
+        { name: 'Tasks', href: '/tasks', icon: CheckSquare, category: 'Work & Clients' },
+        { name: 'My Day', href: '/tasks/my-day', icon: Clock, category: 'Work & Clients' },
+
+        { name: 'Leads', href: '/leads', icon: Target, category: 'Sales & Pipeline' },
+        { name: 'Sales Automations', href: '/sales/automations', icon: Zap, category: 'Sales & Pipeline' },
+        { name: 'Contracts Vault', href: '/sales/contracts', icon: FileSignature, category: 'Sales & Pipeline' },
+        { name: 'Quotations', href: '/quotations', icon: FileText, category: 'Sales & Pipeline' },
+        { name: 'Email Campaigns', href: '/campaigns', icon: MessageSquare, category: 'Sales & Pipeline' },
+
+        { name: 'Invoices', href: '/invoices', icon: FileText, category: 'Financial Hub' },
+        { name: 'Credit Notes', href: '/credit-notes', icon: FileText, category: 'Financial Hub' },
+        { name: 'Vendor Bills', href: '/vendor-bills', icon: Wallet, category: 'Financial Hub' },
+        { name: 'GST & P&L', href: '/reports/gst', icon: BarChart, category: 'Financial Hub' },
+        { name: 'Expenses', href: '/expenses', icon: Wallet, category: 'Financial Hub' },
+        { name: 'Payroll', href: '/salary', icon: Wallet, category: 'Financial Hub' },
+
+        { name: 'AMC', href: '/amc', icon: Shield, category: 'Operations & Assets' },
+        { name: 'Domains', href: '/domains', icon: Globe, category: 'Operations & Assets' },
+        { name: 'Hosting', href: '/hosting', icon: Server, category: 'Operations & Assets' },
+        { name: 'Expiry Alerts', href: '/expiry-alerts', icon: BellRing, category: 'Operations & Assets' },
+
+        { name: 'Team', href: '/team?tab=members', icon: Users, category: 'Team & HR' },
+        { name: 'Attendance', href: '/attendance', icon: Clock, category: 'Team & HR' },
+        { name: 'Time Tracking', href: '/time', icon: Clock, category: 'Team & HR' },
+        { name: 'Capacity Planning', href: '/team/capacity', icon: BarChart, category: 'Team & HR' },
+        { name: 'Approvals', href: '/approvals', icon: FileSignature, category: 'Team & HR' },
+        { name: 'Offer Letters', href: '/offer-letters', icon: Shield, category: 'Team & HR' },
+        { name: 'Goals & OKRs', href: '/goals', icon: Trophy, category: 'Team & HR' },
+
+        { name: 'Support Tickets', href: '/tickets', icon: LifeBuoy, category: 'Communications' },
+        { name: 'Project Chat', href: '/project-chat', icon: MessageCircle, category: 'Communications' },
+        { name: 'Live Chat', href: '/chat', icon: MessageSquare, category: 'Communications' },
+
+        { name: 'Reports', href: '/reports', icon: BarChart, category: 'System & Intelligence' },
+        { name: 'Files', href: '/files', icon: FolderOpen, category: 'System & Intelligence' },
+        { name: 'AI Assistant', href: '/ai-assistant', icon: Brain, category: 'System & Intelligence' },
+        { name: 'Roles & Permissions', href: '/settings/roles', icon: Shield, category: 'System & Intelligence' },
+        { name: 'Settings', href: '/settings', icon: Settings, category: 'System & Intelligence' },
     ]
+
     const filteredItems = navItems.filter(item => {
         if (currentUser?.role === 'owner' || currentUser?.role === 'admin') return true
 
@@ -155,13 +182,13 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         }
 
         if (!permissions && (currentUser?.role as string) !== 'owner') {
-            // Safe Default: If permissions haven't loaded yet, only show Dashboard.
             return ['Dashboard'].includes(item.name)
         }
 
         const p = permissions
         switch (item.name) {
             case 'Dashboard': return !!p.dashboard?.view
+            case 'My Calendar': return true
             case 'Sales Dashboard': return !!(p.leads?.view || p.dashboard?.view)
             case 'User Tracker': return !!p.user_tracker?.view
             case 'Screen Monitoring': return !!p.screen_monitoring?.view
@@ -169,6 +196,12 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
             case 'Projects': return !!p.projects?.view
             case 'Digital Products': return !!p.projects?.view
             case 'Tasks': return !!p.tasks?.view
+            case 'My Day': return !!p.tasks?.view
+            case 'Sales Automations': return !!p.leads?.view
+            case 'Contracts Vault': return !!p.leads?.view
+            case 'Credit Notes': return !!p.invoices?.view
+            case 'Vendor Bills': return !!p.invoices?.view
+            case 'GST & P&L': return !!p.reports?.view
             case 'Team': return !!p.team?.view
             case 'Capacity Planning': return !!(p.capacity?.view || p.team?.view)
             case 'Approvals': return !!(p.approvals?.view || p.payroll?.view)
@@ -198,121 +231,68 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
         }
     })
 
+    // Group items by category to render structured visual blocks
+    let lastCategory = ''
+
     return (
         <>
-            {/* Mobile Sidebar */}
-            <div className={cn(
-                "fixed inset-0 z-[100] transition-opacity duration-300 lg:hidden",
-                mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-            )} onClick={() => setMobileOpen(false)}>
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+            {/* Mobile Sidebar Overlay & Drawer */}
+            <div 
+                className={cn(
+                    "fixed inset-0 z-[100] transition-opacity duration-300 lg:hidden",
+                    mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                )} 
+                onClick={() => setMobileOpen(false)}
+            >
+                <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md" />
                 <div 
                     className={cn(
-                        "fixed inset-y-0 left-0 flex w-72 flex-col bg-card shadow-2xl transition-transform duration-300 ease-in-out z-[101]",
+                        "fixed inset-y-0 left-0 flex w-72 flex-col bg-card/95 backdrop-blur-2xl shadow-2xl transition-transform duration-300 ease-in-out z-[101] border-r border-border/50",
                         mobileOpen ? "translate-x-0" : "-translate-x-full"
                     )}
                     onClick={e => e.stopPropagation()}
                 >
-                        {/* Mobile Logo */}
-                        <div className="flex h-16 shrink-0 items-center px-4 border-b">
+                    {/* Mobile Brand Header */}
+                    <div className="flex h-16 shrink-0 items-center px-4 border-b border-border/40 justify-between">
+                        <div className={cn("flex items-center gap-2.5 min-w-0 flex-1", logo && "justify-center")}>
                             {logo ? (
-                                <img src={logo} alt="Logo" className="max-h-8 w-auto object-contain" />
+                                <div className="flex items-center justify-center min-w-0 max-w-[180px]">
+                                    <img
+                                        src={logo}
+                                        alt={companyName}
+                                        className="max-h-10 w-auto max-w-full object-contain"
+                                        style={{
+                                            width: logoDims.width !== 'auto' ? logoDims.width : undefined,
+                                            height: logoDims.height !== 'auto' ? logoDims.height : undefined,
+                                        }}
+                                    />
+                                </div>
                             ) : (
-                                <span className="text-lg font-bold text-primary">{companyName}</span>
+                                <>
+                                    <div className="clay-icon h-9 w-9 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary/80 flex items-center justify-center text-white font-extrabold text-sm shadow-sm shrink-0">
+                                        {companyName.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <span className="text-sm font-extrabold text-foreground tracking-tight block truncate">
+                                            {companyName}
+                                        </span>
+                                        <span className="clay-badge text-[9px] font-extrabold tracking-wider uppercase px-2 py-0.5 bg-primary/10 text-primary border-primary/20 inline-block">
+                                            CRM Workspace
+                                        </span>
+                                    </div>
+                                </>
                             )}
                         </div>
-                        {/* Mobile Nav */}
-                        <div className="flex-1 overflow-y-auto py-4">
-                            <nav className="grid gap-1 px-2">
-                                {filteredItems.map((item, index) => {
-                                    const isActive = location.pathname === item.href
-                                    return (
-                                        <Link
-                                            key={index}
-                                            to={item.href}
-                                            onClick={() => setMobileOpen(false)}
-                                            className={cn(
-                                                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                                                isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                            )}
-                                        >
-                                            <item.icon className="h-4 w-4" />
-                                            {item.name}
-                                        </Link>
-                                    )
-                                })}
-                            </nav>
-                        </div>
-                </div>
-            </div>
+                        <button
+                            onClick={() => setMobileOpen(false)}
+                            className="clay-btn h-8 w-8 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all shrink-0 active:scale-95"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </button>
+                    </div>
 
-            {/* Desktop Sidebar */}
-            <div className={cn(
-                "hidden border-r bg-card lg:flex flex-col transition-all duration-300 h-full",
-                collapsed ? "w-[70px]" : "w-64"
-            )}>
-                {/* Desktop Logo */}
-                <div className="flex h-16 shrink-0 items-center px-4 border-b gap-2 justify-between overflow-hidden">
-                    {!collapsed && (
-                        logo ? (
-                            <div className="flex-1 flex justify-start items-center overflow-hidden">
-                                <img
-                                    src={logo}
-                                    alt="Logo"
-                                    className="max-h-10 max-w-full object-contain"
-                                    style={{
-                                        width: logoDims.width !== 'auto' ? logoDims.width : undefined,
-                                        height: logoDims.height !== 'auto' ? logoDims.height : undefined
-                                    }}
-                                />
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex items-center gap-2 overflow-hidden">
-                                <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                    {companyName.charAt(0)}
-                                </div>
-                                <span className="font-bold text-lg truncate">{companyName}</span>
-                            </div>
-                        )
-                    )}
-                    {collapsed && (
-                        icon ? (
-                            <div className="w-full flex justify-center">
-                                <img src={icon} alt="Icon" className="h-8 w-8 object-contain" />
-                            </div>
-                        ) : (
-                            logo ? (
-                                <div className="w-full flex justify-center">
-                                    <img src={logo} alt="Logo" className="h-8 w-auto object-contain" />
-                                </div>
-                            ) : (
-                                <span className="mx-auto font-bold text-primary">{companyName.charAt(0)}</span>
-                            )
-                        )
-                    )}
-
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="hidden lg:flex"
-                        onClick={() => setCollapsed(!collapsed)}
-                    >
-                        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                    </Button>
-
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="lg:hidden"
-                        onClick={() => setMobileOpen(false)}
-                    >
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                </div>
-
-                {/* Navigation */}
-                <div className="flex-1 overflow-y-auto py-6">
-                    <nav className="grid gap-1 px-3">
+                    {/* Mobile Nav Links */}
+                    <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scrollbar-hide">
                         {filteredItems.map((item, index) => {
                             const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)
                             return (
@@ -321,85 +301,252 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
                                     to={item.href}
                                     onClick={() => setMobileOpen(false)}
                                     className={cn(
-                                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all relative group",
+                                        "flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all relative group",
                                         isActive
-                                            ? "bg-primary/10 text-primary" // Professional: colored text/bg tint instead of solid fill
-                                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                        collapsed && "justify-center px-2"
+                                            ? "clay-nav-active font-bold text-white shadow-md"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                                     )}
-                                    title={collapsed ? item.name : undefined}
                                 >
-                                    {/* Active Indicator Bar (Left) */}
-                                    {isActive && !collapsed && (
-                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-primary rounded-r-full" />
-                                    )}
-
-                                    <item.icon className={cn(
-                                        "h-4 w-4 flex-shrink-0 transition-colors",
-                                        isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                                    )} />
-
-                                    {!collapsed && (
-                                        <span className={cn(
-                                            "truncate",
-                                            isActive && "font-bold"
-                                        )}>
-                                            {item.name}
-                                        </span>
+                                    <div className={cn(
+                                        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-all",
+                                        isActive
+                                            ? "bg-white/20 text-white shadow-xs"
+                                            : "text-muted-foreground group-hover:text-primary group-hover:bg-primary/10"
+                                    )}>
+                                        <item.icon className="h-4 w-4" />
+                                    </div>
+                                    <span className={cn(
+                                        "truncate font-bold tracking-tight text-[12px] flex-1",
+                                        isActive ? "text-white" : "text-foreground/80 group-hover:text-foreground"
+                                    )}>
+                                        {item.name}
+                                    </span>
+                                    {isActive && (
+                                        <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0 shadow-xs" />
                                     )}
                                 </Link>
                             )
                         })}
-                    </nav>
-                </div>
+                    </div>
 
-                {/* User Profile (Collapsed/Expanded) */}
-                <div className="p-4 border-t">
-                    <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-                        {!collapsed ? (
-                            <>
-                                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-2 ring-background">
+                    {/* Mobile Profile Footer */}
+                    <div className="p-3 border-t border-border/40 bg-card/40">
+                        <div className="clay-card p-2.5 rounded-2xl flex items-center gap-2.5 bg-card/90">
+                            <div className="relative shrink-0">
+                                <div className="clay-icon h-9 w-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-extrabold text-xs">
                                     {currentUser?.name?.charAt(0) || 'U'}
                                 </div>
-                                <div className="overflow-hidden flex-1">
-                                    <p className="text-sm font-medium truncate">{currentUser?.name}</p>
-                                    <p className="text-xs text-muted-foreground truncate capitalize">{currentUser?.role}</p>
-                                </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={async () => {
-                                    try {
-                                        await api.post('/time-entries/stop-running')
-                                    } catch (err) {
-                                        console.error('Logout timer stop failed', err)
-                                    } finally {
-                                        localStorage.removeItem('token');
-                                        navigate('/login');
-                                    }
-                                }} title="Logout">
-                                    <LogOut className="h-4 w-4" />
-                                </Button>
-                            </>
-                        ) : (
-                            <div className="flex flex-col gap-2 items-center">
-                                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-2 ring-background">
-                                    {currentUser?.name?.charAt(0) || 'U'}
-                                </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={async () => {
-                                    try {
-                                        await api.post('/time-entries/stop-running')
-                                    } catch (err) {
-                                        console.error('Logout timer stop failed', err)
-                                    } finally {
-                                        localStorage.removeItem('token');
-                                        navigate('/login');
-                                    }
-                                }} title="Logout">
-                                    <LogOut className="h-4 w-4" />
-                                </Button>
+                                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" />
                             </div>
-                        )}
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-extrabold text-foreground truncate leading-tight">
+                                    {currentUser?.name}
+                                </p>
+                                <span className="clay-badge text-[9px] font-bold uppercase px-1.5 py-0.2 bg-muted text-muted-foreground truncate leading-tight mt-0.5 inline-block">
+                                    {currentUser?.role}
+                                </span>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await api.post('/time-entries/stop-running')
+                                    } catch (err) {
+                                        console.error('Logout timer stop failed', err)
+                                    } finally {
+                                        localStorage.removeItem('token');
+                                        navigate('/login');
+                                    }
+                                }}
+                                className="clay-btn h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all shrink-0 active:scale-95 shadow-xs"
+                                title="Logout"
+                            >
+                                <LogOut className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* Desktop Claymorphic Sidebar */}
+            <aside 
+                className={cn(
+                    "hidden border-r border-border/50 bg-card/95 backdrop-blur-xl lg:flex flex-col transition-all duration-300 h-full relative z-20 shadow-xs",
+                    collapsed ? "w-[72px]" : "w-64"
+                )}
+            >
+                {/* Desktop Brand Header */}
+                <div className="flex h-16 shrink-0 items-center px-3.5 border-b border-border/40 gap-2 justify-between overflow-hidden bg-card/50">
+                    {!collapsed ? (
+                        <div className={cn("flex items-center gap-2.5 min-w-0 flex-1", logo && "justify-center")}>
+                            {logo ? (
+                                <div className="flex items-center justify-center min-w-0 max-w-[180px]">
+                                    <img
+                                        src={logo}
+                                        alt={companyName}
+                                        className="max-h-10 w-auto max-w-full object-contain"
+                                        style={{
+                                            width: logoDims.width !== 'auto' ? logoDims.width : undefined,
+                                            height: logoDims.height !== 'auto' ? logoDims.height : undefined,
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="clay-icon h-9 w-9 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary/80 flex items-center justify-center text-white font-extrabold text-sm shrink-0 shadow-sm">
+                                        {companyName.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <span className="font-extrabold text-sm text-foreground tracking-tight truncate block leading-snug">
+                                            {companyName}
+                                        </span>
+                                        <span className="clay-badge text-[9px] font-extrabold tracking-wider uppercase px-2 py-0.5 bg-primary/10 text-primary border-primary/20 inline-block leading-tight">
+                                            Enterprise
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="w-full flex justify-center">
+                            {icon ? (
+                                <div className="clay-icon h-9 w-9 rounded-xl bg-card flex items-center justify-center">
+                                    <img src={icon} alt="Icon" className="h-6 w-6 object-contain" />
+                                </div>
+                            ) : (
+                                <div className="clay-icon h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white font-extrabold text-sm shadow-sm">
+                                    {companyName.charAt(0)}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Toggle Button */}
+                    <button
+                        onClick={() => setCollapsed(!collapsed)}
+                        className="hidden lg:flex clay-btn h-8 w-8 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground items-center justify-center transition-all shrink-0 active:scale-95 shadow-xs"
+                        title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                    >
+                        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                    </button>
+                </div>
+
+                {/* Desktop Nav Scrollable Container */}
+                <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-0.5 scrollbar-hide">
+                    {filteredItems.map((item, index) => {
+                        const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)
+                        const showHeader = !collapsed && item.category && item.category !== lastCategory
+                        if (item.category) lastCategory = item.category
+
+                        return (
+                            <div key={index}>
+                                {showHeader && (
+                                    <div className="pt-3 pb-1 px-2.5 flex items-center justify-between">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground/60 font-sans">
+                                            {item.category}
+                                        </span>
+                                    </div>
+                                )}
+                                <Link
+                                    to={item.href}
+                                    className={cn(
+                                        "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold transition-all relative group",
+                                        isActive
+                                            ? "clay-nav-active font-bold text-white shadow-md"
+                                            : "text-foreground/80 hover:text-foreground hover:bg-card/80 hover:shadow-xs",
+                                        collapsed && "justify-center px-1.5 py-2 h-10 w-10 mx-auto mb-1"
+                                    )}
+                                    title={collapsed ? item.name : undefined}
+                                >
+                                    <div className={cn(
+                                        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-all",
+                                        isActive
+                                            ? "bg-white/20 text-white shadow-xs"
+                                            : "text-muted-foreground group-hover:text-primary group-hover:bg-primary/10"
+                                    )}>
+                                        <item.icon className="h-4 w-4" />
+                                    </div>
+
+                                    {!collapsed && (
+                                        <span className={cn(
+                                            "truncate font-bold tracking-tight text-[12px] flex-1",
+                                            isActive ? "text-white" : "text-foreground/80 group-hover:text-foreground"
+                                        )}>
+                                            {item.name}
+                                        </span>
+                                    )}
+
+                                    {isActive && !collapsed && (
+                                        <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0 shadow-xs" />
+                                    )}
+                                </Link>
+                            </div>
+                        )
+                    })}
+                </div>
+
+                {/* Desktop User Profile Capsule Footer */}
+                <div className="p-2.5 border-t border-border/40 bg-card/40">
+                    {!collapsed ? (
+                        <div className="clay-card p-2.5 rounded-2xl flex items-center gap-2.5 bg-card/90">
+                            <div className="relative shrink-0">
+                                <div className="clay-icon h-9 w-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-extrabold text-xs">
+                                    {currentUser?.name?.charAt(0) || 'U'}
+                                </div>
+                                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-extrabold text-foreground truncate leading-tight">
+                                    {currentUser?.name}
+                                </p>
+                                <span className="clay-badge text-[9px] font-bold uppercase px-1.5 py-0.2 bg-muted text-muted-foreground truncate leading-tight mt-0.5 inline-block">
+                                    {currentUser?.role}
+                                </span>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await api.post('/time-entries/stop-running')
+                                    } catch (err) {
+                                        console.error('Logout timer stop failed', err)
+                                    } finally {
+                                        localStorage.removeItem('token');
+                                        navigate('/login');
+                                    }
+                                }}
+                                className="clay-btn h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all shrink-0 active:scale-95 shadow-xs"
+                                title="Logout"
+                            >
+                                <LogOut className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2 items-center py-1">
+                            <div className="relative">
+                                <div className="clay-icon h-9 w-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-extrabold text-xs" title={currentUser?.name}>
+                                    {currentUser?.name?.charAt(0) || 'U'}
+                                </div>
+                                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" />
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await api.post('/time-entries/stop-running')
+                                    } catch (err) {
+                                        console.error('Logout timer stop failed', err)
+                                    } finally {
+                                        localStorage.removeItem('token');
+                                        navigate('/login');
+                                    }
+                                }}
+                                className="clay-btn h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                                title="Logout"
+                            >
+                                <LogOut className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </aside>
         </>
     )
 }

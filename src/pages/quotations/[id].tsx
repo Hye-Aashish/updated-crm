@@ -9,6 +9,8 @@ import {
 import api from '@/lib/api-client';
 import { formatCurrency } from '@/lib/utils';
 
+import { appConfirm, appAlert } from '@/lib/app-dialog'
+
 export default function QuotationDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -31,12 +33,12 @@ export default function QuotationDetailPage() {
     };
 
     const handleApprove = async () => {
-        if (!confirm('Are you sure you want to approve this proposal? This will LOCK the project scope and activate Milestone Tracking.')) return;
+        if (!await appConfirm('Are you sure you want to approve this proposal? This will LOCK the project scope and activate Milestone Tracking.')) return;
         setActionLoading(true);
         try {
             await api.patch(`/quotations/${id}/approve`);
             fetchQuotation();
-        } catch (e) { alert('Approval failed'); }
+        } catch (e) { await appAlert('Approval failed'); }
         finally { setActionLoading(false); }
     };
 
@@ -55,26 +57,26 @@ export default function QuotationDetailPage() {
     };
 
     const submitChangeRequest = async () => {
-        if (!crData.title) return alert('Title is required');
+        if (!crData.title) return await appAlert('Title is required');
         setActionLoading(true);
         try {
             await api.post(`/quotations/${id}/change-request`, crData);
             setShowCRModal(false);
             setCrData({ title: '', description: '', estimatedCost: 0 });
             fetchQuotation();
-        } catch (e) { alert('Failed to submit change request'); }
+        } catch (e) { await appAlert('Failed to submit change request'); }
         finally { setActionLoading(false); }
     };
 
     const handleConvertToProject = async () => {
-        if (!confirm('Convert this approved quotation into a live project?')) return;
+        if (!await appConfirm('Convert this approved quotation into a live project?')) return;
         setActionLoading(true);
         try {
             const res = await api.post(`/quotations/${id}/convert-to-project`);
             setQuotation({ ...quotation, linkedProjectId: res.data.project._id });
-            alert('Successfully converted to project!');
+            await appAlert('Successfully converted to project!');
         } catch (e: any) {
-            alert(e.response?.data?.message || 'Failed to convert to project');
+            await appAlert(e.response?.data?.message || 'Failed to convert to project');
         } finally {
             setActionLoading(false);
         }
@@ -125,9 +127,9 @@ export default function QuotationDetailPage() {
                             {quotation.status}
                         </div>
                         <button
-                            onClick={() => {
+                            onClick={async () => {
                                 navigator.clipboard.writeText(`${window.location.origin}/q/${id}`);
-                                alert('Proposal link copied to clipboard!');
+                                await appAlert('Proposal link copied to clipboard!');
                             }}
                             className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs tracking-widest uppercase hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all flex items-center gap-2"
                         >

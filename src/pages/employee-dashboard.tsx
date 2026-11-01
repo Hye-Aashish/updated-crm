@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { useAttendance } from '@/hooks/use-attendance'
 import { useDashboardMetrics } from '@/hooks/use-dashboard-metrics'
+import { UpcomingScheduleWidget } from '@/components/calendar/upcoming-schedule-widget'
 
 export function EmployeeDashboardPage() {
     const navigate = useNavigate()
@@ -129,6 +130,10 @@ export function EmployeeDashboardPage() {
                                 </CardContent>
                             </Card>
                         ))}
+                    </div>
+
+                    <div className="mt-6">
+                        <UpcomingScheduleWidget basePath="/employee/calendar" title="My Upcoming Schedule" />
                     </div>
 
                     {/* Overall Performance HUD */}

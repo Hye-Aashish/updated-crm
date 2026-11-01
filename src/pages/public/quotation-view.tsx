@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
+import { appAlert } from '@/lib/app-dialog'
+
 const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
 
 function formatCurrencyPublic(amount: number, currency: string = 'INR'): string {
@@ -59,13 +61,13 @@ export default function PublicQuotationView() {
     };
 
     const handleAccept = async () => {
-        if (!signature) return alert('Please enter your full name as signature');
+        if (!signature) return await appAlert('Please enter your full name as signature');
         setAccepting(true);
         try {
             await axios.patch(`${API_BASE}/quotations/public/${id}/approve`, { signature });
             setApproved(true);
             setQuotation({ ...quotation, status: 'approved' });
-        } catch (e) { alert('Acceptance failed. Please contact support.'); }
+        } catch (e) { await appAlert('Acceptance failed. Please contact support.'); }
         finally { setAccepting(false); }
     };
 

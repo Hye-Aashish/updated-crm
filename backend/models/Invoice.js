@@ -18,7 +18,7 @@ const invoiceSchema = new mongoose.Schema({
     currency: { type: String, default: 'INR' },
     status: {
         type: String,
-        enum: ['draft', 'pending', 'paid', 'overdue', 'cancelled'],
+        enum: ['draft', 'pending', 'partially-paid', 'paid', 'overdue', 'cancelled'],
         default: 'draft'
     },
     lineItems: [{
@@ -30,9 +30,20 @@ const invoiceSchema = new mongoose.Schema({
     subtotal: { type: Number, default: 0 },
     tax: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
+    amountPaid: { type: Number, default: 0 },
+    payments: [{
+        amount: Number,
+        method: { type: String, default: 'manual' },
+        note: String,
+        paidAt: { type: Date, default: Date.now },
+        recordedBy: String
+    }],
     date: { type: Date, required: true },
     dueDate: { type: Date, required: true },
     paidDate: { type: Date },
+    lastReminderSentAt: { type: Date },
+    nextRecurrenceAt: { type: Date },
+    recurrenceParentId: { type: String },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     autoSend: { type: Boolean, default: false },

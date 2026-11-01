@@ -16,6 +16,8 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
     milestone: { label: 'Milestone Sign-off', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200' },
     design: { label: 'Design Approval', color: 'bg-purple-500/10 text-purple-600 border-purple-200' },
@@ -129,7 +131,7 @@ export function ApprovalsPage() {
     }
 
     const handleDeleteApproval = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this approval request?')) return
+        if (!await appConfirm('Are you sure you want to delete this approval request?')) return
         try {
             await api.delete(`/approvals/${id}`)
             toast({ title: 'Approval Request Deleted' })

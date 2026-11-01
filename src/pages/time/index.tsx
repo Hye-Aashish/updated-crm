@@ -28,6 +28,8 @@ import { timeEntryService, TimeEntry, TimeEntryStats } from '@/lib/timeEntryServ
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
 
+import { appConfirm } from '@/lib/app-dialog'
+
 export function TimePage() {
     const navigate = useNavigate()
     const { toast } = useToast()
@@ -350,7 +352,7 @@ export function TimePage() {
                                     size="sm"
                                     className="ml-auto text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 font-black uppercase tracking-widest"
                                     onClick={async () => {
-                                        if (confirm("Stop all running timers?")) {
+                                        if (await appConfirm("Stop all running timers?")) {
                                             const active = timeEntries.filter(e => e.isRunning)
                                             await Promise.all(active.map(async (e) => {
                                                 await timeEntryService.stopTimer(e._id)
