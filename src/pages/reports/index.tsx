@@ -1,9 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
     DollarSign, Briefcase, CheckSquare, UserCheck, Target,
-    TrendingUp, TrendingDown, Users, Activity, ArrowUpRight, ArrowDownRight, Clock, Zap
+    TrendingUp, TrendingDown, Users, Activity, ArrowUpRight, ArrowDownRight, Clock, Zap,
+    PhoneCall, CheckCircle2, Sparkles, Trophy, User,
+    Search, ExternalLink, RotateCcw, BarChart3, AlertCircle,
+    Flame, AlertTriangle, Layers
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import api from '@/lib/api-client'
@@ -29,13 +35,15 @@ export function ReportsPage() {
         users: [],
         invoices: [],
         timeEntries: [],
+        stages: [] as any[],
+        telecallerAnalytics: null as any,
         loading: true
     })
 
     useEffect(() => {
         const fetchAllData = async () => {
             try {
-                const [expRes, leadsRes, projRes, ticketsRes, tasksRes, usersRes, invRes, timeRes] = await Promise.all([
+                const [expRes, leadsRes, projRes, ticketsRes, tasksRes, usersRes, invRes, timeRes, stagesRes, teleRes] = await Promise.all([
                     api.get('/expenses'),
                     api.get('/leads'),
                     api.get('/projects'),
@@ -43,7 +51,9 @@ export function ReportsPage() {
                     api.get('/tasks').catch(() => ({ data: [] })),
                     api.get('/users').catch(() => ({ data: [] })),
                     api.get('/invoices').catch(() => ({ data: [] })),
-                    api.get('/time-entries').catch(() => ({ data: [] }))
+                    api.get('/time-entries').catch(() => ({ data: [] })),
+                    api.get('/leads/stages').catch(() => ({ data: [] })),
+                    api.get('/leads/telecaller-analytics?range=all').catch(() => ({ data: null }))
                 ])
 
                 setData({
@@ -55,6 +65,8 @@ export function ReportsPage() {
                     users: usersRes.data || [],
                     invoices: invRes.data || [],
                     timeEntries: timeRes.data || [],
+                    stages: stagesRes.data || [],
+                    telecallerAnalytics: teleRes.data || null,
                     loading: false
                 })
             } catch (error) {
@@ -126,7 +138,7 @@ export function ReportsPage() {
             {/* Detailed Content Sections */}
             <div className="mt-4 transition-all duration-500">
                 {activeTab === 'finance' && <FinanceSection data={data} />}
-                {activeTab === 'sales' && <SalesSection data={data} />}
+                {activeTab === 'sales' && <SalesSection data={data} navigate={navigate} />}
                 {activeTab === 'projects' && <ProjectSection data={data} />}
                 {activeTab === 'tasks' && <TaskSection data={data} navigate={navigate} />}
                 {activeTab === 'team' && <TeamSection data={data} />}
@@ -265,34 +277,665 @@ function FinanceSection({ data }: { data: any }) {
 }
 
 // --- 2. SALES SECTION ---
-function SalesSection({ data }: { data: any }) {
-    const funnelData = [
-        { name: 'Leads', value: data.leads.length, color: '#3b82f6' },
-        { name: 'Contacted', value: data.leads.filter((l: any) => l.stage === 'contacted').length, color: '#8b5cf6' },
-        { name: 'Qualified', value: data.leads.filter((l: any) => l.stage === 'qualified').length, color: '#10b981' },
-        { name: 'Won', value: data.leads.filter((l: any) => l.stage === 'won' || l.stage === 'closed').length, color: '#f59e0b' },
-    ]
+const getStageColorHex = (colorClass?: string, index: number = 0) => {
+    const palette = ['#3b82f6', '#eab308', '#a855f7', '#10b981', '#ef4444', '#06b6d4', '#f97316', '#ec4899', '#8b5cf6']
+    if (!colorClass) return palette[index % palette.length]
+    if (colorClass.startsWith('#')) return colorClass
+    if (colorClass.includes('blue')) return '#3b82f6'
+    if (colorClass.includes('yellow') || colorClass.includes('amber')) return '#eab308'
+    if (colorClass.includes('purple') || colorClass.includes('violet')) return '#a855f7'
+    if (colorClass.includes('green') || colorClass.includes('emerald')) return '#10b981'
+    if (colorClass.includes('red') || colorClass.includes('rose')) return '#ef4444'
+    if (colorClass.includes('cyan') || colorClass.includes('teal')) return '#06b6d4'
+    if (colorClass.includes('orange')) return '#f97316'
+    if (colorClass.includes('pink')) return '#ec4899'
+    return palette[index % palette.length]
+}
 
-    const conversionEfficiency = funnelData[0].value > 0
-        ? ((funnelData[3].value / funnelData[0].value) * 100).toFixed(0)
-        : 0
+function SalesSection({ data, navigate }: { data: any, navigate?: any }) {
+    const [timeRange, setTimeRange] = useState<'all' | 'this_month' | 'this_week' | 'today'>('all')
+    const [selectedAgent, setSelectedAgent] = useState<string>('all')
+    const [selectedStage, setSelectedStage] = useState<string>('all')
+    const [searchQuery, setSearchQuery] = useState<string>('')
+
+    // 1. Raw Leads & Stages
+    const allLeads = useMemo(() => Array.isArray(data.leads) ? data.leads : [], [data.leads])
+    const stages = useMemo(() => {
+        if (Array.isArray(data.stages) && data.stages.length > 0) {
+            return data.stages
+        }
+        return [
+            { id: 'new', label: 'New Leads', color: 'bg-blue-500', order: 0 },
+            { id: 'discussion', label: 'In Discussion', color: 'bg-yellow-500', order: 1 },
+            { id: 'proposal', label: 'Proposal Sent', color: 'bg-purple-500', order: 2 },
+            { id: 'closed', label: 'Closed / Won', color: 'bg-green-500', order: 3 },
+            { id: 'lose', label: 'Lost', color: 'bg-red-500', order: 4 },
+        ]
+    }, [data.stages])
+
+    // List of agents for dropdown
+    const availableAgents = useMemo(() => {
+        const agentMap = new Map<string, string>()
+        if (Array.isArray(data.users)) {
+            data.users.forEach((u: any) => {
+                if (u.name) agentMap.set(u._id || u.name, u.name)
+            })
+        }
+        allLeads.forEach((l: any) => {
+            if (l.assignedToName) agentMap.set(l.assignedTo || l.assignedToName, l.assignedToName)
+            if (l.createdByName) agentMap.set(l.createdBy || l.createdByName, l.createdByName)
+        })
+        return Array.from(agentMap.entries()).map(([id, name]) => ({ id, name }))
+    }, [data.users, allLeads])
+
+    // 2. Filter Leads by Time, Agent, Stage, and Search
+    const filteredLeads = useMemo(() => {
+        const now = new Date()
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+        const weekStart = now.getTime() - 7 * 24 * 60 * 60 * 1000
+        const monthStart = now.getTime() - 30 * 24 * 60 * 60 * 1000
+
+        return allLeads.filter((lead: any) => {
+            // Time filter
+            const leadDate = new Date(lead.createdAt || lead.updatedAt || Date.now()).getTime()
+            if (timeRange === 'today' && leadDate < todayStart) return false
+            if (timeRange === 'this_week' && leadDate < weekStart) return false
+            if (timeRange === 'this_month' && leadDate < monthStart) return false
+
+            // Agent filter
+            if (selectedAgent !== 'all') {
+                const matches = (lead.assignedTo && lead.assignedTo === selectedAgent) ||
+                                (lead.assignedToName && lead.assignedToName.toLowerCase() === selectedAgent.toLowerCase()) ||
+                                (lead.createdBy && (lead.createdBy === selectedAgent || lead.createdBy._id === selectedAgent)) ||
+                                (lead.createdByName && lead.createdByName.toLowerCase() === selectedAgent.toLowerCase())
+                if (!matches) return false
+            }
+
+            // Stage filter
+            if (selectedStage !== 'all') {
+                if (selectedStage === 'closed') {
+                    const s = (lead.stage || '').toLowerCase()
+                    if (s !== 'closed' && s !== 'won' && !s.includes('closed') && !s.includes('won')) return false
+                } else if (lead.stage !== selectedStage) {
+                    return false
+                }
+            }
+
+            // Search query
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase()
+                const matchName = lead.name?.toLowerCase().includes(q)
+                const matchCompany = lead.company?.toLowerCase().includes(q)
+                const matchPhone = lead.phone?.toLowerCase().includes(q)
+                const matchEmail = lead.email?.toLowerCase().includes(q)
+                const matchSource = lead.source?.toLowerCase().includes(q)
+                if (!matchName && !matchCompany && !matchPhone && !matchEmail && !matchSource) return false
+            }
+
+            return true
+        })
+    }, [allLeads, timeRange, selectedAgent, selectedStage, searchQuery])
+
+    // 3. Executive Metrics
+    const metrics = useMemo(() => {
+        const total = filteredLeads.length
+        let wonCount = 0
+        let wonRevenue = 0
+        let pipelineValue = 0
+        let contactedCount = 0
+        let overdueCount = 0
+        let upcomingCount = 0
+        const nowMs = Date.now()
+
+        filteredLeads.forEach((lead: any) => {
+            const val = Number(lead.value) || 0
+            const stage = (lead.stage || '').toLowerCase()
+            const isWon = stage === 'closed' || stage === 'won' || stage.includes('closed') || stage.includes('won')
+            const isLost = stage === 'lose' || stage === 'lost' || stage.includes('lose') || stage.includes('lost')
+
+            if (isWon) {
+                wonCount++
+                wonRevenue += val
+            } else if (!isLost) {
+                pipelineValue += val
+            }
+
+            const hasActivities = Array.isArray(lead.activities) && lead.activities.length > 0
+            if (hasActivities || lead.lastFollowUpDate || lead.lastFollowUpOutcome || stage !== 'new') {
+                contactedCount++
+            }
+
+            if (lead.reminder?.date) {
+                const remMs = new Date(lead.reminder.date).getTime()
+                if (remMs < nowMs && !lead.reminder.completed) {
+                    overdueCount++
+                } else if (!lead.reminder.completed) {
+                    upcomingCount++
+                }
+            }
+        })
+
+        const winRate = total > 0 ? ((wonCount / total) * 100).toFixed(1) : '0'
+        const avgDealWon = wonCount > 0 ? Math.round(wonRevenue / wonCount) : (total > 0 ? Math.round((pipelineValue + wonRevenue) / total) : 0)
+        const contactRate = total > 0 ? ((contactedCount / total) * 100).toFixed(1) : '0'
+
+        return {
+            total,
+            wonCount,
+            wonRevenue,
+            pipelineValue: pipelineValue + wonRevenue,
+            activePipelineValue: pipelineValue,
+            winRate,
+            avgDealWon,
+            contactedCount,
+            contactRate,
+            overdueCount,
+            upcomingCount
+        }
+    }, [filteredLeads])
+
+    // 4. Dynamic Pipeline Stages Breakdown
+    const stageFlowData = useMemo(() => {
+        const total = filteredLeads.length || 1
+        return stages.map((st: any, idx: number) => {
+            const leadsInStage = filteredLeads.filter((l: any) => {
+                if (st.id === 'closed') {
+                    return l.stage === 'closed' || l.stage === 'won' || (l.stage || '').toLowerCase().includes('won')
+                }
+                return l.stage === st.id
+            })
+            const count = leadsInStage.length
+            const val = leadsInStage.reduce((acc: number, l: any) => acc + (Number(l.value) || 0), 0)
+            const percentage = Math.round((count / total) * 100)
+            const color = getStageColorHex(st.color, idx)
+
+            return {
+                id: st.id,
+                label: st.label,
+                count,
+                value: val,
+                percentage,
+                color,
+                colorClass: st.color || 'bg-primary'
+            }
+        })
+    }, [stages, filteredLeads])
+
+    // 5. Lead Acquisition Sources Breakdown
+    const sourceBreakdown = useMemo(() => {
+        const sourceMap = new Map<string, { total: number, won: number, wonRev: number, contacted: number }>()
+
+        filteredLeads.forEach((lead: any) => {
+            const src = (lead.source || 'Direct Inflow').trim() || 'Direct Inflow'
+            if (!sourceMap.has(src)) {
+                sourceMap.set(src, { total: 0, won: 0, wonRev: 0, contacted: 0 })
+            }
+            const s = sourceMap.get(src)!
+            s.total++
+
+            const stage = (lead.stage || '').toLowerCase()
+            const isWon = stage === 'closed' || stage === 'won' || stage.includes('closed') || stage.includes('won')
+            if (isWon) {
+                s.won++
+                s.wonRev += (Number(lead.value) || 0)
+            }
+
+            const hasAct = (Array.isArray(lead.activities) && lead.activities.length > 0) || lead.lastFollowUpOutcome || stage !== 'new'
+            if (hasAct) {
+                s.contacted++
+            }
+        })
+
+        const palette = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b']
+        return Array.from(sourceMap.entries())
+            .map(([source, stats], idx) => ({
+                source,
+                leads: stats.total,
+                contacted: stats.contacted,
+                won: stats.won,
+                revenue: stats.wonRev,
+                conversionRate: stats.total > 0 ? ((stats.won / stats.total) * 100).toFixed(1) : '0',
+                color: palette[idx % palette.length]
+            }))
+            .sort((a, b) => b.leads - a.leads)
+    }, [filteredLeads])
+
+    // 6. Telecaller / Agent Leaderboard
+    const agentLeaderboard = useMemo(() => {
+        const agentMap = new Map<string, {
+            name: string,
+            role: string,
+            assignedLeads: number,
+            activitiesCount: number,
+            contactedCount: number,
+            wonCount: number,
+            wonRevenue: number,
+            overdueCount: number
+        }>()
+
+        // From telecaller analytics if available
+        if (data.telecallerAnalytics?.agents && Array.isArray(data.telecallerAnalytics.agents)) {
+            data.telecallerAnalytics.agents.forEach((ag: any) => {
+                if (ag.name && ag.name !== 'Unassigned') {
+                    agentMap.set(ag.name, {
+                        name: ag.name,
+                        role: ag.role || 'Telecaller',
+                        assignedLeads: 0,
+                        activitiesCount: ag.callsInRange || ag.callsToday || 0,
+                        contactedCount: ag.uniqueLeadsContacted?.length || 0,
+                        wonCount: ag.dealsWon || 0,
+                        wonRevenue: ag.dealsWonValue || 0,
+                        overdueCount: ag.overdueFollowups || 0
+                    })
+                }
+            })
+        }
+
+        // Aggregate from filtered leads
+        const nowMs = Date.now()
+        filteredLeads.forEach((lead: any) => {
+            const agentName = lead.assignedToName || lead.createdByName || lead.lastContactedBy || 'Unassigned'
+            if (!agentMap.has(agentName)) {
+                agentMap.set(agentName, {
+                    name: agentName,
+                    role: 'Sales Rep',
+                    assignedLeads: 0,
+                    activitiesCount: 0,
+                    contactedCount: 0,
+                    wonCount: 0,
+                    wonRevenue: 0,
+                    overdueCount: 0
+                })
+            }
+            const record = agentMap.get(agentName)!
+            record.assignedLeads++
+
+            const actList = Array.isArray(lead.activities) ? lead.activities : []
+            if (actList.length > 0) {
+                record.activitiesCount += actList.length
+                record.contactedCount++
+            } else if (lead.lastFollowUpOutcome || (lead.stage && lead.stage !== 'new')) {
+                record.contactedCount++
+            }
+
+            const stage = (lead.stage || '').toLowerCase()
+            const isWon = stage === 'closed' || stage === 'won' || stage.includes('closed') || stage.includes('won')
+            if (isWon) {
+                record.wonCount++
+                record.wonRevenue += (Number(lead.value) || 0)
+            }
+
+            if (lead.reminder?.date && !lead.reminder.completed) {
+                if (new Date(lead.reminder.date).getTime() < nowMs) {
+                    record.overdueCount++
+                }
+            }
+        })
+
+        return Array.from(agentMap.values())
+            .filter(a => a.assignedLeads > 0 || a.activitiesCount > 0)
+            .map(a => ({
+                ...a,
+                conversionRate: a.assignedLeads > 0 ? ((a.wonCount / a.assignedLeads) * 100).toFixed(1) : '0',
+                contactRate: a.assignedLeads > 0 ? ((a.contactedCount / a.assignedLeads) * 100).toFixed(1) : '0'
+            }))
+            .sort((a, b) => b.wonRevenue - a.wonRevenue || b.assignedLeads - a.assignedLeads)
+    }, [filteredLeads, data.telecallerAnalytics])
+
+    // 7. Follow-up Outcomes Distribution
+    const outcomeData = useMemo(() => {
+        const outcomes: Record<string, number> = {}
+
+        filteredLeads.forEach((lead: any) => {
+            if (lead.lastFollowUpOutcome) {
+                const key = lead.lastFollowUpOutcome.trim()
+                outcomes[key] = (outcomes[key] || 0) + 1
+            }
+            if (Array.isArray(lead.activities)) {
+                lead.activities.forEach((act: any) => {
+                    if (act.outcome) {
+                        const key = act.outcome.trim()
+                        outcomes[key] = (outcomes[key] || 0) + 1
+                    }
+                })
+            }
+        })
+
+        const palette = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#64748b']
+        const entries = Object.entries(outcomes).map(([name, value], idx) => ({
+            name,
+            value,
+            color: palette[idx % palette.length]
+        })).sort((a, b) => b.value - a.value)
+
+        if (entries.length === 0) {
+            return [
+                { name: 'No Calls Logged', value: filteredLeads.length || 1, color: '#94a3b8' }
+            ]
+        }
+        return entries
+    }, [filteredLeads])
+
+    // 8. Top 5 High-Value Deals & Stale Leads Watchlist
+    const highValueDeals = useMemo(() => {
+        return [...filteredLeads]
+            .filter((l: any) => {
+                const s = (l.stage || '').toLowerCase()
+                return !s.includes('lost') && !s.includes('lose')
+            })
+            .sort((a: any, b: any) => (Number(b.value) || 0) - (Number(a.value) || 0))
+            .slice(0, 5)
+    }, [filteredLeads])
+
+    const staleLeads = useMemo(() => {
+        const nowMs = Date.now()
+        const fourDaysAgo = nowMs - (4 * 24 * 60 * 60 * 1000)
+        return [...filteredLeads]
+            .filter((l: any) => {
+                const s = (l.stage || '').toLowerCase()
+                if (s.includes('won') || s.includes('closed') || s.includes('lost') || s.includes('lose')) return false
+                const isOverdue = l.reminder?.date && new Date(l.reminder.date).getTime() < nowMs && !l.reminder.completed
+                const isInactive = new Date(l.updatedAt || l.createdAt || nowMs).getTime() < fourDaysAgo
+                return isOverdue || isInactive
+            })
+            .slice(0, 5)
+    }, [filteredLeads])
+
+    const isFiltered = timeRange !== 'all' || selectedAgent !== 'all' || selectedStage !== 'all' || searchQuery.trim().length > 0
+
+    const resetFilters = () => {
+        setTimeRange('all')
+        setSelectedAgent('all')
+        setSelectedStage('all')
+        setSearchQuery('')
+    }
 
     return (
         <div className="space-y-6">
+            {/* Filter & Period Selector Bar */}
+            <Card className="border border-border/60 shadow-sm bg-card/60 backdrop-blur-md">
+                <CardContent className="p-4 sm:p-5">
+                    <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                        {/* Search Input */}
+                        <div className="relative flex-1 min-w-[240px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by lead name, company, phone, source..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 h-10 rounded-xl bg-background/80 text-xs sm:text-sm border-border/60"
+                            />
+                        </div>
+
+                        {/* Controls Group */}
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            {/* Time Range Pills */}
+                            <div className="flex items-center bg-muted/60 p-1 rounded-xl border border-border/40 text-xs">
+                                <button
+                                    onClick={() => setTimeRange('all')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${timeRange === 'all' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    All Time
+                                </button>
+                                <button
+                                    onClick={() => setTimeRange('this_month')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${timeRange === 'this_month' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    This Month
+                                </button>
+                                <button
+                                    onClick={() => setTimeRange('this_week')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${timeRange === 'this_week' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    This Week
+                                </button>
+                                <button
+                                    onClick={() => setTimeRange('today')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${timeRange === 'today' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    Today
+                                </button>
+                            </div>
+
+                            {/* Agent Selector */}
+                            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                                <SelectTrigger className="h-10 w-[170px] text-xs font-semibold rounded-xl bg-background/80 border-border/60">
+                                    <div className="flex items-center gap-2 truncate">
+                                        <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                        <SelectValue placeholder="All Agents" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl text-xs">
+                                    <SelectItem value="all" className="text-xs font-bold">All Agents & Callers</SelectItem>
+                                    {availableAgents.map((ag) => (
+                                        <SelectItem key={ag.id} value={ag.id} className="text-xs font-medium">
+                                            {ag.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {/* Stage Selector */}
+                            <Select value={selectedStage} onValueChange={setSelectedStage}>
+                                <SelectTrigger className="h-10 w-[150px] text-xs font-semibold rounded-xl bg-background/80 border-border/60">
+                                    <div className="flex items-center gap-2 truncate">
+                                        <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                        <SelectValue placeholder="All Stages" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl text-xs">
+                                    <SelectItem value="all" className="text-xs font-bold">All Stages</SelectItem>
+                                    {stages.map((st: any) => (
+                                        <SelectItem key={st.id} value={st.id} className="text-xs font-medium">
+                                            {st.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {/* Reset Button */}
+                            {isFiltered && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={resetFilters}
+                                    className="h-10 px-3 text-xs text-muted-foreground hover:text-foreground gap-1.5 rounded-xl border border-dashed border-border"
+                                >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    Reset
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Status hint */}
+                    <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                            <span>Showing <strong className="text-foreground">{filteredLeads.length}</strong> of {allLeads.length} total leads</span>
+                            {isFiltered && (
+                                <Badge variant="secondary" className="text-[10px] py-0 px-2 font-medium bg-primary/10 text-primary">
+                                    Filtered View Active
+                                </Badge>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                Live Engine Sync
+                            </span>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Executive KPI Metric Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {/* 1. Total Pipeline Value */}
+                <Card className="border border-border/60 shadow-sm bg-card/80">
+                    <CardContent className="p-4 space-y-1">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Gross Pipeline</span>
+                            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
+                                <DollarSign className="h-4 w-4" />
+                            </div>
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-foreground truncate">
+                            {formatCurrency(metrics.pipelineValue)}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                            <span>{metrics.total} total leads in scope</span>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 2. Closed-Won Revenue */}
+                <Card className="border border-border/60 shadow-sm bg-card/80">
+                    <CardContent className="p-4 space-y-1">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Won Revenue</span>
+                            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
+                                <Trophy className="h-4 w-4" />
+                            </div>
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 truncate">
+                            {formatCurrency(metrics.wonRevenue)}
+                        </div>
+                        <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>{metrics.wonCount} deals closed won</span>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 3. Win Rate / Conversion */}
+                <Card className="border border-border/60 shadow-sm bg-card/80">
+                    <CardContent className="p-4 space-y-1">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Win Rate</span>
+                            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
+                                <Target className="h-4 w-4" />
+                            </div>
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-foreground">
+                            {metrics.winRate}%
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-1">
+                            <div
+                                className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                                style={{ width: `${Math.min(100, Math.max(0, Number(metrics.winRate)))}%` }}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 4. Average Deal Won */}
+                <Card className="border border-border/60 shadow-sm bg-card/80">
+                    <CardContent className="p-4 space-y-1">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Avg Deal Size</span>
+                            <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-500">
+                                <Sparkles className="h-4 w-4" />
+                            </div>
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-foreground truncate">
+                            {formatCurrency(metrics.avgDealWon)}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                            <span>Per converted opportunity</span>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 5. Contact / Outreach Rate */}
+                <Card className="border border-border/60 shadow-sm bg-card/80">
+                    <CardContent className="p-4 space-y-1">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Contact Rate</span>
+                            <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-500">
+                                <PhoneCall className="h-4 w-4" />
+                            </div>
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-foreground">
+                            {metrics.contactRate}%
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                            <span>{metrics.contactedCount} of {metrics.total} contacted</span>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 6. Follow-up Health */}
+                <Card className="border border-border/60 shadow-sm bg-card/80">
+                    <CardContent className="p-4 space-y-1">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Follow-up Health</span>
+                            <div className={`p-1.5 rounded-lg ${metrics.overdueCount > 0 ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                                {metrics.overdueCount > 0 ? <AlertCircle className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                            </div>
+                        </div>
+                        <div className={`text-lg sm:text-xl font-black ${metrics.overdueCount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                            {metrics.overdueCount > 0 ? `${metrics.overdueCount} Overdue` : 'All On Track'}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                            <span>{metrics.upcomingCount} pending follow-ups</span>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Section 1: Pipeline Stage Flow & Dynamic Stage Funnel */}
             <div className="grid lg:grid-cols-3 gap-6">
-                <Card className="lg:col-span-2 border-none shadow-sm">
-                    <CardHeader>
-                        <CardTitle>Sales Conversion Funnel</CardTitle>
-                        <CardDescription>Visual breakdown of prospect journey</CardDescription>
+                <Card className="lg:col-span-2 border border-border/60 shadow-sm">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-base font-bold flex items-center gap-2">
+                                    <BarChart3 className="h-5 w-5 text-primary" />
+                                    Dynamic Pipeline Stage Funnel
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Distribution of opportunities across active workflow stages
+                                </CardDescription>
+                            </div>
+                            <Badge variant="outline" className="text-xs font-semibold">
+                                {stageFlowData.length} Stages Configured
+                            </Badge>
+                        </div>
                     </CardHeader>
-                    <CardContent className="h-[400px]">
+                    <CardContent className="h-[360px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart layout="vertical" data={funnelData} margin={{ left: 30 }}>
-                                <XAxis type="number" hide />
-                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} />
-                                <Tooltip />
-                                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                                    {funnelData.map((entry, index) => (
+                            <BarChart
+                                layout="vertical"
+                                data={stageFlowData}
+                                margin={{ left: 20, right: 30, top: 10, bottom: 10 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" opacity={0.5} />
+                                <XAxis type="number" tickLine={false} axisLine={false} />
+                                <YAxis
+                                    dataKey="label"
+                                    type="category"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    width={120}
+                                    tick={{ fontSize: 12, fill: 'currentColor', fontWeight: 600 }}
+                                />
+                                <Tooltip
+                                    formatter={(value: any, _name: any, item: any) => {
+                                        return [
+                                            `${value} leads (${formatCurrency(item.payload.value)}) - ${item.payload.percentage}% share`,
+                                            'Volume'
+                                        ]
+                                    }}
+                                    contentStyle={{
+                                        backgroundColor: 'hsl(var(--card))',
+                                        borderColor: 'hsl(var(--border))',
+                                        borderRadius: '12px',
+                                        fontSize: '12px',
+                                        fontWeight: 600
+                                    }}
+                                />
+                                <Bar dataKey="count" radius={[0, 8, 8, 0]}>
+                                    {stageFlowData.map((entry: any, index: number) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Bar>
@@ -301,18 +944,414 @@ function SalesSection({ data }: { data: any }) {
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm flex flex-col items-center justify-center p-6 bg-primary text-primary-foreground text-center overflow-hidden relative">
-                    <div className="z-10">
-                        <h4 className="text-lg font-bold opacity-80 uppercase tracking-widest text-xs mb-2">Conversion Efficiency</h4>
-                        <div className="text-7xl font-black mb-4">
-                            {conversionEfficiency}%
-                        </div>
-                        <p className="max-w-[200px] text-sm opacity-90 mx-auto">Overall win rate from initial inquiry to closed-won status.</p>
+                {/* Stage Breakdown & Quick Action */}
+                <Card className="border border-border/60 shadow-sm flex flex-col justify-between">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base font-bold">Stage Value Breakdown</CardTitle>
+                        <CardDescription className="text-xs">Monetary value and share by stage</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 flex-1 overflow-y-auto max-h-[290px] pr-2">
+                        {stageFlowData.map((stage: any) => (
+                            <div
+                                key={stage.id}
+                                onClick={() => setSelectedStage(stage.id === selectedStage ? 'all' : stage.id)}
+                                className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                                    selectedStage === stage.id
+                                        ? 'border-primary bg-primary/5 shadow-sm'
+                                        : 'border-border/40 hover:border-border hover:bg-muted/40'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <div
+                                        className="w-3 h-3 rounded-full shrink-0"
+                                        style={{ backgroundColor: stage.color }}
+                                    />
+                                    <div className="truncate">
+                                        <div className="text-xs font-bold truncate">{stage.label}</div>
+                                        <div className="text-[10px] text-muted-foreground">{stage.count} Leads ({stage.percentage}%)</div>
+                                    </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <div className="text-xs font-bold text-foreground">
+                                        {formatCurrency(stage.value)}
+                                    </div>
+                                    <span className="text-[10px] font-medium text-muted-foreground">
+                                        {metrics.pipelineValue > 0 ? `${Math.round((stage.value / metrics.pipelineValue) * 100)}% val` : '0%'}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </CardContent>
+                    <div className="p-4 pt-2 border-t border-border/40">
+                        <Button
+                            onClick={() => navigate ? navigate('/leads') : window.location.href = '/leads'}
+                            className="w-full text-xs font-bold gap-2 rounded-xl"
+                        >
+                            Open Kanban Pipeline Board
+                            <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
                     </div>
-                    {/* Decorative Background Elements */}
-                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-                    <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-black/10 rounded-full blur-3xl" />
                 </Card>
+            </div>
+
+            {/* Section 2: Lead Acquisition Sources & Channel ROI */}
+            <div className="grid lg:grid-cols-12 gap-6">
+                <Card className="lg:col-span-5 border border-border/60 shadow-sm">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base font-bold flex items-center gap-2">
+                            <Flame className="h-5 w-5 text-amber-500" />
+                            Lead Acquisition Channels
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                            Top sources generating inquiries and customer flow
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={sourceBreakdown.slice(0, 6)} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" opacity={0.5} />
+                                <XAxis dataKey="source" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} angle={-15} textAnchor="end" />
+                                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                                <Tooltip
+                                    formatter={(val: any, _name: any, item: any) => [`${val} Leads (${formatCurrency(item.payload.revenue)} won)`, 'Inflow']}
+                                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', fontSize: '12px' }}
+                                />
+                                <Bar dataKey="leads" radius={[6, 6, 0, 0]}>
+                                    {sourceBreakdown.slice(0, 6).map((entry: any, index: number) => (
+                                        <Cell key={`source-cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+
+                {/* Source ROI Performance Table */}
+                <Card className="lg:col-span-7 border border-border/60 shadow-sm flex flex-col justify-between">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base font-bold">Acquisition Channel Conversion ROI</CardTitle>
+                        <CardDescription className="text-xs">Performance and closed revenue by channel</CardDescription>
+                    </CardHeader>
+                    <CardContent className="overflow-x-auto p-0 px-4 pb-4">
+                        <table className="w-full text-left text-xs">
+                            <thead>
+                                <tr className="border-b border-border/60 text-muted-foreground uppercase text-[10px] font-bold">
+                                    <th className="py-2.5 px-2">Channel / Source</th>
+                                    <th className="py-2.5 px-2 text-center">Inflow</th>
+                                    <th className="py-2.5 px-2 text-center">Contacted</th>
+                                    <th className="py-2.5 px-2 text-center">Won</th>
+                                    <th className="py-2.5 px-2 text-right">Revenue Won</th>
+                                    <th className="py-2.5 px-2 text-right">Win %</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/40">
+                                {sourceBreakdown.map((src: any) => (
+                                    <tr key={src.source} className="hover:bg-muted/40 transition-colors">
+                                        <td className="py-2.5 px-2 font-bold flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: src.color }} />
+                                            <span className="truncate max-w-[150px]">{src.source}</span>
+                                        </td>
+                                        <td className="py-2.5 px-2 text-center font-semibold">{src.leads}</td>
+                                        <td className="py-2.5 px-2 text-center text-muted-foreground">{src.contacted}</td>
+                                        <td className="py-2.5 px-2 text-center font-semibold text-emerald-600 dark:text-emerald-400">
+                                            {src.won}
+                                        </td>
+                                        <td className="py-2.5 px-2 text-right font-bold text-foreground">
+                                            {formatCurrency(src.revenue)}
+                                        </td>
+                                        <td className="py-2.5 px-2 text-right">
+                                            <Badge variant={Number(src.conversionRate) > 15 ? 'default' : 'secondary'} className="text-[10px] py-0 px-1.5 font-bold">
+                                                {src.conversionRate}%
+                                            </Badge>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {sourceBreakdown.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="py-6 text-center text-muted-foreground">
+                                            No source records found for selected period.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Section 3: Telecaller & Sales Rep Performance Audit Table */}
+            <Card className="border border-border/60 shadow-sm overflow-hidden">
+                <CardHeader className="pb-3 border-b border-border/40 bg-muted/20">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div>
+                            <CardTitle className="text-base font-bold flex items-center gap-2">
+                                <Trophy className="h-5 w-5 text-amber-500" />
+                                Telecaller & Sales Rep Performance Leaderboard
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                                Complete admin audit of assigned leads, activities, closed deals, and follow-up discipline
+                            </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="text-xs font-semibold">
+                            {agentLeaderboard.length} Agents Logged
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0 overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead>
+                            <tr className="border-b border-border/60 bg-muted/40 text-muted-foreground uppercase text-[10px] font-bold">
+                                <th className="py-3 px-4">Sales Representative</th>
+                                <th className="py-3 px-3 text-center">Assigned Leads</th>
+                                <th className="py-3 px-3 text-center">Activities / Calls</th>
+                                <th className="py-3 px-3 text-center">Contact %</th>
+                                <th className="py-3 px-3 text-center">Deals Won</th>
+                                <th className="py-3 px-3 text-right">Won Revenue</th>
+                                <th className="py-3 px-3 text-center">Overdue Follow-ups</th>
+                                <th className="py-3 px-3 text-right">Win %</th>
+                                <th className="py-3 px-4 text-right">Quick Filter</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/40">
+                            {agentLeaderboard.map((agent, idx) => (
+                                <tr key={agent.name} className="hover:bg-muted/40 transition-colors">
+                                    <td className="py-3 px-4">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="relative">
+                                                <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary font-bold flex items-center justify-center text-xs">
+                                                    {agent.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                {idx === 0 && (
+                                                    <span className="absolute -top-1 -right-1 text-xs" title="Top Performer">
+                                                        👑
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-foreground flex items-center gap-1.5">
+                                                    {agent.name}
+                                                    {idx === 0 && (
+                                                        <Badge variant="secondary" className="text-[9px] py-0 px-1 font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-none">
+                                                            Top Rep
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] text-muted-foreground capitalize">{agent.role}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="py-3 px-3 text-center font-bold text-foreground">
+                                        {agent.assignedLeads}
+                                    </td>
+                                    <td className="py-3 px-3 text-center font-semibold text-muted-foreground">
+                                        {agent.activitiesCount}
+                                    </td>
+                                    <td className="py-3 px-3 text-center">
+                                        <span className="font-semibold">{agent.contactRate}%</span>
+                                    </td>
+                                    <td className="py-3 px-3 text-center font-bold text-emerald-600 dark:text-emerald-400">
+                                        {agent.wonCount}
+                                    </td>
+                                    <td className="py-3 px-3 text-right font-black text-foreground">
+                                        {formatCurrency(agent.wonRevenue)}
+                                    </td>
+                                    <td className="py-3 px-3 text-center">
+                                        {agent.overdueCount > 0 ? (
+                                            <Badge variant="destructive" className="text-[10px] py-0 px-1.5 font-bold gap-1">
+                                                <AlertCircle className="h-3 w-3" />
+                                                {agent.overdueCount} Overdue
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none">
+                                                Clean
+                                            </Badge>
+                                        )}
+                                    </td>
+                                    <td className="py-3 px-3 text-right">
+                                        <span className="font-bold text-foreground">{agent.conversionRate}%</span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setSelectedAgent(agent.name)}
+                                            className="h-7 text-[11px] font-semibold px-2 rounded-lg"
+                                        >
+                                            Audit Agent
+                                        </Button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {agentLeaderboard.length === 0 && (
+                                <tr>
+                                    <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                                        No sales agent activity recorded for selected range.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </CardContent>
+            </Card>
+
+            {/* Section 4: Follow-up Outcomes & Call Discipline + Opportunities Watchlist */}
+            <div className="grid lg:grid-cols-12 gap-6">
+                {/* Outcomes Donut Chart */}
+                <Card className="lg:col-span-5 border border-border/60 shadow-sm flex flex-col justify-between">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base font-bold flex items-center gap-2">
+                            <Activity className="h-5 w-5 text-indigo-500" />
+                            Follow-up & Call Outcomes
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                            Distribution of calling dispositions and customer responses
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[280px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={outcomeData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={55}
+                                    outerRadius={85}
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                >
+                                    {outcomeData.map((entry, index) => (
+                                        <Cell key={`outcome-cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    formatter={(value: any, name: any) => [`${value} occurrences`, name]}
+                                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', fontSize: '12px' }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                    <div className="p-4 pt-0 border-t border-border/40 grid grid-cols-2 gap-2 max-h-[140px] overflow-y-auto">
+                        {outcomeData.map((item) => (
+                            <div key={item.name} className="flex items-center gap-2 text-xs">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                <span className="truncate text-muted-foreground font-medium">{item.name}</span>
+                                <span className="ml-auto font-bold text-foreground">{item.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+
+                {/* Top Opportunities & Stale Leads Watchlist */}
+                <div className="lg:col-span-7 space-y-6">
+                    {/* Top 5 High-Value Deals */}
+                    <Card className="border border-border/60 shadow-sm">
+                        <CardHeader className="pb-2.5">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-amber-500" />
+                                    Top High-Value Active Opportunities
+                                </CardTitle>
+                                <span className="text-[11px] text-muted-foreground">Highest pipeline potential</span>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-border/40">
+                                {highValueDeals.map((lead: any) => (
+                                    <div
+                                        key={lead._id || lead.id}
+                                        className="p-3 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
+                                    >
+                                        <div className="min-w-0 flex-1 mr-3">
+                                            <div className="font-bold text-xs truncate flex items-center gap-2">
+                                                <span>{lead.name}</span>
+                                                <Badge variant="outline" className="text-[10px] py-0 px-1 font-semibold uppercase">
+                                                    {lead.stage}
+                                                </Badge>
+                                            </div>
+                                            <div className="text-[11px] text-muted-foreground truncate flex items-center gap-2 mt-0.5">
+                                                <span>{lead.company}</span>
+                                                <span>•</span>
+                                                <span>Agent: {lead.assignedToName || 'Unassigned'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0 flex items-center gap-3">
+                                            <div className="text-sm font-black text-foreground">
+                                                {formatCurrency(lead.value || 0)}
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 rounded-lg"
+                                                onClick={() => navigate ? navigate(`/leads?search=${encodeURIComponent(lead.name)}`) : window.location.href = `/leads`}
+                                            >
+                                                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {highValueDeals.length === 0 && (
+                                    <div className="p-4 text-center text-xs text-muted-foreground">
+                                        No active opportunities found in current filter.
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Stale / At-Risk Leads Watchlist */}
+                    <Card className="border border-border/60 shadow-sm">
+                        <CardHeader className="pb-2.5">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-sm font-bold flex items-center gap-2 text-rose-500">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    At-Risk & Stale Leads Watchlist
+                                </CardTitle>
+                                <span className="text-[11px] text-rose-500 font-semibold">Immediate Follow-up Needed</span>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-border/40">
+                                {staleLeads.map((lead: any) => {
+                                    const isOverdue = lead.reminder?.date && new Date(lead.reminder.date).getTime() < Date.now() && !lead.reminder.completed
+                                    return (
+                                        <div
+                                            key={lead._id || lead.id}
+                                            className="p-3 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
+                                        >
+                                            <div className="min-w-0 flex-1 mr-3">
+                                                <div className="font-bold text-xs truncate flex items-center gap-2">
+                                                    <span>{lead.name}</span>
+                                                    <span className="text-muted-foreground text-[10px]">({lead.company})</span>
+                                                    {isOverdue && (
+                                                        <Badge variant="destructive" className="text-[9px] py-0 px-1 font-bold">
+                                                            Overdue Reminder
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="text-[11px] text-muted-foreground truncate flex items-center gap-2 mt-0.5">
+                                                    <span>Agent: {lead.assignedToName || 'Unassigned'}</span>
+                                                    <span>•</span>
+                                                    <span>Last Outcome: {lead.lastFollowUpOutcome || 'None'}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <div className="text-xs font-bold text-foreground">
+                                                    {formatCurrency(lead.value || 0)}
+                                                </div>
+                                                <span className="text-[10px] text-rose-500 font-medium">Needs Attention</span>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                                {staleLeads.length === 0 && (
+                                    <div className="p-4 text-center text-xs text-muted-foreground">
+                                        🎉 Great job! No stale or overdue leads at this time.
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </div>
     )

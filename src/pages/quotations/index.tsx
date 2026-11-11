@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, FileText, Download, Mail, Eye, Edit, Trash2, Paperclip, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
+import { usePortalPrefix } from '@/lib/nav-utils';
 import api from '@/lib/api-client';
 
 import { appConfirm } from '@/lib/app-dialog'
@@ -30,6 +31,7 @@ export default function QuotationsPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<string>('all');
     const navigate = useNavigate();
+    const portalPrefix = usePortalPrefix();
 
     useEffect(() => {
         fetchQuotations();
@@ -107,7 +109,7 @@ export default function QuotationsPage() {
                     <p className="text-gray-600 mt-1">Manage and generate professional quotations</p>
                 </div>
                 <button
-                    onClick={() => navigate('/quotations/create')}
+                    onClick={() => navigate(`${portalPrefix}/quotations/create`)}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                     <Plus className="w-5 h-5" />
@@ -146,7 +148,7 @@ export default function QuotationsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">No quotations found</h3>
                         <p className="text-gray-600 mb-4">Create your first quotation to get started</p>
                         <button
-                            onClick={() => navigate('/quotations/create')}
+                            onClick={() => navigate(`${portalPrefix}/quotations/create`)}
                             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                         >
                             <Plus className="w-5 h-5" />
@@ -214,14 +216,14 @@ export default function QuotationsPage() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center gap-2">
                                                 <button
-                                                    onClick={() => navigate(`/quotations/${quotation._id}`)}
+                                                    onClick={() => navigate(`${portalPrefix}/quotations/${quotation._id}`)}
                                                     className="text-blue-600 hover:text-blue-900"
                                                     title="View"
                                                 >
                                                     <Eye className="w-4 h-4" />
                                                 </button>
                                                 <button
-                                                    onClick={() => navigate(`/quotations/${quotation._id}/edit`)}
+                                                    onClick={() => navigate(`${portalPrefix}/quotations/${quotation._id}/edit`)}
                                                     className="text-green-600 hover:text-green-900"
                                                     title="Edit"
                                                 >
@@ -235,7 +237,7 @@ export default function QuotationsPage() {
                                                     <Download className="w-4 h-4" />
                                                 </button>
                                                 <button
-                                                    onClick={() => navigate(`/quotations/${quotation._id}/share`)}
+                                                    onClick={() => navigate(`${portalPrefix}/quotations/${quotation._id}/share`)}
                                                     className="text-indigo-600 hover:text-indigo-900"
                                                     title="Share"
                                                 >

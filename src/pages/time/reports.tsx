@@ -38,9 +38,11 @@ import { timeEntryService, GranularTimeReportData, EmployeeSpeedMetric } from '@
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { usePortalPrefix } from '@/lib/nav-utils'
 
 export function TimeReportsPage() {
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const { users: globalUsers, projects: globalProjects, currentUser } = useAppStore()
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner'
@@ -240,7 +242,7 @@ export function TimeReportsPage() {
             {/* Header & Navigation */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <Button variant="outline" size="icon" onClick={() => navigate('/time')} className="h-10 w-10 rounded-xl">
+                    <Button variant="outline" size="icon" onClick={() => navigate(`${portalPrefix}/time`)} className="h-10 w-10 rounded-xl">
                         <ArrowLeft className="h-5 w-5" />
                     </Button>
                     <div>

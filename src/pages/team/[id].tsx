@@ -90,12 +90,25 @@ export function TeamMemberPage() {
         return manager ? manager.name : 'Unknown'
     }
 
-    const openDocument = (url?: string) => {
-        if (url) {
-            const win = window.open()
-            if (win) {
-                win.document.write(`<iframe src="${url}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`)
+    const openDocument = async (url?: string) => {
+        if (!url) return
+        try {
+            if (url.includes('/api/')) {
+                const apiPath = url.slice(url.indexOf('/api/') + 4)
+                const res = await api.get(apiPath, { responseType: 'blob' })
+                const contentType = res.headers?.['content-type'] || 'application/pdf'
+                const blobUrl = URL.createObjectURL(new Blob([res.data], { type: contentType }))
+                window.open(blobUrl, '_blank', 'noopener,noreferrer')
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+                return
             }
+            window.open(url, '_blank', 'noopener,noreferrer')
+        } catch (err: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Unable to open document',
+                description: err.userMessage || err.message || 'Please check permissions'
+            })
         }
     }
 

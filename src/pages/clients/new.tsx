@@ -2,14 +2,16 @@ import { ClientForm } from '@/components/forms/client-form'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
+import { usePortalPrefix } from '@/lib/nav-utils'
 
 export function NewClientPage() {
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto pb-10">
             <div className="flex items-center gap-4 mb-6">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
+                <Button variant="ghost" size="icon" onClick={() => navigate(`${portalPrefix}/clients`)}>
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
                 {/* Title is handled inside ClientForm or can be here. 

@@ -18,7 +18,13 @@ import {
     ArrowRight,
     Loader2,
     AlertCircle,
-    MessageCircle
+    MessageCircle,
+    Key,
+    Copy,
+    Check,
+    ExternalLink,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
 import axios from 'axios';
@@ -78,10 +84,32 @@ export function PublicClientOnboarding() {
     const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
     const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null);
 
-    // Fetch form configuration if token is present
+    // Client Portal Access State
+    const [portalPassword, setPortalPassword] = useState('');
+    const [showPortalPassword, setShowPortalPassword] = useState(false);
+    const [portalAccessResult, setPortalAccessResult] = useState<any>(null);
+    const [copiedPortalCreds, setCopiedPortalCreds] = useState(false);
+
+    // Fetch form configuration
     useEffect(() => {
         if (!token) {
-            setFetchingForm(false);
+            const templateParam = searchParams.get('template') || '';
+            const fetchGeneralConfig = async () => {
+                setFetchingForm(true);
+                setErrorMsg('');
+                try {
+                    const res = await axios.get(
+                        `${import.meta.env.VITE_API_URL || '/api'}/clients/public/onboarding-config${templateParam ? `?template=${encodeURIComponent(templateParam)}` : ''}`
+                    );
+                    if (res.data.agency) setAgency(res.data.agency);
+                    if (res.data.config) setFormConfig(res.data.config);
+                } catch (err: any) {
+                    console.warn('Could not load general onboarding config', err);
+                } finally {
+                    setFetchingForm(false);
+                }
+            };
+            fetchGeneralConfig();
             return;
         }
 
@@ -136,7 +164,7 @@ export function PublicClientOnboarding() {
         };
 
         fetchForm();
-    }, [token]);
+    }, [token, searchParams]);
 
     const handleStandardChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -149,7 +177,7 @@ export function PublicClientOnboarding() {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldId: string, fieldName: string) => {
         const file = e.target.files?.[0];
-        if (!file || !token) return;
+        if (!file) return;
 
         setUploadingFieldId(fieldId);
         const data = new FormData();
@@ -158,8 +186,12 @@ export function PublicClientOnboarding() {
         data.append('fieldName', fieldName);
 
         try {
+            const uploadUrl = token
+                ? `${import.meta.env.VITE_API_URL || '/api'}/clients/public/onboarding-form/${token}/upload`
+                : `${import.meta.env.VITE_API_URL || '/api'}/clients/public/onboarding/upload`;
+
             const res = await axios.post(
-                `${import.meta.env.VITE_API_URL || '/api'}/clients/public/onboarding-form/${token}/upload`,
+                uploadUrl,
                 data,
                 { headers: { 'Content-Type': 'multipart/form-data' } }
             );
@@ -195,36 +227,37 @@ export function PublicClientOnboarding() {
                 ? formData.services.split(',').map(s => s.trim()).filter(Boolean)
                 : [];
 
+            const payload = {
+                ...formData,
+                portalPassword: portalPassword.trim() || undefined,
+                services: servicesArray,
+                onboardingData: customAnswers,
+                onboardingFiles: uploadedFiles
+            };
+
+            let response;
             if (token) {
                 // Submit to specific client token endpoint
-                const payload = {
-                    ...formData,
-                    services: servicesArray,
-                    onboardingData: customAnswers,
-                    onboardingFiles: uploadedFiles
-                };
-
-                await axios.post(
+                response = await axios.post(
                     `${import.meta.env.VITE_API_URL || '/api'}/clients/public/onboarding-form/${token}/submit`,
                     payload
                 );
             } else {
-                // Submit generic intake
-                const payload = {
-                    ...formData,
-                    services: servicesArray
-                };
-
-                await axios.post(
+                // Submit generic intake & auto-register new client in CRM!
+                response = await axios.post(
                     `${import.meta.env.VITE_API_URL || '/api'}/clients/public/onboarding`,
                     payload
                 );
             }
 
+            if (response.data?.portalAccess) {
+                setPortalAccessResult(response.data.portalAccess);
+            }
+
             setSubmitted(true);
             toast({
                 title: 'Onboarding Submitted Successfully!',
-                description: 'Our team will review your details and begin onboarding.'
+                description: 'Your client profile has been registered with our team.'
             });
         } catch (error: any) {
             console.error('Submission error:', error);
@@ -305,6 +338,81 @@ export function PublicClientOnboarding() {
                                 `We have successfully received your information and assets. Our team has been notified and will proceed with the next steps immediately.`}
                         </p>
                     </div>
+
+                    {/* Client Portal Credentials Card */}
+                    {portalAccessResult?.enabled && (
+                        <div className="clay-card p-5 rounded-3xl bg-primary/5 border border-primary/20 text-left space-y-3.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
+                                    <Key className="h-4 w-4" /> Client Portal Access Activated
+                                </span>
+                                <Badge className="clay-badge bg-emerald-500/15 text-emerald-600 border-0 text-[10px] font-bold">
+                                    Login Ready
+                                </Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground font-medium leading-relaxed">
+                                You can now log into your dedicated Client Portal to view project progress, milestone deliveries, invoices, and direct communication.
+                            </p>
+                            <div className="bg-card p-3 rounded-2xl border border-border/40 space-y-2 text-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground text-[11px] font-bold">Portal URL:</span>
+                                    <span className="font-mono font-bold text-foreground">{window.location.origin}/login</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground text-[11px] font-bold">Username / Email:</span>
+                                    <span className="font-mono font-bold text-primary">{portalAccessResult.email}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground text-[11px] font-bold">Password:</span>
+                                    <span className="font-mono font-black text-foreground bg-muted px-2 py-0.5 rounded-md select-all">
+                                        {portalAccessResult.password}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        const text = `Client Portal Credentials:\nURL: ${window.location.origin}/login\nEmail: ${portalAccessResult.email}\nPassword: ${portalAccessResult.password}`;
+                                        navigator.clipboard.writeText(text);
+                                        setCopiedPortalCreds(true);
+                                        toast({ title: 'Credentials Copied!', description: 'Saved to your clipboard.' });
+                                        setTimeout(() => setCopiedPortalCreds(false), 2500);
+                                    }}
+                                    variant="outline"
+                                    className="clay-btn flex-1 text-xs font-bold gap-1.5 h-9 rounded-xl"
+                                >
+                                    {copiedPortalCreds ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                                    {copiedPortalCreds ? 'Copied' : 'Copy Credentials'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => window.location.href = '/login'}
+                                    className="clay-btn bg-primary hover:bg-primary/95 text-white flex-1 text-xs font-extrabold gap-1.5 h-9 rounded-xl shadow-md"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" /> Login to Client Portal
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                    {portalAccessResult?.existingAccount && (
+                        <div className="clay-card p-5 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-left space-y-2 shadow-sm">
+                            <span className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                <Key className="h-4 w-4" /> Existing Account Detected
+                            </span>
+                            <p className="text-[11px] text-muted-foreground font-medium leading-relaxed">
+                                {portalAccessResult.message || 'An account with this email already exists. Please log in with your existing password or contact an administrator.'}
+                            </p>
+                            <Button
+                                type="button"
+                                onClick={() => window.location.href = '/login'}
+                                variant="outline"
+                                className="clay-btn w-full text-xs font-extrabold gap-1.5 h-9 rounded-xl mt-2"
+                            >
+                                <ExternalLink className="h-3.5 w-3.5" /> Go to Login
+                            </Button>
+                        </div>
+                    )}
 
                     {/* Agency Contact Card */}
                     <div className="clay-inset p-4 rounded-2xl bg-muted/30 text-left space-y-2">
@@ -766,6 +874,50 @@ export function PublicClientOnboarding() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Section: Client Portal Account Setup */}
+                        <div className="clay-card p-5 rounded-2xl bg-primary/5 border border-primary/20 space-y-3">
+                            <div className="flex items-center gap-2.5 pb-2 border-b border-primary/15">
+                                <div className="clay-icon h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                    <Key className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
+                                        Client Portal Login Access
+                                    </h4>
+                                    <p className="text-[11px] text-muted-foreground font-medium">
+                                        Your client portal account will be activated with your email ({formData.email || 'your email'}) so you can track project progress, chat with the team, and access invoices.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="portalPassword" className="text-xs font-bold text-foreground flex items-center justify-between">
+                                    <span>Create Portal Password (Optional)</span>
+                                    <span className="text-[10px] text-muted-foreground font-normal">Min 6 characters (or auto-generated)</span>
+                                </Label>
+                                <div className="relative">
+                                    <Input
+                                        id="portalPassword"
+                                        type={showPortalPassword ? 'text' : 'password'}
+                                        value={portalPassword}
+                                        onChange={e => setPortalPassword(e.target.value)}
+                                        placeholder="Set a password or leave blank to auto-generate"
+                                        className="clay-input text-xs h-10 rounded-xl pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPortalPassword(!showPortalPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        {showPortalPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">
+                                    If left blank, a secure temporary password will be automatically assigned and displayed right after submission.
+                                </p>
+                            </div>
+                        </div>
 
                         {/* Submit Button */}
                         <div className="pt-4">

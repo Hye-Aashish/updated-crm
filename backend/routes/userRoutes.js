@@ -45,11 +45,22 @@ router.post('/', protect, authorize('admin', 'owner'), async (req, res) => {
         name, email, password, role, department, designation, salary, phone, avatar,
         employeeId, salutation, country, gender, dateOfBirth, joiningDate, reportingTo,
         language, address, about, aadharNumber, panNumber, documentAadhar, documentPan,
-        documentOfferLetter, clientId
+        documentOfferLetter
     } = req.body;
 
     if (!name || !email || !password) {
         return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+
+    if (String(password).trim().length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    // Client login accounts must only be created from the Clients / Onboarding flow
+    if (role === 'client') {
+        return res.status(400).json({
+            message: 'Client portal accounts cannot be created from Team Management. Create the client and configure portal login in the Clients module.'
+        });
     }
 
     // Prevent creating owner accounts (only existing owners should exist)
@@ -58,10 +69,10 @@ router.post('/', protect, authorize('admin', 'owner'), async (req, res) => {
     }
 
     const user = new User({
-        name, email, password, role, department, designation, salary, phone, avatar,
+        name, email, password: String(password).trim(), role, department, designation, salary, phone, avatar,
         employeeId, salutation, country, gender, dateOfBirth, joiningDate, reportingTo,
         language, address, about, aadharNumber, panNumber, documentAadhar, documentPan,
-        documentOfferLetter, clientId
+        documentOfferLetter
     });
     try {
         const newUser = await user.save();
@@ -93,6 +104,10 @@ router.put('/:id', protect, async (req, res) => {
         // Prevent role escalation
         if (req.user.role !== 'admin' && req.user.role !== 'owner') {
             delete updateData.role;
+        } else if (updateData.role === 'client' && user.role !== 'client') {
+            return res.status(400).json({
+                message: 'Client portal accounts must be managed from the Clients module.'
+            });
         }
 
         // Whitelist fields based on user role
@@ -113,9 +128,18 @@ router.put('/:id', protect, async (req, res) => {
             }
         });
 
-        // Handle password update separately to ensure hashing
-        if (updateData.password && (isAdmin || userId === req.user._id.toString())) {
-            user.password = updateData.password;
+        // Handle password update separately to ensure hashing and currentPassword verification on self-change
+        if (updateData.password) {
+            const trimmedPassword = String(updateData.password).trim();
+            if (trimmedPassword.length < 6) {
+                return res.status(400).json({ message: 'Password must be at least 6 characters' });
+            }
+            if (!isAdmin) {
+                if (!updateData.currentPassword || !(await user.matchPassword(String(updateData.currentPassword)))) {
+                    return res.status(400).json({ message: 'Current password is incorrect' });
+                }
+            }
+            user.password = trimmedPassword;
         }
 
         await user.save();

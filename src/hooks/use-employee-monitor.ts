@@ -40,7 +40,11 @@ export function useEmployeeMonitor() {
 
     async function startMonitoring() {
         console.log('[MONITOR] Starting automatic screen tracking...');
-        socketRef.current = io(SOCKET_URL);
+        const token = localStorage.getItem('token');
+        socketRef.current = io(SOCKET_URL, {
+            auth: { token },
+            query: { token }
+        });
 
         socketRef.current.on('connect', async () => {
             console.log('[MONITOR] Connected to tracking server');

@@ -53,7 +53,9 @@ export default function PublicQuotationView() {
 
     const fetchQuotation = async () => {
         try {
-            const res = await axios.get(`${API_BASE}/quotations/public/${id}`);
+            const tokenParam = new URLSearchParams(window.location.search).get('token');
+            const qs = tokenParam ? `?token=${encodeURIComponent(tokenParam)}` : '';
+            const res = await axios.get(`${API_BASE}/quotations/public/${id}${qs}`);
             setQuotation(res.data);
             if (res.data.status === 'approved') setApproved(true);
         } catch (e) { console.error(e); }
@@ -64,7 +66,8 @@ export default function PublicQuotationView() {
         if (!signature) return await appAlert('Please enter your full name as signature');
         setAccepting(true);
         try {
-            await axios.patch(`${API_BASE}/quotations/public/${id}/approve`, { signature });
+            const tokenParam = new URLSearchParams(window.location.search).get('token');
+            await axios.patch(`${API_BASE}/quotations/public/${id}/approve`, { signature, token: tokenParam || undefined });
             setApproved(true);
             setQuotation({ ...quotation, status: 'approved' });
         } catch (e) { await appAlert('Acceptance failed. Please contact support.'); }

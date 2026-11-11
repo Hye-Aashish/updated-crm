@@ -1,66 +1,52 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, CheckSquare, MessageSquare } from 'lucide-react'
+import { LayoutDashboard, Briefcase, CheckSquare, MessageSquare, LifeBuoy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
-import { useState, useEffect, useMemo, type ComponentType } from 'react'
-import api from '@/lib/api-client'
+import { useMemo, type ComponentType } from 'react'
+import { usePermissions } from '@/hooks/use-permissions'
+import { isNavItemActive, isAdminOrOwnerRole, resolvePortalPrefix } from '@/lib/nav-utils'
 
 type NavItem = {
     label: string
     icon: ComponentType<{ className?: string }>
     path: string
+    module: string
 }
 
 export function BottomNav() {
     const navigate = useNavigate()
     const location = useLocation()
-    const { currentUser, settings } = useAppStore()
-    const [permissions, setPermissions] = useState<any>(null)
-
-    useEffect(() => {
-        const apply = (roles: any[]) => {
-            if (currentUser?.role && roles) {
-                const role = roles.find((r: any) => r.name === currentUser.role)
-                if (role) setPermissions(role.permissions)
-            }
-        }
-        if (settings?.roles) {
-            apply(settings.roles)
-            return
-        }
-        api.get('/settings').then(res => apply(res.data?.roles || [])).catch(() => {})
-    }, [currentUser, settings])
+    const currentUser = useAppStore((s) => s.currentUser)
+    const { permissions, canView } = usePermissions()
 
     const role = currentUser?.role
-    const isEmployeePortal = location.pathname.startsWith('/employee')
-        || role === 'employee' || role === 'developer' || role === 'pm'
-    const isClientPortal = location.pathname.startsWith('/client') || role === 'client'
-    const baseUrl = isClientPortal ? '/client' : isEmployeePortal ? '/employee' : ''
+    const baseUrl = resolvePortalPrefix(location.pathname, role)
 
-    const navItems: NavItem[] = useMemo(() => [
-        { label: 'Home', icon: LayoutDashboard, path: `${baseUrl}/dashboard`.replace('//', '/') },
-        { label: 'Projects', icon: Briefcase, path: `${baseUrl}/projects`.replace('//', '/') },
-        { label: 'Tasks', icon: CheckSquare, path: `${baseUrl}/tasks`.replace('//', '/') },
-        { label: 'Chat', icon: MessageSquare, path: `${baseUrl}/project-chat`.replace('//', '/') },
-    ], [baseUrl])
+    const filteredItems: NavItem[] = useMemo(() => {
+        const items: NavItem[] = [
+            { label: 'Home', icon: LayoutDashboard, path: `${baseUrl}/dashboard`, module: 'dashboard' },
+            { label: 'Projects', icon: Briefcase, path: `${baseUrl}/projects`, module: 'projects' },
+            { label: 'Tasks', icon: CheckSquare, path: `${baseUrl}/tasks`, module: 'tasks' },
+        ]
 
-    const canView = (item: NavItem) => {
-        if (role === 'owner' || role === 'admin' || isClientPortal) return true
-        if (!permissions) return item.label === 'Home'
-        const p = permissions
-        switch (item.label) {
-            case 'Home': return !!p.dashboard?.view
-            case 'Projects': return !!p.projects?.view
-            case 'Tasks': return !!p.tasks?.view
-            case 'Chat': return !!(p.project_chat?.view || p.tickets?.view)
-            default: return true
+        const hasProjectChat = canView('project_chat')
+        const hasTickets = canView('tickets')
+        if (hasProjectChat || (!permissions && isAdminOrOwnerRole(role))) {
+            items.push({ label: 'Chat', icon: MessageSquare, path: `${baseUrl}/project-chat`, module: 'project_chat' })
+        } else if (hasTickets) {
+            items.push({ label: 'Tickets', icon: LifeBuoy, path: `${baseUrl}/tickets`, module: 'tickets' })
         }
-    }
 
-    const filteredItems = navItems.filter(canView)
+        if (isAdminOrOwnerRole(role)) return items
 
-    const isPathActive = (path: string) =>
-        location.pathname === path || location.pathname.startsWith(`${path}/`)
+        return items.filter((item) => {
+            if (!permissions) return item.label === 'Home'
+            if (item.label === 'Home' && baseUrl !== '') return true
+            return canView(item.module)
+        })
+    }, [baseUrl, canView, permissions, role])
+
+    const allPaths = useMemo(() => filteredItems.map((i) => i.path), [filteredItems])
 
     return (
         <nav
@@ -70,7 +56,7 @@ export function BottomNav() {
         >
             <div className="flex items-stretch justify-around h-16 px-1 max-w-lg mx-auto">
                 {filteredItems.map((item) => {
-                    const active = isPathActive(item.path)
+                    const active = isNavItemActive(location.pathname, item.path, allPaths)
                     return (
                         <button
                             key={item.label}

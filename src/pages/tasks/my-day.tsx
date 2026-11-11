@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Star, Calendar, AlertTriangle, CheckSquare } from 'lucide-react'
 import api from '@/lib/api-client'
 import { cn } from '@/lib/utils'
+import { usePortalPrefix } from '@/lib/nav-utils'
 import { format } from 'date-fns'
 
 export default function MyDayPage() {
+    const portalPrefix = usePortalPrefix()
     const [loading, setLoading] = useState(true)
     const [tasks, setTasks] = useState<any[]>([])
 
@@ -55,7 +57,7 @@ export default function MyDayPage() {
                     <h1 className="text-xl font-extrabold tracking-tight">My Day</h1>
                     <p className="text-sm text-muted-foreground">Due today, overdue, and starred tasks</p>
                 </div>
-                <Button asChild variant="outline" size="sm"><Link to="/tasks">Full board</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link to={`${portalPrefix}/tasks`}>Full board</Link></Button>
             </div>
 
             {tasks.length === 0 && (
@@ -67,7 +69,7 @@ export default function MyDayPage() {
                     <h2 className="text-xs font-extrabold uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
                         <AlertTriangle className="h-3.5 w-3.5" /> Overdue ({overdue.length})
                     </h2>
-                    {overdue.map(t => <TaskRow key={t._id} task={t} onStar={() => toggleStar(t)} onDone={() => markDone(t)} />)}
+                    {overdue.map(t => <TaskRow key={t._id} task={t} portalPrefix={portalPrefix} onStar={() => toggleStar(t)} onDone={() => markDone(t)} />)}
                 </section>
             )}
 
@@ -76,13 +78,13 @@ export default function MyDayPage() {
                     <Calendar className="h-3.5 w-3.5" /> Today ({today.length})
                 </h2>
                 {today.length === 0 && <p className="text-sm text-muted-foreground px-1">No tasks due today.</p>}
-                {today.map(t => <TaskRow key={t._id} task={t} onStar={() => toggleStar(t)} onDone={() => markDone(t)} />)}
+                {today.map(t => <TaskRow key={t._id} task={t} portalPrefix={portalPrefix} onStar={() => toggleStar(t)} onDone={() => markDone(t)} />)}
             </section>
         </div>
     )
 }
 
-function TaskRow({ task, onStar, onDone }: { task: any; onStar: () => void; onDone: () => void }) {
+function TaskRow({ task, portalPrefix, onStar, onDone }: { task: any; portalPrefix: string; onStar: () => void; onDone: () => void }) {
     const slaOver = task.slaDueAt && new Date(task.slaDueAt) < new Date()
     return (
         <Card className={cn('border-border/60', slaOver && 'border-rose-300/60')}>
@@ -91,7 +93,7 @@ function TaskRow({ task, onStar, onDone }: { task: any; onStar: () => void; onDo
                     <CheckSquare className="h-5 w-5" />
                 </button>
                 <div className="min-w-0 flex-1">
-                    <Link to={`/tasks/${task._id}`} className="text-sm font-bold hover:text-primary truncate block">{task.title}</Link>
+                    <Link to={`${portalPrefix}/tasks/${task._id}`} className="text-sm font-bold hover:text-primary truncate block">{task.title}</Link>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                         <Badge variant="secondary" className="text-[10px]">{task.priority}</Badge>
                         {task.dueDate && <Badge variant="outline" className="text-[10px]">{format(new Date(task.dueDate), 'MMM d')}</Badge>}

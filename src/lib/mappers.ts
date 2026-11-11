@@ -50,6 +50,10 @@ export const mapProject = (p: any): Project => {
         iosBuildNumber: p.iosBuildNumber,
 
         adminPanelRequired: p.adminPanelRequired || false,
+        adminPanelStatus: p.adminPanelStatus || 'not-started',
+        adminPanelUrl: p.adminPanelUrl,
+        adminPanelStagingUrl: p.adminPanelStagingUrl,
+        adminPanelVersion: p.adminPanelVersion,
         apiRequired: p.apiRequired || false,
         hostingRequired: p.hostingRequired || false,
         maintenanceRequired: p.maintenanceRequired || false,
@@ -107,10 +111,26 @@ export const mapClient = (c: any): Client => ({
     status: c.status,
     industry: c.industry,
     city: c.city,
+    state: c.state,
+    country: c.country,
     website: c.website,
     gstNumber: c.gstNumber,
     leadSource: c.leadSource,
+    services: c.services || [],
+    budget: c.budget,
+    paymentModel: c.paymentModel,
+    deadline: c.expectedDeadline ? new Date(c.expectedDeadline) : undefined,
+    expectedDeadline: c.expectedDeadline,
+    assignedTo: c.assignedTo,
+    followUpDate: c.followUpDate ? new Date(c.followUpDate) : undefined,
     notes: c.notes,
+    onboardingToken: c.onboardingToken,
+    onboardingStatus: c.onboardingStatus || 'not_sent',
+    onboardingSentAt: c.onboardingSentAt,
+    onboardingCompletedAt: c.onboardingCompletedAt,
+    customOnboardingConfig: c.customOnboardingConfig,
+    onboardingData: c.onboardingData || {},
+    onboardingFiles: c.onboardingFiles || [],
     createdAt: new Date(c.createdAt),
     updatedAt: new Date(c.updatedAt || c.createdAt),
 });
@@ -129,10 +149,14 @@ export const mapTask = (t: any): Task => {
         estimatedHours: t.estimatedHours,
         labels: t.labels || [],
         checklist: t.checklist || [],
+        attachments: t.attachments || [],
         totalTimeSpent: t.totalTimeSpent,
         lastStartTime: t.lastStartTime,
         isTimerRunning: t.isTimerRunning,
         timeEntryId: t.timeEntryId,
+        creatorId: t.creatorId,
+        starred: t.starred,
+        slaDueAt: t.slaDueAt ? new Date(t.slaDueAt) : undefined,
         createdAt: t.createdAt ? new Date(t.createdAt) : new Date(),
         updatedAt: t.updatedAt || t.createdAt ? new Date(t.updatedAt || t.createdAt) : new Date(),
     }
@@ -188,6 +212,12 @@ export const mapExpense = (e: any): Expense => ({
 
 export const mapLead = (l: any): Lead => {
     if (!l) return {} as Lead;
+    const activities = Array.isArray(l.activities) ? l.activities : [];
+    const lastAct = activities.length > 0 ? activities[activities.length - 1] : null;
+    const derivedOutcome = l.lastFollowUpOutcome || lastAct?.outcome || (l.lastNote || lastAct?.content ? 'Note Added' : undefined);
+    const derivedNote = l.lastNote || lastAct?.content;
+    const derivedDate = l.lastFollowUpDate ? new Date(l.lastFollowUpDate) : (lastAct?.createdAt ? new Date(lastAct.createdAt) : undefined);
+
     return {
         id: l._id || l.id,
         _id: l._id || l.id,
@@ -204,14 +234,14 @@ export const mapLead = (l: any): Lead => {
         assignedToName: l.assignedToName,
         createdBy: l.createdBy,
         createdByName: l.createdByName,
-        lastContactedBy: l.lastContactedBy,
+        lastContactedBy: l.lastContactedBy || lastAct?.createdByName,
         isFallbackFollowUp: l.isFallbackFollowUp || false,
         absentTelecallerName: l.absentTelecallerName,
-        lastFollowUpDate: l.lastFollowUpDate ? new Date(l.lastFollowUpDate) : undefined,
-        lastFollowUpOutcome: l.lastFollowUpOutcome,
-        lastNote: l.lastNote,
+        lastFollowUpDate: derivedDate,
+        lastFollowUpOutcome: derivedOutcome,
+        lastNote: derivedNote,
         customFields: l.customFields || {},
-        activities: l.activities || [],
+        activities: activities,
         reminder: l.reminder,
         tags: l.tags || [],
         aiPriority: l.aiPriority || 'red',

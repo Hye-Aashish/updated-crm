@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
 import { Task, TaskPriority, TaskStatus } from '@/types'
 import { mapTask } from '@/lib/mappers'
+import { usePermissions } from '@/hooks/use-permissions'
+import { isAdminOrOwnerRole } from '@/lib/nav-utils'
 
 interface ProjectTaskDialogProps {
     projectId: string
@@ -20,7 +22,12 @@ interface ProjectTaskDialogProps {
 export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: ProjectTaskDialogProps) {
     const { toast } = useToast()
     const { currentUser, users, addTask, updateTask: updateStoreTask } = useAppStore()
+    const { hasPermission } = usePermissions()
     const [loading, setLoading] = useState(false)
+
+    const currentUserId = currentUser?.id || (currentUser as any)?._id || ''
+    const canAssignOthers = isAdminOrOwnerRole(currentUser?.role) || hasPermission('tasks', 'assign_others')
+    const staffUsers = users.filter((u) => u.role !== 'client')
 
     const [formData, setFormData] = useState({
         title: '',
@@ -42,7 +49,7 @@ export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: Proje
                 attachments: task.attachments || []
             })
         } else {
-            const defaultAssignee = currentUser?.id || users[0]?.id || ''
+            const defaultAssignee = canAssignOthers ? '' : currentUserId
             setFormData({
                 title: '',
                 description: '',
@@ -52,7 +59,7 @@ export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: Proje
                 attachments: []
             })
         }
-    }, [task, open, users, currentUser])
+    }, [task, open, canAssignOthers, currentUserId])
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -85,8 +92,13 @@ export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: Proje
     }
 
     const handleSubmit = async () => {
-        if (!formData.title) {
+        if (!formData.title.trim()) {
             toast({ variant: "destructive", title: "Error", description: "Task title is required" })
+            return
+        }
+        const resolvedAssigneeId = canAssignOthers ? formData.assigneeId : currentUserId
+        if (!resolvedAssigneeId) {
+            toast({ variant: "destructive", title: "Error", description: "Please select an assignee" })
             return
         }
 
@@ -94,8 +106,10 @@ export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: Proje
         try {
             const taskData = {
                 ...formData,
+                title: formData.title.trim(),
+                assigneeId: resolvedAssigneeId,
                 projectId,
-                dueDate: new Date(formData.dueDate),
+                dueDate: formData.dueDate ? new Date(formData.dueDate) : new Date(),
                 status: task ? task.status : 'todo' as TaskStatus
             }
 
@@ -179,10 +193,10 @@ export function ProjectTaskDialog({ projectId, open, onOpenChange, task }: Proje
                             className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-75 disabled:cursor-not-allowed"
                             value={formData.assigneeId}
                             onChange={(e) => setFormData({ ...formData, assigneeId: e.target.value })}
-                            disabled={!['admin', 'owner'].includes(currentUser?.role || '')}
+                            disabled={!canAssignOthers}
                         >
                             <option value="">Select Assignee</option>
-                            {users.map(u => (
+                            {staffUsers.map(u => (
                                 <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                             ))}
                         </select>

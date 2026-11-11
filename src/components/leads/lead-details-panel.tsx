@@ -22,7 +22,7 @@ interface LeadDetailsPanelProps {
     onUpdate: (updatedLead: Lead) => void
     onOpenFollowUp?: (lead: Lead) => void
     onDelete: (leadId: string) => void
-    onAddActivity: (leadId: string, content: string) => Promise<any>
+    onAddActivity: (leadId: string, content: string, outcome?: string) => Promise<any>
     isAdminOrOwner?: boolean
     users?: User[]
     onAssignLead?: (leadId: string, userId: string, userName: string) => Promise<any>
@@ -113,6 +113,7 @@ export function LeadDetailsPanel({
 }: LeadDetailsPanelProps) {
     const { toast } = useToast()
     const [newActivityContent, setNewActivityContent] = useState('')
+    const [newActivityOutcome, setNewActivityOutcome] = useState('Note Added')
     const [reminderDate, setReminderDate] = useState('')
     const [reminderTone, setReminderTone] = useState('default')
     const [newTagInput, setNewTagInput] = useState('')
@@ -194,10 +195,11 @@ export function LeadDetailsPanel({
         if (!targetId || !newActivityContent.trim()) return
         setSavingNote(true)
         try {
-            const updatedLead = await onAddActivity(targetId, newActivityContent)
+            const updatedLead = await onAddActivity(targetId, newActivityContent, newActivityOutcome)
             if (updatedLead) {
                 onUpdate(updatedLead)
                 setNewActivityContent('')
+                setNewActivityOutcome('Note Added')
             }
         } catch (error) {
             console.error("Add Note Error:", error)
@@ -550,19 +552,23 @@ export function LeadDetailsPanel({
             </div>
 
             {/* Follow-up Summary Banner */}
-            {lead.lastFollowUpOutcome && (
+            {(lead.lastFollowUpOutcome || lead.lastNote || (lead.activities && lead.activities.length > 0)) && (
                 <div className="p-3.5 bg-card border border-border/60 rounded-xl space-y-1">
                     <div className="flex items-center justify-between">
                         <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Last Interaction Summary</Label>
                         <Badge variant="outline" className="text-[10px] font-bold">
-                            {lead.lastFollowUpOutcome}
+                            {lead.lastFollowUpOutcome || lead.activities?.[lead.activities.length - 1]?.outcome || 'Note Added'}
                         </Badge>
                     </div>
-                    {lead.lastNote && (
-                        <p className="text-xs font-semibold text-foreground">"{lead.lastNote}"</p>
+                    {(lead.lastNote || lead.activities?.[lead.activities.length - 1]?.content) && (
+                        <p className="text-xs font-semibold text-foreground">
+                            "{lead.lastNote || lead.activities?.[lead.activities.length - 1]?.content}"
+                        </p>
                     )}
-                    {lead.lastFollowUpDate && (
-                        <p className="text-[10px] text-muted-foreground">Logged on {format(new Date(lead.lastFollowUpDate), 'MMM d, yyyy h:mm a')}</p>
+                    {(lead.lastFollowUpDate || lead.activities?.[lead.activities.length - 1]?.createdAt) && (
+                        <p className="text-[10px] text-muted-foreground">
+                            Logged on {format(new Date(lead.lastFollowUpDate || lead.activities?.[lead.activities.length - 1]?.createdAt), 'MMM d, yyyy h:mm a')}
+                        </p>
                     )}
                 </div>
             )}
@@ -694,8 +700,27 @@ export function LeadDetailsPanel({
                     )}
                 </div>
 
-                <div className="space-y-2 pt-2 border-t border-border/30">
-                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Quick Note Entry</Label>
+                <div className="space-y-2.5 pt-2 border-t border-border/30">
+                    <div className="flex items-center justify-between gap-2">
+                        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Quick Note & Outcome</Label>
+                        <Select value={newActivityOutcome} onValueChange={setNewActivityOutcome}>
+                            <SelectTrigger className="h-7 text-[11px] font-semibold w-[160px] bg-background">
+                                <SelectValue placeholder="Select outcome" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Note Added">📝 Note Added</SelectItem>
+                                <SelectItem value="Call Connected">📞 Call Connected</SelectItem>
+                                <SelectItem value="Call Not Answered">📵 Call Not Answered</SelectItem>
+                                <SelectItem value="Follow-up Required">⏰ Follow-up Required</SelectItem>
+                                <SelectItem value="WhatsApp Sent">💬 WhatsApp Sent</SelectItem>
+                                <SelectItem value="Email Sent">✉️ Email Sent</SelectItem>
+                                <SelectItem value="Meeting Scheduled">📅 Meeting Scheduled</SelectItem>
+                                <SelectItem value="Busy">⏳ Busy</SelectItem>
+                                <SelectItem value="Interested">⭐ Interested</SelectItem>
+                                <SelectItem value="Not Interested">❌ Not Interested</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <Textarea placeholder="Add a quick note or comment on this lead..." value={newActivityContent} onChange={(e) => setNewActivityContent(e.target.value)} className="min-h-[80px] text-xs rounded-xl" />
                     <div className="flex justify-end">
                         <Button size="sm" onClick={handleAddNote} disabled={!newActivityContent.trim() || savingNote} className="font-bold text-xs uppercase tracking-wider rounded-lg">

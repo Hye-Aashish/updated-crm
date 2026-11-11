@@ -16,6 +16,7 @@ import api from '@/lib/api-client'
 import type { Invoice, Client } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
+import { usePortalPrefix } from '@/lib/nav-utils'
 
 import { appConfirm } from '@/lib/app-dialog'
 
@@ -34,6 +35,7 @@ const COLOR_PRESETS = [
 export function InvoiceDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const [loading, setLoading] = useState(true)
     const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -1189,7 +1191,7 @@ export function InvoiceDetailPage() {
             <div className="bg-card p-4 rounded-xl shadow-sm border flex flex-col lg:flex-row items-center justify-between gap-4 no-print sticky top-4 z-50 max-h-[80vh] overflow-y-auto lg:overflow-visible">
                 <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
                     <div className="flex items-center justify-between w-full sm:w-auto">
-                        <Button variant="ghost" size="icon" onClick={() => navigate('/invoices')} className="shrink-0">
+                        <Button variant="ghost" size="icon" onClick={() => navigate(`${portalPrefix}/invoices`)} className="shrink-0">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
                         <span className="text-sm font-semibold sm:hidden">Customization</span>
@@ -1330,7 +1332,7 @@ export function InvoiceDetailPage() {
                                     try {
                                         await api.delete(`/invoices/${invoice.id}`);
                                         toast({ title: 'Invoice Deleted', description: 'The invoice has been removed.' });
-                                        navigate('/invoices');
+                                        navigate(`${portalPrefix}/invoices`);
                                     } catch (err) {
                                         toast({ title: 'Failed to delete invoice', variant: 'destructive' });
                                     }

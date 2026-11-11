@@ -44,7 +44,11 @@ scratch/
 # Uploads
 backend/public/uploads/*
 !backend/public/uploads/.gitkeep
+backend/private/uploads/*
+!backend/private/uploads/.gitkeep
 
 # WhatsApp sessions
 backend/.wwebjs_auth/
 backend/.wwebjs_cache/
+.tools/
+.npm-cache/

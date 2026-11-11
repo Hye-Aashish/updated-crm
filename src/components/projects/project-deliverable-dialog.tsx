@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Globe, Smartphone } from 'lucide-react'
+import { Globe, Smartphone, Server } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { mapProject } from '@/lib/mappers'
@@ -14,7 +14,7 @@ interface ProjectDeliverableDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     project: Project
-    type: 'website' | 'android' | 'ios'
+    type: 'website' | 'admin' | 'android' | 'ios'
     onSuccess: (updated: Project) => void
 }
 
@@ -42,12 +42,22 @@ export function ProjectDeliverableDialog({
     const [iosVersion, setIosVersion] = useState(project.iosVersion || 'v1.0.0')
     const [iosAppUrl, setIosAppUrl] = useState(project.iosAppUrl || '')
 
+    const [adminPanelStatus, setAdminPanelStatus] = useState(project.adminPanelStatus || 'not-started')
+    const [adminPanelUrl, setAdminPanelUrl] = useState(project.adminPanelUrl || '')
+    const [adminPanelStagingUrl, setAdminPanelStagingUrl] = useState(project.adminPanelStagingUrl || '')
+    const [adminPanelVersion, setAdminPanelVersion] = useState(project.adminPanelVersion || 'v1.0.0')
+
     useEffect(() => {
         if (open) {
             setWebsiteStatus(project.websiteStatus || 'not-started')
             setDomain(project.domain || '')
             setProductionUrl(project.productionUrl || project.websiteUrl || '')
             setStagingUrl(project.stagingUrl || '')
+
+            setAdminPanelStatus(project.adminPanelStatus || 'not-started')
+            setAdminPanelUrl(project.adminPanelUrl || '')
+            setAdminPanelStagingUrl(project.adminPanelStagingUrl || '')
+            setAdminPanelVersion(project.adminPanelVersion || 'v1.0.0')
 
             setAndroidStatus(project.androidStatus || 'not-started')
             setAndroidVersion(project.androidVersion || 'v1.0.0')
@@ -68,20 +78,31 @@ export function ProjectDeliverableDialog({
 
         if (type === 'website') {
             payload = {
+                websiteRequired: true,
                 websiteStatus,
                 domain: domain.trim(),
                 productionUrl: productionUrl.trim(),
                 websiteUrl: productionUrl.trim(),
                 stagingUrl: stagingUrl.trim()
             }
+        } else if (type === 'admin') {
+            payload = {
+                adminPanelRequired: true,
+                adminPanelStatus,
+                adminPanelUrl: adminPanelUrl.trim(),
+                adminPanelStagingUrl: adminPanelStagingUrl.trim(),
+                adminPanelVersion: adminPanelVersion.trim()
+            }
         } else if (type === 'android') {
             payload = {
+                androidRequired: true,
                 androidStatus,
                 androidVersion: androidVersion.trim(),
                 androidAppUrl: androidAppUrl.trim()
             }
         } else if (type === 'ios') {
             payload = {
+                iosRequired: true,
                 iosStatus,
                 iosVersion: iosVersion.trim(),
                 iosAppUrl: iosAppUrl.trim()
@@ -89,12 +110,12 @@ export function ProjectDeliverableDialog({
         }
 
         try {
-            const res = await api.put(`/projects/${pId}`, payload)
+            const res = await api.put(`/projects/${pId}/deliverables`, payload)
             const updated = mapProject(res.data)
 
             toast({
                 title: 'Updated Successfully! 🚀',
-                description: `${type.toUpperCase()} deployment details updated.`
+                description: `${type === 'admin' ? 'Admin Panel' : type.toUpperCase()} details saved.`
             })
 
             onOpenChange(false)
@@ -119,15 +140,19 @@ export function ProjectDeliverableDialog({
                         <DialogTitle className="text-lg font-bold flex items-center gap-2">
                             {type === 'website' ? (
                                 <>
-                                    <Globe className="h-5 w-5 text-blue-500" /> Edit Website Details & URLs
+                                    <Globe className="h-5 w-5 text-blue-500" /> Add / Edit Website Details
+                                </>
+                            ) : type === 'admin' ? (
+                                <>
+                                    <Server className="h-5 w-5 text-amber-500" /> Add / Edit Admin Panel Details
                                 </>
                             ) : type === 'android' ? (
                                 <>
-                                    <Smartphone className="h-5 w-5 text-emerald-500" /> Edit Android App Details
+                                    <Smartphone className="h-5 w-5 text-emerald-500" /> Add / Edit Android App Details
                                 </>
                             ) : (
                                 <>
-                                    <Smartphone className="h-5 w-5 text-purple-500" /> Edit iOS App Details
+                                    <Smartphone className="h-5 w-5 text-purple-500" /> Add / Edit iOS App Details
                                 </>
                             )}
                         </DialogTitle>
@@ -183,6 +208,58 @@ export function ProjectDeliverableDialog({
                                         value={stagingUrl}
                                         onChange={(e) => setStagingUrl(e.target.value)}
                                         className="h-9 font-semibold text-muted-foreground"
+                                    />
+                                </div>
+                            </>
+                        )}
+
+                        {type === 'admin' && (
+                            <>
+                                <div className="space-y-1.5">
+                                    <Label className="font-bold">Admin Panel Deployment Status</Label>
+                                    <Select value={adminPanelStatus} onValueChange={(val: any) => setAdminPanelStatus(val)}>
+                                        <SelectTrigger className="h-9 font-bold">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="not-started">⏳ Not Started</SelectItem>
+                                            <SelectItem value="development">💻 In Development</SelectItem>
+                                            <SelectItem value="testing">🧪 Testing & QA</SelectItem>
+                                            <SelectItem value="ready">✅ Ready for Deployment</SelectItem>
+                                            <SelectItem value="deployed">📦 Deployed</SelectItem>
+                                            <SelectItem value="live">🚀 Live & Active</SelectItem>
+                                            <SelectItem value="down">⚠️ Maintenance / Down</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label className="font-bold">Admin Panel Live / Login URL</Label>
+                                    <Input
+                                        placeholder="e.g. https://admin.acmeacademy.com"
+                                        value={adminPanelUrl}
+                                        onChange={(e) => setAdminPanelUrl(e.target.value)}
+                                        className="h-9 font-semibold text-primary"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label className="font-bold">Staging / Test Admin URL (Optional)</Label>
+                                    <Input
+                                        placeholder="e.g. https://staging-admin.acmeacademy.com"
+                                        value={adminPanelStagingUrl}
+                                        onChange={(e) => setAdminPanelStagingUrl(e.target.value)}
+                                        className="h-9 font-semibold text-muted-foreground"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label className="font-bold">Build / Version (Optional)</Label>
+                                    <Input
+                                        placeholder="e.g. v1.0.0"
+                                        value={adminPanelVersion}
+                                        onChange={(e) => setAdminPanelVersion(e.target.value)}
+                                        className="h-9 font-semibold"
                                     />
                                 </div>
                             </>

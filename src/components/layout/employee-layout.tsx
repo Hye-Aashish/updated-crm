@@ -6,6 +6,7 @@ import { BottomNav } from './bottom-nav'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
+import { normalizeRoleKey } from '@/lib/nav-utils'
 
 import { ChatNotificationListener } from '../chat-notification-listener'
 
@@ -28,12 +29,21 @@ export function EmployeeLayout() {
             if (!currentUser) {
                 try {
                     const res = await api.get('/auth/me')
+                    if (normalizeRoleKey(res.data?.role) === 'client') {
+                        setCurrentUser(res.data)
+                        navigate('/client/dashboard', { replace: true })
+                        return
+                    }
                     setCurrentUser(res.data)
                 } catch (err) {
                     console.error("Employee Auth failed:", err)
                     localStorage.removeItem('token')
                     navigate('/login')
+                    return
                 }
+            } else if (normalizeRoleKey(currentUser.role) === 'client') {
+                navigate('/client/dashboard', { replace: true })
+                return
             }
             setAuthLoading(false)
         }
@@ -63,7 +73,7 @@ export function EmployeeLayout() {
                 setMobileOpen={setMobileOpen}
             />
 
-            <div className={cn("flex-1 flex flex-col h-full transition-all duration-300 ease-in-out relative overflow-hidden")}>
+            <div className={cn("flex-1 min-w-0 flex flex-col h-full transition-all duration-300 ease-in-out relative overflow-hidden")}>
                 <header className="sticky top-0 z-30 flex h-14 items-center border-b border-border/60 bg-background/90 backdrop-blur-md px-3 sm:px-5 shadow-2xs shrink-0">
                     <div className="flex-1 min-w-0">
                         <Topbar onMenuClick={() => setMobileOpen(true)} />

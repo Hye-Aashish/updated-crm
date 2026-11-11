@@ -7,6 +7,7 @@ import { QuickNotesWidget } from './quick-notes-widget'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
+import { normalizeRoleKey } from '@/lib/nav-utils'
 
 import { ChatNotificationListener } from '../chat-notification-listener'
 
@@ -29,12 +30,21 @@ export function DashboardLayout() {
             if (!currentUser) {
                 try {
                     const res = await api.get('/auth/me')
+                    if (normalizeRoleKey(res.data?.role) === 'client') {
+                        setCurrentUser(res.data)
+                        navigate('/client/dashboard', { replace: true })
+                        return
+                    }
                     setCurrentUser(res.data)
                 } catch (err) {
                     console.error("Auth failed:", err)
                     localStorage.removeItem('token')
                     navigate('/login')
+                    return
                 }
+            } else if (normalizeRoleKey(currentUser.role) === 'client') {
+                navigate('/client/dashboard', { replace: true })
+                return
             }
             setAuthLoading(false)
         }
@@ -92,7 +102,7 @@ export function DashboardLayout() {
             {/* Main Content Wrapper */}
             <div
                 className={cn(
-                    "flex-1 flex flex-col h-full transition-all duration-300 ease-in-out relative overflow-hidden"
+                    "flex-1 min-w-0 flex flex-col h-full transition-all duration-300 ease-in-out relative overflow-hidden"
                 )}
             >
                 {/* Slim Header Topbar */}

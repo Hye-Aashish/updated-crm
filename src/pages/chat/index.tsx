@@ -35,7 +35,7 @@ export const ChatPage = () => {
 
     useEffect(() => {
         if (currentUser?.role === 'client') {
-            navigate('/project-chat');
+            navigate('/client/project-chat');
         }
     }, [currentUser, navigate]);
     const [socket, setSocket] = useState<Socket | null>(null);

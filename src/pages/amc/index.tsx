@@ -22,9 +22,19 @@ import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import {
     Shield, Plus, RefreshCw, FileText, AlertTriangle,
     CheckCircle2, Clock, XCircle,
-    IndianRupee, Eye, Trash2, Edit
+    IndianRupee, Eye, Trash2, Edit, Calendar
 } from 'lucide-react'
-import { format, differenceInDays } from 'date-fns'
+import { format, differenceInDays, startOfDay, addMonths, addYears } from 'date-fns'
+
+interface AmcRenewalEntry {
+    renewedAt: string
+    previousEndDate?: string
+    effectiveStartDate?: string
+    newEndDate: string
+    durationLabel?: string
+    amount: number
+    note?: string
+}
 
 interface AmcRecord {
     _id: string
@@ -42,7 +52,75 @@ interface AmcRecord {
     invoices: { _id: string; invoiceNumber: string; total: number; status: string; date: string }[]
     notes?: string
     autoInvoice: boolean
-    renewalHistory: { renewedAt: string; newEndDate: string; amount: number; note?: string }[]
+    renewalHistory: AmcRenewalEntry[]
+}
+
+function getAmcDaysLeft(endDate: string): number {
+    return differenceInDays(startOfDay(new Date(endDate)), startOfDay(new Date()))
+}
+
+function getEffectiveAmcStatus(amc: Pick<AmcRecord, 'endDate' | 'status'>): AmcRecord['status'] {
+    if (amc.status === 'cancelled') return 'cancelled'
+    const daysLeft = getAmcDaysLeft(amc.endDate)
+    if (daysLeft < 0) return 'expired'
+    if (daysLeft <= 30) return 'expiring-soon'
+    return 'active'
+}
+
+function formatAmcDuration(fromInput: Date | string, toInput: Date | string): string {
+    const start = startOfDay(new Date(fromInput))
+    const end = startOfDay(new Date(toInput))
+    const totalDays = differenceInDays(end, start)
+    if (isNaN(totalDays) || totalDays <= 0) return '0 Days'
+
+    let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+    const anchor = addMonths(start, months)
+    if (anchor > end) {
+        months -= 1
+    }
+    const remDays = differenceInDays(end, addMonths(start, months))
+
+    if (months >= 12 && months % 12 === 0 && remDays <= 1) {
+        const years = Math.round(months / 12)
+        return `${years} ${years === 1 ? 'Year' : 'Years'}`
+    }
+    if (months >= 1 && remDays <= 2) {
+        return `${months} ${months === 1 ? 'Month' : 'Months'}`
+    }
+    if (months >= 12) {
+        const years = Math.floor(months / 12)
+        const remMonths = months % 12
+        return remMonths > 0 ? `${years}Y ${remMonths}M` : `${years} ${years === 1 ? 'Year' : 'Years'}`
+    }
+    if (months >= 1) {
+        return `${months}M ${remDays}D`
+    }
+    return `${totalDays} ${totalDays === 1 ? 'Day' : 'Days'}`
+}
+
+function getRenewalBaseDate(amc: Pick<AmcRecord, 'endDate'>): Date {
+    const daysLeft = getAmcDaysLeft(amc.endDate)
+    return daysLeft >= 0 ? startOfDay(new Date(amc.endDate)) : startOfDay(new Date())
+}
+
+function getEntryDurationLabel(amc: AmcRecord, entry: AmcRenewalEntry, idx: number): string {
+    if (entry.durationLabel) return entry.durationLabel
+    const base = entry.effectiveStartDate
+        || entry.previousEndDate
+        || (idx > 0 ? amc.renewalHistory[idx - 1]?.newEndDate : undefined)
+        || amc.startDate
+    if (base && entry.newEndDate) {
+        const formatted = formatAmcDuration(base, entry.newEndDate)
+        if (formatted !== '0 Days') return formatted
+    }
+    return freqDurationFallback[amc.frequency] || 'Custom'
+}
+
+const freqDurationFallback: Record<string, string> = {
+    monthly: '1 Month',
+    quarterly: '3 Months',
+    'half-yearly': '6 Months',
+    annually: '1 Year'
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -89,7 +167,7 @@ export default function AmcPage() {
         notes: '', autoInvoice: false, status: 'active'
     })
     const [renewForm, setRenewForm] = useState({
-        newEndDate: '', amount: '', note: '', generateInvoice: true, taxPercentage: '0'
+        newEndDate: '', amount: '', note: '', generateInvoice: true, taxPercentage: '0', durationLabel: ''
     })
     const [invoiceForm, setInvoiceForm] = useState({ dueDate: '', note: '', taxPercentage: '0' })
     const [saving, setSaving] = useState(false)
@@ -205,6 +283,39 @@ export default function AmcPage() {
         }
     }
 
+    const handleOpenRenew = (amc: AmcRecord) => {
+        const base = getRenewalBaseDate(amc)
+        let suggestedDate: Date
+        let defaultLabel: string
+        switch (amc.frequency) {
+            case 'monthly':
+                suggestedDate = addMonths(base, 1)
+                defaultLabel = '1 Month'
+                break
+            case 'quarterly':
+                suggestedDate = addMonths(base, 3)
+                defaultLabel = '3 Months'
+                break
+            case 'half-yearly':
+                suggestedDate = addMonths(base, 6)
+                defaultLabel = '6 Months'
+                break
+            default:
+                suggestedDate = addYears(base, 1)
+                defaultLabel = '1 Year'
+                break
+        }
+        setShowRenew(amc)
+        setRenewForm({
+            newEndDate: format(suggestedDate, 'yyyy-MM-dd'),
+            amount: '',
+            note: '',
+            generateInvoice: true,
+            taxPercentage: '0',
+            durationLabel: defaultLabel
+        })
+    }
+
     const handleRenew = async () => {
         if (!renewForm.newEndDate) {
             toast({ title: 'Validation Error', description: 'New end date is required', variant: 'destructive' })
@@ -212,12 +323,15 @@ export default function AmcPage() {
         }
         setSaving(true)
         try {
+            const base = getRenewalBaseDate(showRenew!)
+            const computedDuration = renewForm.durationLabel || formatAmcDuration(base, renewForm.newEndDate)
             await api.post(`/amc/${showRenew!._id}/renew`, {
                 ...renewForm,
+                durationLabel: computedDuration,
                 amount: renewForm.amount ? parseFloat(renewForm.amount) : undefined,
                 taxPercentage: parseFloat(renewForm.taxPercentage)
             })
-            toast({ title: '🔄 AMC Renewed', description: 'Contract renewed successfully!' })
+            toast({ title: '🔄 AMC Renewed', description: `Contract renewed for ${computedDuration}!` })
             setShowRenew(null)
             fetchAll()
         } catch (err: any) {
@@ -264,14 +378,12 @@ export default function AmcPage() {
         const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
             a.clientId?.name?.toLowerCase().includes(search.toLowerCase()) ||
             a.projectId?.name?.toLowerCase().includes(search.toLowerCase())
-        const matchStatus = filterStatus === 'all' || a.status === filterStatus
+        const effectiveStatus = getEffectiveAmcStatus(a)
+        const matchStatus = filterStatus === 'all' || effectiveStatus === filterStatus
         return matchSearch && matchStatus
     })
 
-    const getDaysLeft = (endDate: string) => {
-        const days = differenceInDays(new Date(endDate), new Date())
-        return days
-    }
+    const getDaysLeft = (endDate: string) => getAmcDaysLeft(endDate)
 
     if (loading) return <PageSkeleton />
 
@@ -297,9 +409,9 @@ export default function AmcPage() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {[
                     { label: 'Total AMCs', value: stats?.total ?? amcs.length, icon: Shield, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Active', value: stats?.active ?? amcs.filter(a => a.status === 'active').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Expiring Soon', value: stats?.expiringSoon ?? amcs.filter(a => a.status === 'expiring-soon').length, icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Expired', value: stats?.expired ?? amcs.filter(a => a.status === 'expired').length, icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
+                    { label: 'Active', value: stats?.active ?? amcs.filter(a => getEffectiveAmcStatus(a) === 'active').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: 'Expiring Soon', value: stats?.expiringSoon ?? amcs.filter(a => getEffectiveAmcStatus(a) === 'expiring-soon').length, icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Expired', value: stats?.expired ?? amcs.filter(a => getEffectiveAmcStatus(a) === 'expired').length, icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
                     { label: 'Total Revenue', value: formatCurrency(stats?.totalRevenue ?? amcs.reduce((s, a) => s + a.amount, 0)), icon: IndianRupee, color: 'text-violet-600', bg: 'bg-violet-50' },
                 ].map(({ label, value, icon: Icon, color, bg }) => (
                     <Card key={label} className="border-0 shadow-sm">
@@ -341,16 +453,17 @@ export default function AmcPage() {
 
             {/* Table */}
             <Card className="border-0 shadow-sm">
-                <CardContent className="p-0">
+                <CardContent className="p-0 overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-gray-50">
                                 <TableHead className="pl-5">AMC Name</TableHead>
                                 <TableHead>Client</TableHead>
-                                <TableHead>Project</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Frequency</TableHead>
-                                <TableHead>End Date</TableHead>
+                                <TableHead>Project / Product</TableHead>
+                                <TableHead>Amount & Cycle</TableHead>
+                                <TableHead>Started On</TableHead>
+                                <TableHead>Expires On</TableHead>
+                                <TableHead>Renewal & Term</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Invoices</TableHead>
                                 <TableHead className="text-right pr-5">Actions</TableHead>
@@ -359,15 +472,23 @@ export default function AmcPage() {
                         <TableBody>
                             {filtered.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="text-center py-12 text-gray-400">
+                                    <TableCell colSpan={10} className="text-center py-12 text-gray-400">
                                         <Shield className="h-10 w-10 mx-auto mb-2 opacity-30" />
                                         No AMC contracts found
                                     </TableCell>
                                 </TableRow>
                             )}
                             {filtered.map(amc => {
-                                const sc = statusConfig[amc.status] || statusConfig['active']
+                                const effectiveStatus = getEffectiveAmcStatus(amc)
+                                const sc = statusConfig[effectiveStatus] || statusConfig['active']
                                 const daysLeft = getDaysLeft(amc.endDate)
+                                const contractDuration = formatAmcDuration(amc.startDate, amc.endDate)
+                                const renewals = amc.renewalHistory || []
+                                const latestRenewalIdx = renewals.length - 1
+                                const latestRenewal = latestRenewalIdx >= 0 ? renewals[latestRenewalIdx] : null
+                                const latestRenewalDuration = latestRenewal
+                                    ? getEntryDurationLabel(amc, latestRenewal, latestRenewalIdx)
+                                    : null
                                 return (
                                     <TableRow key={amc._id} className="hover:bg-gray-50/50 transition-colors">
                                         <TableCell className="pl-5 font-medium text-gray-900">
@@ -398,23 +519,58 @@ export default function AmcPage() {
                                                 </Link>
                                             )}
                                         </TableCell>
-                                        <TableCell className="font-semibold">
-                                            {formatCurrency(amc.amount)}
-                                        </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className="text-xs capitalize">
+                                            <div className="font-semibold text-gray-900">{formatCurrency(amc.amount)}</div>
+                                            <Badge variant="outline" className="text-[10px] mt-0.5 capitalize">
                                                 {freqLabel[amc.frequency] || amc.frequency}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="text-sm">{format(new Date(amc.endDate), 'dd MMM yyyy')}</div>
-                                            {daysLeft >= 0 ? (
-                                                <div className={`text-xs mt-0.5 ${daysLeft <= 30 ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
-                                                    {daysLeft} days left
+                                            <div className="text-sm font-medium text-gray-800">
+                                                {format(new Date(amc.startDate), 'dd MMM yyyy')}
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-0.5">
+                                                Span: {contractDuration}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="text-sm font-medium text-gray-800">
+                                                {format(new Date(amc.endDate), 'dd MMM yyyy')}
+                                            </div>
+                                            {daysLeft > 0 ? (
+                                                <div className={`text-xs mt-0.5 font-medium ${daysLeft <= 30 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                                    Expires in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
+                                                </div>
+                                            ) : daysLeft === 0 ? (
+                                                <div className="text-xs mt-0.5 text-amber-600 font-semibold">
+                                                    Expires today
                                                 </div>
                                             ) : (
-                                                <div className="text-xs mt-0.5 text-red-500 font-medium">
-                                                    Expired {Math.abs(daysLeft)} days ago
+                                                <div className="text-xs mt-0.5 text-red-600 font-medium">
+                                                    Expired {Math.abs(daysLeft)} {Math.abs(daysLeft) === 1 ? 'day' : 'days'} ago
+                                                </div>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {latestRenewal ? (
+                                                <div>
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+                                                        <RefreshCw className="h-3 w-3" />
+                                                        Renewed for {latestRenewalDuration}
+                                                    </span>
+                                                    <div className="text-[11px] text-gray-500 mt-1">
+                                                        On {format(new Date(latestRenewal.renewedAt), 'dd MMM yyyy')}
+                                                        {renewals.length > 1 ? ` · ${renewals.length} renewals` : ''}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <div className="text-xs font-medium text-gray-700">
+                                                        Initial Term ({contractDuration})
+                                                    </div>
+                                                    <div className="text-[11px] text-gray-400 mt-0.5">
+                                                        Not renewed yet
+                                                    </div>
                                                 </div>
                                             )}
                                         </TableCell>
@@ -441,7 +597,7 @@ export default function AmcPage() {
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" title="Generate Invoice" onClick={() => setShowInvoice(amc)}>
                                                     <FileText className="h-4 w-4" />
                                                 </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Renew AMC" onClick={() => { setShowRenew(amc); setRenewForm({ newEndDate: '', amount: '', note: '', generateInvoice: true, taxPercentage: '0' }) }}>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Renew AMC" onClick={() => handleOpenRenew(amc)}>
                                                     <RefreshCw className="h-4 w-4" />
                                                 </Button>
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" title="Delete" onClick={() => setShowDeleteConfirm(amc._id)}>
@@ -570,34 +726,84 @@ export default function AmcPage() {
                             <RefreshCw className="h-5 w-5 text-emerald-600" /> Renew AMC
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                            <div className="font-medium text-gray-800">{showRenew?.name}</div>
-                            <div className="text-gray-500 mt-1">Current end: {showRenew?.endDate ? format(new Date(showRenew.endDate), 'dd MMM yyyy') : '—'}</div>
-                        </div>
-                        <div>
-                            <Label>New End Date *</Label>
-                            <Input type="date" value={renewForm.newEndDate} onChange={e => setRenewForm(f => ({ ...f, newEndDate: e.target.value }))} className="mt-1" />
-                        </div>
-                        <div>
-                            <Label>New Amount — leave blank to keep current</Label>
-                            <Input type="number" placeholder={`Current: ${formatCurrency(showRenew?.amount || 0)}`} value={renewForm.amount} onChange={e => setRenewForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" />
-                        </div>
-                        <div>
-                            <Label>Note</Label>
-                            <Input placeholder="e.g. Renewed for 2026" value={renewForm.note} onChange={e => setRenewForm(f => ({ ...f, note: e.target.value }))} className="mt-1" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input type="checkbox" id="genInv" checked={renewForm.generateInvoice} onChange={e => setRenewForm(f => ({ ...f, generateInvoice: e.target.checked }))} className="h-4 w-4 accent-blue-600" />
-                            <label htmlFor="genInv" className="text-sm text-gray-700">Generate invoice on renewal</label>
-                        </div>
-                        {renewForm.generateInvoice && (
-                            <div>
-                                <Label>Tax % on Invoice</Label>
-                                <Input type="number" placeholder="e.g. 18" value={renewForm.taxPercentage} onChange={e => setRenewForm(f => ({ ...f, taxPercentage: e.target.value }))} className="mt-1 w-32" />
+                    {showRenew && (
+                        <div className="space-y-4 py-2">
+                            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                                <div className="font-semibold text-gray-900">{showRenew.name}</div>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                                    <span>Started: <strong>{format(new Date(showRenew.startDate), 'dd MMM yyyy')}</strong></span>
+                                    <span>Current Expiry: <strong>{format(new Date(showRenew.endDate), 'dd MMM yyyy')}</strong></span>
+                                </div>
+                                <div className="text-[11px] text-gray-500">
+                                    {getAmcDaysLeft(showRenew.endDate) < 0
+                                        ? `Contract expired ${Math.abs(getAmcDaysLeft(showRenew.endDate))} days ago — quick duration extends from today (${format(new Date(), 'dd MMM yyyy')}).`
+                                        : `Quick duration extends from current expiry (${format(new Date(showRenew.endDate), 'dd MMM yyyy')}).`}
+                                </div>
                             </div>
-                        )}
-                    </div>
+                            <div>
+                                <Label className="text-xs font-medium text-gray-600">Quick Renewal Duration</Label>
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {[
+                                        { label: '1 Month', apply: (d: Date) => addMonths(d, 1) },
+                                        { label: '3 Months', apply: (d: Date) => addMonths(d, 3) },
+                                        { label: '6 Months', apply: (d: Date) => addMonths(d, 6) },
+                                        { label: '1 Year', apply: (d: Date) => addYears(d, 1) },
+                                        { label: '2 Years', apply: (d: Date) => addYears(d, 2) },
+                                    ].map(preset => (
+                                        <Button
+                                            key={preset.label}
+                                            type="button"
+                                            size="sm"
+                                            variant={renewForm.durationLabel === preset.label ? 'default' : 'outline'}
+                                            className={`h-7 text-xs ${renewForm.durationLabel === preset.label ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+                                            onClick={() => {
+                                                const nextDate = preset.apply(getRenewalBaseDate(showRenew))
+                                                setRenewForm(f => ({
+                                                    ...f,
+                                                    newEndDate: format(nextDate, 'yyyy-MM-dd'),
+                                                    durationLabel: preset.label
+                                                }))
+                                            }}
+                                        >
+                                            + {preset.label}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <Label>New Expiry Date *</Label>
+                                <Input
+                                    type="date"
+                                    value={renewForm.newEndDate}
+                                    onChange={e => setRenewForm(f => ({ ...f, newEndDate: e.target.value, durationLabel: '' }))}
+                                    className="mt-1"
+                                />
+                                {renewForm.newEndDate && (
+                                    <p className="text-xs text-emerald-700 font-medium mt-1">
+                                        Renewing for {renewForm.durationLabel || formatAmcDuration(getRenewalBaseDate(showRenew), renewForm.newEndDate)} (Expires: {format(new Date(renewForm.newEndDate), 'dd MMM yyyy')})
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <Label>New Amount — leave blank to keep current</Label>
+                                <Input type="number" placeholder={`Current: ${formatCurrency(showRenew.amount || 0)}`} value={renewForm.amount} onChange={e => setRenewForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" />
+                            </div>
+                            <div>
+                                <Label>Note</Label>
+                                <Input placeholder="e.g. Renewed for 1 year" value={renewForm.note} onChange={e => setRenewForm(f => ({ ...f, note: e.target.value }))} className="mt-1" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" id="genInv" checked={renewForm.generateInvoice} onChange={e => setRenewForm(f => ({ ...f, generateInvoice: e.target.checked }))} className="h-4 w-4 accent-blue-600" />
+                                <label htmlFor="genInv" className="text-sm text-gray-700">Generate invoice on renewal</label>
+                            </div>
+                            {renewForm.generateInvoice && (
+                                <div>
+                                    <Label>Tax % on Invoice</Label>
+                                    <Input type="number" placeholder="e.g. 18" value={renewForm.taxPercentage} onChange={e => setRenewForm(f => ({ ...f, taxPercentage: e.target.value }))} className="mt-1 w-32" />
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowRenew(null)}>Cancel</Button>
                         <Button onClick={handleRenew} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
@@ -651,8 +857,63 @@ export default function AmcPage() {
                             <Shield className="h-5 w-5 text-blue-600" /> {showDetail?.name}
                         </DialogTitle>
                     </DialogHeader>
-                    {showDetail && (
+                    {showDetail && (() => {
+                        const effectiveStatus = getEffectiveAmcStatus(showDetail)
+                        const detailDaysLeft = getAmcDaysLeft(showDetail.endDate)
+                        const totalSpan = formatAmcDuration(showDetail.startDate, showDetail.endDate)
+                        const renewals = showDetail.renewalHistory || []
+                        const lastRenewal = renewals.length > 0 ? renewals[renewals.length - 1] : null
+                        const lastRenewalDuration = lastRenewal ? getEntryDurationLabel(showDetail, lastRenewal, renewals.length - 1) : null
+                        return (
                         <div className="space-y-5">
+                            {/* Clear Timeline & Renewal Overview */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="rounded-xl border bg-gray-50/70 p-3">
+                                    <p className="text-[11px] font-medium text-gray-500 flex items-center gap-1">
+                                        <Calendar className="h-3 w-3" /> Started On
+                                    </p>
+                                    <p className="text-sm font-bold text-gray-900 mt-1">
+                                        {format(new Date(showDetail.startDate), 'dd MMM yyyy')}
+                                    </p>
+                                </div>
+                                <div className="rounded-xl border bg-gray-50/70 p-3">
+                                    <p className="text-[11px] font-medium text-gray-500 flex items-center gap-1">
+                                        <Clock className="h-3 w-3" /> Expires On
+                                    </p>
+                                    <p className="text-sm font-bold text-gray-900 mt-1">
+                                        {format(new Date(showDetail.endDate), 'dd MMM yyyy')}
+                                    </p>
+                                    <p className={`text-[11px] font-medium mt-0.5 ${detailDaysLeft < 0 ? 'text-red-600' : detailDaysLeft <= 30 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                        {detailDaysLeft > 0
+                                            ? `${detailDaysLeft} days left`
+                                            : detailDaysLeft === 0
+                                                ? 'Expires today'
+                                                : `Expired ${Math.abs(detailDaysLeft)} days ago`}
+                                    </p>
+                                </div>
+                                <div className="rounded-xl border bg-gray-50/70 p-3">
+                                    <p className="text-[11px] font-medium text-gray-500">Contract Duration</p>
+                                    <p className="text-sm font-bold text-gray-900 mt-1">{totalSpan}</p>
+                                    <p className="text-[11px] text-gray-500 mt-0.5 capitalize">{freqLabel[showDetail.frequency] || showDetail.frequency}</p>
+                                </div>
+                                <div className="rounded-xl border bg-gray-50/70 p-3">
+                                    <p className="text-[11px] font-medium text-gray-500">Renewed For</p>
+                                    {lastRenewal ? (
+                                        <>
+                                            <p className="text-sm font-bold text-emerald-700 mt-1">{lastRenewalDuration}</p>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                {format(new Date(lastRenewal.renewedAt), 'dd MMM yyyy')} ({renewals.length}x)
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm font-bold text-gray-700 mt-1">Initial Term</p>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">Not renewed yet</p>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div className="space-y-2">
                                     <div><span className="text-gray-500">Client:</span> <span className="font-medium ml-1">{showDetail.clientId?.name}</span></div>
@@ -663,14 +924,11 @@ export default function AmcPage() {
                                             <Link to={`/clients/${showDetail.clientId?._id}`} className="text-violet-600 hover:underline ml-1">{showDetail.clientProductId?.product?.name || 'Digital Product'}</Link>
                                         )}
                                     </div>
-                                    <div><span className="text-gray-500">Amount:</span> <span className="font-semibold ml-1">{formatCurrency(showDetail.amount)}</span></div>
-                                    <div><span className="text-gray-500">Frequency:</span> <span className="ml-1">{freqLabel[showDetail.frequency]}</span></div>
                                 </div>
                                 <div className="space-y-2">
-                                    <div><span className="text-gray-500">Start:</span> <span className="ml-1">{format(new Date(showDetail.startDate), 'dd MMM yyyy')}</span></div>
-                                    <div><span className="text-gray-500">End:</span> <span className="ml-1">{format(new Date(showDetail.endDate), 'dd MMM yyyy')}</span></div>
+                                    <div><span className="text-gray-500">Amount:</span> <span className="font-semibold ml-1">{formatCurrency(showDetail.amount)}</span></div>
                                     <div><span className="text-gray-500">Status:</span>
-                                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium border ${statusConfig[showDetail.status]?.color}`}>{statusConfig[showDetail.status]?.label}</span>
+                                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium border ${statusConfig[effectiveStatus]?.color}`}>{statusConfig[effectiveStatus]?.label}</span>
                                     </div>
                                 </div>
                             </div>
@@ -711,21 +969,31 @@ export default function AmcPage() {
                                 </div>
                             )}
 
-                            {showDetail.renewalHistory?.length > 0 && (
+                            {renewals.length > 0 && (
                                 <div>
                                     <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
-                                        <RefreshCw className="h-4 w-4" /> Renewal History
+                                        <RefreshCw className="h-4 w-4" /> Renewal History ({renewals.length})
                                     </p>
                                     <div className="space-y-2">
-                                        {showDetail.renewalHistory.map((r: any, i: number) => (
-                                            <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-sm">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Renewed on {format(new Date(r.renewedAt), 'dd MMM yyyy')}</span>
-                                                    <span className="font-medium text-emerald-700">→ {format(new Date(r.newEndDate), 'dd MMM yyyy')}</span>
+                                        {renewals.map((r, i) => {
+                                            const entryDur = getEntryDurationLabel(showDetail, r, i)
+                                            const periodFrom = r.effectiveStartDate || r.previousEndDate
+                                            return (
+                                            <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2.5 text-sm">
+                                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge className="bg-emerald-600 text-white text-[10px]">For {entryDur}</Badge>
+                                                        <span className="text-gray-700 font-medium">Renewed on {format(new Date(r.renewedAt), 'dd MMM yyyy')}</span>
+                                                    </div>
+                                                    <span className="font-semibold text-emerald-800">
+                                                        {periodFrom ? `${format(new Date(periodFrom), 'dd MMM yyyy')} → ` : 'Extended till '}
+                                                        {format(new Date(r.newEndDate), 'dd MMM yyyy')}
+                                                    </span>
                                                 </div>
-                                                {r.amount && <div className="text-gray-500 mt-1">{formatCurrency(r.amount)}{r.note ? ` — ${r.note}` : ''}</div>}
+                                                {r.amount && <div className="text-gray-600 text-xs mt-1">{formatCurrency(r.amount)}{r.note ? ` — ${r.note}` : ''}</div>}
                                             </div>
-                                        ))}
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -750,7 +1018,8 @@ export default function AmcPage() {
                                 </Button>
                             </div>
                         </div>
-                    )}
+                        )
+                    })()}
                 </DialogContent>
             </Dialog>
 

@@ -8,12 +8,14 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api-client';
 import { formatCurrency } from '@/lib/utils';
+import { usePortalPrefix } from '@/lib/nav-utils';
 
 import { appConfirm, appAlert } from '@/lib/app-dialog'
 
 export default function QuotationDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const portalPrefix = usePortalPrefix();
     const [quotation, setQuotation] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
@@ -109,7 +111,7 @@ export default function QuotationDetailPage() {
             <div className="bg-white border-b sticky top-0 z-30">
                 <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-6">
-                        <button onClick={() => navigate('/quotations')} className="p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                        <button onClick={() => navigate(`${portalPrefix}/quotations`)} className="p-2 hover:bg-gray-50 rounded-lg transition-colors">
                             <ArrowLeft className="w-5 h-5 text-gray-400" />
                         </button>
                         <div className="h-8 w-px bg-gray-100"></div>
@@ -128,7 +130,8 @@ export default function QuotationDetailPage() {
                         </div>
                         <button
                             onClick={async () => {
-                                navigator.clipboard.writeText(`${window.location.origin}/q/${id}`);
+                                const shareKey = quotation.publicToken || id;
+                                navigator.clipboard.writeText(`${window.location.origin}/q/${shareKey}`);
                                 await appAlert('Proposal link copied to clipboard!');
                             }}
                             className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs tracking-widest uppercase hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all flex items-center gap-2"
@@ -305,7 +308,7 @@ export default function QuotationDetailPage() {
 
                                 {quotation.parentQuotation && (
                                     <button
-                                        onClick={() => navigate(`/quotations/${quotation.parentQuotation._id}`)}
+                                        onClick={() => navigate(`${portalPrefix}/quotations/${quotation.parentQuotation._id}`)}
                                         className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-xs font-bold text-gray-400"
                                     >
                                         <span>View Previous Revision (v{quotation.version - 1})</span>
@@ -340,7 +343,7 @@ export default function QuotationDetailPage() {
                                         <FolderOpen className="w-5 h-5 text-green-400" />
                                     </div>
                                     <p className="text-xs font-bold text-gray-300 uppercase tracking-widest mb-2">Finalized As</p>
-                                    <button onClick={() => navigate(`/projects/${quotation.linkedProjectId}`)} className="text-sm font-black text-white hover:text-green-400 flex items-center justify-center gap-2 mx-auto">
+                                    <button onClick={() => navigate(`${portalPrefix}/projects/${quotation.linkedProjectId}`)} className="text-sm font-black text-white hover:text-green-400 flex items-center justify-center gap-2 mx-auto">
                                         View Project <ExternalLink className="w-3 h-3" />
                                     </button>
                                 </div>
@@ -386,7 +389,7 @@ export default function QuotationDetailPage() {
                         <div className="space-y-4">
                             {!quotation.scopeLocked && (
                                 <button
-                                    onClick={() => navigate(`/quotations/${id}/edit`)}
+                                    onClick={() => navigate(`${portalPrefix}/quotations/${id}/edit`)}
                                     className="w-full h-14 bg-white border border-gray-100 hover:border-blue-100 hover:bg-blue-50 rounded-2xl text-xs font-black text-blue-600 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3"
                                 >
                                     <Edit className="w-4 h-4" /> Modify Scope

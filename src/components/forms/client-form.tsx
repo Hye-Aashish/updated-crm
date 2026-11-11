@@ -23,11 +23,13 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, X, Upload, FileIcon } from 'lucide-react'
+import { Loader2, X, Upload, FileIcon, Key, Lock, Eye, EyeOff, Sparkles, Mail } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api-client'
 import { useAppStore } from '@/store'
+import { generatePortalPassword } from '@/lib/utils'
 
 import { appConfirm } from '@/lib/app-dialog'
 
@@ -97,6 +99,11 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
     const { addClient, updateClient, users, setUsers } = useAppStore()
     const [loading, setLoading] = useState(false)
     const [files, setFiles] = useState<File[]>([])
+    const [createPortalAccess, setCreatePortalAccess] = useState(false)
+    const [portalEmail, setPortalEmail] = useState('')
+    const [portalEmailTouched, setPortalEmailTouched] = useState(false)
+    const [portalPassword, setPortalPassword] = useState('')
+    const [showPortalPassword, setShowPortalPassword] = useState(false)
 
     // Fetch Users for "Assigned To"
     useEffect(() => {
@@ -146,6 +153,29 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
     })
 
     const onSubmit = async (data: ClientFormValues) => {
+        const effectivePortalEmail = (portalEmail || data.email || '').trim().toLowerCase()
+        const trimmedPortalPassword = portalPassword.trim()
+
+        if (mode === 'create' && createPortalAccess) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+            if (!effectivePortalEmail || !emailRegex.test(effectivePortalEmail)) {
+                toast({
+                    title: "Invalid Portal Login Email",
+                    description: "Please enter a valid email ID for Client Portal login.",
+                    variant: "destructive"
+                })
+                return
+            }
+            if (trimmedPortalPassword.length < 6) {
+                toast({
+                    title: "Invalid Portal Password",
+                    description: "Portal password must be at least 6 characters (or click Auto-Generate).",
+                    variant: "destructive"
+                })
+                return
+            }
+        }
+
         setLoading(true)
 
         try {
@@ -153,7 +183,15 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                 // Send to Backend
                 const response = await api.post('/clients', {
                     ...data,
-                    expectedDeadline: data.deadline // Map field
+                    email: data.email || (createPortalAccess ? effectivePortalEmail : ''),
+                    expectedDeadline: data.deadline, // Map field
+                    ...(createPortalAccess
+                        ? {
+                            createPortalAccess: true,
+                            portalEmail: effectivePortalEmail,
+                            portalPassword: trimmedPortalPassword,
+                        }
+                        : {})
                 })
 
                 const savedClient = response.data
@@ -183,10 +221,30 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                     updatedAt: new Date(savedClient.updatedAt)
                 })
 
+                if (savedClient.portalAccess?.userId) {
+                    const portalUserRecord = {
+                        id: savedClient.portalAccess.userId,
+                        _id: savedClient.portalAccess.userId,
+                        name: savedClient.name,
+                        email: savedClient.portalAccess.email,
+                        role: 'client',
+                        clientId: savedClient._id,
+                        phone: savedClient.phone || ''
+                    }
+                    setUsers([...users.filter(u => u.id !== portalUserRecord.id), portalUserRecord as any])
+                }
+
                 toast({
-                    title: "Client Created Successfully",
-                    description: `${data.name} has been added to the system.`,
+                    title: savedClient.portalAccess?.enabled
+                        ? "Client & Portal Login Created"
+                        : "Client Created Successfully",
+                    description: savedClient.portalAccess?.enabled
+                        ? `${data.name} added with login access (${savedClient.portalAccess.email}).`
+                        : `${data.name} has been added to the system.`,
                 })
+
+                navigate(savedClient.portalAccess?.enabled ? `/clients/${savedClient._id}` : '/clients')
+                return
             } else {
                 // UPDATE / Edit Mode
                 if (!clientId) throw new Error("Client ID missing for update")
@@ -215,6 +273,7 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                     gstNumber: updated.gstNumber,
                     leadSource: updated.leadSource,
                     budget: updated.budget,
+                    services: updated.services || [],
                     paymentModel: updated.paymentModel,
                     deadline: updated.expectedDeadline,
                     assignedTo: updated.assignedTo,
@@ -229,11 +288,11 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
             }
 
             navigate('/clients')
-        } catch (error) {
+        } catch (error: any) {
             console.error(error)
             toast({
                 title: "Error",
-                description: "Failed to save client. Please try again.",
+                description: error?.response?.data?.message || "Failed to save client. Please try again.",
                 variant: "destructive"
             })
         } finally {
@@ -361,12 +420,108 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                                     <FormItem>
                                         <FormLabel>Email</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="rahul@example.com" {...field} />
+                                            <Input
+                                                placeholder="rahul@example.com"
+                                                {...field}
+                                                onChange={(e) => {
+                                                    field.onChange(e)
+                                                    if (!portalEmailTouched) {
+                                                        setPortalEmail(e.target.value)
+                                                    }
+                                                }}
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
+
+                            {mode === 'create' && (
+                                <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="space-y-0.5">
+                                            <div className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                                                <Key className="h-4 w-4 text-emerald-600" />
+                                                Create Client Portal Login
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Assign portal Email ID & Password now so this client can log in right away.
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={createPortalAccess}
+                                            onCheckedChange={(checked) => {
+                                                setCreatePortalAccess(checked)
+                                                if (checked) {
+                                                    if (!portalEmail && form.getValues('email')) {
+                                                        setPortalEmail(form.getValues('email') || '')
+                                                    }
+                                                    if (!portalPassword) {
+                                                        setPortalPassword(generatePortalPassword(form.getValues('name')))
+                                                    }
+                                                }
+                                            }}
+                                            aria-label="Enable Client Portal Login"
+                                        />
+                                    </div>
+
+                                    {createPortalAccess && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-emerald-500/20">
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="client-portal-email" className="text-xs font-semibold flex items-center gap-1.5">
+                                                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /> Portal Login Email ID *
+                                                </Label>
+                                                <Input
+                                                    id="client-portal-email"
+                                                    type="email"
+                                                    value={portalEmail}
+                                                    onChange={(e) => {
+                                                        setPortalEmailTouched(true)
+                                                        setPortalEmail(e.target.value)
+                                                    }}
+                                                    placeholder="client@example.com"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <div className="flex items-center justify-between">
+                                                    <Label htmlFor="client-portal-password" className="text-xs font-semibold flex items-center gap-1.5">
+                                                        <Lock className="h-3.5 w-3.5 text-muted-foreground" /> Portal Password *
+                                                    </Label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setPortalPassword(generatePortalPassword(form.getValues('name')))
+                                                            setShowPortalPassword(true)
+                                                        }}
+                                                        className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+                                                    >
+                                                        <Sparkles className="h-3 w-3" /> Auto-Generate
+                                                    </button>
+                                                </div>
+                                                <div className="relative">
+                                                    <Input
+                                                        id="client-portal-password"
+                                                        type={showPortalPassword ? 'text' : 'password'}
+                                                        value={portalPassword}
+                                                        onChange={(e) => setPortalPassword(e.target.value)}
+                                                        placeholder="Min 6 characters"
+                                                        className="pr-10 font-mono"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowPortalPassword(!showPortalPassword)}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                        aria-label={showPortalPassword ? 'Hide password' : 'Show password'}
+                                                    >
+                                                        {showPortalPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 

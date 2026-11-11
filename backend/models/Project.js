@@ -72,6 +72,15 @@ const projectSchema = new mongoose.Schema({
     iosBuildNumber: { type: String },
 
     adminPanelRequired: { type: Boolean, default: false },
+    adminPanelStatus: {
+        type: String,
+        enum: ['not-started', 'development', 'testing', 'ready', 'deployed', 'live', 'down'],
+        default: 'not-started'
+    },
+    adminPanelUrl: { type: String },
+    adminPanelStagingUrl: { type: String },
+    adminPanelVersion: { type: String },
+
     apiRequired: { type: Boolean, default: false },
     hostingRequired: { type: Boolean, default: false },
     maintenanceRequired: { type: Boolean, default: false },

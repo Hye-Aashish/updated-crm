@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
+const { escapeRegex } = require('../utils/securityHelpers');
 
 const Lead = require('../models/Lead');
 const User = require('../models/User');
@@ -85,7 +86,7 @@ router.get('/calls', protect, async (req, res) => {
             filter.verificationStatus = verificationStatus;
         }
         if (search) {
-            const regex = new RegExp(search.trim(), 'i');
+            const regex = new RegExp(escapeRegex(search.trim()), 'i');
             filter.$or = [
                 { leadName: regex },
                 { company: regex },

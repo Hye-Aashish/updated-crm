@@ -62,7 +62,7 @@ async function assertClientAccess(req, client) {
 
     const linked = await Project.exists({
         clientId: clientId,
-        $or: [{ pmId: userId }, { members: userId }]
+        $or: [{ pmId: userId }, { members: userId }, { developers: userId }, { designers: userId }]
     });
     if (!linked) {
         return { ok: false, status: 403, message: 'Not authorized to view this client' };
@@ -70,4 +70,31 @@ async function assertClientAccess(req, client) {
     return { ok: true };
 }
 
-module.exports = { assertInvoiceAccess, assertClientAccess, isPrivileged };
+/**
+ * Project access: client -> own clientId; staff -> PM/member/developer/designer; admin/owner -> all.
+ */
+async function assertProjectAccess(req, project) {
+    if (!req.user || !project) {
+        return { ok: false, status: 401, message: 'Not authorized' };
+    }
+    if (isPrivileged(req.user)) return { ok: true };
+
+    if (req.user.role === 'client') {
+        const own = req.user.clientId?.toString?.() || '';
+        const projClientId = project.clientId?.toString?.() || String(project.clientId || '');
+        if (!own || own !== projClientId) {
+            return { ok: false, status: 403, message: 'Not authorized to access this project' };
+        }
+        return { ok: true };
+    }
+
+    const userId = req.user._id.toString();
+    const isPM = String(project.pmId || '') === userId;
+    const hasId = (arr) => Array.isArray(arr) && arr.map(String).includes(userId);
+    if (!isPM && !hasId(project.members) && !hasId(project.developers) && !hasId(project.designers)) {
+        return { ok: false, status: 403, message: 'Not authorized to access this project' };
+    }
+    return { ok: true };
+}
+
+module.exports = { assertInvoiceAccess, assertClientAccess, assertProjectAccess, isPrivileged };

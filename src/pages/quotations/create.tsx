@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Sparkles, UploadCloud, Loader2, FileText, Trash2 } from 'lucide-react';
 import api from '@/lib/api-client';
+import { usePortalPrefix } from '@/lib/nav-utils';
 
 import { appAlert } from '@/lib/app-dialog'
 
 export default function QuotationBuilder() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const portalPrefix = usePortalPrefix();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState<any>({
         clientName: '',
@@ -72,7 +74,7 @@ export default function QuotationBuilder() {
             const method = id ? 'put' : 'post';
 
             await api[method](url, data);
-            navigate('/quotations');
+            navigate(`${portalPrefix}/quotations`);
         } catch (error: any) {
             console.error(error);
             const msg = error.response?.data?.error || error.response?.data?.message || 'Error saving quotation';
@@ -87,7 +89,7 @@ export default function QuotationBuilder() {
             {/* Top Bar */}
             <div className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.05)] z-10 sticky top-0">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/quotations')} className="p-2.5 hover:bg-gray-100 rounded-xl transition-all">
+                    <button onClick={() => navigate(`${portalPrefix}/quotations`)} className="p-2.5 hover:bg-gray-100 rounded-xl transition-all">
                         <ArrowLeft className="w-5 h-5 text-gray-600" />
                     </button>
                     <div>

@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
     ChevronLeft, Edit, Trash2, Plus, FileText, Paperclip,
-    Download, Globe, Smartphone, Shield, Flag, RefreshCw
+    Download, Globe, Smartphone, Shield, Flag, RefreshCw, Server
 } from 'lucide-react'
 import { formatCurrency, getInitials } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -29,13 +29,15 @@ import { ProjectMilestonesTab } from '@/components/projects/project-milestones-t
 import { ProjectCheckpointDialog } from '@/components/projects/project-checkpoint-dialog'
 import { ProjectDeliverableDialog } from '@/components/projects/project-deliverable-dialog'
 
-import { mapProject, mapClient, mapUser } from '@/lib/mappers'
+import { mapProject, mapClient, mapUser, mapTask } from '@/lib/mappers'
+import { isAdminOrOwnerRole, normalizeRoleKey, usePortalPrefix } from '@/lib/nav-utils'
 
 import { appConfirm } from '@/lib/app-dialog'
 
 export function ProjectDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
 
     // Module State
@@ -49,7 +51,7 @@ export function ProjectDetailPage() {
     const [teamDialogOpen, setTeamDialogOpen] = useState(false)
     const [checkpointDialogOpen, setCheckpointDialogOpen] = useState(false)
     const [deliverableDialogOpen, setDeliverableDialogOpen] = useState(false)
-    const [deliverableType, setDeliverableType] = useState<'website' | 'android' | 'ios'>('website')
+    const [deliverableType, setDeliverableType] = useState<'website' | 'admin' | 'android' | 'ios'>('website')
 
     // Dialog & Form States
     const [selectedCpForProof, setSelectedCpForProof] = useState<any>(null)
@@ -62,7 +64,7 @@ export function ProjectDetailPage() {
 
     const {
         projects, setProjects,
-        tasks,
+        tasks, setTasks,
         users, setUsers,
         files,
         clients, setClients,
@@ -101,23 +103,25 @@ export function ProjectDetailPage() {
     // Load initial data
     useEffect(() => {
         const fetchData = async () => {
-            if (projects.length === 0 || clients.length === 0 || users.length === 0) {
+            if (projects.length === 0 || clients.length === 0 || users.length === 0 || tasks.length === 0) {
                 try {
-                    const [pRes, cRes, uRes] = await Promise.all([
-                        api.get('/projects'),
-                        api.get('/clients'),
-                        api.get('/users')
+                    const [pRes, cRes, uRes, tRes] = await Promise.all([
+                        projects.length === 0 ? api.get('/projects').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        clients.length === 0 ? api.get('/clients').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        users.length === 0 ? api.get('/users').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                        tasks.length === 0 ? api.get('/tasks').catch(() => ({ data: null })) : Promise.resolve({ data: null })
                     ])
-                    if (pRes.data) setProjects(pRes.data.map(mapProject))
-                    if (cRes.data) setClients(cRes.data.map(mapClient))
-                    if (uRes.data) setUsers(uRes.data.map(mapUser))
+                    if (Array.isArray(pRes?.data)) setProjects(pRes.data.map(mapProject))
+                    if (Array.isArray(cRes?.data)) setClients(cRes.data.map(mapClient))
+                    if (Array.isArray(uRes?.data)) setUsers(uRes.data.map(mapUser))
+                    if (Array.isArray(tRes?.data)) setTasks(tRes.data.map(mapTask))
                 } catch (e) {
                     console.error(e)
                 }
             }
         }
         fetchData()
-    }, [projects.length, clients.length, users.length, setProjects, setClients, setUsers])
+    }, [projects.length, clients.length, users.length, tasks.length, setProjects, setClients, setUsers, setTasks])
 
     if (!project) return <div className="p-10 text-center font-bold text-muted-foreground">Loading project workspace...</div>
 
@@ -127,6 +131,8 @@ export function ProjectDetailPage() {
     const projectFiles = files.filter(f => f.projectId === project.id)
 
     const health = project.health || 'green'
+    const canViewProjectPayments = isAdminOrOwnerRole(currentUser?.role)
+    const canManageDeliverables = !!currentUser && normalizeRoleKey(currentUser.role) !== 'client'
 
     const handleDelete = async () => {
         const pId = (project as any)._id || project.id
@@ -136,7 +142,7 @@ export function ProjectDetailPage() {
                 deleteProject(project.id)
                 deleteProject(pId)
                 toast({ title: 'Project deleted', description: `"${project.name}" has been deleted.` })
-                navigate('/projects')
+                navigate(`${portalPrefix}/projects`)
             } catch (err: any) {
                 toast({
                     title: 'Delete failed',
@@ -211,7 +217,7 @@ export function ProjectDetailPage() {
             {/* Breadcrumb Header */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
-                    <button onClick={() => navigate('/projects')} className="hover:text-primary transition-colors">Projects</button>
+                    <button onClick={() => navigate(`${portalPrefix}/projects`)} className="hover:text-primary transition-colors">Projects</button>
                     <ChevronLeft className="h-3.5 w-3.5 rotate-180" />
                     <span className="text-foreground truncate">{project.name}</span>
                 </div>
@@ -236,7 +242,7 @@ export function ProjectDetailPage() {
 
                     <div className="flex items-center gap-2">
                         {['owner', 'admin', 'pm'].includes(currentUser?.role) && (
-                            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${project.id}/edit`)} className="h-9 font-bold text-xs">
+                            <Button variant="outline" size="sm" onClick={() => navigate(`${portalPrefix}/projects/${project.id}/edit`)} className="h-9 font-bold text-xs">
                                 <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit Project
                             </Button>
                         )}
@@ -250,7 +256,7 @@ export function ProjectDetailPage() {
             </div>
 
             {/* Quick KPI Strip */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className={`grid grid-cols-2 ${canViewProjectPayments ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3`}>
                 <Card className="bg-card border-border/60">
                     <CardContent className="p-3.5 space-y-1">
                         <p className="text-[10px] font-bold text-muted-foreground uppercase">Overall Progress</p>
@@ -281,21 +287,24 @@ export function ProjectDetailPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-card border-border/60">
-                    <CardContent className="p-3.5 space-y-1">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Project Budget</p>
-                        <p className="text-xl font-black text-foreground">{formatCurrency(project.budget)}</p>
-                        <p className="text-[10px] text-emerald-600 font-semibold">
-                            Status: {project.paymentStatus || 'Pending'}
-                        </p>
-                    </CardContent>
-                </Card>
+                {canViewProjectPayments && (
+                    <Card className="bg-card border-border/60">
+                        <CardContent className="p-3.5 space-y-1">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Project Budget</p>
+                            <p className="text-xl font-black text-foreground">{formatCurrency(project.budget)}</p>
+                            <p className="text-[10px] text-emerald-600 font-semibold">
+                                Status: {project.paymentStatus || 'Pending'}
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card className="bg-card border-border/60">
                     <CardContent className="p-3.5 space-y-1">
                         <p className="text-[10px] font-bold text-muted-foreground uppercase">Deliverables Live</p>
                         <div className="flex items-center gap-2 pt-0.5">
                             {project.websiteRequired && <span title="Website"><Globe className={`h-4 w-4 ${project.websiteStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} /></span>}
+                            {project.adminPanelRequired && <span title="Admin Panel"><Server className={`h-4 w-4 ${project.adminPanelStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} /></span>}
                             {project.androidRequired && <span title="Android"><Smartphone className={`h-4 w-4 ${project.androidStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} /></span>}
                             {project.iosRequired && <span title="iOS"><Smartphone className={`h-4 w-4 ${project.iosStatus === 'live' ? 'text-emerald-500' : 'text-gray-400'}`} /></span>}
                         </div>
@@ -321,8 +330,11 @@ export function ProjectDetailPage() {
                     {currentUser?.role !== 'client' && (
                         <TabsTrigger value="followups" className="text-xs font-bold">Follow-ups ({followups.length})</TabsTrigger>
                     )}
-                    <TabsTrigger value="payments" className="text-xs font-bold">Payments</TabsTrigger>
+                    {canViewProjectPayments && (
+                        <TabsTrigger value="payments" className="text-xs font-bold">Payments</TabsTrigger>
+                    )}
                     <TabsTrigger value="website" className="text-xs font-bold">Website</TabsTrigger>
+                    <TabsTrigger value="admin" className="text-xs font-bold">Admin</TabsTrigger>
                     <TabsTrigger value="android" className="text-xs font-bold">Android</TabsTrigger>
                     <TabsTrigger value="ios" className="text-xs font-bold">iOS</TabsTrigger>
                     {currentUser?.role !== 'client' && (
@@ -394,6 +406,10 @@ export function ProjectDetailPage() {
                                     <div className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
                                         <span className="flex items-center gap-2"><Globe className="h-4 w-4 text-blue-500" /> Website Status</span>
                                         <Badge variant="outline" className="uppercase text-[9px]">{project.websiteStatus || 'Not Started'}</Badge>
+                                    </div>
+                                    <div className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
+                                        <span className="flex items-center gap-2"><Server className="h-4 w-4 text-amber-500" /> Admin Panel</span>
+                                        <Badge variant="outline" className="uppercase text-[9px]">{project.adminPanelStatus || 'Not Started'}</Badge>
                                     </div>
                                     <div className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
                                         <span className="flex items-center gap-2"><Smartphone className="h-4 w-4 text-emerald-500" /> Android App</span>
@@ -518,7 +534,7 @@ export function ProjectDetailPage() {
                 <TabsContent value="tasks" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-base font-bold">Task Management Board</h3>
-                        <Button size="sm" onClick={() => navigate('/tasks')} className="h-8 font-bold text-xs">
+                        <Button size="sm" onClick={() => navigate(`${portalPrefix}/tasks`)} className="h-8 font-bold text-xs">
                             <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Task
                         </Button>
                     </div>
@@ -611,9 +627,9 @@ export function ProjectDetailPage() {
                     </div>
                 </TabsContent>
 
-                {/* 8. PAYMENTS TAB */}
-                <TabsContent value="payments" className="space-y-4">
-                    {currentUser?.role !== 'client' && (
+                {/* 8. PAYMENTS TAB (Admin & Owner ONLY) */}
+                {canViewProjectPayments && (
+                    <TabsContent value="payments" className="space-y-4">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-base font-bold">Financial Summary & Milestone Billing Breakdown</CardTitle>
@@ -639,13 +655,13 @@ export function ProjectDetailPage() {
                                 </div>
                             </CardContent>
                         </Card>
-                    )}
 
-                    <ProjectMilestonesTab 
-                        project={project} 
-                        onProjectUpdate={(updated) => updateProject(project.id, updated)} 
-                    />
-                </TabsContent>
+                        <ProjectMilestonesTab
+                            project={project}
+                            onProjectUpdate={(updated) => updateProject(project.id, updated)}
+                        />
+                    </TabsContent>
+                )}
 
                 {/* 9. WEBSITE TAB */}
                 <TabsContent value="website" className="space-y-4">
@@ -655,7 +671,7 @@ export function ProjectDetailPage() {
                                 <CardTitle className="text-base font-bold flex items-center gap-2">
                                     <Globe className="h-5 w-5 text-blue-500" /> Website Deployment Tracker
                                 </CardTitle>
-                                {['owner', 'admin', 'pm', 'developer'].includes(currentUser?.role) && (
+                                {canManageDeliverables && (
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -665,7 +681,7 @@ export function ProjectDetailPage() {
                                         }}
                                         className="h-8 text-xs font-bold gap-1.5"
                                     >
-                                        <Edit className="h-3.5 w-3.5" /> Edit Website Details
+                                        <Edit className="h-3.5 w-3.5" /> {(project.productionUrl || project.websiteUrl || project.domain) ? 'Edit Website Details' : 'Add Website Details'}
                                     </Button>
                                 )}
                             </div>
@@ -680,13 +696,90 @@ export function ProjectDetailPage() {
                                     <Label className="text-xs font-bold">Domain</Label>
                                     <Input value={project.domain || '-'} readOnly className="h-9 font-semibold" />
                                 </div>
-                                <div className="space-y-1 md:col-span-2">
+                                <div className="space-y-1">
                                     <Label className="text-xs font-bold">Production URL (Live Link)</Label>
                                     {project.productionUrl || project.websiteUrl ? (
                                         <div className="flex items-center gap-2">
                                             <Input value={project.productionUrl || project.websiteUrl} readOnly className="h-9 font-semibold text-primary" />
                                             <a href={project.productionUrl || project.websiteUrl} target="_blank" rel="noreferrer" className="px-3 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-md hover:bg-primary/90 flex items-center gap-1 shrink-0">
                                                 <Globe className="h-3.5 w-3.5" /> Open Website
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <Input value="-" readOnly className="h-9 font-semibold" />
+                                    )}
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Staging / Demo URL</Label>
+                                    {project.stagingUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input value={project.stagingUrl} readOnly className="h-9 font-semibold text-muted-foreground" />
+                                            <a href={project.stagingUrl} target="_blank" rel="noreferrer" className="px-3 py-2 border text-xs font-bold rounded-md hover:bg-muted flex items-center gap-1 shrink-0">
+                                                <Globe className="h-3.5 w-3.5" /> Open
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <Input value="-" readOnly className="h-9 font-semibold" />
+                                    )}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* 9.5 ADMIN PANEL TAB */}
+                <TabsContent value="admin" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base font-bold flex items-center gap-2">
+                                    <Server className="h-5 w-5 text-amber-500" /> Admin Panel Tracker
+                                </CardTitle>
+                                {canManageDeliverables && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setDeliverableType('admin')
+                                            setDeliverableDialogOpen(true)
+                                        }}
+                                        className="h-8 text-xs font-bold gap-1.5"
+                                    >
+                                        <Edit className="h-3.5 w-3.5" /> {project.adminPanelUrl ? 'Edit Admin Details' : 'Add Admin Details'}
+                                    </Button>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-xs font-medium">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Admin Panel Status</Label>
+                                    <Input value={(project.adminPanelStatus || 'not-started').toUpperCase()} readOnly className="h-9 uppercase font-bold" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Version</Label>
+                                    <Input value={project.adminPanelVersion || 'v1.0.0'} readOnly className="h-9 font-semibold" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Admin Panel Live / Login URL</Label>
+                                    {project.adminPanelUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input value={project.adminPanelUrl} readOnly className="h-9 font-semibold text-primary" />
+                                            <a href={project.adminPanelUrl} target="_blank" rel="noreferrer" className="px-3 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-md hover:bg-primary/90 flex items-center gap-1 shrink-0">
+                                                <Server className="h-3.5 w-3.5" /> Open Admin
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <Input value="-" readOnly className="h-9 font-semibold" />
+                                    )}
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold">Staging / Test Admin URL</Label>
+                                    {project.adminPanelStagingUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input value={project.adminPanelStagingUrl} readOnly className="h-9 font-semibold text-muted-foreground" />
+                                            <a href={project.adminPanelStagingUrl} target="_blank" rel="noreferrer" className="px-3 py-2 border text-xs font-bold rounded-md hover:bg-muted flex items-center gap-1 shrink-0">
+                                                <Server className="h-3.5 w-3.5" /> Open
                                             </a>
                                         </div>
                                     ) : (
@@ -706,7 +799,7 @@ export function ProjectDetailPage() {
                                 <CardTitle className="text-base font-bold flex items-center gap-2">
                                     <Smartphone className="h-5 w-5 text-emerald-500" /> Android App Tracker
                                 </CardTitle>
-                                {['owner', 'admin', 'pm', 'developer'].includes(currentUser?.role) && (
+                                {canManageDeliverables && (
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -716,7 +809,7 @@ export function ProjectDetailPage() {
                                         }}
                                         className="h-8 text-xs font-bold gap-1.5"
                                     >
-                                        <Edit className="h-3.5 w-3.5" /> Edit Android Details
+                                        <Edit className="h-3.5 w-3.5" /> {project.androidAppUrl ? 'Edit Android Details' : 'Add Android Details'}
                                     </Button>
                                 )}
                             </div>
@@ -732,8 +825,17 @@ export function ProjectDetailPage() {
                                     <Input value={project.androidVersion || 'v1.0.0'} readOnly className="h-9 font-semibold" />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-xs font-bold">Play Store Link</Label>
-                                    <Input value={project.androidAppUrl || '-'} readOnly className="h-9 font-semibold text-primary" />
+                                    <Label className="text-xs font-bold">Play Store / APK Link</Label>
+                                    {project.androidAppUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input value={project.androidAppUrl} readOnly className="h-9 font-semibold text-primary" />
+                                            <a href={project.androidAppUrl} target="_blank" rel="noreferrer" className="px-3 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-md hover:bg-primary/90 flex items-center gap-1 shrink-0">
+                                                <Smartphone className="h-3.5 w-3.5" /> Open
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <Input value="-" readOnly className="h-9 font-semibold text-primary" />
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -748,7 +850,7 @@ export function ProjectDetailPage() {
                                 <CardTitle className="text-base font-bold flex items-center gap-2">
                                     <Smartphone className="h-5 w-5 text-purple-500" /> iOS App Tracker
                                 </CardTitle>
-                                {['owner', 'admin', 'pm', 'developer'].includes(currentUser?.role) && (
+                                {canManageDeliverables && (
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -758,7 +860,7 @@ export function ProjectDetailPage() {
                                         }}
                                         className="h-8 text-xs font-bold gap-1.5"
                                     >
-                                        <Edit className="h-3.5 w-3.5" /> Edit iOS Details
+                                        <Edit className="h-3.5 w-3.5" /> {project.iosAppUrl ? 'Edit iOS Details' : 'Add iOS Details'}
                                     </Button>
                                 )}
                             </div>
@@ -774,8 +876,17 @@ export function ProjectDetailPage() {
                                     <Input value={project.iosVersion || 'v1.0.0'} readOnly className="h-9 font-semibold" />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-xs font-bold">App Store Link</Label>
-                                    <Input value={project.iosAppUrl || '-'} readOnly className="h-9 font-semibold text-primary" />
+                                    <Label className="text-xs font-bold">App Store / TestFlight Link</Label>
+                                    {project.iosAppUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input value={project.iosAppUrl} readOnly className="h-9 font-semibold text-primary" />
+                                            <a href={project.iosAppUrl} target="_blank" rel="noreferrer" className="px-3 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-md hover:bg-primary/90 flex items-center gap-1 shrink-0">
+                                                <Smartphone className="h-3.5 w-3.5" /> Open
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <Input value="-" readOnly className="h-9 font-semibold text-primary" />
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

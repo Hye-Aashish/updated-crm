@@ -10,10 +10,12 @@ import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { isSpeechSupported, startVoiceInput } from '@/lib/voice-input'
 import { saveDraft, loadDraft, clearDraft } from '@/lib/offline-drafts'
+import { usePortalPrefix } from '@/lib/nav-utils'
 
 export function TaskDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const [task, setTask] = useState<any>(null)
     const [subtasks, setSubtasks] = useState<any[]>([])
@@ -37,7 +39,7 @@ export function TaskDetailPage() {
             if (draft) setDesc(draft)
         } catch {
             toast({ title: 'Task not found', variant: 'destructive' })
-            navigate('/tasks')
+            navigate(`${portalPrefix}/tasks`)
         } finally {
             setLoading(false)
         }
@@ -135,7 +137,7 @@ export function TaskDetailPage() {
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Subtasks</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                     {subtasks.map(s => (
-                        <Link key={s._id} to={`/tasks/${s._id}`} className="flex items-center justify-between p-2 rounded-lg border text-sm hover:bg-muted/40">
+                        <Link key={s._id} to={`${portalPrefix}/tasks/${s._id}`} className="flex items-center justify-between p-2 rounded-lg border text-sm hover:bg-muted/40">
                             <span className="font-semibold truncate">{s.title}</span>
                             <Badge variant="secondary">{s.status}</Badge>
                         </Link>

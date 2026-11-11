@@ -11,15 +11,17 @@ import {
     DollarSign, Clock, Edit, Trash2, ExternalLink, Shield, Key, UserCheck, UserX, Lock,
     ListTodo, CreditCard, TrendingUp, Check, AlertTriangle, Sparkles, Calendar
 } from 'lucide-react'
-import { formatCurrency, getInitials } from '@/lib/utils'
+import { formatCurrency, getInitials, generatePortalPassword } from '@/lib/utils'
 import api from '@/lib/api-client'
 import { VisitorSessionsTimeline } from '@/components/contacts/visitor-sessions-timeline'
 import { ClientProductForm } from '@/components/clients/client-product-dialog'
 import { ClientProductManagerDialog } from '@/components/clients/client-product-manager-dialog'
 import { ClientOnboardingDialog } from '@/components/clients/client-onboarding-dialog'
+import { mapClient } from '@/lib/mappers'
 import { usePermissions } from '@/hooks/use-permissions'
+import { isAdminOrOwnerRole, usePortalPrefix } from '@/lib/nav-utils'
 import { Progress } from '@/components/ui/progress'
-import { Package, Plus, FolderOpen, Copy, Share2, MessageCircle, Download, CheckCircle2, FileCheck, RefreshCw, Globe, Send, User, Building2 } from 'lucide-react'
+import { Package, Plus, FolderOpen, Copy, Share2, MessageCircle, Download, CheckCircle2, FileCheck, RefreshCw, Globe, Send, User, Building2, Eye, EyeOff, Loader2 } from 'lucide-react'
 import type { ClientProduct } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -38,6 +40,7 @@ import { appConfirm } from '@/lib/app-dialog'
 export function ClientDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const { clients, projects, invoices, setClients, deleteClient, users, setUsers, currentUser } = useAppStore()
     const { canView, canCreate } = usePermissions()
@@ -46,10 +49,14 @@ export function ClientDetailPage() {
     const client = clients.find((c) => c.id === id)
 
     // Portal Access State
-    const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
-    const [isCreatePortalDialogOpen, setIsCreatePortalDialogOpen] = useState(false)
+    const [isManagePortalOpen, setIsManagePortalOpen] = useState(false)
     const [portalPassword, setPortalPassword] = useState('')
     const [portalEmail, setPortalEmail] = useState('')
+    const [showPortalPassword, setShowPortalPassword] = useState(false)
+    const [savingPortal, setSavingPortal] = useState(false)
+    const [copiedPortalCreds, setCopiedPortalCreds] = useState(false)
+    const [portalUser, setPortalUser] = useState<any>(null)
+    const [portalAccessChecked, setPortalAccessChecked] = useState(false)
 
     // Client Products State
     const [clientProducts, setClientProducts] = useState<ClientProduct[]>([])
@@ -62,13 +69,20 @@ export function ClientDetailPage() {
     const [isOnboardingDialogOpen, setIsOnboardingDialogOpen] = useState(false)
     const [copiedOnboardingLink, setCopiedOnboardingLink] = useState(false)
 
-    // Always fetch latest client data including onboarding details on load
+    // Always fetch latest client data and portal access status on load
     useEffect(() => {
         if (id) {
             api.get(`/clients/${id}`).then(res => {
-                const fetched = { ...res.data, id: res.data._id || res.data.id }
+                const fetched = mapClient(res.data)
                 setClients(clients.map(c => c.id === id ? { ...c, ...fetched } : c))
             }).catch(err => console.error("Client fetch error", err))
+
+            api.get(`/clients/${id}/portal-access`).then(res => {
+                setPortalUser(res.data?.hasAccess ? res.data.user : null)
+                setPortalAccessChecked(true)
+            }).catch(() => {
+                setPortalAccessChecked(false)
+            })
         }
     }, [id])
 
@@ -93,64 +107,83 @@ export function ClientDetailPage() {
         }
     }, [client])
 
-    const clientUser = users.find(u => u.clientId === client?.id || (u.role === 'client' && u.email?.toLowerCase() === client?.email?.toLowerCase()))
+    const storeClientUser = users.find(u => u.clientId === client?.id || (u.role === 'client' && u.email?.toLowerCase() === client?.email?.toLowerCase()))
+    const clientUser = portalAccessChecked ? portalUser : (portalUser || storeClientUser)
 
-    const handleCreatePortal = async () => {
+    const generateRandomPassword = () => generatePortalPassword(client?.name)
+
+    const handleSavePortalCredentials = async () => {
         if (!client) return
-        if (!portalEmail || !portalPassword) {
-            toast({ variant: "destructive", title: "Validation Error", description: "Email and password are required" })
+        const trimmedEmail = portalEmail.trim()
+        const trimmedPassword = portalPassword.trim()
+        if (!trimmedEmail) {
+            toast({ variant: "destructive", title: "Validation Error", description: "Login email is required" })
             return
         }
+        if (trimmedPassword && trimmedPassword.length < 6) {
+            toast({ variant: "destructive", title: "Validation Error", description: "Portal password must be at least 6 characters" })
+            return
+        }
+        setSavingPortal(true)
         try {
-            const payload = {
-                name: client.name,
-                email: portalEmail,
-                password: portalPassword,
-                role: 'client',
-                clientId: client.id
+            const res = await api.post(`/clients/${client.id}/portal-access`, {
+                email: trimmedEmail,
+                password: trimmedPassword || undefined,
+                name: client.name
+            })
+            const savedCreds = res.data?.credentials
+            if (savedCreds) {
+                setPortalUser({ id: savedCreds.id, _id: savedCreds.id, ...savedCreds })
+                setPortalAccessChecked(true)
             }
-            const res = await api.post('/users', payload)
-            const created = { id: res.data._id, ...res.data }
-            setUsers([...users, created])
-            setIsCreatePortalDialogOpen(false)
-            setPortalPassword('')
-            toast({ title: "Portal Access Enabled", description: `Login account created for ${client.name}.` })
-        } catch (error: any) {
-            const msg = error.response?.data?.message || "Failed to create portal user"
-            toast({ variant: "destructive", title: "Error", description: msg })
-        }
-    }
+            // Refresh users list if accessible so UI store stays synced
+            api.get('/users').then(usersRes => {
+                setUsers(usersRes.data.map((u: any) => ({ id: u._id, ...u })))
+            }).catch(() => { })
 
-    const handleResetPassword = async () => {
-        if (!clientUser) return
-        if (!portalPassword) {
-            toast({ variant: "destructive", title: "Validation Error", description: "Password cannot be empty" })
-            return
-        }
-        try {
-            await api.put(`/users/${clientUser.id}`, { password: portalPassword })
-            setIsPasswordDialogOpen(false)
+            toast({
+                title: clientUser && trimmedPassword ? "Client Password Reset" : "Client Portal Access Saved",
+                description: clientUser && trimmedPassword
+                    ? `Password updated for ${trimmedEmail}.`
+                    : `Login account configured for ${trimmedEmail}.`
+            })
             setPortalPassword('')
-            toast({ title: "Password Updated", description: "Client's password has been successfully updated." })
+            setShowPortalPassword(false)
+            setIsManagePortalOpen(false)
         } catch (error: any) {
-            const msg = error.response?.data?.message || "Failed to update password"
+            const msg = error.response?.data?.message || "Failed to save client portal credentials"
             toast({ variant: "destructive", title: "Error", description: msg })
+        } finally {
+            setSavingPortal(false)
         }
     }
 
     const handleDisablePortal = async () => {
-        if (!clientUser) return
+        if (!client) return
         if (!await appConfirm("Are you sure you want to disable login portal access for this client? This will delete their login user account.")) {
             return
         }
         try {
-            await api.delete(`/users/${clientUser.id}`)
-            setUsers(users.filter(u => u.id !== clientUser.id))
+            await api.delete(`/clients/${client.id}/portal-access`)
+            setPortalUser(null)
+            setPortalAccessChecked(true)
+            api.get('/users').then(usersRes => {
+                setUsers(usersRes.data.map((u: any) => ({ id: u._id, ...u })))
+            }).catch(() => { })
+            setPortalPassword('')
+            setIsManagePortalOpen(false)
             toast({ title: "Portal Access Disabled", description: "The login account has been removed." })
         } catch (error: any) {
-            const msg = error.response?.data?.message || "Failed to delete portal user"
+            const msg = error.response?.data?.message || "Failed to disable portal user"
             toast({ variant: "destructive", title: "Error", description: msg })
         }
+    }
+
+    const handleWhatsAppCredentials = () => {
+        if (!client) return
+        const phone = (client.phone || '').replace(/[^0-9]/g, '')
+        const text = `Hello ${client.name},\n\nHere are your Client Portal login details:\n🌐 Portal URL: ${window.location.origin}/login\n📧 Login Email: ${portalEmail || client.email}\n🔑 Password: ${portalPassword || '(Existing password)'}\n\nYou can log in anytime to track your project deliverables, view invoices, and communicate directly with our team.\n\nThank you!`
+        window.open(`https://api.whatsapp.com/send?${phone ? `phone=${phone}&` : ''}text=${encodeURIComponent(text)}`, '_blank')
     }
 
     const handleDelete = async () => {
@@ -159,10 +192,10 @@ export function ClientDetailPage() {
             try {
                 await api.delete(`/clients/${client.id}`)
                 deleteClient(client.id)
-                navigate('/clients')
+                navigate(`${portalPrefix}/clients`)
             } catch (error) {
                 console.error("Delete failed", error)
-                navigate('/clients') // Redirect anyway if 404
+                navigate(`${portalPrefix}/clients`) // Redirect anyway if 404
             }
         }
     }
@@ -173,30 +206,7 @@ export function ClientDetailPage() {
             const fetchClients = async () => {
                 try {
                     const response = await api.get('/clients')
-                    const backendClients = response.data.map((c: any) => ({
-                        id: c._id,
-                        name: c.name,
-                        company: c.company,
-                        email: c.email,
-                        phone: c.phone,
-                        address: c.address,
-                        type: c.type,
-                        status: c.status,
-                        industry: c.industry,
-                        city: c.city,
-                        website: c.website,
-                        gstNumber: c.gstNumber,
-                        leadSource: c.leadSource,
-                        notes: c.notes,
-                        services: c.services || [],
-                        budget: c.budget,
-                        paymentModel: c.paymentModel,
-                        deadline: c.expectedDeadline ? new Date(c.expectedDeadline) : undefined,
-                        assignedTo: c.assignedTo,
-                        followUpDate: c.followUpDate ? new Date(c.followUpDate) : undefined,
-                        createdAt: new Date(c.createdAt),
-                        updatedAt: new Date(c.updatedAt)
-                    }))
+                    const backendClients = response.data.map(mapClient)
                     setClients(backendClients)
                 } catch (error) {
                     console.error("Failed to fetch clients", error)
@@ -269,7 +279,7 @@ export function ClientDetailPage() {
             <div className="flex flex-col items-center justify-center h-[50vh]">
                 <h2 className="text-2xl font-bold mb-2">Client Not Found</h2>
                 <p className="text-muted-foreground mb-4">The client you are looking for does not exist.</p>
-                <Button onClick={() => navigate('/clients')}>Back to Clients</Button>
+                <Button onClick={() => navigate(`${portalPrefix}/clients`)}>Back to Clients</Button>
             </div>
         )
     }
@@ -330,7 +340,7 @@ export function ClientDetailPage() {
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <button onClick={() => navigate('/clients')} className="hover:text-primary transition-colors">Clients</button>
+                    <button onClick={() => navigate(`${portalPrefix}/clients`)} className="hover:text-primary transition-colors">Clients</button>
                     <ChevronLeft className="h-4 w-4 rotate-180" />
                     <span className="text-foreground font-medium truncate">{client.name}</span>
                 </div>
@@ -352,11 +362,47 @@ export function ClientDetailPage() {
                         </div>
                     </div>
 
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/clients/${client.id}/edit`)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit Profile
+                    <div className="flex gap-2 flex-wrap items-center">
+                        {clientUser ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="clay-btn gap-1.5 font-bold border-emerald-500/40 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 shadow-xs h-9 rounded-xl"
+                                onClick={() => {
+                                    setPortalEmail(clientUser.email || client.email || '')
+                                    setPortalPassword('')
+                                    setIsManagePortalOpen(true)
+                                }}
+                                title="Manage or Reset Client Portal Login & Password"
+                            >
+                                <Key className="h-3.5 w-3.5 text-emerald-600" /> Login Active / Reset Password
+                            </Button>
+                        ) : (
+                            <Button
+                                size="sm"
+                                className="clay-btn gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs h-9 rounded-xl"
+                                onClick={() => {
+                                    setPortalEmail(client.email || '')
+                                    setPortalPassword(generateRandomPassword())
+                                    setIsManagePortalOpen(true)
+                                }}
+                                title="Setup Client ID and Password for Client Portal"
+                            >
+                                <Lock className="h-3.5 w-3.5" /> Setup Client Login
+                            </Button>
+                        )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="clay-btn gap-1.5 font-bold border-primary/40 text-primary hover:bg-primary/10 shadow-xs h-9 rounded-xl"
+                            onClick={() => setIsOnboardingDialogOpen(true)}
+                        >
+                            <Sparkles className="h-4 w-4 text-primary" /> Onboarding Form Builder
                         </Button>
-                        <Button variant="destructive" size="icon" className="w-9 h-9" onClick={handleDelete}>
+                        <Button variant="outline" size="sm" className="clay-btn font-bold h-9 rounded-xl" onClick={() => navigate(`${portalPrefix}/clients/${client.id}/edit`)}>
+                            <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit Profile
+                        </Button>
+                        <Button variant="destructive" size="icon" className="w-9 h-9 rounded-xl" onClick={handleDelete}>
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
@@ -513,8 +559,17 @@ export function ClientDetailPage() {
                                             </div>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setPortalPassword(''); setIsPasswordDialogOpen(true); }}>
-                                                <Key className="h-3.5 w-3.5" /> Reset Password
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="gap-1.5 font-bold"
+                                                onClick={() => {
+                                                    setPortalEmail(clientUser.email || client.email || '')
+                                                    setPortalPassword('')
+                                                    setIsManagePortalOpen(true)
+                                                }}
+                                            >
+                                                <Key className="h-3.5 w-3.5" /> Manage Credentials / Reset
                                             </Button>
                                             <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleDisablePortal}>
                                                 <UserX className="h-3.5 w-3.5" /> Disable Access
@@ -536,7 +591,15 @@ export function ClientDetailPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5" onClick={() => { setPortalPassword(''); setIsCreatePortalDialogOpen(true); }}>
+                                        <Button
+                                            size="sm"
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-bold"
+                                            onClick={() => {
+                                                setPortalEmail(client.email || '')
+                                                setPortalPassword(generateRandomPassword())
+                                                setIsManagePortalOpen(true)
+                                            }}
+                                        >
                                             <Lock className="h-3.5 w-3.5" /> Setup Client Login
                                         </Button>
                                     </div>
@@ -552,19 +615,21 @@ export function ClientDetailPage() {
                             {clientProjects.length === 0 ? (
                                 <div className="p-8 text-center text-muted-foreground">
                                     <p>No projects found for this client.</p>
-                                    <Button variant="link" onClick={() => navigate('/projects/new')}>Create Project</Button>
+                                    <Button variant="link" onClick={() => navigate(`${portalPrefix}/projects/new`)}>Create Project</Button>
                                 </div>
                             ) : (
                                 <div className="divide-y">
                                     {clientProjects.map(project => (
-                                        <div key={project.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
+                                        <div key={project.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`${portalPrefix}/projects/${project.id}`)}>
                                             <div>
                                                 <h4 className="font-semibold text-sm">{project.name}</h4>
                                                 <p className="text-xs text-muted-foreground mt-1">Due: {new Date(project.deadline).toLocaleDateString()}</p>
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <Badge variant="secondary">{project.status}</Badge>
-                                                <span className="font-medium text-sm">{formatCurrency(project.budget)}</span>
+                                                {isAdminOrOwnerRole(currentUser?.role) && (
+                                                    <span className="font-medium text-sm">{formatCurrency(project.budget)}</span>
+                                                )}
                                                 <ChevronLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
                                             </div>
                                         </div>
@@ -606,7 +671,7 @@ export function ClientDetailPage() {
                         <div>
                             <h3 className="text-lg font-bold tracking-tight">Assigned Digital Products</h3>
                             <p className="text-xs text-muted-foreground">
-                                {canViewFinances 
+                                {canViewFinances
                                     ? "Track progress, milestones, pending tasks, and payment collections for this client."
                                     : "Track progress, deliverables, milestones, and pending tasks for this client."}
                             </p>
@@ -685,19 +750,16 @@ export function ClientDetailPage() {
                                     </div>
                                     <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totalPaid)}</div>
                                 </div>
-                                <div className={`p-3.5 rounded-xl border shadow-xs ${
-                                    totalPending === 0
+                                <div className={`p-3.5 rounded-xl border shadow-xs ${totalPending === 0
                                         ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-200'
                                         : 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40'
-                                }`}>
-                                    <div className={`text-xs font-medium uppercase flex items-center gap-1.5 ${
-                                        totalPending === 0 ? 'text-emerald-700' : 'text-rose-700 dark:text-rose-400'
                                     }`}>
+                                    <div className={`text-xs font-medium uppercase flex items-center gap-1.5 ${totalPending === 0 ? 'text-emerald-700' : 'text-rose-700 dark:text-rose-400'
+                                        }`}>
                                         <AlertTriangle className="h-3.5 w-3.5" /> Pending Balance
                                     </div>
-                                    <div className={`text-xl font-bold mt-1 ${
-                                        totalPending === 0 ? 'text-emerald-700' : 'text-rose-700 dark:text-rose-400'
-                                    }`}>
+                                    <div className={`text-xl font-bold mt-1 ${totalPending === 0 ? 'text-emerald-700' : 'text-rose-700 dark:text-rose-400'
+                                        }`}>
                                         {formatCurrency(totalPending)}
                                     </div>
                                 </div>
@@ -783,17 +845,16 @@ export function ClientDetailPage() {
                                                     {/* Work status */}
                                                     <Badge
                                                         variant="secondary"
-                                                        className={`text-[10px] ${
-                                                            cp.workStatus === 'completed'
+                                                        className={`text-[10px] ${cp.workStatus === 'completed'
                                                                 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
                                                                 : cp.workStatus === 'in_progress'
-                                                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
-                                                                : cp.workStatus === 'review'
-                                                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
-                                                                : cp.workStatus === 'on_hold'
-                                                                ? 'bg-amber-100 text-amber-800'
-                                                                : 'bg-muted'
-                                                        }`}
+                                                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                                                                    : cp.workStatus === 'review'
+                                                                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                                                                        : cp.workStatus === 'on_hold'
+                                                                            ? 'bg-amber-100 text-amber-800'
+                                                                            : 'bg-muted'
+                                                            }`}
                                                     >
                                                         {cp.workStatus === 'completed' && '✅ Completed'}
                                                         {cp.workStatus === 'in_progress' && '⚙️ In Progress'}
@@ -805,13 +866,12 @@ export function ClientDetailPage() {
                                                     {canViewFinances && (
                                                         <Badge
                                                             variant="outline"
-                                                            className={`text-[10px] ${
-                                                                cp.paymentStatus === 'paid'
+                                                            className={`text-[10px] ${cp.paymentStatus === 'paid'
                                                                     ? 'text-emerald-700 border-emerald-300'
                                                                     : cp.paymentStatus === 'partial'
-                                                                    ? 'text-amber-700 border-amber-300'
-                                                                    : 'text-rose-700 border-rose-300'
-                                                            }`}
+                                                                        ? 'text-amber-700 border-amber-300'
+                                                                        : 'text-rose-700 border-rose-300'
+                                                                }`}
                                                         >
                                                             {cp.paymentStatus === 'paid' && 'Paid'}
                                                             {cp.paymentStatus === 'partial' && 'Partial'}
@@ -917,7 +977,7 @@ export function ClientDetailPage() {
                                                         size="sm"
                                                         variant="default"
                                                         className="flex-1 text-xs gap-1.5 shadow-xs bg-indigo-600 hover:bg-indigo-700"
-                                                        onClick={() => navigate(`/projects/${cp.projectId}`)}
+                                                        onClick={() => navigate(`${portalPrefix}/projects/${cp.projectId}`)}
                                                     >
                                                         <FolderOpen className="h-3.5 w-3.5" /> Project Workspace
                                                     </Button>
@@ -979,13 +1039,12 @@ export function ClientDetailPage() {
                     <Card className="p-6 rounded-3xl border border-border/40 space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <div className={`clay-icon h-12 w-12 rounded-2xl flex items-center justify-center ${
-                                    client.onboardingStatus === 'completed'
+                                <div className={`clay-icon h-12 w-12 rounded-2xl flex items-center justify-center ${client.onboardingStatus === 'completed'
                                         ? 'bg-emerald-500/15 text-emerald-600'
                                         : client.onboardingStatus === 'sent'
-                                        ? 'bg-blue-500/15 text-blue-600'
-                                        : 'bg-primary/10 text-primary'
-                                }`}>
+                                            ? 'bg-blue-500/15 text-blue-600'
+                                            : 'bg-primary/10 text-primary'
+                                    }`}>
                                     {client.onboardingStatus === 'completed' ? (
                                         <CheckCircle2 className="h-6 w-6" />
                                     ) : client.onboardingStatus === 'sent' ? (
@@ -1000,8 +1059,8 @@ export function ClientDetailPage() {
                                             {client.onboardingStatus === 'completed'
                                                 ? 'Client Onboarding Completed'
                                                 : client.onboardingStatus === 'sent'
-                                                ? 'Onboarding Form Sent - Awaiting Client Response'
-                                                : 'Client Onboarding Not Initiated'}
+                                                    ? 'Onboarding Form Sent - Awaiting Client Response'
+                                                    : 'Client Onboarding Not Initiated'}
                                         </h2>
                                         {client.onboardingStatus === 'completed' ? (
                                             <Badge className="clay-badge bg-emerald-500/15 text-emerald-600 font-bold px-2 py-0.5">
@@ -1021,8 +1080,8 @@ export function ClientDetailPage() {
                                         {client.onboardingStatus === 'completed'
                                             ? `Form successfully submitted by client on ${client.onboardingCompletedAt ? new Date(client.onboardingCompletedAt).toLocaleString() : 'recently'}. All details synced below.`
                                             : client.onboardingStatus === 'sent'
-                                            ? `Form generated and link issued on ${client.onboardingSentAt ? new Date(client.onboardingSentAt).toLocaleDateString() : 'recently'}. Client can fill it anytime.`
-                                            : 'Create a tailored onboarding questionnaire for this client to collect brand assets, business details, and technical scope.'}
+                                                ? `Form generated and link issued on ${client.onboardingSentAt ? new Date(client.onboardingSentAt).toLocaleDateString() : 'recently'}. Client can fill it anytime.`
+                                                : 'Create a tailored onboarding questionnaire for this client to collect brand assets, business details, and technical scope.'}
                                     </p>
                                 </div>
                             </div>
@@ -1192,7 +1251,7 @@ export function ClientDetailPage() {
                                     const label = fieldConfig?.label || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 
                                     // Don't show file URLs as raw text here if already in files section
-                                    const isFileUrl = typeof value === 'string' && (value.startsWith('/public/uploads') || value.startsWith('http'))
+                                    const isFileUrl = typeof value === 'string' && (value.startsWith('/public/uploads') || value.startsWith('/api/files/secure') || value.startsWith('http'))
 
                                     return (
                                         <div key={key} className="clay-inset p-3.5 rounded-2xl bg-card/60 space-y-1.5 border border-border/30">
@@ -1283,68 +1342,154 @@ export function ClientDetailPage() {
                 </TabsContent>
             </Tabs>
 
-            {/* Create Portal Access Dialog */}
-            <Dialog open={isCreatePortalDialogOpen} onOpenChange={setIsCreatePortalDialogOpen}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Setup Client Portal Login</DialogTitle>
-                        <DialogDescription>
-                            Create login credentials for {client.name} to access their CRM portal.
-                        </DialogDescription>
+            {/* Comprehensive Manage Client Portal Login Dialog */}
+            <Dialog
+                open={isManagePortalOpen}
+                onOpenChange={(open) => {
+                    setIsManagePortalOpen(open)
+                    if (!open) {
+                        setPortalPassword('')
+                        setShowPortalPassword(false)
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[500px] p-6 rounded-3xl">
+                    <DialogHeader className="space-y-1">
+                        <div className="flex items-center gap-2.5">
+                            <div className="clay-icon h-10 w-10 rounded-2xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
+                                <Key className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-lg font-black text-foreground">
+                                    Client Portal Login Credentials
+                                </DialogTitle>
+                                <DialogDescription className="text-xs text-muted-foreground font-medium">
+                                    Manage User ID and Password for {client.name} to access their dedicated Client Panel.
+                                </DialogDescription>
+                            </div>
+                        </div>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="portal-email">Login Email</Label>
+
+                    <div className="space-y-4 py-3">
+                        {/* Status banner */}
+                        <div className={`p-3 rounded-2xl border flex items-center justify-between text-xs ${clientUser
+                                ? 'bg-emerald-50/70 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300'
+                                : 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/30 text-amber-800 dark:text-amber-300'
+                            }`}>
+                            <div className="flex items-center gap-2 font-bold">
+                                {clientUser ? <UserCheck className="h-4 w-4 text-emerald-600" /> : <UserX className="h-4 w-4 text-amber-600" />}
+                                <span>{clientUser ? 'Login Account Active' : 'No Login Account Configured'}</span>
+                            </div>
+                            <span className="font-mono text-[11px]">Role: client</span>
+                        </div>
+
+                        {/* Login Email / User ID */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="portal-email" className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Mail className="h-3.5 w-3.5 text-muted-foreground" /> Client Login Email / User ID *
+                            </Label>
                             <Input
                                 id="portal-email"
                                 type="email"
                                 value={portalEmail}
                                 onChange={(e) => setPortalEmail(e.target.value)}
                                 placeholder="client@example.com"
+                                className="clay-input text-xs h-10 rounded-xl"
                             />
+                            <p className="text-[10px] text-muted-foreground">The client will use this email address to log in at {window.location.origin}/login</p>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="portal-password">Password</Label>
-                            <Input
-                                id="portal-password"
-                                type="text"
-                                value={portalPassword}
-                                onChange={(e) => setPortalPassword(e.target.value)}
-                                placeholder="Set password (min 6 characters)"
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsCreatePortalDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleCreatePortal} className="bg-blue-600 hover:bg-blue-700 text-white">Enable Access</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
-            {/* Reset Password Dialog */}
-            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Reset Client Password</DialogTitle>
-                        <DialogDescription>
-                            Set a new login password for {client.name}.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="reset-password">New Password</Label>
-                            <Input
-                                id="reset-password"
-                                type="text"
-                                value={portalPassword}
-                                onChange={(e) => setPortalPassword(e.target.value)}
-                                placeholder="Enter new password (min 6 characters)"
-                            />
+                        {/* Password with Auto-generate & show/hide */}
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="portal-password" className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                    <Lock className="h-3.5 w-3.5 text-muted-foreground" /> {clientUser ? 'New Password (Optional to change)' : 'Login Password *'}
+                                </Label>
+                                <button
+                                    type="button"
+                                    onClick={() => setPortalPassword(generateRandomPassword())}
+                                    className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1"
+                                >
+                                    <Sparkles className="h-3 w-3" /> Auto-Generate
+                                </button>
+                            </div>
+                            <div className="relative">
+                                <Input
+                                    id="portal-password"
+                                    type={showPortalPassword ? 'text' : 'password'}
+                                    value={portalPassword}
+                                    onChange={(e) => setPortalPassword(e.target.value)}
+                                    placeholder={clientUser ? 'Leave blank to keep existing password' : 'Enter password (min 6 characters)'}
+                                    className="clay-input text-xs h-10 rounded-xl pr-10 font-mono"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPortalPassword(!showPortalPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                    {showPortalPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Quick Share Buttons (Copy & WhatsApp) */}
+                        <div className="flex items-center gap-2 pt-1">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const text = `Client Portal Credentials:\nURL: ${window.location.origin}/login\nEmail: ${portalEmail || client.email}\nPassword: ${portalPassword || '(Existing password)'}`
+                                    navigator.clipboard.writeText(text)
+                                    setCopiedPortalCreds(true)
+                                    toast({ title: 'Credentials Copied!', description: 'Saved to clipboard.' })
+                                    setTimeout(() => setCopiedPortalCreds(false), 2000)
+                                }}
+                                className="clay-btn flex-1 text-xs font-bold gap-1.5 h-8 rounded-xl"
+                            >
+                                {copiedPortalCreds ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                                {copiedPortalCreds ? 'Copied' : 'Copy Credentials'}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleWhatsAppCredentials}
+                                className="clay-btn flex-1 text-xs font-bold gap-1.5 h-8 rounded-xl text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30"
+                            >
+                                <MessageCircle className="h-3.5 w-3.5" /> Send on WhatsApp
+                            </Button>
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleResetPassword} className="bg-blue-600 hover:bg-blue-700 text-white">Save Password</Button>
+
+                    <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/40">
+                        {clientUser && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleDisablePortal}
+                                className="text-destructive hover:bg-destructive/10 text-xs font-bold mr-auto h-9 rounded-xl"
+                            >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" /> Disable Access
+                            </Button>
+                        )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsManagePortalOpen(false)}
+                            className="clay-btn text-xs font-bold h-9 rounded-xl"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            size="sm"
+                            disabled={savingPortal}
+                            onClick={handleSavePortalCredentials}
+                            className="clay-btn bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs h-9 px-4 rounded-xl shadow-md gap-1.5"
+                        >
+                            {savingPortal ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            {clientUser ? (portalPassword.trim() ? 'Save & Reset Password' : 'Update Credentials') : 'Create & Enable Login'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -1358,7 +1503,7 @@ export function ClientDetailPage() {
                             Configure pricing, delivery timeline, work status, and initial deliverables.
                         </DialogDescription>
                     </DialogHeader>
-                    <ClientProductForm 
+                    <ClientProductForm
                         clientId={client.id}
                         initialData={editingClientProduct}
                         onSuccess={() => { setIsProductDialogOpen(false); fetchClientProducts(); }}

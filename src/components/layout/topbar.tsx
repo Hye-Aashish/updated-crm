@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
     Bell, Menu, Moon, Search, Sun, Plus,
-    DollarSign, Zap, Code, Megaphone, Wifi, Car, LogOut, Loader2, Mic
+    DollarSign, Zap, Code, Megaphone, Wifi, Car, LogOut, Loader2, Mic, KeyRound
 } from 'lucide-react'
 import { saveDraft, loadDraft, clearDraft } from '@/lib/offline-drafts'
 import { isSpeechSupported, startVoiceInput } from '@/lib/voice-input'
@@ -22,8 +22,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 
 import { useTheme } from '../theme-provider'
 import { useAppStore } from '@/store'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { usePermissions, performAppLogout } from '@/hooks/use-permissions'
+import { withPortalPrefix, normalizeRoleKey } from '@/lib/nav-utils'
 import { Users, Briefcase, CheckSquare, TrendingUp, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
@@ -47,6 +49,8 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     const { theme, setTheme } = useTheme()
     const { toast } = useToast()
     const navigate = useNavigate()
+    const location = useLocation()
+    const { canView } = usePermissions()
     const { currentUser, notifications, markNotificationRead, markAllNotificationsRead, leads, projects, tasks, clients } = useAppStore()
 
     useEffect(() => {
@@ -76,6 +80,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         const currentUserName = currentUser?.name?.toLowerCase().trim();
 
         leads.forEach(l => {
+            if (!canView('leads')) return;
             if (!isAdminOrOwner) {
                 const hasAssignee = Boolean(
                     (l.assignedTo && l.assignedTo !== 'unassigned' && String(l.assignedTo).trim() !== '') ||
@@ -93,33 +98,39 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             }
 
             if (l.name.toLowerCase().includes(query) || l.company.toLowerCase().includes(query)) {
-                results.push({ type: 'Lead', id: l.id, title: l.name, subtitle: l.company, link: '/leads', icon: TrendingUp })
+                results.push({ type: 'Lead', id: l.id, title: l.name, subtitle: l.company, link: withPortalPrefix('/leads', location.pathname, currentUser?.role), icon: TrendingUp })
             }
         })
 
         // Search Projects
-        projects.forEach(p => {
-            if (p.name.toLowerCase().includes(query)) {
-                results.push({ type: 'Project', id: p.id, title: p.name, subtitle: p.type, link: `/projects/${p.id}`, icon: Briefcase })
-            }
-        })
+        if (canView('projects')) {
+            projects.forEach(p => {
+                if (p.name.toLowerCase().includes(query)) {
+                    results.push({ type: 'Project', id: p.id, title: p.name, subtitle: p.type, link: withPortalPrefix(`/projects/${p.id}`, location.pathname, currentUser?.role), icon: Briefcase })
+                }
+            })
+        }
 
         // Search Tasks
-        tasks.forEach(t => {
-            if (t.title.toLowerCase().includes(query)) {
-                results.push({ type: 'Task', id: t.id, title: t.title, subtitle: t.status, link: '/tasks', icon: CheckSquare })
-            }
-        })
+        if (canView('tasks')) {
+            tasks.forEach(t => {
+                if (t.title.toLowerCase().includes(query)) {
+                    results.push({ type: 'Task', id: t.id, title: t.title, subtitle: t.status, link: withPortalPrefix('/tasks', location.pathname, currentUser?.role), icon: CheckSquare })
+                }
+            })
+        }
 
         // Search Clients
-        clients.forEach(c => {
-            if (c.name.toLowerCase().includes(query) || c.company.toLowerCase().includes(query)) {
-                results.push({ type: 'Client', id: c.id, title: c.name, subtitle: c.company, link: `/clients/${c.id}`, icon: Users })
-            }
-        })
+        if (canView('clients')) {
+            clients.forEach(c => {
+                if (c.name.toLowerCase().includes(query) || c.company.toLowerCase().includes(query)) {
+                    results.push({ type: 'Client', id: c.id, title: c.name, subtitle: c.company, link: withPortalPrefix(`/clients/${c.id}`, location.pathname, currentUser?.role), icon: Users })
+                }
+            })
+        }
 
         setSearchResults(results.slice(0, 8)) // Limit results
-    }, [searchQuery, leads, projects, tasks, clients])
+    }, [searchQuery, leads, projects, tasks, clients, canView, location.pathname, currentUser])
 
     // Close on click outside
     useEffect(() => {
@@ -510,16 +521,22 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                             <p className="text-xs leading-none text-muted-foreground">{currentUser?.email}</p>
                         </div>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg" onClick={async () => {
-                            try {
-                                await api.post('/time-entries/stop-running')
-                            } catch (err) {
-                                console.error('Logout timer stop failed', err)
-                            } finally {
-                                localStorage.removeItem('token');
-                                navigate('/login');
-                            }
-                        }}>
+                        <DropdownMenuItem
+                            className="cursor-pointer rounded-lg"
+                            onClick={() => {
+                                const roleKey = normalizeRoleKey(currentUser?.role)
+                                if (roleKey === 'client' || location.pathname.startsWith('/client')) {
+                                    navigate('/client/settings')
+                                } else if (roleKey === 'employee' || location.pathname.startsWith('/employee')) {
+                                    navigate('/employee/settings')
+                                } else {
+                                    navigate('/profile')
+                                }
+                            }}
+                        >
+                            <KeyRound className="mr-2 h-4 w-4 text-primary" /> Profile & Change Password
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg" onClick={() => performAppLogout(navigate, currentUser?.role)}>
                             <LogOut className="mr-2 h-4 w-4" /> Log out
                         </DropdownMenuItem>
                     </DropdownMenuContent>

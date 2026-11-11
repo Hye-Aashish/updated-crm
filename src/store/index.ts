@@ -112,6 +112,7 @@ interface AppState {
     settings: any | null
     setSettings: (settings: any) => void
     fetchSettings: () => Promise<void>
+    resetWorkspaceData: () => void
 
     // Product actions
     setProducts: (products: Product[]) => void
@@ -420,6 +421,26 @@ export const useAppStore = create<AppState>((set) => ({
             console.error("Failed to fetch settings in store", error)
         }
     },
+    resetWorkspaceData: () => set({
+        currentUser: null as any,
+        settings: null,
+        users: [],
+        clients: [],
+        projects: [],
+        tasks: [],
+        timeEntries: [],
+        invoices: [],
+        communicationLogs: [],
+        files: [],
+        activities: [],
+        notifications: [],
+        leads: [],
+        expenses: [],
+        tickets: [],
+        products: [],
+        clientProducts: [],
+        runningTimer: null,
+    }),
 
     // Product actions
     setProducts: (products) => set({ products }),

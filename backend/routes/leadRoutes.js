@@ -1051,8 +1051,11 @@ router.get('/telecaller-analytics', protect, async (req, res) => {
             totalAssignedLeads: a.totalAssignedLeads
         }));
 
+        const pipelineStages = await PipelineStage.find().sort({ order: 1 }).lean();
+
         res.json({
             summary,
+            pipelineStages,
             agents: filteredAgents,
             allAgents: allAgentsList,
             dailyCallingLogs: sortedCallingLogs,
@@ -1417,7 +1420,7 @@ router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) =
         const allowedFields = ['name', 'company', 'email', 'phone', 'value', 'source', 'stage',
             'assignedTo', 'assignedToName', 'notes', 'customFields', 'reminder', 'tags', 'website', 'address',
             'industry', 'designation', 'description', 'lostReason', 'project',
-            'referredBy', 'partnerId', 'partnerName'];
+            'referredBy', 'partnerId', 'partnerName', 'lastFollowUpOutcome', 'lastNote', 'lastFollowUpDate'];
         const safeData = {};
         allowedFields.forEach(f => { if (req.body[f] !== undefined) safeData[f] = req.body[f]; });
 
@@ -1523,18 +1526,23 @@ router.post('/:id/activities', protect, async (req, res) => {
             return res.status(403).json({ message: 'Not authorized to add activities to this lead' });
         }
 
+        const now = new Date();
+        const outcome = req.body.outcome || (req.body.type === 'call' ? 'Call Logged' : 'Note Added');
+
         lead.activities.push({
             content: req.body.content,
             type: req.body.type || 'note',
-            outcome: req.body.outcome,
+            outcome: outcome,
             duration: Number(req.body.duration || req.body.durationSeconds || 0),
             createdByName: req.user.name,
-            createdAt: new Date()
+            createdAt: now
         });
 
         lead.lastContactedBy = req.user.name;
         lead.lastContactedById = req.user._id.toString();
         lead.lastNote = req.body.content;
+        lead.lastFollowUpOutcome = outcome;
+        lead.lastFollowUpDate = now;
 
         // Run AI Analysis and Schedule Reminders if keywords found
         try {

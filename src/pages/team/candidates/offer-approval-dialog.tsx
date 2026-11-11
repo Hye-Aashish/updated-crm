@@ -51,8 +51,19 @@ export function OfferApprovalDialog({ open, onOpenChange, candidate, onDecision 
         }
     }
 
-    const downloadPdf = () => {
-        window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/candidates/${candidate._id}/pdf`, '_blank')
+    const downloadPdf = async () => {
+        try {
+            const res = await api.get(`/candidates/${candidate._id}/pdf`, { responseType: 'blob' })
+            const blobUrl = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+            window.open(blobUrl, '_blank', 'noopener,noreferrer')
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+        } catch (err: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Download Failed',
+                description: err.userMessage || err.message || 'Unable to load PDF preview'
+            })
+        }
     }
 
     const offer = candidate.offerLetter || {}

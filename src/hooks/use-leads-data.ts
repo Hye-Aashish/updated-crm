@@ -116,16 +116,17 @@ export function useLeadsData() {
         }
     }
 
-    const addActivity = async (leadId: string, content: string) => {
+    const addActivity = async (leadId: string, content: string, outcome?: string) => {
         try {
             const res = await api.post(`/leads/${leadId}/activities`, {
                 content,
-                type: 'note'
+                type: 'note',
+                outcome: outcome || 'Note Added'
             })
             const updatedLead = mapLead(res.data)
             const updatedLeads = leads.map(l => l.id === leadId ? updatedLead : l)
             setLeads(updatedLeads)
-            toast({ description: "Note added" })
+            toast({ description: "Note and outcome recorded" })
             return updatedLead
         } catch (error: any) {
             handleApiError(error, toast, "Failed to add note")

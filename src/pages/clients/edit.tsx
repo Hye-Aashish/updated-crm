@@ -3,11 +3,11 @@ import { useAppStore } from '@/store'
 import { ClientForm } from '@/components/forms/client-form'
 import { useEffect } from 'react'
 import api from '@/lib/api-client'
+import { mapClient } from '@/lib/mappers'
 
 export function EditClientPage() {
     const { id } = useParams()
     const { clients, setClients } = useAppStore()
-
 
     const client = clients.find(c => c.id === id)
 
@@ -17,30 +17,7 @@ export function EditClientPage() {
             const fetchClients = async () => {
                 try {
                     const response = await api.get('/clients')
-                    const backendClients = response.data.map((c: any) => ({
-                        id: c._id,
-                        name: c.name,
-                        company: c.company,
-                        email: c.email,
-                        phone: c.phone,
-                        address: c.address,
-                        type: c.type,
-                        status: c.status,
-                        industry: c.industry,
-                        city: c.city,
-                        website: c.website,
-                        gstNumber: c.gstNumber,
-                        leadSource: c.leadSource,
-                        budget: c.budget,
-                        paymentModel: c.paymentModel,
-                        deadline: c.expectedDeadline ? new Date(c.expectedDeadline) : undefined,
-                        services: c.services || [],
-                        assignedTo: c.assignedTo,
-                        followUpDate: c.followUpDate ? new Date(c.followUpDate) : undefined,
-                        notes: c.notes,
-                        createdAt: new Date(c.createdAt),
-                        updatedAt: new Date(c.updatedAt)
-                    }))
+                    const backendClients = response.data.map(mapClient)
                     setClients(backendClients)
                 } catch (error) {
                     console.error("Failed to fetch clients", error)

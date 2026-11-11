@@ -39,7 +39,10 @@ const amcSchema = new mongoose.Schema({
     // Renewal history
     renewalHistory: [{
         renewedAt: { type: Date },
+        previousEndDate: { type: Date },
+        effectiveStartDate: { type: Date },
         newEndDate: { type: Date },
+        durationLabel: { type: String },
         amount: { type: Number },
         invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
         note: { type: String }
@@ -51,24 +54,33 @@ const amcSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+function computeAmcStatus(endDate, currentStatus) {
+    if (currentStatus === 'cancelled') return 'cancelled';
+    if (!endDate) return currentStatus || 'pending';
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endDay = new Date(endDate);
+    endDay.setHours(0, 0, 0, 0);
+
+    const thirtyDaysLater = new Date(startOfToday);
+    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+
+    if (endDay < startOfToday) return 'expired';
+    if (endDay <= thirtyDaysLater) return 'expiring-soon';
+    return 'active';
+}
+
+amcSchema.statics.computeStatus = computeAmcStatus;
+
 // Auto-update status based on dates
 amcSchema.pre('save', function () {
     if (!this.projectId && !this.clientProductId) {
         throw new Error('AMC must be associated with either a Project or a Digital Product (ClientProduct)');
     }
 
-    const now = new Date();
-    const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-    if (this.status !== 'cancelled') {
-        if (this.endDate < now) {
-            this.status = 'expired';
-        } else if (this.endDate <= thirtyDaysLater) {
-            this.status = 'expiring-soon';
-        } else {
-            this.status = 'active';
-        }
-    }
+    this.status = computeAmcStatus(this.endDate, this.status);
     this.updatedAt = new Date();
 });
 

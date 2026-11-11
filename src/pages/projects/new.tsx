@@ -20,9 +20,11 @@ import type { ProjectStatus, ProjectType, PaymentModel } from '@/types'
 import api from '@/lib/api-client'
 import { mapProject, mapClient, mapUser } from '@/lib/mappers'
 import { getCurrencySymbol } from '@/lib/utils'
+import { isAdminOrOwnerRole, usePortalPrefix } from '@/lib/nav-utils'
 
 export function NewProjectPage() {
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const addProject = useAppStore((state) => state.addProject)
     const setClients = useAppStore((state) => state.setClients)
@@ -30,6 +32,7 @@ export function NewProjectPage() {
     const users = useAppStore((state) => state.users)
     const setUsers = useAppStore((state) => state.setUsers)
     const currentUser = useAppStore((state) => state.currentUser)
+    const canViewProjectPayments = isAdminOrOwnerRole(currentUser?.role)
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
@@ -96,7 +99,7 @@ export function NewProjectPage() {
                 description: `${formData.name} created! Automatic template checkpoints generated.`,
             })
 
-            navigate(`/projects/${savedProject.id || savedProject._id}`)
+            navigate(`${portalPrefix}/projects/${savedProject.id || savedProject._id}`)
         } catch (error: any) {
             console.error(error)
             toast({
@@ -117,7 +120,7 @@ export function NewProjectPage() {
     return (
         <div className="space-y-6 max-w-4xl mx-auto font-sans pb-10">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/projects')}>
+                <Button variant="ghost" size="icon" onClick={() => navigate(`${portalPrefix}/projects`)}>
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div>
@@ -264,57 +267,59 @@ export function NewProjectPage() {
                             </div>
                         </div>
 
-                        {/* Financials & Budget */}
-                        <div className="space-y-4 pt-4 border-t">
-                            <Label className="text-xs font-bold uppercase tracking-wider block text-foreground">Financial & Payment Setup</Label>
-                            <div className="grid gap-4 md:grid-cols-4">
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-bold">Total Budget ({getCurrencySymbol()})</Label>
-                                    <Input
-                                        name="budget"
-                                        type="number"
-                                        placeholder="100000"
-                                        required
-                                        value={formData.budget}
-                                        onChange={handleChange}
-                                        className="h-9 text-sm font-bold"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-bold">Advance Amount</Label>
-                                    <Input
-                                        name="advanceAmount"
-                                        type="number"
-                                        placeholder="30000"
-                                        value={formData.advanceAmount}
-                                        onChange={handleChange}
-                                        className="h-9 text-sm font-semibold"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-bold">Milestone Amount</Label>
-                                    <Input
-                                        name="milestoneAmount"
-                                        type="number"
-                                        placeholder="40000"
-                                        value={formData.milestoneAmount}
-                                        onChange={handleChange}
-                                        className="h-9 text-sm font-semibold"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-bold">Final Amount</Label>
-                                    <Input
-                                        name="finalAmount"
-                                        type="number"
-                                        placeholder="30000"
-                                        value={formData.finalAmount}
-                                        onChange={handleChange}
-                                        className="h-9 text-sm font-semibold"
-                                    />
+                        {/* Financials & Budget (Admin & Owner ONLY) */}
+                        {canViewProjectPayments && (
+                            <div className="space-y-4 pt-4 border-t">
+                                <Label className="text-xs font-bold uppercase tracking-wider block text-foreground">Financial & Payment Setup</Label>
+                                <div className="grid gap-4 md:grid-cols-4">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Total Budget ({getCurrencySymbol()})</Label>
+                                        <Input
+                                            name="budget"
+                                            type="number"
+                                            placeholder="100000"
+                                            required
+                                            value={formData.budget}
+                                            onChange={handleChange}
+                                            className="h-9 text-sm font-bold"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Advance Amount</Label>
+                                        <Input
+                                            name="advanceAmount"
+                                            type="number"
+                                            placeholder="30000"
+                                            value={formData.advanceAmount}
+                                            onChange={handleChange}
+                                            className="h-9 text-sm font-semibold"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Milestone Amount</Label>
+                                        <Input
+                                            name="milestoneAmount"
+                                            type="number"
+                                            placeholder="40000"
+                                            value={formData.milestoneAmount}
+                                            onChange={handleChange}
+                                            className="h-9 text-sm font-semibold"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold">Final Amount</Label>
+                                        <Input
+                                            name="finalAmount"
+                                            type="number"
+                                            placeholder="30000"
+                                            value={formData.finalAmount}
+                                            onChange={handleChange}
+                                            className="h-9 text-sm font-semibold"
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         <div className="space-y-2 pt-2">
                             <Label htmlFor="description" className="text-xs font-bold uppercase">Project Description & Scope</Label>
@@ -329,7 +334,7 @@ export function NewProjectPage() {
                         </div>
 
                         <div className="flex justify-end gap-3 pt-4">
-                            <Button type="button" variant="outline" onClick={() => navigate('/projects')}>
+                            <Button type="button" variant="outline" onClick={() => navigate(`${portalPrefix}/projects`)}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={loading} className="font-bold px-6">

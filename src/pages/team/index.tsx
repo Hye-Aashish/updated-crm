@@ -41,7 +41,7 @@ export function TeamPage() {
     const navigate = useNavigate()
     const location = useLocation()
     const { toast } = useToast()
-    const { users, setUsers, tasks, clients, setClients } = useAppStore()
+    const { users, setUsers, tasks } = useAppStore()
     const [loading, setLoading] = useState(true)
 
     // UI State
@@ -76,8 +76,7 @@ export function TeamPage() {
         documentAadhar: '',
         documentPan: '',
         documentOfferLetter: '',
-        salary: '',
-        clientId: ''
+        salary: ''
     })
 
     // Attendance Settings State - Removed as part of redesign
@@ -94,7 +93,7 @@ export function TeamPage() {
         }
     }, [location.search])
 
-    // Fetch Users & Clients
+    // Fetch Users
     useEffect(() => {
         const fetchUsers = async () => {
             if (users.length === 0) {
@@ -106,29 +105,16 @@ export function TeamPage() {
                 }
             }
         }
-        const fetchClients = async () => {
-            if (clients.length === 0) {
-                try {
-                    const res = await api.get('/clients')
-                    setClients(res.data.map((c: any) => ({ id: c._id, ...c })))
-                } catch (error) {
-                    console.error("Failed to fetch clients", error)
-                }
-            }
-        }
         const fetchData = async () => {
             setLoading(true)
             try {
-                await Promise.all([
-                    fetchUsers(),
-                    fetchClients()
-                ])
+                await fetchUsers()
             } finally {
                 setLoading(false)
             }
         }
         fetchData()
-    }, [users.length, clients.length, setUsers, setClients])
+    }, [users.length, setUsers])
 
     // File Upload Handler
     const handleFileChange = (field: 'avatar' | 'documentAadhar' | 'documentPan' | 'documentOfferLetter', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,6 +133,10 @@ export function TeamPage() {
             toast({ variant: "destructive", title: "Validation Error", description: "Name, Email, and Password are required" })
             return
         }
+        if (newUser.password.trim().length < 6) {
+            toast({ variant: "destructive", title: "Validation Error", description: "Password must be at least 6 characters" })
+            return
+        }
         try {
             const res = await api.post('/users', newUser)
             const created = { id: res.data._id, ...res.data }
@@ -156,7 +146,7 @@ export function TeamPage() {
                 employeeId: '', salutation: 'Mr.', name: '', email: '', password: 'password123', role: 'employee',
                 avatar: '', designation: '', department: '', country: 'India', phone: '', gender: 'Male',
                 dateOfBirth: '', joiningDate: '', reportingTo: '', language: 'English', address: '', about: '',
-                aadharNumber: '', panNumber: '', documentAadhar: '', documentPan: '', documentOfferLetter: '', salary: '', clientId: ''
+                aadharNumber: '', panNumber: '', documentAadhar: '', documentPan: '', documentOfferLetter: '', salary: ''
             })
             toast({ title: "Account Created", description: `${created.name} added successfully.` })
         } catch (error: any) {
@@ -181,9 +171,10 @@ export function TeamPage() {
 
 
     // --- KPI Calculations (Members) ---
-    const totalMembers = users.length
-    const developers = users.filter(u => u.role === 'developer' || u.role === 'employee').length
-    const owners = users.filter(u => u.role === 'owner' || u.role === 'admin').length
+    const teamMembers = users.filter(u => u.role !== 'client')
+    const totalMembers = teamMembers.length
+    const developers = teamMembers.filter(u => u.role === 'developer' || u.role === 'employee').length
+    const owners = teamMembers.filter(u => u.role === 'owner' || u.role === 'admin').length
 
     const StatsCard = ({ title, value, icon: Icon, color, bg }: any) => (
         <Card className="border-l-4 shadow-sm" style={{ borderLeftColor: color }}>
@@ -208,7 +199,7 @@ export function TeamPage() {
     }
 
     const roleColors: Record<string, 'default' | 'secondary' | 'outline'> = {
-        'owner': 'default', 'admin': 'default', 'developer': 'outline', 'employee': 'outline', 'client': 'outline'
+        'owner': 'default', 'admin': 'default', 'developer': 'outline', 'employee': 'outline', 'pm': 'outline', 'sales': 'outline'
     }
 
     if (loading && users.length === 0) {
@@ -292,12 +283,10 @@ export function TeamPage() {
                                                     <Label>Password *</Label>
                                                     <Input type="text" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="Enter custom password" />
                                                 </div>
-                                                {newUser.role !== 'client' && (
-                                                    <div className="space-y-2">
-                                                        <Label>Designation</Label>
-                                                        <Input value={newUser.designation} onChange={e => setNewUser({ ...newUser, designation: e.target.value })} placeholder="Senior Developer" />
-                                                    </div>
-                                                )}
+                                                <div className="space-y-2">
+                                                    <Label>Designation</Label>
+                                                    <Input value={newUser.designation} onChange={e => setNewUser({ ...newUser, designation: e.target.value })} placeholder="Senior Developer" />
+                                                </div>
                                             </div>
 
                                             {/* Row 3 */}
@@ -344,12 +333,10 @@ export function TeamPage() {
 
                                             {/* Row 5 */}
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                {newUser.role !== 'client' && (
-                                                    <div className="space-y-2">
-                                                        <Label>Monthly Salary</Label>
-                                                        <Input value={newUser.salary} onChange={e => setNewUser({ ...newUser, salary: e.target.value })} placeholder="e.g. 50000" />
-                                                    </div>
-                                                )}
+                                                <div className="space-y-2">
+                                                    <Label>Monthly Salary</Label>
+                                                    <Input value={newUser.salary} onChange={e => setNewUser({ ...newUser, salary: e.target.value })} placeholder="e.g. 50000" />
+                                                </div>
                                                 <div className="space-y-2">
                                                     <Label>Reporting To</Label>
                                                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newUser.reportingTo} onChange={e => setNewUser({ ...newUser, reportingTo: e.target.value })}>
@@ -373,26 +360,14 @@ export function TeamPage() {
                                                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
                                                         <option value="employee">Employee</option>
                                                         <option value="developer">Developer</option>
+                                                        <option value="pm">Project Manager</option>
+                                                        <option value="sales">Sales Agent</option>
                                                         <option value="admin">Admin</option>
-                                                        <option value="client">Client</option>
                                                     </select>
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                        Client portal accounts are created in the Clients section.
+                                                    </p>
                                                 </div>
-                                                {newUser.role === 'client' && (
-                                                    <div className="space-y-2">
-                                                        <Label>Assign to Client *</Label>
-                                                        <select
-                                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                                            value={newUser.clientId}
-                                                            onChange={e => setNewUser({ ...newUser, clientId: e.target.value })}
-                                                            required
-                                                        >
-                                                            <option value="">Select Client</option>
-                                                            {clients.map(c => (
-                                                                <option key={c.id} value={c.id}>{c.company} ({c.name})</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                )}
                                             </div>
 
                                             {/* Address & About */}

@@ -86,3 +86,14 @@ export function calculateProgress(completed: number, total: number): number {
     if (total === 0) return 0
     return Math.round((completed / total) * 100)
 }
+
+export function generatePortalPassword(name?: string): string {
+    const cleanName = (name || 'Client').replace(/[^a-zA-Z]/g, '').slice(0, 5) || 'Client'
+    const prefix = cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
+    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+    const bytes = new Uint32Array(6)
+    window.crypto.getRandomValues(bytes)
+    const digits = String((bytes[0] % 9000) + 1000)
+    const suffix = charset[bytes[1] % charset.length] + charset[bytes[2] % charset.length]
+    return `${prefix}@${digits}${suffix}`
+}

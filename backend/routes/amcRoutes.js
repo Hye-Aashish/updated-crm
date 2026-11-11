@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Amc = require('../models/Amc');
 const Invoice = require('../models/Invoice');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
@@ -14,19 +15,72 @@ const getNextInvoiceNumber = async () => {
 
 // ─── Static routes BEFORE /:id routes ───────────────────────────────────────
 
+// Helper: format readable contract/renewal duration
+const formatDurationLabel = (fromDate, toDate) => {
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    if (totalDays <= 0) return '0 Days';
+
+    let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+    const anchor = new Date(start);
+    anchor.setMonth(anchor.getMonth() + months);
+    if (anchor > end) {
+        months--;
+        anchor.setTime(start.getTime());
+        anchor.setMonth(anchor.getMonth() + months);
+    }
+    const remDays = Math.round((end.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (months >= 12 && months % 12 === 0 && remDays <= 1) {
+        const yrs = Math.round(months / 12);
+        return `${yrs} ${yrs === 1 ? 'Year' : 'Years'}`;
+    }
+    if (months >= 1 && remDays <= 2) {
+        return `${months} ${months === 1 ? 'Month' : 'Months'}`;
+    }
+    if (months >= 12) {
+        const yrs = Math.floor(months / 12);
+        const remM = months % 12;
+        return remM > 0 ? `${yrs}Y ${remM}M` : `${yrs} ${yrs === 1 ? 'Year' : 'Years'}`;
+    }
+    if (months >= 1) {
+        return `${months}M ${remDays}D`;
+    }
+    return `${totalDays} ${totalDays === 1 ? 'Day' : 'Days'}`;
+};
+
 // GET AMC stats summary
 router.get('/stats/summary', protect, async (req, res, next) => {
     try {
+        let baseFilter = {};
+        if (req.user.role === 'client') {
+            if (!req.user.clientId || !mongoose.Types.ObjectId.isValid(req.user.clientId)) {
+                return res.json({ total: 0, active: 0, expiringSoon: 0, expired: 0, totalRevenue: 0 });
+            }
+            baseFilter = { clientId: new mongoose.Types.ObjectId(String(req.user.clientId)) };
+        }
+
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const thirtyDaysLater = new Date(startOfToday);
+        thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+
+        const nonCancelled = { ...baseFilter, status: { $ne: 'cancelled' } };
+
         const [total, active, expiringSoon, expired] = await Promise.all([
-            Amc.countDocuments(),
-            Amc.countDocuments({ status: 'active' }),
-            Amc.countDocuments({ status: 'expiring-soon' }),
-            Amc.countDocuments({ status: 'expired' })
+            Amc.countDocuments(baseFilter),
+            Amc.countDocuments({ ...nonCancelled, endDate: { $gt: thirtyDaysLater } }),
+            Amc.countDocuments({ ...nonCancelled, endDate: { $gte: startOfToday, $lte: thirtyDaysLater } }),
+            Amc.countDocuments({ ...nonCancelled, endDate: { $lt: startOfToday } })
         ]);
 
-        const revenueResult = await Amc.aggregate([
-            { $group: { _id: null, total: { $sum: '$amount' } } }
-        ]);
+        const revenuePipeline = [];
+        if (Object.keys(baseFilter).length > 0) revenuePipeline.push({ $match: baseFilter });
+        revenuePipeline.push({ $group: { _id: null, total: { $sum: '$amount' } } });
+        const revenueResult = await Amc.aggregate(revenuePipeline);
 
         res.json({
             total,
@@ -55,7 +109,12 @@ router.get('/', protect, async (req, res, next) => {
             .populate('clientId', 'name email company')
             .populate('invoices', 'invoiceNumber total status date')
             .sort({ createdAt: -1 });
-        res.json(amcs);
+        const normalized = amcs.map(doc => {
+            const obj = doc.toObject();
+            obj.status = Amc.computeStatus(obj.endDate, obj.status);
+            return obj;
+        });
+        res.json(normalized);
     } catch (err) {
         next(err);
     }
@@ -136,7 +195,16 @@ router.get('/:id', protect, async (req, res, next) => {
             .populate('invoices', 'invoiceNumber total status date dueDate type')
             .populate('renewalHistory.invoiceId', 'invoiceNumber total status');
         if (!amc) return res.status(404).json({ message: 'AMC not found' });
-        res.json(amc);
+        if (req.user.role === 'client') {
+            const own = req.user.clientId?.toString?.() || '';
+            const amcClientId = amc.clientId?._id?.toString?.() || amc.clientId?.toString?.() || '';
+            if (!own || own !== amcClientId) {
+                return res.status(403).json({ message: 'Not authorized to view this AMC' });
+            }
+        }
+        const obj = amc.toObject();
+        obj.status = Amc.computeStatus(obj.endDate, obj.status);
+        res.json(obj);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -148,12 +216,29 @@ router.put('/:id', protect, checkPermission('amc', 'edit'), async (req, res, nex
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
         }
-        const updated = await Amc.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
+        const allowedFields = [
+            'name', 'projectId', 'clientProductId', 'clientId', 'startDate', 'endDate',
+            'renewalDate', 'amount', 'frequency', 'status', 'services', 'description',
+            'autoInvoice', 'notes', 'nextInvoiceDate'
+        ];
+        const safeUpdate = { updatedAt: new Date() };
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) safeUpdate[field] = req.body[field];
+        }
+        const existingAmc = await Amc.findById(req.params.id);
+        if (!existingAmc) return res.status(404).json({ message: 'AMC not found' });
+
+        const targetEndDate = safeUpdate.endDate ? new Date(safeUpdate.endDate) : existingAmc.endDate;
+        const targetStatus = safeUpdate.status !== undefined ? safeUpdate.status : existingAmc.status;
+        if (targetStatus !== 'cancelled') {
+            safeUpdate.status = Amc.computeStatus(targetEndDate, targetStatus);
+        }
+
+        const updated = await Amc.findByIdAndUpdate(req.params.id, safeUpdate, { new: true, runValidators: true })
             .populate('projectId', 'name status')
             .populate({ path: 'clientProductId', populate: { path: 'product', select: 'name' } })
             .populate('clientId', 'name email company')
             .populate('invoices', 'invoiceNumber total status date');
-        if (!updated) return res.status(404).json({ message: 'AMC not found' });
         res.json(updated);
     } catch (err) {
         next(err);
@@ -163,6 +248,9 @@ router.put('/:id', protect, checkPermission('amc', 'edit'), async (req, res, nex
 // DELETE AMC
 router.delete('/:id', protect, checkPermission('amc', 'delete'), async (req, res, next) => {
     try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
         const deleted = await Amc.findByIdAndDelete(req.params.id);
         if (!deleted) return res.status(404).json({ message: 'AMC not found' });
         res.json({ message: 'AMC deleted successfully' });
@@ -237,15 +325,31 @@ router.post('/:id/renew', protect, checkPermission('amc', 'edit'), async (req, r
         const amc = await Amc.findById(req.params.id);
         if (!amc) return res.status(404).json({ message: 'AMC not found' });
 
-        const { newEndDate, amount, note, generateInvoice, taxPercentage = 0 } = req.body;
+        const { newEndDate, amount, note, generateInvoice, taxPercentage = 0, durationLabel } = req.body;
         if (!newEndDate) return res.status(400).json({ message: 'New end date is required' });
 
+        const parsedNewEnd = new Date(newEndDate);
+        if (isNaN(parsedNewEnd.getTime())) {
+            return res.status(400).json({ message: 'Invalid renewal end date' });
+        }
+
         const renewedAt = new Date();
+        const startOfToday = new Date(renewedAt);
+        startOfToday.setHours(0, 0, 0, 0);
+        const prevEndDay = new Date(amc.endDate);
+        prevEndDay.setHours(0, 0, 0, 0);
+        const effectiveStartDate = prevEndDay >= startOfToday ? amc.endDate : renewedAt;
+
         const renewalAmount = amount ? parseFloat(amount) : amc.amount;
+        const resolvedDuration = (durationLabel && String(durationLabel).trim())
+            || formatDurationLabel(effectiveStartDate, parsedNewEnd);
 
         const renewalEntry = {
             renewedAt,
-            newEndDate: new Date(newEndDate),
+            previousEndDate: amc.endDate,
+            effectiveStartDate,
+            newEndDate: parsedNewEnd,
+            durationLabel: resolvedDuration,
             amount: renewalAmount,
             note: note || ''
         };

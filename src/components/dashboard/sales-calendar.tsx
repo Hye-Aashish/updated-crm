@@ -124,16 +124,44 @@ export function SalesCalendar({ agents, isPersonalView = false }: SalesCalendarP
                         </Select>
                     )}
 
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                        <SelectTrigger className="h-8 w-32 text-xs font-semibold rounded-xl border-border/60">
-                            <SelectValue placeholder="All Activities" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all" className="text-xs font-semibold">All Activities</SelectItem>
-                            <SelectItem value="meeting" className="text-xs font-semibold">Meetings Only</SelectItem>
-                            <SelectItem value="followup" className="text-xs font-semibold">Follow-ups Only</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    {/* Dedicated Follow-up vs Meeting Tabs */}
+                    <div className="inline-flex rounded-xl bg-background/80 p-0.5 border border-border/40 shadow-2xs gap-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setTypeFilter('followup')}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                typeFilter === 'followup'
+                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            <Phone className="h-3 w-3" />
+                            <span>Follow-ups</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setTypeFilter('meeting')}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                typeFilter === 'meeting'
+                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            <CalendarCheck className="h-3 w-3" />
+                            <span>Meetings</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setTypeFilter('all')}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                typeFilter === 'all'
+                                    ? 'bg-primary text-primary-foreground shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            All
+                        </button>
+                    </div>
 
                     <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-xl border border-border/40">
                         <Button

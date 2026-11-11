@@ -1,7 +1,8 @@
 const ChatWidget = require('../models/ChatWidget');
 const ChatConversation = require('../models/ChatConversation');
 const ChatMessage = require('../models/ChatMessage');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const uuidv4 = () => crypto.randomUUID();
 
 // Widget Controller
 exports.createWidget = async (req, res) => {

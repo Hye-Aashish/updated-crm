@@ -45,7 +45,7 @@
         socket.on('connect', () => {
             console.log('Connected to chat server');
             if (conversationId) {
-                socket.emit('visitor_join', { conversationId });
+                socket.emit('visitor_join', { conversationId, token });
             }
         });
 
@@ -70,7 +70,7 @@
                 width: 60px;
                 height: 60px;
                 border-radius: 50%;
-                background-color: ${widgetConfig.primary_color};
+                background-color: ${/^#[0-9a-fA-F]{3,8}$/.test(widgetConfig.primary_color || '') ? widgetConfig.primary_color : '#0f172a'};
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                 display: flex;
                 align-items: center;
@@ -182,9 +182,9 @@
         window.id = 'crm-chat-window';
         window.innerHTML = `
             <div class="chat-header">
-                <span style="font-weight:bold">${widgetConfig.widget_name || 'Support'}</span>
+                <span id="crm-chat-title" style="font-weight:bold"></span>
                 <span style="font-size:12px;opacity:0.8">Online</span>
-                <span style="cursor:pointer" onclick="document.getElementById('crm-chat-window').classList.remove('open')">&times;</span>
+                <span style="cursor:pointer" id="crm-chat-close">&times;</span>
             </div>
             <div class="chat-messages" id="crm-chat-messages">
                 <div class="message admin">Hello! How can we help you today?</div>
@@ -198,6 +198,11 @@
         container.appendChild(window);
         container.appendChild(button);
         document.body.appendChild(container);
+
+        document.getElementById('crm-chat-title').textContent = widgetConfig.widget_name || 'Support';
+        document.getElementById('crm-chat-close').onclick = () => {
+            document.getElementById('crm-chat-window').classList.remove('open');
+        };
 
         // Event listeners
         document.getElementById('crm-chat-send').onclick = sendMessage;

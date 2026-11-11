@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const milestoneSchema = new mongoose.Schema({
     name: { type: String, required: true },
@@ -102,6 +103,7 @@ const quotationSchema = new mongoose.Schema({
         coverPageSubtitle: String
     },
     attachmentUrl: String,
+    publicToken: { type: String, index: true },
     linkedProjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
     approvedAt: Date,
     rejectedReason: String
@@ -109,8 +111,11 @@ const quotationSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Auto-generate quotation number & Calculate Totals
+// Auto-generate quotation number, public token & Calculate Totals
 quotationSchema.pre('save', async function () {
+    if (!this.publicToken) {
+        this.publicToken = crypto.randomBytes(24).toString('hex');
+    }
     // 1. Calculate Financials if not locked
     if (!this.scopeLocked) {
         this.totalAmount = this.modules

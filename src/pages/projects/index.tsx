@@ -3,7 +3,7 @@ import {
     Plus, Search, LayoutGrid, List as ListIcon, Briefcase, CheckSquare, 
     AlertTriangle, Layers, Globe, Smartphone, Clock, FileCode, ArrowUpRight, 
     Kanban, MoreVertical, Edit, Trash2, Eye, ShieldAlert, 
-    ArrowUpDown, Play, Pause, CheckCircle2
+    ArrowUpDown, Play, Pause, CheckCircle2, Server
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +19,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { usePermissions } from '@/hooks/use-permissions'
+import { isAdminOrOwnerRole, usePortalPrefix } from '@/lib/nav-utils'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ProjectService } from '@/lib/services/project.service'
 import { ClientService } from '@/lib/services/client.service'
@@ -48,8 +49,11 @@ const HEALTH_OPTIONS: { value: ProjectHealth; label: string; dotClass: string }[
 
 export function ProjectsPage() {
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const { canCreate, canDelete } = usePermissions()
+    const currentUser = useAppStore((s) => s.currentUser)
+    const canViewProjectPayments = isAdminOrOwnerRole(currentUser?.role)
     const [view, setView] = useState<'grid' | 'kanban' | 'list'>('grid')
     const [loading, setLoading] = useState(true)
     const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -213,14 +217,14 @@ export function ProjectsPage() {
 
                 {/* Quick Action Navigation Buttons */}
                 <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => navigate('/projects/developer-dashboard')} className="h-9 font-semibold text-xs border-border/80 hover:bg-accent">
+                    <Button variant="outline" size="sm" onClick={() => navigate(`${portalPrefix}/projects/developer-dashboard`)} className="h-9 font-semibold text-xs border-border/80 hover:bg-accent">
                         <FileCode className="mr-1.5 h-4 w-4 text-purple-600 dark:text-purple-400" /> Dev Workspace
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate('/projects/templates')} className="h-9 font-semibold text-xs border-border/80 hover:bg-accent">
+                    <Button variant="outline" size="sm" onClick={() => navigate(`${portalPrefix}/projects/templates`)} className="h-9 font-semibold text-xs border-border/80 hover:bg-accent">
                         <Layers className="mr-1.5 h-4 w-4 text-blue-600 dark:text-blue-400" /> Templates
                     </Button>
                     {canCreate('projects') && (
-                        <Button onClick={() => navigate('/projects/new')} className="h-9 font-bold text-xs bg-gradient-to-r from-primary to-indigo-600 text-white shadow-md hover:opacity-90">
+                        <Button onClick={() => navigate(`${portalPrefix}/projects/new`)} className="h-9 font-bold text-xs bg-gradient-to-r from-primary to-indigo-600 text-white shadow-md hover:opacity-90">
                             <Plus className="mr-1.5 h-4 w-4" /> New Project
                         </Button>
                     )}
@@ -243,9 +247,11 @@ export function ProjectsPage() {
                         <Briefcase className="h-4 w-4" />
                     </div>
                     <div className="text-2xl font-black text-foreground">{metrics.total}</div>
-                    <div className="text-[10px] text-muted-foreground font-semibold mt-1 truncate">
-                        Sum: {formatCurrency(metrics.totalBudgetSum)}
-                    </div>
+                    {canViewProjectPayments && (
+                        <div className="text-[10px] text-muted-foreground font-semibold mt-1 truncate">
+                            Sum: {formatCurrency(metrics.totalBudgetSum)}
+                        </div>
+                    )}
                 </button>
 
                 {/* IN PROGRESS */}
@@ -415,7 +421,9 @@ export function ProjectsPage() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="deadline" className="text-xs font-semibold">Sort: Deadline</SelectItem>
-                            <SelectItem value="budget" className="text-xs font-semibold">Sort: Budget</SelectItem>
+                            {canViewProjectPayments && (
+                                <SelectItem value="budget" className="text-xs font-semibold">Sort: Budget</SelectItem>
+                            )}
                             <SelectItem value="progress" className="text-xs font-semibold">Sort: Progress</SelectItem>
                             <SelectItem value="name" className="text-xs font-semibold">Sort: Name</SelectItem>
                         </SelectContent>
@@ -539,7 +547,7 @@ export function ProjectsPage() {
 
                                                 <CardTitle 
                                                     className="text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1 cursor-pointer"
-                                                    onClick={() => navigate(`/projects/${projectId}`)}
+                                                    onClick={() => navigate(`${portalPrefix}/projects/${projectId}`)}
                                                 >
                                                     {project.name}
                                                 </CardTitle>
@@ -562,7 +570,7 @@ export function ProjectsPage() {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48 text-xs font-semibold">
-                                                    <DropdownMenuItem onClick={() => navigate(`/projects/${projectId}`)}>
+                                                    <DropdownMenuItem onClick={() => navigate(`${portalPrefix}/projects/${projectId}`)}>
                                                         <Eye className="mr-2 h-3.5 w-3.5 text-primary" /> View Details
                                                     </DropdownMenuItem>
 
@@ -592,7 +600,7 @@ export function ProjectsPage() {
                                                         </DropdownMenuSubContent>
                                                     </DropdownMenuSub>
 
-                                                    <DropdownMenuItem onClick={() => navigate(`/projects/${projectId}/edit`)}>
+                                                    <DropdownMenuItem onClick={() => navigate(`${portalPrefix}/projects/${projectId}/edit`)}>
                                                         <Edit className="mr-2 h-3.5 w-3.5 text-muted-foreground" /> Edit Project
                                                     </DropdownMenuItem>
 
@@ -642,6 +650,11 @@ export function ProjectsPage() {
                                                 <Globe className="h-3 w-3" /> Web: {project.websiteStatus || 'Dev'}
                                             </Badge>
                                         )}
+                                        {project.adminPanelRequired && (
+                                            <Badge variant="outline" className="text-[9px] font-bold flex items-center gap-1 bg-amber-500/5 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-950">
+                                                <Server className="h-3 w-3" /> Admin: {project.adminPanelStatus || 'Dev'}
+                                            </Badge>
+                                        )}
                                         {project.androidRequired && (
                                             <Badge variant="outline" className="text-[9px] font-bold flex items-center gap-1 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-950">
                                                 <Smartphone className="h-3 w-3" /> Android: {project.androidStatus || 'Dev'}
@@ -655,12 +668,14 @@ export function ProjectsPage() {
                                     </div>
 
                                     {/* Footer Details */}
-                                    <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-border/40 font-medium">
-                                        <div>
-                                            <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Budget</p>
-                                            <p className="font-extrabold text-foreground">{formatCurrency(project.budget)}</p>
-                                        </div>
-                                        <div className="text-right">
+                                    <div className={`grid ${canViewProjectPayments ? 'grid-cols-2' : 'grid-cols-1'} gap-2 text-xs pt-3 border-t border-border/40 font-medium`}>
+                                        {canViewProjectPayments && (
+                                            <div>
+                                                <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Budget</p>
+                                                <p className="font-extrabold text-foreground">{formatCurrency(project.budget)}</p>
+                                            </div>
+                                        )}
+                                        <div className={canViewProjectPayments ? 'text-right' : 'flex items-center justify-between'}>
                                             <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Deadline</p>
                                             <p className={`font-bold ${isPastDue ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
                                                 {formatDate(dueDate)}
@@ -673,7 +688,7 @@ export function ProjectsPage() {
                                     <Button 
                                         variant="outline" 
                                         size="sm" 
-                                        onClick={() => navigate(`/projects/${projectId}`)} 
+                                        onClick={() => navigate(`${portalPrefix}/projects/${projectId}`)} 
                                         className="w-full text-xs font-bold h-8 border-border/60 hover:bg-primary hover:text-white transition-colors gap-1 mt-1"
                                     >
                                         Open Project Dashboard <ArrowUpRight className="h-3.5 w-3.5" />
@@ -720,7 +735,7 @@ export function ProjectsPage() {
                                             return (
                                                 <div 
                                                     key={pid}
-                                                    onClick={() => navigate(`/projects/${pid}`)}
+                                                    onClick={() => navigate(`${portalPrefix}/projects/${pid}`)}
                                                     className="bg-card p-3.5 rounded-xl border border-border/60 hover:border-primary/50 shadow-xs hover:shadow-md transition-all cursor-pointer space-y-2.5"
                                                 >
                                                     <div className="flex justify-between items-start gap-1">
@@ -747,8 +762,10 @@ export function ProjectsPage() {
                                                     </div>
 
                                                     <div className="flex items-center justify-between text-[10px] pt-1 font-bold">
-                                                        <span className="text-foreground">{formatCurrency(p.budget)}</span>
-                                                        <span className="text-muted-foreground">{formatDate(p.dueDate || p.deadline)}</span>
+                                                        {canViewProjectPayments && (
+                                                            <span className="text-foreground">{formatCurrency(p.budget)}</span>
+                                                        )}
+                                                        <span className="text-muted-foreground ml-auto">{formatDate(p.dueDate || p.deadline)}</span>
                                                     </div>
                                                 </div>
                                             )
@@ -773,7 +790,9 @@ export function ProjectsPage() {
                                     <th className="px-5 py-3.5">Health</th>
                                     <th className="px-5 py-3.5">Progress</th>
                                     <th className="px-5 py-3.5">Deliverables</th>
-                                    <th className="px-5 py-3.5">Budget</th>
+                                    {canViewProjectPayments && (
+                                        <th className="px-5 py-3.5">Budget</th>
+                                    )}
                                     <th className="px-5 py-3.5 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -787,7 +806,7 @@ export function ProjectsPage() {
                                         <tr 
                                             key={pid} 
                                             className="hover:bg-muted/30 transition-colors cursor-pointer" 
-                                            onClick={() => navigate(`/projects/${pid}`)}
+                                            onClick={() => navigate(`${portalPrefix}/projects/${pid}`)}
                                         >
                                             <td className="px-5 py-3.5">
                                                 <div className="font-bold text-sm text-foreground hover:text-primary transition-colors">
@@ -848,6 +867,11 @@ export function ProjectsPage() {
                                                             <Globe className="h-3.5 w-3.5" />
                                                         </span>
                                                     )}
+                                                    {p.adminPanelRequired && (
+                                                        <span title={`Admin Panel: ${p.adminPanelStatus || 'Dev'}`} className="p-1 rounded bg-amber-500/10 text-amber-600">
+                                                            <Server className="h-3.5 w-3.5" />
+                                                        </span>
+                                                    )}
                                                     {p.androidRequired && (
                                                         <span title={`Android: ${p.androidStatus || 'Dev'}`} className="p-1 rounded bg-emerald-500/10 text-emerald-600">
                                                             <Smartphone className="h-3.5 w-3.5" />
@@ -862,9 +886,11 @@ export function ProjectsPage() {
                                             </td>
 
                                             {/* Budget */}
-                                            <td className="px-5 py-3.5 font-bold text-foreground">
-                                                {formatCurrency(p.budget)}
-                                            </td>
+                                            {canViewProjectPayments && (
+                                                <td className="px-5 py-3.5 font-bold text-foreground">
+                                                    {formatCurrency(p.budget)}
+                                                </td>
+                                            )}
 
                                             {/* Actions */}
                                             <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
@@ -872,7 +898,7 @@ export function ProjectsPage() {
                                                     <Button 
                                                         size="sm" 
                                                         variant="ghost" 
-                                                        onClick={() => navigate(`/projects/${pid}`)}
+                                                        onClick={() => navigate(`${portalPrefix}/projects/${pid}`)}
                                                         className="h-7 w-7 p-0"
                                                         title="View Project"
                                                     >

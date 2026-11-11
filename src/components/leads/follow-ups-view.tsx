@@ -13,7 +13,7 @@ interface FollowUpsViewProps {
     onUpdate: (updatedLead: Lead) => void
     onOpenFollowUp: (lead: Lead) => void
     onDelete: (leadId: string) => void
-    onAddActivity: (leadId: string, content: string) => Promise<any>
+    onAddActivity: (leadId: string, content: string, outcome?: string) => Promise<any>
 }
 
 export function FollowUpsView({ leads, stages, onUpdate, onOpenFollowUp, onDelete, onAddActivity }: FollowUpsViewProps) {

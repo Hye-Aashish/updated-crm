@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Domain = require('../models/Domain');
 const Invoice = require('../models/Invoice');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
@@ -15,16 +16,25 @@ const getNextInvoiceNumber = async () => {
 // GET Domain & Hosting stats summary
 router.get('/stats/summary', protect, async (req, res, next) => {
     try {
+        let baseFilter = {};
+        if (req.user.role === 'client') {
+            if (!req.user.clientId || !mongoose.Types.ObjectId.isValid(req.user.clientId)) {
+                return res.json({ total: 0, active: 0, expiringSoon: 0, expired: 0, totalCost: 0 });
+            }
+            baseFilter = { clientId: new mongoose.Types.ObjectId(String(req.user.clientId)) };
+        }
+
         const [total, active, expiringSoon, expired] = await Promise.all([
-            Domain.countDocuments(),
-            Domain.countDocuments({ status: 'active' }),
-            Domain.countDocuments({ status: 'expiring-soon' }),
-            Domain.countDocuments({ status: 'expired' })
+            Domain.countDocuments(baseFilter),
+            Domain.countDocuments({ ...baseFilter, status: 'active' }),
+            Domain.countDocuments({ ...baseFilter, status: 'expiring-soon' }),
+            Domain.countDocuments({ ...baseFilter, status: 'expired' })
         ]);
 
-        const totalCostResult = await Domain.aggregate([
-            { $group: { _id: null, total: { $sum: '$amount' } } }
-        ]);
+        const costPipeline = [];
+        if (Object.keys(baseFilter).length > 0) costPipeline.push({ $match: baseFilter });
+        costPipeline.push({ $group: { _id: null, total: { $sum: '$amount' } } });
+        const totalCostResult = await Domain.aggregate(costPipeline);
 
         res.json({
             total,
@@ -107,6 +117,13 @@ router.get('/:id', protect, async (req, res, next) => {
             .populate('clientId', 'name email phone company')
             .populate('invoices', 'invoiceNumber total status date dueDate type');
         if (!domainRecord) return res.status(404).json({ message: 'Record not found' });
+        if (req.user.role === 'client') {
+            const own = req.user.clientId?.toString?.() || '';
+            const recClientId = domainRecord.clientId?._id?.toString?.() || domainRecord.clientId?.toString?.() || '';
+            if (!own || own !== recClientId) {
+                return res.status(403).json({ message: 'Not authorized to view this domain record' });
+            }
+        }
         res.json(domainRecord);
     } catch (err) {
         next(err);
@@ -119,7 +136,15 @@ router.put('/:id', protect, checkPermission('domains', 'edit'), async (req, res,
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
         }
-        const updated = await Domain.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
+        const allowedFields = [
+            'domainName', 'type', 'provider', 'clientId', 'projectId',
+            'purchaseDate', 'expiryDate', 'amount', 'status', 'autoRenew', 'notes'
+        ];
+        const safeUpdate = { updatedAt: new Date() };
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) safeUpdate[field] = req.body[field];
+        }
+        const updated = await Domain.findByIdAndUpdate(req.params.id, safeUpdate, { new: true, runValidators: true })
             .populate('projectId', 'name status')
             .populate('clientId', 'name email company')
             .populate('invoices', 'invoiceNumber total status date');
@@ -133,6 +158,9 @@ router.put('/:id', protect, checkPermission('domains', 'edit'), async (req, res,
 // DELETE domain
 router.delete('/:id', protect, checkPermission('domains', 'delete'), async (req, res, next) => {
     try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
         const deleted = await Domain.findByIdAndDelete(req.params.id);
         if (!deleted) return res.status(404).json({ message: 'Record not found' });
         res.json({ message: 'Record deleted successfully' });

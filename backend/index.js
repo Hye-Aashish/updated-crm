@@ -26,6 +26,7 @@ if (!process.env.JWT_SECRET) {
 
 // Initialize app
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 const allowedOrigins = [
@@ -81,30 +82,36 @@ app.use(cors({
 }));
 
 // 2.5 Rate Limiting — Prevent brute-force and abuse
+const isDev = process.env.NODE_ENV !== 'production';
+const skipLocalOrOptions = (req) => isDev || req.method === 'OPTIONS';
+
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500, // 500 requests per window per IP
+    max: isDev ? 10000 : 500, // 500 requests per window per IP
     message: { message: 'Too many requests, please try again later.' },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    skip: skipLocalOrOptions
 });
 app.use('/api', globalLimiter);
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: process.env.NODE_ENV === 'production' ? 10 : 500,
+    max: isDev ? 1000 : 20,
     message: { message: 'Too many login attempts. Please try again after 15 minutes.' },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    skip: skipLocalOrOptions
 });
 app.use('/api/auth/login', authLimiter);
 
 const publicEndpointLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 60, // 60 requests per minute
+    max: isDev ? 1000 : 60, // 60 requests per minute
     message: { message: 'Rate limit exceeded.' },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    skip: skipLocalOrOptions
 });
 app.use('/api/tracking', publicEndpointLimiter);
 app.use('/api/lead-forms/public', publicEndpointLimiter);
@@ -113,8 +120,13 @@ app.use('/api/whatsapp/webhook', publicEndpointLimiter);
 app.use('/api/invoices/public', publicEndpointLimiter);
 app.use('/api/clients/public', publicEndpointLimiter);
 
-// 3. Body parser with limits
-app.use(express.json({ limit: '10mb' }));
+// 3. Body parser with limits & rawBody capture for webhook HMAC verification
+app.use(express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // 4. NoSQL Injection Prevention — custom sanitizer (express-mongo-sanitize not compatible with Express 5)
@@ -206,16 +218,24 @@ const routes = {
     'credit-notes': require('./routes/creditNoteRoutes'),
     'vendor-bills': require('./routes/vendorBillRoutes'),
     'finance-reports': require('./routes/financeReportRoutes'),
-    calendar: require('./routes/calendarRoutes')
+    calendar: require('./routes/calendarRoutes'),
+    'work-audit': require('./routes/workAuditRoutes')
 };
 
 Object.entries(routes).forEach(([path, handler]) => {
     app.use(`/api/${path}`, handler);
 });
 
-// Serve static widget file
-app.use('/public', express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+// Serve static widget/public branding files with hardening headers
+const staticSecurityHeaders = (res, filePath) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    const ext = path.extname(filePath).toLowerCase();
+    if (!['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf', '.mp4', '.mp3', '.wav'].includes(ext)) {
+        res.setHeader('Content-Disposition', 'attachment');
+    }
+};
+app.use('/public', express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore', setHeaders: staticSecurityHeaders }));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), { dotfiles: 'ignore', setHeaders: staticSecurityHeaders }));
 
 app.get('/', (req, res) => res.send('Nexprism CRM API v1.0 - Operational'));
 

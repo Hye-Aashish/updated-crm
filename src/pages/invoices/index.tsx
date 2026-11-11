@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { usePermissions } from '@/hooks/use-permissions'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { usePortalPrefix } from '@/lib/nav-utils'
 import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
 import type { Invoice } from '@/types'
@@ -33,6 +34,7 @@ import { appConfirm } from '@/lib/app-dialog'
 
 export function InvoicesPage() {
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { canCreate, canEdit, canDelete } = usePermissions()
     const { toast } = useToast()
     const { invoices, clients, currentUser, setInvoices, setClients } = useAppStore()
@@ -225,7 +227,7 @@ export function InvoicesPage() {
                     <p className="text-muted-foreground mt-1">Manage billing and payments.</p>
                 </div>
                 {canCreate('invoices') && (
-                    <Button onClick={() => navigate('/invoices/new')}>
+                    <Button onClick={() => navigate(`${portalPrefix}/invoices/new`)}>
                         <Plus className="mr-2 h-4 w-4" /> Create Invoice
                     </Button>
                 )}
@@ -300,7 +302,7 @@ export function InvoicesPage() {
                                             <p className="text-sm text-muted-foreground">Try adjusting your search or filters.</p>
                                         </div>
                                         {['owner', 'admin'].includes(currentUser?.role || '') && (
-                                            <Button variant="outline" size="sm" onClick={() => navigate('/invoices/new')} className="mt-2 text-primary border-primary/20 hover:bg-primary/5">
+                                            <Button variant="outline" size="sm" onClick={() => navigate(`${portalPrefix}/invoices/new`)} className="mt-2 text-primary border-primary/20 hover:bg-primary/5">
                                                 Create First Invoice
                                             </Button>
                                         )}
@@ -311,7 +313,7 @@ export function InvoicesPage() {
                             filteredInvoices.map((invoice) => {
                                 const client = clients.find((c) => c.id === invoice.clientId)
                                 return (
-                                    <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/30 transition-colors border-border/50" onClick={() => navigate(`/invoices/${invoice.id}`)}>
+                                    <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/30 transition-colors border-border/50" onClick={() => navigate(`${portalPrefix}/invoices/${invoice.id}`)}>
                                         <TableCell className="font-bold text-foreground">{invoice.number}</TableCell>
                                         <TableCell className="text-muted-foreground font-medium">{client?.name || 'Unknown'}</TableCell>
                                         <TableCell className="text-muted-foreground/80">{formatDate(invoice.date)}</TableCell>
@@ -340,7 +342,7 @@ export function InvoicesPage() {
                                                         className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-bold"
                                                         onClick={(e) => {
                                                             e.stopPropagation()
-                                                            navigate(`/invoices/${invoice.id}`)
+                                                            navigate(`${portalPrefix}/invoices/${invoice.id}`)
                                                         }}
                                                     >
                                                         <CreditCard className="h-4 w-4 mr-1" />
@@ -437,7 +439,7 @@ export function InvoicesPage() {
                                                     variant="ghost"
                                                     size="sm"
                                                     className="h-8 font-medium"
-                                                    onClick={() => navigate(`/invoices/${invoice.id}`)}
+                                                    onClick={() => navigate(`${portalPrefix}/invoices/${invoice.id}`)}
                                                 >
                                                     View
                                                 </Button>

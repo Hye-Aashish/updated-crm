@@ -1,8 +1,45 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Task = require('../models/Task');
 const Project = require('../models/Project');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const { assertProjectAccess } = require('../utils/assertAccess');
+
+const normalizeTaskRole = (role) => String(role || '').trim().toLowerCase();
+
+const canManageProjectTask = async (req, task) => {
+    const userId = req.user._id.toString();
+    if (task.creatorId?.toString() === userId || task.assigneeId?.toString() === userId) {
+        return true;
+    }
+    if (normalizeTaskRole(req.user.role) === 'pm' && task.projectId) {
+        const project = await Project.findById(task.projectId).select('pmId');
+        if (project && project.pmId?.toString() === userId) {
+            return true;
+        }
+    }
+    return false;
+};
+
+const canAccessTask = async (req, task) => {
+    if (!req.user || !task) return { ok: false, status: 401, message: 'Not authorized' };
+    if (req.user.role === 'admin' || req.user.role === 'owner') return { ok: true };
+    if (req.user.role === 'client') {
+        const project = await Project.findById(task.projectId);
+        if (!project || String(project.clientId || '') !== String(req.user.clientId || '')) {
+            return { ok: false, status: 403, message: 'Not authorized' };
+        }
+        return { ok: true };
+    }
+    const userId = req.user._id.toString();
+    if (task.creatorId === userId || task.assigneeId === userId) return { ok: true };
+    if (task.projectId) {
+        const project = await Project.findById(task.projectId);
+        if (project) return await assertProjectAccess(req, project);
+    }
+    return { ok: false, status: 403, message: 'Not authorized to access this task' };
+};
 
 // Helper to update project progress
 const updateProjectProgress = async (projectId) => {
@@ -31,13 +68,17 @@ router.get('/my-day', protect, async (req, res) => {
         end.setHours(23, 59, 59, 999);
 
         const tasks = await Task.find({
-            parentId: { $in: [null, undefined, ''] },
-            status: { $nin: ['done', 'completed'] },
-            $or: [
-                { assigneeId: userId, dueDate: { $lte: end } },
-                { assigneeId: userId, starred: true },
-                { creatorId: userId, dueDate: { $lte: end } },
-                { creatorId: userId, starred: true }
+            $and: [
+                { $or: [{ parentId: { $exists: false } }, { parentId: null }, { parentId: '' }] },
+                { status: { $nin: ['done', 'completed'] } },
+                {
+                    $or: [
+                        { assigneeId: userId, dueDate: { $lte: end } },
+                        { assigneeId: userId, starred: true },
+                        { creatorId: userId, dueDate: { $lte: end } },
+                        { creatorId: userId, starred: true }
+                    ]
+                }
             ]
         }).sort({ dueDate: 1, priority: -1 });
 
@@ -50,6 +91,11 @@ router.get('/my-day', protect, async (req, res) => {
 // Subtasks for a parent
 router.get('/:id/subtasks', protect, async (req, res) => {
     try {
+        const parent = await Task.findById(req.params.id);
+        if (!parent) return res.status(404).json({ message: 'Parent task not found' });
+        const access = await canAccessTask(req, parent);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         const subtasks = await Task.find({ parentId: req.params.id }).sort({ createdAt: 1 });
         res.json(subtasks);
     } catch (err) {
@@ -59,8 +105,14 @@ router.get('/:id/subtasks', protect, async (req, res) => {
 
 router.post('/:id/subtasks', protect, async (req, res) => {
     try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients are not permitted to create subtasks' });
+        }
         const parent = await Task.findById(req.params.id);
         if (!parent) return res.status(404).json({ message: 'Parent task not found' });
+        const access = await canAccessTask(req, parent);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         const sub = await Task.create({
             title: req.body.title || 'Subtask',
             description: req.body.description || '',
@@ -82,41 +134,38 @@ router.post('/:id/subtasks', protect, async (req, res) => {
 // GET all tasks (optional filter by projectId)
 router.get('/', protect, async (req, res) => {
     try {
-        const filter = {};
-        if (req.query.projectId) filter.projectId = req.query.projectId;
-        if (req.query.assigneeId) filter.assigneeId = req.query.assigneeId;
+        const conditions = [];
+        if (req.query.projectId) conditions.push({ projectId: req.query.projectId });
+        if (req.query.assigneeId) conditions.push({ assigneeId: req.query.assigneeId });
         // Board default: hide subtasks unless explicitly requested
         if (req.query.includeSubtasks !== 'true') {
-            filter.$or = [{ parentId: { $exists: false } }, { parentId: null }, { parentId: '' }];
+            conditions.push({ $or: [{ parentId: { $exists: false } }, { parentId: null }, { parentId: '' }] });
         }
 
-        // RBAC Logic
-        const user = req.user;
-        if (user.role === 'client') {
-            const myProjects = await Project.find({ clientId: user.clientId }).select('_id');
+        const role = normalizeTaskRole(req.user.role);
+        if (role === 'client') {
+            const myProjects = await Project.find({ clientId: req.user.clientId }).select('_id');
             const myProjectIds = myProjects.map(p => p._id.toString());
-            const filterWithClient = { ...filter, projectId: { $in: myProjectIds } };
-            const tasks = await Task.find(filterWithClient).sort({ createdAt: -1 });
-            return res.json(tasks);
+            conditions.push({ projectId: { $in: myProjectIds } });
+        } else if (role !== 'admin' && role !== 'owner') {
+            const userId = req.user._id.toString();
+            // Staff see tasks assigned to them or created by them; PMs also see tasks in projects they manage
+            const aclOr = [
+                { creatorId: userId },
+                { assigneeId: userId }
+            ];
+            if (role === 'pm') {
+                const managedProjects = await Project.find({ pmId: userId }).select('_id');
+                const managedProjectIds = managedProjects.map(p => p._id.toString());
+                if (managedProjectIds.length > 0) {
+                    aclOr.push({ projectId: { $in: managedProjectIds } });
+                }
+            }
+            conditions.push({ $or: aclOr });
         }
 
-        if (user.role !== 'admin' && user.role !== 'owner') {
-            const userId = user._id.toString();
-
-            // Employee and developer roles can only see tasks they created.
-            // If creatorId is not set, we fall back to checking if assigneeId is the user.
-            const aclQuery = {
-                $or: [
-                    { creatorId: userId },
-                    { creatorId: { $exists: false }, assigneeId: userId }
-                ]
-            };
-
-            const tasks = await Task.find({ $and: [filter, aclQuery] }).sort({ createdAt: -1 });
-            return res.json(tasks);
-        }
-
-        const tasks = await Task.find(filter).sort({ createdAt: -1 });
+        const query = conditions.length > 0 ? { $and: conditions } : {};
+        const tasks = await Task.find(query).sort({ createdAt: -1 });
         res.json(tasks);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -255,6 +304,24 @@ router.get('/activities', protect, async (req, res) => {
     }
 });
 
+const notifyTaskAssignee = async (task, actor, isReassign = false) => {
+    try {
+        const assigneeId = task.assigneeId?.toString();
+        if (!assigneeId || !mongoose.Types.ObjectId.isValid(assigneeId)) return;
+        if (String(assigneeId) === String(actor._id)) return;
+        const Notification = require('../models/Notification');
+        await Notification.create({
+            userId: assigneeId,
+            title: isReassign ? 'Task Assigned to You' : 'New Task Assigned',
+            message: `${actor.name || 'Admin'} assigned task "${task.title}" to you.`,
+            type: 'new_task',
+            relatedId: task._id.toString()
+        });
+    } catch (nErr) {
+        console.error('Notif Error:', nErr);
+    }
+};
+
 // GET single task
 router.get('/:id', protect, async (req, res) => {
     try {
@@ -262,18 +329,15 @@ router.get('/:id', protect, async (req, res) => {
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
         // RBAC Check
-        if (req.user.role === 'client') {
+        const role = normalizeTaskRole(req.user.role);
+        if (role === 'client') {
             const project = await Project.findById(task.projectId);
-            if (!project || project.clientId !== req.user.clientId) {
+            if (!project || String(project.clientId || '') !== String(req.user.clientId || '')) {
                 return res.status(403).json({ message: 'Not authorized' });
             }
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-            const userId = req.user._id.toString();
-            
-            const isCreator = task.creatorId === userId;
-            const isLegacyAssignee = !task.creatorId && task.assigneeId === userId;
-
-            if (!isCreator && !isLegacyAssignee) {
+        } else if (role !== 'admin' && role !== 'owner') {
+            const allowed = await canManageProjectTask(req, task);
+            if (!allowed) {
                 return res.status(403).json({ message: 'Not authorized to view this task' });
             }
         }
@@ -287,8 +351,19 @@ router.get('/:id', protect, async (req, res) => {
 // CREATE a new task
 router.post('/', protect, async (req, res) => {
     try {
+        const role = normalizeTaskRole(req.user.role);
+        if (role === 'client') {
+            return res.status(403).json({ message: 'Clients are not permitted to create internal tasks' });
+        }
+        if (req.body.projectId && role !== 'admin' && role !== 'owner') {
+            const project = await Project.findById(req.body.projectId);
+            if (!project) return res.status(404).json({ message: 'Project not found' });
+            const access = await assertProjectAccess(req, project);
+            if (!access.ok) return res.status(access.status).json({ message: access.message });
+        }
+
         // Enforce shift (attendance) or timer check for non-admin/owner roles
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        if (role !== 'admin' && role !== 'owner') {
             const TimeEntry = require('../models/TimeEntry');
             const Attendance = require('../models/Attendance');
 
@@ -325,6 +400,9 @@ router.post('/', protect, async (req, res) => {
             ...req.body,
             creatorId: req.user._id.toString()
         };
+        if (!taskData.assigneeId) {
+            delete taskData.assigneeId;
+        }
         if (!taskData.slaDueAt && taskData.priority) {
             const hours = { urgent: 8, high: 24, medium: 72, low: 168 }[taskData.priority] || 72;
             taskData.slaDueAt = new Date(Date.now() + hours * 60 * 60 * 1000);
@@ -345,7 +423,7 @@ router.post('/', protect, async (req, res) => {
             const TaskActivity = require('../models/TaskActivity');
             const User = require('../models/User');
             let assigneeName = '';
-            if (newTask.assigneeId) {
+            if (newTask.assigneeId && mongoose.Types.ObjectId.isValid(newTask.assigneeId)) {
                 const assignee = await User.findById(newTask.assigneeId);
                 if (assignee) assigneeName = assignee.name;
             }
@@ -365,16 +443,8 @@ router.post('/', protect, async (req, res) => {
             console.error('Task activity creation error:', actErr);
         }
 
-        // Trigger Notification
-        try {
-            const Notification = require('../models/Notification');
-            await Notification.create({
-                title: 'New Task Assigned',
-                message: `A new task "${newTask.title}" has been created.`,
-                type: 'new_task',
-                relatedId: newTask._id
-            });
-        } catch (nErr) { console.error('Notif Error:', nErr); }
+        // Trigger Notification for assignee
+        await notifyTaskAssignee(newTask, req.user, false);
 
         res.status(201).json(newTask);
     } catch (err) {
@@ -389,9 +459,10 @@ router.put('/:id', protect, async (req, res) => {
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
         // RBAC Check
-        if (req.user.role === 'client') {
+        const role = normalizeTaskRole(req.user.role);
+        if (role === 'client') {
             const project = await Project.findById(task.projectId);
-            if (!project || project.clientId !== req.user.clientId) {
+            if (!project || String(project.clientId || '') !== String(req.user.clientId || '')) {
                 return res.status(403).json({ message: 'Not authorized' });
             }
             if (req.body.status && req.body.status !== task.status) {
@@ -433,14 +504,10 @@ router.put('/:id', protect, async (req, res) => {
                     delete req.body[key];
                 }
             }
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-            const userId = req.user._id.toString();
-
-            const isCreator = task.creatorId === userId;
-            const isLegacyAssignee = !task.creatorId && task.assigneeId?.toString() === userId;
-
-            if (!isCreator && !isLegacyAssignee) {
-                console.warn(`Unauthorized task update attempt by user ${userId} on task ${req.params.id}. Roles: ${req.user.role}`);
+        } else if (role !== 'admin' && role !== 'owner') {
+            const allowed = await canManageProjectTask(req, task);
+            if (!allowed) {
+                console.warn(`Unauthorized task update attempt by user ${req.user._id.toString()} on task ${req.params.id}. Roles: ${req.user.role}`);
                 return res.status(403).json({ message: 'Not authorized to update this task' });
             }
         }
@@ -524,12 +591,33 @@ router.put('/:id', protect, async (req, res) => {
             req.body.slaDueAt = new Date(Date.now() + hours * 60 * 60 * 1000);
         }
 
-        const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, {
+        const editableFields = [
+            'title', 'description', 'status', 'priority', 'assigneeId', 'dueDate',
+            'estimatedHours', 'labels', 'attachments', 'checklist', 'starred',
+            'recurrence', 'ticketId', 'slaDueAt',
+            'isTimerRunning', 'totalTimeSpent', 'lastStartTime', 'timeEntryId'
+        ];
+        if (role === 'admin' || role === 'owner') {
+            editableFields.push('projectId');
+        }
+        const safeUpdate = { updatedAt: new Date() };
+        for (const field of editableFields) {
+            if (req.body[field] !== undefined) safeUpdate[field] = req.body[field];
+        }
+
+        const updatedTask = await Task.findByIdAndUpdate(req.params.id, safeUpdate, {
             new: true,
             runValidators: true
         });
-        // Recalculate progress for the project
+        // Recalculate progress for the project(s)
         await updateProjectProgress(updatedTask.projectId);
+        if (task.projectId && String(task.projectId) !== String(updatedTask.projectId || '')) {
+            await updateProjectProgress(task.projectId);
+        }
+
+        if (safeUpdate.assigneeId && String(safeUpdate.assigneeId) !== String(task.assigneeId || '')) {
+            await notifyTaskAssignee(updatedTask, req.user, true);
+        }
 
         // @mentions in description → in-app notifications
         try {
@@ -568,16 +656,22 @@ router.delete('/:id', protect, async (req, res) => {
         const task = await Task.findById(req.params.id);
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
-        // RBAC Check (Only Admin/Owner/PM can delete)
-        if (req.user.role === 'client') {
+        // RBAC Check (Only Admin/Owner/Creator/Project PM can delete)
+        const deleteRole = normalizeTaskRole(req.user.role);
+        if (deleteRole === 'client') {
             return res.status(403).json({ message: 'Clients cannot delete tasks' });
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        } else if (deleteRole !== 'admin' && deleteRole !== 'owner') {
             const userId = req.user._id.toString();
 
-            const isCreator = task.creatorId === userId;
+            const isCreator = task.creatorId?.toString() === userId;
             const isLegacyAssignee = !task.creatorId && task.assigneeId?.toString() === userId;
+            let isProjectPM = false;
+            if (deleteRole === 'pm' && task.projectId) {
+                const proj = await Project.findById(task.projectId).select('pmId');
+                isProjectPM = !!(proj && proj.pmId?.toString() === userId);
+            }
 
-            if (!isCreator && !isLegacyAssignee) {
+            if (!isCreator && !isLegacyAssignee && !isProjectPM) {
                 return res.status(403).json({ message: 'Not authorized to delete this task' });
             }
         }

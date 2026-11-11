@@ -9,7 +9,7 @@ interface LeadDetailsDialogProps {
     onUpdate: (updatedLead: Lead) => void
     onOpenFollowUp?: (lead: Lead) => void
     onDelete: (leadId: string) => void
-    onAddActivity: (leadId: string, content: string) => Promise<any>
+    onAddActivity: (leadId: string, content: string, outcome?: string) => Promise<any>
     isAdminOrOwner?: boolean
     users?: User[]
     onAssignLead?: (leadId: string, userId: string, userName: string) => Promise<any>

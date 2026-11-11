@@ -6,6 +6,7 @@ const Project = require('../models/Project');
 const sendEmail = require('../utils/sendEmail');
 const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 const { assertInvoiceAccess } = require('../utils/assertAccess');
+const { timingSafeEqualStr } = require('../utils/securityHelpers');
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -632,6 +633,7 @@ router.post('/payment/webhook', async (req, res) => {
 
         // Verify webhook signature (REQUIRED for security)
         const signature = req.headers['x-webhook-signature'];
+        const timestamp = req.headers['x-webhook-timestamp'];
         const Setting = require('../models/Setting');
         const settings = await Setting.findOne({ type: 'general' });
         const secret = settings?.billing?.cashfreeClientSecret || process.env.CASHFREE_CLIENT_SECRET;
@@ -644,8 +646,10 @@ router.post('/payment/webhook', async (req, res) => {
             console.warn('[SECURITY] Webhook rejected: missing signature header');
             return res.status(401).send('Missing webhook signature');
         }
-        const expectedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('base64');
-        if (signature !== expectedSignature) {
+        const rawPayload = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
+        const signedPayload = timestamp ? `${timestamp}${rawPayload}` : rawPayload;
+        const expectedSignature = crypto.createHmac('sha256', secret).update(signedPayload).digest('base64');
+        if (!timingSafeEqualStr(String(signature), expectedSignature)) {
             console.warn('[SECURITY] Invalid webhook signature rejected');
             return res.status(401).send('Invalid signature');
         }
@@ -653,32 +657,34 @@ router.post('/payment/webhook', async (req, res) => {
         // Cashfree can send webhook in different formats depending on version/config
         const orderId = req.body.data?.order?.order_id || req.body.order_id;
         const paymentStatus = req.body.data?.payment?.payment_status || req.body.order_status;
+        const paidAmount = Number(
+            req.body.data?.payment?.payment_amount ??
+            req.body.data?.order?.order_amount ??
+            req.body.order_amount
+        );
 
         if (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') {
-            const invoice = await Invoice.findOne({ cashfreeOrderId: orderId });
+            let targetInvoice = await Invoice.findOne({ cashfreeOrderId: orderId });
 
-            if (!invoice) {
-                // Fallback: try finding by part of order ID if prefix used
-                // orderId might be like INV_123_167823...
+            if (!targetInvoice) {
                 const parts = (orderId || '').split('_');
                 if (parts.length >= 2) {
                     const invNo = parts[1];
-                    const invByNo = await Invoice.findOne({ invoiceNumber: invNo });
-                    if (invByNo && invByNo.status !== 'paid') {
-                        invByNo.status = 'paid';
-                        invByNo.paidDate = new Date();
-                        await invByNo.save();
-                        console.log(`[PAYMENT] Invoice #${invByNo.invoiceNumber} paid (via fallback lookup)`);
-                        return res.status(200).send('OK');
-                    }
+                    targetInvoice = await Invoice.findOne({ invoiceNumber: invNo });
                 }
             }
 
-            if (invoice && invoice.status !== 'paid') {
-                invoice.status = 'paid';
-                invoice.paidDate = new Date();
-                await invoice.save();
-                console.log(`[PAYMENT] Invoice #${invoice.invoiceNumber} paid via Cashfree Webhook`);
+            if (targetInvoice && targetInvoice.status !== 'paid') {
+                const remainingDue = Math.max(0, Number(targetInvoice.total || 0) - Number(targetInvoice.amountPaid || 0));
+                if (!Number.isFinite(paidAmount) || paidAmount <= 0 || paidAmount < (remainingDue - 0.01)) {
+                    console.warn(`[SECURITY] Cashfree payment amount mismatch for Invoice #${targetInvoice.invoiceNumber}: paid=${paidAmount}, expected>=${remainingDue}`);
+                    return res.status(400).send('Payment amount verification failed');
+                }
+                targetInvoice.status = 'paid';
+                targetInvoice.amountPaid = targetInvoice.total;
+                targetInvoice.paidDate = new Date();
+                await targetInvoice.save();
+                console.log(`[PAYMENT] Invoice #${targetInvoice.invoiceNumber} paid via Cashfree Webhook`);
             }
         }
 

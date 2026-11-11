@@ -2,10 +2,15 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure upload directory exists
+// Ensure upload directories exist
 const uploadDir = path.join(__dirname, '../public/uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const privateUploadDir = path.join(__dirname, '../private/uploads');
+if (!fs.existsSync(privateUploadDir)) {
+    fs.mkdirSync(privateUploadDir, { recursive: true });
 }
 
 // Allowed file extensions whitelist
@@ -29,9 +34,9 @@ const ALLOWED_MIMES = [
     'video/mp4', 'audio/mpeg', 'audio/wav',
 ];
 
-const storage = multer.diskStorage({
+const makeStorage = (dir) => multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, uploadDir);
+        cb(null, dir);
     },
     filename: function (req, file, cb) {
         // Sanitize the original filename to prevent path traversal
@@ -52,13 +57,20 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-const upload = multer({
-    storage: storage,
+const commonOptions = {
     limits: {
         fileSize: 50 * 1024 * 1024,  // 50MB limit to match frontend UI
         files: 5                       // Max 5 files per request
     },
     fileFilter: fileFilter
-});
+};
+
+const upload = multer({ storage: makeStorage(uploadDir), ...commonOptions });
+const uploadPrivate = multer({ storage: makeStorage(privateUploadDir), ...commonOptions });
+
+upload.upload = upload;
+upload.uploadPrivate = uploadPrivate;
+upload.uploadDir = uploadDir;
+upload.privateUploadDir = privateUploadDir;
 
 module.exports = upload;

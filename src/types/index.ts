@@ -284,6 +284,10 @@ export interface Project {
     iosBuildNumber?: string
 
     adminPanelRequired?: boolean
+    adminPanelStatus?: 'not-started' | 'development' | 'testing' | 'ready' | 'deployed' | 'live' | 'down'
+    adminPanelUrl?: string
+    adminPanelStagingUrl?: string
+    adminPanelVersion?: string
     apiRequired?: boolean
     hostingRequired?: boolean
     maintenanceRequired?: boolean
@@ -341,6 +345,9 @@ export interface Task {
     isTimerRunning?: boolean
     timeEntryId?: string
     ticketId?: string
+    creatorId?: string
+    starred?: boolean
+    slaDueAt?: Date
 
     createdAt: Date
     updatedAt: Date

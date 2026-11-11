@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { PageSkeleton } from './components/ui/page-skeleton'
 
 // Layouts
@@ -85,23 +85,50 @@ const VendorBillsPage = lazy(() => import('./pages/finance/vendor-bills'))
 const GstReportPage = lazy(() => import('./pages/finance/gst-report'))
 const CreditNotesPage = lazy(() => import('./pages/finance/credit-notes'))
 const CalendarPage = lazy(() => import('./pages/calendar').then(m => ({ default: m.CalendarPage })))
+const WorkAuditPage = lazy(() => import('./pages/work-audit').then(m => ({ default: m.WorkAuditPage })))
 
 import { usePermissions } from './hooks/use-permissions'
 import { useAppStore } from './store'
+import { normalizeRoleKey, isAdminOrOwnerRole } from './lib/nav-utils'
 
 function PermissionGuard({ module, children }: { module: string; children: React.ReactNode }) {
     const { canView, loading } = usePermissions()
     const { currentUser } = useAppStore()
+    const location = useLocation()
 
     if (loading) {
         return <PageSkeleton />
     }
 
     if (!canView(module)) {
-        if (currentUser?.role === 'client') {
+        const roleKey = normalizeRoleKey(currentUser?.role)
+        if (roleKey === 'client') {
             return <Navigate to="/client/dashboard" replace />
         }
-        if (currentUser?.role === 'employee' || currentUser?.role === 'developer' || currentUser?.role === 'pm') {
+        if (roleKey === 'employee' || location.pathname.startsWith('/employee')) {
+            return <Navigate to="/employee/dashboard" replace />
+        }
+        return <Navigate to="/dashboard" replace />
+    }
+
+    return <>{children}</>
+}
+
+function AdminOnlyGuard({ children }: { children: React.ReactNode }) {
+    const { loading } = usePermissions()
+    const { currentUser } = useAppStore()
+    const location = useLocation()
+
+    if (loading || !currentUser) {
+        return <PageSkeleton />
+    }
+
+    if (!isAdminOrOwnerRole(currentUser?.role)) {
+        const roleKey = normalizeRoleKey(currentUser?.role)
+        if (roleKey === 'client') {
+            return <Navigate to="/client/dashboard" replace />
+        }
+        if (roleKey === 'employee' || location.pathname.startsWith('/employee')) {
             return <Navigate to="/employee/dashboard" replace />
         }
         return <Navigate to="/dashboard" replace />
@@ -132,15 +159,15 @@ export function AppRoutes() {
                 {/* Dashboard Routes */}
                 <Route path="/" element={<DashboardLayout />}>
                     <Route index element={<Navigate to="/dashboard" replace />} />
-                    <Route path="dashboard" element={<DashboardPage />} />
-                    <Route path="calendar" element={<CalendarPage />} />
-                    <Route path="sales-dashboard" element={<PermissionGuard module="leads"><SalesDashboardPage /></PermissionGuard>} />
+                    <Route path="dashboard" element={<PermissionGuard module="dashboard"><DashboardPage /></PermissionGuard>} />
+                    <Route path="calendar" element={<PermissionGuard module="calendar"><CalendarPage /></PermissionGuard>} />
+                    <Route path="sales-dashboard" element={<PermissionGuard module="sales_dashboard"><SalesDashboardPage /></PermissionGuard>} />
 
                     {/* Core Functionality */}
                     <Route path="attendance" element={<PermissionGuard module="attendance"><AttendancePage /></PermissionGuard>} />
                     <Route path="leads" element={<PermissionGuard module="leads"><LeadsPage /></PermissionGuard>} />
-                    <Route path="sales/automations" element={<PermissionGuard module="leads"><SalesAutomationsPage /></PermissionGuard>} />
-                    <Route path="sales/contracts" element={<PermissionGuard module="leads"><ContractsVaultPage /></PermissionGuard>} />
+                    <Route path="sales/automations" element={<PermissionGuard module="sales_automations"><SalesAutomationsPage /></PermissionGuard>} />
+                    <Route path="sales/contracts" element={<PermissionGuard module="contracts"><ContractsVaultPage /></PermissionGuard>} />
                     <Route path="clients" element={<PermissionGuard module="clients"><ClientsPage /></PermissionGuard>} />
                     <Route path="clients/new" element={<PermissionGuard module="clients"><NewClientPage /></PermissionGuard>} />
                     <Route path="clients/:id" element={<PermissionGuard module="clients"><ClientDetailPage /></PermissionGuard>} />
@@ -149,21 +176,21 @@ export function AppRoutes() {
                     <Route path="projects" element={<PermissionGuard module="projects"><ProjectsPage /></PermissionGuard>} />
                     <Route path="projects/new" element={<PermissionGuard module="projects"><NewProjectPage /></PermissionGuard>} />
                     <Route path="projects/developer-dashboard" element={<PermissionGuard module="projects"><DeveloperDashboardPage /></PermissionGuard>} />
-                    <Route path="projects/templates" element={<PermissionGuard module="projects"><ProjectTemplatesPage /></PermissionGuard>} />
+                    <Route path="projects/templates" element={<PermissionGuard module="templates"><ProjectTemplatesPage /></PermissionGuard>} />
                     <Route path="projects/:id" element={<PermissionGuard module="projects"><ProjectDetailPage /></PermissionGuard>} />
                     <Route path="projects/:id/edit" element={<PermissionGuard module="projects"><EditProjectPage /></PermissionGuard>} />
 
-                    <Route path="products" element={<PermissionGuard module="projects"><ProductsPage /></PermissionGuard>} />
+                    <Route path="products" element={<PermissionGuard module="products"><ProductsPage /></PermissionGuard>} />
 
                     <Route path="tasks" element={<PermissionGuard module="tasks"><TasksPage /></PermissionGuard>} />
-                    <Route path="tasks/my-day" element={<PermissionGuard module="tasks"><MyDayPage /></PermissionGuard>} />
+                    <Route path="tasks/my-day" element={<PermissionGuard module="my_day"><MyDayPage /></PermissionGuard>} />
                     <Route path="tasks/:id" element={<PermissionGuard module="tasks"><TaskDetailPage /></PermissionGuard>} />
 
                     {/* Operations */}
                     <Route path="team" element={<PermissionGuard module="team"><TeamPage /></PermissionGuard>} />
                     <Route path="team/:id" element={<PermissionGuard module="team"><TeamMemberPage /></PermissionGuard>} />
-                    <Route path="offer-letters" element={<PermissionGuard module="team"><OfferLettersPage /></PermissionGuard>} />
-                    <Route path="team/offer-letters" element={<PermissionGuard module="team"><OfferLettersPage /></PermissionGuard>} />
+                    <Route path="offer-letters" element={<PermissionGuard module="offer_letters"><OfferLettersPage /></PermissionGuard>} />
+                    <Route path="team/offer-letters" element={<PermissionGuard module="offer_letters"><OfferLettersPage /></PermissionGuard>} />
 
                     <Route path="time" element={<PermissionGuard module="time_tracking"><TimePage /></PermissionGuard>} />
                     <Route path="time/reports" element={<PermissionGuard module="time_tracking"><TimeReportsPage /></PermissionGuard>} />
@@ -172,9 +199,9 @@ export function AppRoutes() {
                     <Route path="invoices" element={<PermissionGuard module="invoices"><InvoicesPage /></PermissionGuard>} />
                     <Route path="invoices/new" element={<PermissionGuard module="invoices"><NewInvoicePage /></PermissionGuard>} />
                     <Route path="invoices/:id" element={<PermissionGuard module="invoices"><InvoiceDetailPage /></PermissionGuard>} />
-                    <Route path="credit-notes" element={<PermissionGuard module="invoices"><CreditNotesPage /></PermissionGuard>} />
-                    <Route path="vendor-bills" element={<PermissionGuard module="invoices"><VendorBillsPage /></PermissionGuard>} />
-                    <Route path="reports/gst" element={<PermissionGuard module="reports"><GstReportPage /></PermissionGuard>} />
+                    <Route path="credit-notes" element={<PermissionGuard module="credit_notes"><CreditNotesPage /></PermissionGuard>} />
+                    <Route path="vendor-bills" element={<PermissionGuard module="vendor_bills"><VendorBillsPage /></PermissionGuard>} />
+                    <Route path="reports/gst" element={<PermissionGuard module="gst_reports"><GstReportPage /></PermissionGuard>} />
                     <Route path="expenses" element={<PermissionGuard module="expenses"><ExpensesPage /></PermissionGuard>} />
                     <Route path="salary" element={<PermissionGuard module="payroll"><SalaryPage /></PermissionGuard>} />
                     <Route path="amc" element={<PermissionGuard module="amc"><AmcPage /></PermissionGuard>} />
@@ -190,10 +217,12 @@ export function AppRoutes() {
                     <Route path="user-tracker" element={<PermissionGuard module="user_tracker"><UserTrackerPage /></PermissionGuard>} />
                     <Route path="screen-monitoring" element={<PermissionGuard module="screen_monitoring"><ScreenMonitoringPage /></PermissionGuard>} />
                     <Route path="reports" element={<PermissionGuard module="reports"><ReportsPage /></PermissionGuard>} />
+                    <Route path="work-audit" element={<AdminOnlyGuard><WorkAuditPage /></AdminOnlyGuard>} />
 
                     <Route path="files" element={<PermissionGuard module="files"><FilesPage /></PermissionGuard>} />
                     <Route path="settings" element={<PermissionGuard module="settings"><SettingsPage /></PermissionGuard>} />
                     <Route path="settings/roles" element={<PermissionGuard module="roles"><RolesPermissionsPage /></PermissionGuard>} />
+                    <Route path="profile" element={<EmployeeSettingsPage />} />
                     <Route path="ai-assistant" element={<PermissionGuard module="ai_assistant"><AIAssistantPage /></PermissionGuard>} />
 
                     {/* Quotations */}
@@ -203,31 +232,83 @@ export function AppRoutes() {
                     <Route path="quotations/:id/edit" element={<PermissionGuard module="quotations"><QuotationEditor /></PermissionGuard>} />
 
                     {/* New Business Efficiency Modules */}
-                    <Route path="capacity" element={<PermissionGuard module="team"><ResourceCapacityPage /></PermissionGuard>} />
-                    <Route path="team/capacity" element={<PermissionGuard module="team"><ResourceCapacityPage /></PermissionGuard>} />
-                    <Route path="approvals" element={<ApprovalsPage />} />
-                    <Route path="campaigns" element={<PermissionGuard module="leads"><CampaignsPage /></PermissionGuard>} />
-                    <Route path="goals" element={<GoalsPage />} />
+                    <Route path="capacity" element={<PermissionGuard module="capacity_planning"><ResourceCapacityPage /></PermissionGuard>} />
+                    <Route path="team/capacity" element={<PermissionGuard module="capacity_planning"><ResourceCapacityPage /></PermissionGuard>} />
+                    <Route path="approvals" element={<PermissionGuard module="approvals"><ApprovalsPage /></PermissionGuard>} />
+                    <Route path="campaigns" element={<PermissionGuard module="campaigns"><CampaignsPage /></PermissionGuard>} />
+                    <Route path="goals" element={<PermissionGuard module="goals"><GoalsPage /></PermissionGuard>} />
                 </Route>
 
                 {/* Employee Routes */}
                 <Route path="/employee" element={<EmployeeLayout />}>
                     <Route index element={<Navigate to="/employee/dashboard" replace />} />
                     <Route path="dashboard" element={<EmployeeDashboardPage />} />
-                    <Route path="calendar" element={<CalendarPage employeeMode />} />
+                    <Route path="calendar" element={<PermissionGuard module="calendar"><CalendarPage employeeMode /></PermissionGuard>} />
+                    <Route path="sales-dashboard" element={<PermissionGuard module="sales_dashboard"><SalesDashboardPage /></PermissionGuard>} />
+                    <Route path="user-tracker" element={<PermissionGuard module="user_tracker"><UserTrackerPage /></PermissionGuard>} />
+                    <Route path="screen-monitoring" element={<PermissionGuard module="screen_monitoring"><ScreenMonitoringPage /></PermissionGuard>} />
+
+                    <Route path="clients" element={<PermissionGuard module="clients"><ClientsPage /></PermissionGuard>} />
+                    <Route path="clients/new" element={<PermissionGuard module="clients"><NewClientPage /></PermissionGuard>} />
+                    <Route path="clients/:id" element={<PermissionGuard module="clients"><ClientDetailPage /></PermissionGuard>} />
+                    <Route path="clients/:id/edit" element={<PermissionGuard module="clients"><EditClientPage /></PermissionGuard>} />
 
                     <Route path="projects" element={<PermissionGuard module="projects"><ProjectsPage /></PermissionGuard>} />
+                    <Route path="projects/new" element={<PermissionGuard module="projects"><NewProjectPage /></PermissionGuard>} />
+                    <Route path="projects/developer-dashboard" element={<PermissionGuard module="projects"><DeveloperDashboardPage /></PermissionGuard>} />
+                    <Route path="projects/templates" element={<PermissionGuard module="templates"><ProjectTemplatesPage /></PermissionGuard>} />
                     <Route path="projects/:id" element={<PermissionGuard module="projects"><ProjectDetailPage /></PermissionGuard>} />
-                    <Route path="products" element={<PermissionGuard module="projects"><ProductsPage /></PermissionGuard>} />
+                    <Route path="projects/:id/edit" element={<PermissionGuard module="projects"><EditProjectPage /></PermissionGuard>} />
+                    <Route path="products" element={<PermissionGuard module="products"><ProductsPage /></PermissionGuard>} />
+
                     <Route path="tasks" element={<PermissionGuard module="tasks"><TasksPage /></PermissionGuard>} />
+                    <Route path="tasks/my-day" element={<PermissionGuard module="my_day"><MyDayPage /></PermissionGuard>} />
                     <Route path="tasks/:id" element={<PermissionGuard module="tasks"><TaskDetailPage /></PermissionGuard>} />
 
-                    <Route path="time" element={<PermissionGuard module="time_tracking"><TimePage /></PermissionGuard>} />
-                    <Route path="project-chat" element={<PermissionGuard module="project_chat"><ProjectChatPage /></PermissionGuard>} />
-                    <Route path="files" element={<PermissionGuard module="files"><FilesPage /></PermissionGuard>} />
-                    <Route path="tickets" element={<PermissionGuard module="tickets"><TicketsPage /></PermissionGuard>} />
+                    <Route path="leads" element={<PermissionGuard module="leads"><LeadsPage /></PermissionGuard>} />
+                    <Route path="sales/automations" element={<PermissionGuard module="sales_automations"><SalesAutomationsPage /></PermissionGuard>} />
+                    <Route path="sales/contracts" element={<PermissionGuard module="contracts"><ContractsVaultPage /></PermissionGuard>} />
+                    <Route path="quotations" element={<PermissionGuard module="quotations"><QuotationsPage /></PermissionGuard>} />
+                    <Route path="quotations/create" element={<PermissionGuard module="quotations"><QuotationEditor /></PermissionGuard>} />
+                    <Route path="quotations/:id" element={<PermissionGuard module="quotations"><QuotationDetailPage /></PermissionGuard>} />
+                    <Route path="quotations/:id/edit" element={<PermissionGuard module="quotations"><QuotationEditor /></PermissionGuard>} />
+                    <Route path="campaigns" element={<PermissionGuard module="campaigns"><CampaignsPage /></PermissionGuard>} />
+
+                    <Route path="invoices" element={<PermissionGuard module="invoices"><InvoicesPage /></PermissionGuard>} />
+                    <Route path="invoices/new" element={<PermissionGuard module="invoices"><NewInvoicePage /></PermissionGuard>} />
+                    <Route path="invoices/:id" element={<PermissionGuard module="invoices"><InvoiceDetailPage /></PermissionGuard>} />
+                    <Route path="credit-notes" element={<PermissionGuard module="credit_notes"><CreditNotesPage /></PermissionGuard>} />
+                    <Route path="vendor-bills" element={<PermissionGuard module="vendor_bills"><VendorBillsPage /></PermissionGuard>} />
+                    <Route path="reports/gst" element={<PermissionGuard module="gst_reports"><GstReportPage /></PermissionGuard>} />
+                    <Route path="expenses" element={<PermissionGuard module="expenses"><ExpensesPage /></PermissionGuard>} />
+                    <Route path="salary" element={<PermissionGuard module="payroll"><SalaryPage /></PermissionGuard>} />
+
+                    <Route path="amc" element={<PermissionGuard module="amc"><AmcPage /></PermissionGuard>} />
+                    <Route path="domains" element={<PermissionGuard module="domains"><DomainsPage /></PermissionGuard>} />
+                    <Route path="hosting" element={<PermissionGuard module="hosting"><HostingPage /></PermissionGuard>} />
+                    <Route path="expiry-alerts" element={<PermissionGuard module="expiry_alerts"><ExpiryAlertsPage /></PermissionGuard>} />
+
+                    <Route path="team" element={<PermissionGuard module="team"><TeamPage /></PermissionGuard>} />
+                    <Route path="team/:id" element={<PermissionGuard module="team"><TeamMemberPage /></PermissionGuard>} />
+                    <Route path="team/capacity" element={<PermissionGuard module="capacity_planning"><ResourceCapacityPage /></PermissionGuard>} />
+                    <Route path="offer-letters" element={<PermissionGuard module="offer_letters"><OfferLettersPage /></PermissionGuard>} />
+                    <Route path="approvals" element={<PermissionGuard module="approvals"><ApprovalsPage /></PermissionGuard>} />
+                    <Route path="goals" element={<PermissionGuard module="goals"><GoalsPage /></PermissionGuard>} />
+
                     <Route path="attendance" element={<PermissionGuard module="attendance"><AttendancePage /></PermissionGuard>} />
-                    <Route path="settings" element={<PermissionGuard module="settings"><EmployeeSettingsPage /></PermissionGuard>} />
+                    <Route path="time" element={<PermissionGuard module="time_tracking"><TimePage /></PermissionGuard>} />
+                    <Route path="time/reports" element={<PermissionGuard module="time_tracking"><TimeReportsPage /></PermissionGuard>} />
+
+                    <Route path="tickets" element={<PermissionGuard module="tickets"><TicketsPage /></PermissionGuard>} />
+                    <Route path="project-chat" element={<PermissionGuard module="project_chat"><ProjectChatPage /></PermissionGuard>} />
+                    <Route path="chat" element={<PermissionGuard module="chat"><ChatPage /></PermissionGuard>} />
+                    <Route path="chat/widgets" element={<PermissionGuard module="chat"><ChatWidgetsPage /></PermissionGuard>} />
+
+                    <Route path="reports" element={<PermissionGuard module="reports"><ReportsPage /></PermissionGuard>} />
+                    <Route path="files" element={<PermissionGuard module="files"><FilesPage /></PermissionGuard>} />
+                    <Route path="ai-assistant" element={<PermissionGuard module="ai_assistant"><AIAssistantPage /></PermissionGuard>} />
+                    <Route path="workspace-settings" element={<PermissionGuard module="settings"><SettingsPage /></PermissionGuard>} />
+                    <Route path="settings" element={<EmployeeSettingsPage />} />
                 </Route>
 
                 {/* Client Routes */}
@@ -243,7 +324,7 @@ export function AppRoutes() {
                     <Route path="project-chat" element={<PermissionGuard module="project_chat"><ProjectChatPage /></PermissionGuard>} />
                     <Route path="tickets" element={<PermissionGuard module="tickets"><TicketsPage /></PermissionGuard>} />
                     <Route path="files" element={<PermissionGuard module="files"><FilesPage /></PermissionGuard>} />
-                    <Route path="settings" element={<PermissionGuard module="settings"><EmployeeSettingsPage /></PermissionGuard>} />
+                    <Route path="settings" element={<EmployeeSettingsPage />} />
                 </Route>
 
                 {/* Catch all */}

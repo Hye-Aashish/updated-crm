@@ -275,14 +275,14 @@ export function LeadsList({
 
                                     {/* Last Outcome */}
                                     <td className="hidden lg:table-cell px-5 py-4">
-                                        {lead.lastFollowUpOutcome ? (
+                                        {(lead.lastFollowUpOutcome || lead.lastNote || (lead.activities && lead.activities.length > 0)) ? (
                                             <div className="space-y-0.5">
                                                 <Badge variant="outline" className="text-[10px] font-bold bg-background border-border/60">
-                                                    {lead.lastFollowUpOutcome}
+                                                    {lead.lastFollowUpOutcome || (lead.activities?.[lead.activities.length - 1]?.outcome) || 'Note Added'}
                                                 </Badge>
-                                                {lead.lastNote && (
+                                                {(lead.lastNote || lead.activities?.[lead.activities.length - 1]?.content) && (
                                                     <p className="text-[10px] text-muted-foreground font-medium line-clamp-1 max-w-[180px]">
-                                                        "{lead.lastNote}"
+                                                        "{lead.lastNote || lead.activities?.[lead.activities.length - 1]?.content}"
                                                     </p>
                                                 )}
                                             </div>

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { User, Bell, Lock, Save, Camera, Loader2 } from 'lucide-react'
+import { User, Bell, Lock, Save, Camera, Loader2, Eye, EyeOff } from 'lucide-react'
 import { useAppStore } from '@/store'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
@@ -19,7 +19,9 @@ export function EmployeeSettingsPage() {
     const [currentPassword, setCurrentPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [showPasswords, setShowPasswords] = useState(false)
     const [loading, setLoading] = useState(false)
+    const isClient = currentUser?.role === 'client'
     const [avatar, setAvatar] = useState(currentUser?.avatar || '')
     const avatarInputRef = useRef<HTMLInputElement>(null)
 
@@ -65,13 +67,20 @@ export function EmployeeSettingsPage() {
             toast({ description: "Please fill in all password fields", variant: "destructive" })
             return
         }
+        if (newPassword.trim().length < 6) {
+            toast({ description: "New password must be at least 6 characters", variant: "destructive" })
+            return
+        }
         if (newPassword !== confirmPassword) {
             toast({ description: "New passwords do not match", variant: "destructive" })
             return
         }
         setLoading(true)
         try {
-            await api.put(`/users/${currentUser?._id}`, { password: newPassword })
+            await api.post('/auth/change-password', {
+                currentPassword,
+                newPassword: newPassword.trim(),
+            })
             setCurrentPassword('')
             setNewPassword('')
             setConfirmPassword('')
@@ -169,14 +178,18 @@ export function EmployeeSettingsPage() {
                                         <Label htmlFor="phone">Phone Number</Label>
                                         <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 99999 99999" />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="designation">Designation</Label>
-                                        <Input id="designation" defaultValue={currentUser?.designation || ''} disabled />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="salary">Monthly Salary</Label>
-                                        <Input id="salary" value={currentUser?.salary ? formatCurrency(Number(currentUser.salary)) : 'N/A'} disabled className="font-bold text-emerald-600" />
-                                    </div>
+                                    {!isClient && (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="designation">Designation</Label>
+                                                <Input id="designation" defaultValue={currentUser?.designation || ''} disabled />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="salary">Monthly Salary</Label>
+                                                <Input id="salary" value={currentUser?.salary ? formatCurrency(Number(currentUser.salary)) : 'N/A'} disabled className="font-bold text-emerald-600" />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
                                 <Button onClick={handleProfileSave} disabled={loading}>
@@ -190,23 +203,37 @@ export function EmployeeSettingsPage() {
                     {activeTab === 'security' && (
                         <Card>
                             <CardHeader>
-                                <CardTitle>Security</CardTitle>
-                                <CardDescription>Manage your password and security settings</CardDescription>
+                                <div className="flex items-center justify-between gap-2">
+                                    <div>
+                                        <CardTitle>Change Password</CardTitle>
+                                        <CardDescription>Verify your current password to set a new login password</CardDescription>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowPasswords(!showPasswords)}
+                                        className="text-xs text-muted-foreground"
+                                    >
+                                        {showPasswords ? <EyeOff className="mr-1.5 h-3.5 w-3.5" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
+                                        {showPasswords ? 'Hide' : 'Show'}
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="space-y-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="current-password">Current Password</Label>
-                                        <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+                                        <Input id="current-password" type={showPasswords ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Enter current password" />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="new-password">New Password</Label>
-                                            <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                                            <Label htmlFor="new-password">New Password (min 6 chars)</Label>
+                                            <Input id="new-password" type={showPasswords ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="confirm-password">Confirm New Password</Label>
-                                            <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                                            <Input id="confirm-password" type={showPasswords ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" />
                                         </div>
                                     </div>
                                 </div>

@@ -13,6 +13,7 @@ interface ProjectMilestoneDialogProps {
     onOpenChange: (open: boolean) => void
     milestone?: Milestone | null
     projectBudget: number
+    showPaymentFields?: boolean
     onSave: (milestoneData: Partial<Milestone>) => Promise<void>
 }
 
@@ -21,6 +22,7 @@ export function ProjectMilestoneDialog({
     onOpenChange,
     milestone,
     projectBudget,
+    showPaymentFields = false,
     onSave
 }: ProjectMilestoneDialogProps) {
     const [name, setName] = useState('')
@@ -62,18 +64,21 @@ export function ProjectMilestoneDialog({
 
         setLoading(true)
         try {
-            await onSave({
+            const payload: Partial<Milestone> = {
                 name: name.trim(),
                 description: description.trim(),
                 dueDate: dueDate ? new Date(dueDate) : undefined,
-                amount: numAmount,
                 status: status,
                 completed: status === 'completed',
                 completedAt: status === 'completed' ? (milestone?.completedAt || new Date()) : undefined,
-                paymentStatus: paymentStatus,
-                paidAmount: paymentStatus === 'paid' ? numAmount : paymentStatus === 'unpaid' ? 0 : milestone?.paidAmount || 0,
-                paidDate: paymentStatus === 'paid' ? (milestone?.paidDate || new Date()) : undefined
-            })
+            }
+            if (showPaymentFields) {
+                payload.amount = numAmount
+                payload.paymentStatus = paymentStatus
+                payload.paidAmount = paymentStatus === 'paid' ? numAmount : paymentStatus === 'unpaid' ? 0 : milestone?.paidAmount || 0
+                payload.paidDate = paymentStatus === 'paid' ? (milestone?.paidDate || new Date()) : undefined
+            }
+            await onSave(payload)
             onOpenChange(false)
         } catch (error) {
             console.error('Failed to save milestone', error)
@@ -89,7 +94,9 @@ export function ProjectMilestoneDialog({
                     <DialogHeader>
                         <DialogTitle>{milestone ? 'Edit Milestone' : 'Add Project Milestone'}</DialogTitle>
                         <DialogDescription>
-                            Configure milestone deliverable timeline, target amount, and completion status.
+                            {showPaymentFields
+                                ? 'Configure milestone deliverable timeline, target amount, and completion status.'
+                                : 'Configure milestone deliverable timeline and work completion status.'}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -105,24 +112,26 @@ export function ProjectMilestoneDialog({
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="milestone-amount">Milestone Amount ({getCurrencySymbol()})</Label>
-                                <Input
-                                    id="milestone-amount"
-                                    type="number"
-                                    placeholder="e.g. 35000"
-                                    value={amount}
-                                    onChange={(e) => setAmount(e.target.value)}
-                                    min="0"
-                                    step="any"
-                                />
-                                {projectBudget > 0 && (
-                                    <p className="text-[11px] text-muted-foreground">
-                                        ~{percentage}% of total budget ({formatCurrency(projectBudget)})
-                                    </p>
-                                )}
-                            </div>
+                        <div className={`grid ${showPaymentFields ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                            {showPaymentFields && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="milestone-amount">Milestone Amount ({getCurrencySymbol()})</Label>
+                                    <Input
+                                        id="milestone-amount"
+                                        type="number"
+                                        placeholder="e.g. 35000"
+                                        value={amount}
+                                        onChange={(e) => setAmount(e.target.value)}
+                                        min="0"
+                                        step="any"
+                                    />
+                                    {projectBudget > 0 && (
+                                        <p className="text-[11px] text-muted-foreground">
+                                            ~{percentage}% of total budget ({formatCurrency(projectBudget)})
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="space-y-2">
                                 <Label htmlFor="milestone-date">Target Due Date <span className="text-red-500">*</span></Label>
@@ -136,7 +145,7 @@ export function ProjectMilestoneDialog({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className={`grid ${showPaymentFields ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
                             <div className="space-y-2">
                                 <Label htmlFor="milestone-status">Work Delivery Status</Label>
                                 <Select value={status} onValueChange={(val: any) => setStatus(val)}>
@@ -151,19 +160,21 @@ export function ProjectMilestoneDialog({
                                 </Select>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="milestone-pay-status">Client Payment Status</Label>
-                                <Select value={paymentStatus} onValueChange={(val: any) => setPaymentStatus(val)}>
-                                    <SelectTrigger id="milestone-pay-status">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="paid">✅ Payment Received (Paid)</SelectItem>
-                                        <SelectItem value="partial">🟡 Partially Paid</SelectItem>
-                                        <SelectItem value="unpaid">❌ Payment Due (Unpaid)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            {showPaymentFields && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="milestone-pay-status">Client Payment Status</Label>
+                                    <Select value={paymentStatus} onValueChange={(val: any) => setPaymentStatus(val)}>
+                                        <SelectTrigger id="milestone-pay-status">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="paid">✅ Payment Received (Paid)</SelectItem>
+                                            <SelectItem value="partial">🟡 Partially Paid</SelectItem>
+                                            <SelectItem value="unpaid">❌ Payment Due (Unpaid)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-2">

@@ -229,7 +229,16 @@ exports.createTemplate = async (req, res, next) => {
 
 exports.updateTemplate = async (req, res, next) => {
     try {
-        const updated = await ProjectTemplate.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const allowedFields = ['name', 'projectType', 'description', 'phases', 'isSystemDefault'];
+        const safeUpdate = { updatedAt: new Date() };
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) safeUpdate[field] = req.body[field];
+        }
+        const updated = await ProjectTemplate.findByIdAndUpdate(
+            req.params.id,
+            safeUpdate,
+            { new: true, runValidators: true }
+        );
         if (!updated) return res.status(404).json({ message: 'Template not found' });
         res.json(updated);
     } catch (err) {

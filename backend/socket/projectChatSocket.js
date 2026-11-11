@@ -1,25 +1,55 @@
 const ProjectMessage = require('../models/ProjectMessage');
+const Project = require('../models/Project');
+const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
-// Helper to verify JWT token from socket handshake or query
-const verifySocketToken = (socket) => {
+// Helper to verify JWT token and load current DB user
+const verifySocketUser = async (socket) => {
     try {
         const token = socket.handshake.auth?.token || socket.handshake.query?.token;
         if (!token) return null;
-        return jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!decoded?.id) return null;
+        return await User.findById(decoded.id).select('_id name role clientId').lean();
     } catch (e) {
         return null;
     }
+};
+
+const userHasProjectAccess = async (dbUser, projectId) => {
+    if (!dbUser || !projectId) return false;
+    const project = await Project.findById(projectId).select('clientId pmId members developers designers').lean();
+    if (!project) return false;
+    if (dbUser.role === 'admin' || dbUser.role === 'owner') return true;
+    if (dbUser.role === 'client') {
+        const own = dbUser.clientId?.toString?.() || '';
+        const projClient = project.clientId?.toString?.() || '';
+        return Boolean(own && own === projClient);
+    }
+    const uid = dbUser._id.toString();
+    const hasId = (arr) => Array.isArray(arr) && arr.map(String).includes(uid);
+    return (
+        String(project.pmId || '') === uid ||
+        hasId(project.members) ||
+        hasId(project.developers) ||
+        hasId(project.designers)
+    );
 };
 
 module.exports = (io) => {
     io.on('connection', (socket) => {
 
         // Join a Project Room
-        socket.on('join_project_chat', (projectId) => {
+        socket.on('join_project_chat', async (projectId) => {
             if (!projectId) return;
+            const dbUser = await verifySocketUser(socket);
+            const allowed = await userHasProjectAccess(dbUser, projectId);
+            if (!allowed) {
+                socket.emit('auth_error', { message: 'Not authorized to join this project chat' });
+                return;
+            }
             socket.join(`project_${projectId}`);
-            console.log(`[Socket] User ${socket.id} joined project chat: ${projectId}`);
+            console.log(`[Socket] User ${dbUser._id} joined project chat: ${projectId}`);
         });
 
         // Leave a Project Room
@@ -29,36 +59,30 @@ module.exports = (io) => {
 
         // Send Message to Project Room
         socket.on('send_project_message', async (data) => {
-            console.log('[Socket] Received project message:', data);
             try {
-                const { projectId, senderId, senderName, senderRole, message, attachments } = data;
+                const { projectId, message, attachments } = data || {};
+                if (!projectId) return;
 
-                if (!projectId) {
-                    console.error('[Socket] Missing projectId');
+                const dbUser = await verifySocketUser(socket);
+                const allowed = await userHasProjectAccess(dbUser, projectId);
+                if (!allowed) {
+                    socket.emit('auth_error', { message: 'Not authorized to message this project' });
                     return;
                 }
 
-                const user = verifySocketToken(socket);
-                const sId = user ? (user.id || user._id) : (senderId || 'unknown');
-                const sName = user ? (user.name || senderName) : (senderName || 'User');
-                const sRole = user ? (user.role || senderRole) : (senderRole || 'member');
-
                 const newMessage = new ProjectMessage({
                     projectId,
-                    senderId: sId,
-                    senderName: sName,
-                    senderRole: sRole,
+                    senderId: dbUser._id.toString(),
+                    senderName: dbUser.name || 'User',
+                    senderRole: dbUser.role || 'member',
                     message: message || '',
-                    attachments: attachments || []
+                    attachments: Array.isArray(attachments) ? attachments : []
                 });
 
                 await newMessage.save();
-                console.log('[Socket] Message saved to DB:', newMessage._id);
 
                 // Broadcast to everyone in the project room
                 io.to(`project_${projectId}`).emit('project_message_received', newMessage);
-                console.log(`[Socket] Message broadcast to room: project_${projectId}`);
-
             } catch (error) {
                 console.error('Project Socket Error:', error);
             }
@@ -67,7 +91,26 @@ module.exports = (io) => {
         // Delete message event
         socket.on('delete_project_message', async (data) => {
             try {
-                const { messageId, projectId } = data;
+                const { messageId, projectId } = data || {};
+                if (!messageId || !projectId) return;
+
+                const dbUser = await verifySocketUser(socket);
+                const allowed = await userHasProjectAccess(dbUser, projectId);
+                if (!allowed) {
+                    socket.emit('auth_error', { message: 'Not authorized to delete messages here' });
+                    return;
+                }
+
+                const msg = await ProjectMessage.findById(messageId);
+                if (!msg || String(msg.projectId) !== String(projectId)) return;
+
+                const isPrivileged = dbUser.role === 'admin' || dbUser.role === 'owner';
+                if (!isPrivileged && String(msg.senderId) !== dbUser._id.toString()) {
+                    socket.emit('auth_error', { message: 'Can only delete your own messages' });
+                    return;
+                }
+
+                await ProjectMessage.findByIdAndDelete(messageId);
                 io.to(`project_${projectId}`).emit('project_message_deleted', messageId);
             } catch (error) {
                 console.error('Socket Delete Error:', error);

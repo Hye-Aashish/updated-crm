@@ -27,11 +27,13 @@ import { timeEntryService, TimeEntry, TimeEntryStats } from '@/lib/timeEntryServ
 
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store'
+import { usePortalPrefix } from '@/lib/nav-utils'
 
 import { appConfirm } from '@/lib/app-dialog'
 
 export function TimePage() {
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const { currentUser, tasks: globalTasks, projects: globalProjects, users: globalUsers, updateTask } = useAppStore()
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner'
@@ -321,7 +323,7 @@ export function TimePage() {
                             <Plus className="mr-2 h-4 w-4" />
                             Start Timer
                         </Button>
-                        <Button variant="outline" onClick={() => navigate('/time/reports')} className="flex-1 md:flex-none">
+                        <Button variant="outline" onClick={() => navigate(`${portalPrefix}/time/reports`)} className="flex-1 md:flex-none">
                             Reports
                         </Button>
                     </div>

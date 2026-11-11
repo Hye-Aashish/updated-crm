@@ -15,6 +15,7 @@ import api from '@/lib/api-client'
 import { timeEntryService } from '@/lib/timeEntryService'
 import { mapTask, mapUser, mapProject } from '@/lib/mappers'
 import { usePermissions } from '@/hooks/use-permissions'
+import { isAdminOrOwnerRole } from '@/lib/nav-utils'
 
 // Task Status Type
 type TaskStatus = {
@@ -58,7 +59,10 @@ export function TasksPage() {
     const { currentUser, tasks: storeTasks, users, projects, setTasks: setStoreTasks, setUsers, setProjects, addTask: addStoreTask, updateTask: updateStoreTask } = useAppStore()
 
     const [tasks, setTasks] = useState(storeTasks)
-    const { canCreate } = usePermissions()
+    const { canCreate, hasPermission } = usePermissions()
+    const currentUserId = currentUser?.id || (currentUser as any)?._id || ''
+    const canAssignOthers = isAdminOrOwnerRole(currentUser?.role) || hasPermission('tasks', 'assign_others')
+    const staffUsers = users.filter((u) => u.role !== 'client')
     const [statuses, setStatuses] = useState<TaskStatus[]>(INITIAL_STATUSES)
     const [view, setView] = useState<'list' | 'kanban'>('kanban')
     const [draggedTask, setDraggedTask] = useState<any>(null)
@@ -85,16 +89,16 @@ export function TasksPage() {
         description: '',
         priority: 'medium',
         dueDate: '',
-        assigneeId: (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') ? (currentUser.id || (currentUser as any)._id) : '',
+        assigneeId: (!canAssignOthers && currentUserId) ? currentUserId : '',
         projectId: '',
         attachments: [] as { name: string, fileType: string, data: string }[]
     })
 
     useEffect(() => {
-        if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') {
-            setNewTask(prev => ({ ...prev, assigneeId: currentUser.id || (currentUser as any)._id }))
+        if (!canAssignOthers && currentUserId) {
+            setNewTask(prev => ({ ...prev, assigneeId: currentUserId }))
         }
-    }, [currentUser])
+    }, [canAssignOthers, currentUserId])
     const [newStatus, setNewStatus] = useState({
         label: '',
         color: 'bg-blue-500'
@@ -165,41 +169,39 @@ export function TasksPage() {
         }
     }, [storeTasks, searchQuery, filterPriority, filterProject, filterType, filterEmployee, filterDate])
 
-    // Fetch Data
+    // Always fetch fresh tasks for the signed-in user; populate users/projects if needed
     useEffect(() => {
-        const fetchData = async () => {
-            if (storeTasks.length === 0 || users.length === 0 || projects.length === 0) {
-                try {
-                    const [tasksRes, usersRes, projectsRes] = await Promise.all([
-                        storeTasks.length === 0 ? api.get('/tasks').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
-                        users.length === 0 ? api.get('/users').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
-                        projects.length === 0 ? api.get('/projects').catch(() => ({ data: null })) : Promise.resolve({ data: null })
-                    ])
-
-                    if (tasksRes.data) {
-                        setStoreTasks(tasksRes.data.map(mapTask))
-                    }
-                    if (usersRes?.data) {
-                        setUsers(usersRes.data.map(mapUser))
-                    }
-                    if (projectsRes?.data) {
-                        setProjects(projectsRes.data.map(mapProject))
-                    }
-                } catch (error) {
-                    console.error("Failed to fetch task data", error)
-                }
+        let active = true
+        const loadTaskWorkspace = async () => {
+            if (storeTasks.length === 0) {
+                setLoading(true)
             }
-        }
-        const startFetch = async () => {
-            setLoading(true)
             try {
-                await fetchData()
+                const [tasksRes, usersRes, projectsRes] = await Promise.all([
+                    api.get('/tasks').catch(() => ({ data: null })),
+                    users.length === 0 ? api.get('/users').catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+                    projects.length === 0 ? api.get('/projects').catch(() => ({ data: null })) : Promise.resolve({ data: null })
+                ])
+
+                if (!active) return
+                if (Array.isArray(tasksRes?.data)) {
+                    setStoreTasks(tasksRes.data.map(mapTask))
+                }
+                if (Array.isArray(usersRes?.data)) {
+                    setUsers(usersRes.data.map(mapUser))
+                }
+                if (Array.isArray(projectsRes?.data)) {
+                    setProjects(projectsRes.data.map(mapProject))
+                }
+            } catch (error) {
+                console.error("Failed to fetch task data", error)
             } finally {
-                setLoading(false)
+                if (active) setLoading(false)
             }
         }
-        startFetch()
-    }, [storeTasks.length, users.length, projects.length, setStoreTasks, setUsers, setProjects])
+        loadTaskWorkspace()
+        return () => { active = false }
+    }, [currentUserId, setStoreTasks, setUsers, setProjects])
 
     // --- KPI Calculations ---
     const today = new Date()
@@ -565,16 +567,19 @@ export function TasksPage() {
 
     // Add New Task
     const handleAddTask = async () => {
-        if (!newTask.title) return
+        if (!newTask.title.trim()) {
+            toast({ variant: "destructive", title: "Error", description: "Please enter a task title." })
+            return
+        }
 
-        // Restrict employee task creation without running timer or active attendance session
-        if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') {
+        // Restrict non-admin task creation without running timer or active attendance session
+        if (currentUser && !isAdminOrOwnerRole(currentUser.role)) {
             try {
-                const runningTimer = await timeEntryService.getRunningTimer(currentUser.id || (currentUser as any)._id)
+                const runningTimer = await timeEntryService.getRunningTimer(currentUserId)
                 let isClockedIn = false
                 try {
                     const todayStr = new Date().toISOString().split('T')[0]
-                    const attRes = await api.get(`/attendance/today/${currentUser.id || (currentUser as any)._id}?date=${todayStr}`)
+                    const attRes = await api.get(`/attendance/today/${currentUserId}?date=${todayStr}`)
                     const attData = attRes?.data
                     if (attData && attData.checkIn && !attData.checkOut && (attData.status === 'present' || attData.status === 'on-break')) {
                         isClockedIn = true
@@ -597,41 +602,32 @@ export function TasksPage() {
         }
 
         try {
-            const taskData = {
-                title: newTask.title,
-                description: newTask.description,
-                projectId: newTask.projectId || projects[0]?.id || '',
-                status: 'todo',
-                priority: newTask.priority,
-                assigneeId: newTask.assigneeId || users[0]?.id || '',
-                dueDate: newTask.dueDate ? new Date(newTask.dueDate) : new Date(),
-                attachments: newTask.attachments
-            }
+            const resolvedProjectId = newTask.projectId || projects[0]?.id || ''
+            const resolvedAssigneeId = canAssignOthers ? newTask.assigneeId : currentUserId
 
-            if (!taskData.projectId) {
+            if (!resolvedProjectId) {
                 toast({ variant: "destructive", title: "Error", description: "Please select a project first." })
                 return
             }
 
-            const response = await api.post('/tasks', taskData)
-            const savedTask = response.data
-
-            const frontendTask = {
-                id: savedTask._id,
-                title: savedTask.title,
-                description: savedTask.description,
-                projectId: savedTask.projectId,
-                status: savedTask.status as any,
-                priority: savedTask.priority as any,
-                assigneeId: savedTask.assigneeId,
-                dueDate: new Date(savedTask.dueDate),
-                estimatedHours: 0,
-                labels: [],
-                checklist: [],
-                createdAt: new Date(savedTask.createdAt),
-                updatedAt: new Date(savedTask.updatedAt),
-                attachments: savedTask.attachments || []
+            if (!resolvedAssigneeId) {
+                toast({ variant: "destructive", title: "Error", description: "Please select an assignee." })
+                return
             }
+
+            const taskData = {
+                title: newTask.title.trim(),
+                description: newTask.description,
+                projectId: resolvedProjectId,
+                status: 'todo',
+                priority: newTask.priority,
+                assigneeId: resolvedAssigneeId,
+                dueDate: newTask.dueDate ? new Date(newTask.dueDate) : new Date(),
+                attachments: newTask.attachments
+            }
+
+            const response = await api.post('/tasks', taskData)
+            const frontendTask = mapTask(response.data)
 
             addStoreTask(frontendTask)
             setNewTask({
@@ -639,8 +635,8 @@ export function TasksPage() {
                 description: '',
                 priority: 'medium',
                 dueDate: '',
-                assigneeId: (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'owner') ? (currentUser.id || (currentUser as any)._id) : '',
-                projectId: '',
+                assigneeId: !canAssignOthers ? currentUserId : '',
+                projectId: projects[0]?.id || '',
                 attachments: []
             })
             setIsTaskDialogOpen(false)
@@ -788,8 +784,8 @@ export function TasksPage() {
                         ))}
                     </select>
 
-                    {/* Employee Selector & Date Picker (Admin/Owner only) */}
-                    {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
+                    {/* Employee Selector & Date Picker */}
+                    {canAssignOthers && (
                         <>
                             {/* Employee Selector */}
                             <select
@@ -798,8 +794,8 @@ export function TasksPage() {
                                 onChange={(e) => setFilterEmployee(e.target.value)}
                             >
                                 <option value="all">All Employees</option>
-                                {users.map(u => (
-                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                {staffUsers.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                 ))}
                             </select>
 
@@ -923,7 +919,19 @@ export function TasksPage() {
                     )}
 
                     {canCreate('tasks') && (
-                        <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+                        <Dialog
+                            open={isTaskDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsTaskDialogOpen(open)
+                                if (open) {
+                                    setNewTask(prev => ({
+                                        ...prev,
+                                        projectId: prev.projectId || projects[0]?.id || '',
+                                        assigneeId: !canAssignOthers ? currentUserId : prev.assigneeId
+                                    }))
+                                }
+                            }}
+                        >
                             <DialogTrigger asChild>
                                 <Button size="sm" className="h-9">
                                     <Plus className="h-4 w-4 mr-2" />
@@ -978,29 +986,31 @@ export function TasksPage() {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="project">Project</Label>
+                                            <Label htmlFor="project">Project *</Label>
                                             <select
                                                 id="project"
                                                 value={newTask.projectId}
                                                 onChange={(e) => setNewTask({ ...newTask, projectId: e.target.value })}
                                                 className="w-full h-10 px-3 rounded-md border border-input bg-background"
                                             >
+                                                <option value="">Select Project</option>
                                                 {projects.map(p => (
                                                     <option key={p.id} value={p.id}>{p.name}</option>
                                                 ))}
                                             </select>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="assignee">Assignee</Label>
+                                            <Label htmlFor="assignee">Assignee *</Label>
                                             <select
                                                 id="assignee"
                                                 value={newTask.assigneeId}
                                                 onChange={(e) => setNewTask({ ...newTask, assigneeId: e.target.value })}
                                                 className="w-full h-10 px-3 rounded-md border border-input bg-background disabled:opacity-70 disabled:cursor-not-allowed"
-                                                disabled={currentUser?.role !== 'admin' && currentUser?.role !== 'owner'}
+                                                disabled={!canAssignOthers}
                                             >
-                                                {users.map(u => (
-                                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                                <option value="">Select Assignee</option>
+                                                {staffUsers.map(u => (
+                                                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                                 ))}
                                             </select>
                                         </div>
@@ -1068,7 +1078,7 @@ export function TasksPage() {
                                             className="text-2xl font-bold border-none px-0 focus-visible:ring-0"
                                             value={selectedTask.title}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, title: e.target.value })}
-                                            disabled={['client', 'employee', 'developer'].includes(currentUser?.role || '')}
+                                            disabled={!canAssignOthers}
                                         />
                                     </div>
                                     <Badge variant="secondary" className={`capitalize ${selectedTask.priority === 'urgent' ? 'bg-red-100 text-red-700' :
@@ -1089,8 +1099,9 @@ export function TasksPage() {
                                             className="w-full h-9 rounded-md border border-input bg-background px-3 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.projectId}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, projectId: e.target.value })}
-                                            disabled={['client', 'employee', 'developer'].includes(currentUser?.role || '')}
+                                            disabled={!canAssignOthers}
                                         >
+                                            <option value="">Select Project</option>
                                             {projects.map(p => (
                                                 <option key={p.id} value={p.id}>{p.name}</option>
                                             ))}
@@ -1104,10 +1115,11 @@ export function TasksPage() {
                                             className="w-full h-9 rounded-md border border-input bg-background px-3 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.assigneeId}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, assigneeId: e.target.value })}
-                                            disabled={['client', 'employee', 'developer'].includes(currentUser?.role || '')}
+                                            disabled={!canAssignOthers}
                                         >
-                                            {users.map(u => (
-                                                <option key={u.id} value={u.id}>{u.name}</option>
+                                            <option value="">Select Assignee</option>
+                                            {staffUsers.map(u => (
+                                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                             ))}
                                         </select>
                                     </div>
@@ -1120,7 +1132,7 @@ export function TasksPage() {
                                             className="h-9 disabled:opacity-70 disabled:cursor-not-allowed"
                                             value={selectedTask.dueDate instanceof Date ? selectedTask.dueDate.toISOString().split('T')[0] : selectedTask.dueDate?.split('T')[0]}
                                             onChange={(e) => setSelectedTask({ ...selectedTask, dueDate: e.target.value })}
-                                            disabled={['client', 'employee', 'developer'].includes(currentUser?.role || '')}
+                                            disabled={!canAssignOthers}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -1147,7 +1159,7 @@ export function TasksPage() {
                                         value={selectedTask.description || ''}
                                         onChange={(e) => setSelectedTask({ ...selectedTask, description: e.target.value })}
                                         placeholder="Add more details about this task..."
-                                        disabled={['employee', 'developer'].includes(currentUser?.role || '')}
+                                        disabled={!canAssignOthers && currentUser?.role !== 'client'}
                                     />
                                 </div>
 
@@ -1180,7 +1192,7 @@ export function TasksPage() {
                             </div>
                             <DialogFooter className="border-t pt-4">
                                 <Button variant="outline" onClick={() => setSelectedTask(null)}>Close</Button>
-                                {((['owner', 'admin', 'pm', 'employee', 'developer'].includes(currentUser?.role || '')) || currentUser?.role === 'client') && (
+                                {currentUser && (
                                     <Button onClick={handleUpdateTask}>Save Changes</Button>
                                 )}
                             </DialogFooter>

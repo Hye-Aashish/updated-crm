@@ -1,9 +1,53 @@
 const Client = require('../models/Client');
 const Project = require('../models/Project');
+const User = require('../models/User');
 const crypto = require('crypto');
 const Setting = require('../models/Setting');
 const Notification = require('../models/Notification');
 const ClientOnboardingTemplate = require('../models/ClientOnboardingTemplate');
+const { assertClientAccess, isPrivileged } = require('../utils/assertAccess');
+const { escapeRegex, generateSecurePassword, signFileAccess } = require('../utils/securityHelpers');
+
+async function provisionClientPortalUser(client, rawEmail, requestedPassword) {
+    const clientEmail = (rawEmail || client?.email || '').trim().toLowerCase();
+    if (!clientEmail) return null;
+
+    const existingUser = await User.findOne({ email: clientEmail });
+    if (existingUser) {
+        // Never overwrite an existing account's role, clientId, or password from a public endpoint
+        return {
+            enabled: false,
+            existingAccount: true,
+            email: clientEmail,
+            isNewUser: false,
+            loginUrl: '/login',
+            message: 'An account with this email already exists. Use your existing credentials or ask an administrator to link portal access.'
+        };
+    }
+
+    const plainPassword = requestedPassword && String(requestedPassword).trim().length >= 6
+        ? String(requestedPassword).trim()
+        : generateSecurePassword('Client@');
+
+    const newUser = new User({
+        name: client.name,
+        email: clientEmail,
+        password: plainPassword,
+        role: 'client',
+        clientId: client._id.toString(),
+        phone: client.phone || ''
+    });
+    await newUser.save();
+
+    return {
+        enabled: true,
+        existingAccount: false,
+        email: clientEmail,
+        password: plainPassword,
+        isNewUser: true,
+        loginUrl: '/login'
+    };
+}
 
 exports.getClients = async (req, res, next) => {
     try {
@@ -74,12 +118,65 @@ exports.getClientById = async (req, res, next) => {
 
 exports.createClient = async (req, res, next) => {
     try {
-        const clientData = { ...req.body };
+        const { createPortalAccess, portalEmail, portalPassword, ...clientData } = req.body;
         if (req.user && !clientData.assignedTo) {
             clientData.assignedTo = req.user._id.toString();
         }
+
+        const rawPortalPassword = typeof portalPassword === 'string' ? portalPassword.trim() : '';
+        const wantsPortal = Boolean(createPortalAccess || rawPortalPassword);
+        let loginEmail = '';
+        let resolvedPassword = '';
+
+        if (wantsPortal) {
+            loginEmail = String(portalEmail || clientData.email || '').trim().toLowerCase();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!loginEmail || !emailRegex.test(loginEmail)) {
+                return res.status(400).json({ message: 'A valid portal login email is required when creating portal access.' });
+            }
+            if (rawPortalPassword && rawPortalPassword.length < 6) {
+                return res.status(400).json({ message: 'Portal password must be at least 6 characters.' });
+            }
+
+            const existingUser = await User.findOne({ email: loginEmail });
+            if (existingUser) {
+                return res.status(409).json({
+                    message: `A user account already exists with email ${loginEmail}. Use a different login email.`
+                });
+            }
+
+            resolvedPassword = rawPortalPassword || generateSecurePassword('Client@');
+            if (!clientData.email) {
+                clientData.email = loginEmail;
+            }
+        }
+
         const client = new Client(clientData);
         const newClient = await client.save();
+
+        let portalAccess = null;
+        if (wantsPortal) {
+            try {
+                const portalUser = new User({
+                    name: newClient.name,
+                    email: loginEmail,
+                    password: resolvedPassword,
+                    role: 'client',
+                    clientId: newClient._id.toString(),
+                    phone: newClient.phone || ''
+                });
+                await portalUser.save();
+                portalAccess = {
+                    enabled: true,
+                    email: loginEmail,
+                    userId: portalUser._id,
+                    ...(rawPortalPassword ? {} : { generatedPassword: resolvedPassword })
+                };
+            } catch (userErr) {
+                await Client.findByIdAndDelete(newClient._id).catch(() => {});
+                throw userErr;
+            }
+        }
 
         // Trigger Notification
         try {
@@ -92,7 +189,11 @@ exports.createClient = async (req, res, next) => {
             });
         } catch (nErr) { console.error('Notif Error:', nErr); }
 
-        res.status(201).json(newClient);
+        const responseData = newClient.toObject();
+        if (portalAccess) {
+            responseData.portalAccess = portalAccess;
+        }
+        res.status(201).json(responseData);
     } catch (err) {
         next(err);
     }
@@ -122,7 +223,23 @@ exports.updateClient = async (req, res, next) => {
             }
         }
 
-        const updatedClient = await Client.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const allowedFields = [
+            'name', 'company', 'phone', 'email', 'industry', 'city', 'state',
+            'country', 'website', 'gstNumber', 'address', 'services', 'budget',
+            'expectedDeadline', 'status', 'type', 'leadSource', 'notes'
+        ];
+        if (isPrivileged(req.user) || canEditAll) {
+            allowedFields.push('assignedTo', 'customOnboardingConfig');
+        }
+        const updateData = {};
+        allowedFields.forEach((field) => {
+            if (req.body[field] !== undefined) {
+                updateData[field] = req.body[field];
+            }
+        });
+        updateData.updatedAt = new Date();
+
+        const updatedClient = await Client.findByIdAndUpdate(req.params.id, updateData, { new: true });
         res.json(updatedClient);
     } catch (err) {
         next(err);
@@ -155,26 +272,94 @@ exports.deleteClient = async (req, res, next) => {
 
 exports.createPublicClient = async (req, res, next) => {
     try {
-        const clientData = { ...req.body };
-        // Public form submissions might not have an assigned user, 
-        // they will just be 'new' status
-        clientData.status = 'new';
-        
-        const client = new Client(clientData);
+        const {
+            name,
+            company,
+            phone,
+            email,
+            industry,
+            city,
+            state,
+            country,
+            website,
+            gstNumber,
+            address,
+            services,
+            budget,
+            expectedDeadline,
+            onboardingData,
+            onboardingFiles
+        } = req.body;
+
+        if (!name || !phone) {
+            return res.status(400).json({ message: 'Name and Phone number are required' });
+        }
+
+        const servicesArray = Array.isArray(services)
+            ? services
+            : (services ? String(services).split(',').map(s => s.trim()).filter(Boolean) : []);
+
+        const client = new Client({
+            name: name.trim(),
+            company: (company || name).trim(),
+            phone: phone.trim(),
+            email: email ? email.trim() : undefined,
+            industry: industry || '',
+            city: city || '',
+            state: state || '',
+            country: country || '',
+            website: website || '',
+            gstNumber: gstNumber || '',
+            address: address || '',
+            services: servicesArray,
+            budget: budget || '',
+            expectedDeadline: expectedDeadline ? new Date(expectedDeadline) : undefined,
+            status: 'active',
+            type: 'one-time',
+            leadSource: 'Client Onboarding Form (Self-Registered)',
+            onboardingStatus: 'completed',
+            onboardingCompletedAt: new Date(),
+            onboardingData: onboardingData && typeof onboardingData === 'object' ? onboardingData : {},
+            onboardingFiles: Array.isArray(onboardingFiles) ? onboardingFiles : []
+        });
+
+        client.markModified('onboardingData');
+        client.markModified('onboardingFiles');
         const newClient = await client.save();
+
+        // Auto-provision Client Portal Login Access (new emails only)
+        let portalAccess = null;
+        try {
+            portalAccess = await provisionClientPortalUser(
+                newClient,
+                email,
+                req.body.portalPassword || req.body.password
+            );
+        } catch (uErr) {
+            console.error('Auto portal user creation error in createPublicClient:', uErr);
+        }
 
         // Trigger Notification
         try {
             const Notification = require('../models/Notification');
             await Notification.create({
-                title: 'New Client Onboarding Submitted',
-                message: `Client "${newClient.company || newClient.name}" has completed the onboarding form.`,
+                title: 'New Client Onboarded & Registered',
+                message: `Client "${newClient.company || newClient.name}" has completed onboarding${portalAccess?.enabled ? ' (Client Portal account generated)' : ''}.`,
                 type: 'new_client',
                 relatedId: newClient._id
             });
         } catch (nErr) { console.error('Notif Error:', nErr); }
 
-        res.status(201).json({ message: 'Client onboarded successfully', client: { _id: newClient._id, name: newClient.name } });
+        res.status(201).json({
+            message: 'Client onboarded and registered successfully!',
+            client: {
+                id: newClient._id,
+                _id: newClient._id,
+                name: newClient.name,
+                company: newClient.company
+            },
+            portalAccess
+        });
     } catch (err) {
         next(err);
     }
@@ -195,6 +380,7 @@ exports.generateOnboardingLink = async (req, res, next) => {
 
         if (config) {
             client.customOnboardingConfig = config;
+            client.markModified('customOnboardingConfig');
         }
 
         client.onboardingStatus = 'sent';
@@ -222,6 +408,7 @@ exports.updateOnboardingConfig = async (req, res, next) => {
         if (!client) return res.status(404).json({ message: 'Client not found' });
 
         client.customOnboardingConfig = req.body.config || req.body;
+        client.markModified('customOnboardingConfig');
         await client.save();
 
         res.json({
@@ -334,12 +521,92 @@ exports.uploadOnboardingFile = async (req, res, next) => {
 
         if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-        const fileUrl = `/public/uploads/${req.file.filename}`;
+        const fileUrl = `/api/files/secure/${encodeURIComponent(req.file.filename)}?access=${signFileAccess(req.file.filename)}`;
         res.json({
             fileName: req.file.originalname,
             fileUrl,
             fieldId: req.body.fieldId || '',
             fieldName: req.body.fieldName || req.file.originalname
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Public: Upload file for general/self-registration onboarding form
+exports.uploadGeneralOnboardingFile = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+        const fileUrl = `/api/files/secure/${encodeURIComponent(req.file.filename)}?access=${signFileAccess(req.file.filename)}`;
+        res.json({
+            fileName: req.file.originalname,
+            fileUrl,
+            fieldId: req.body.fieldId || '',
+            fieldName: req.body.fieldName || req.file.originalname
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Public: Get general onboarding form config and templates for self-onboarding
+exports.getPublicGeneralOnboardingConfig = async (req, res, next) => {
+    try {
+        const Setting = require('../models/Setting');
+        const settings = await Setting.findOne({ type: 'general' });
+        const agencyInfo = {
+            companyName: settings?.companyProfile?.companyName || 'NexCRM Business Hub',
+            logo: settings?.companyProfile?.logo || '',
+            email: settings?.companyProfile?.email || '',
+            phone: settings?.companyProfile?.phone || ''
+        };
+
+        const { template: templateParam } = req.query;
+        let template = null;
+        if (templateParam) {
+            const isObjectId = mongoose.Types.ObjectId.isValid(templateParam);
+            const escapedTemplate = escapeRegex(templateParam);
+            const queryConditions = [
+                { name: new RegExp(`^${escapedTemplate}$`, 'i') },
+                { id: templateParam }
+            ];
+            if (isObjectId) {
+                queryConditions.push({ _id: templateParam });
+            }
+            template = await ClientOnboardingTemplate.findOne({ $or: queryConditions });
+        }
+
+        if (!template) {
+            template = await ClientOnboardingTemplate.findOne({ isDefault: true }) || await ClientOnboardingTemplate.findOne();
+        }
+
+        const fallback = DEFAULT_ONBOARDING_TEMPLATES[0];
+        const config = {
+            welcomeTitle: `Welcome to ${agencyInfo.companyName}`,
+            welcomeMessage: `Please take a few moments to provide your business information and project scope so our team can onboard your account and immediately initiate work.`,
+            successTitle: 'Thank You! Details Received',
+            successMessage: `We have successfully received your information and assets. Our team has been notified and your client profile is now registered!`,
+            standardFields: template?.standardFields || {
+                company: true,
+                website: true,
+                gstNumber: true,
+                address: true,
+                city: true,
+                state: true,
+                country: true,
+                industry: true,
+                services: true,
+                budget: true,
+                expectedDeadline: true
+            },
+            customFields: template?.fields || fallback.fields
+        };
+
+        res.json({
+            agency: agencyInfo,
+            config,
+            templateName: template?.name || fallback.name
         });
     } catch (err) {
         next(err);
@@ -400,6 +667,7 @@ exports.submitPublicOnboardingForm = async (req, res, next) => {
                 ...(client.onboardingData || {}),
                 ...onboardingData
             };
+            client.markModified('onboardingData');
         }
 
         // Store file uploads
@@ -408,6 +676,7 @@ exports.submitPublicOnboardingForm = async (req, res, next) => {
                 ...(client.onboardingFiles || []),
                 ...onboardingFiles
             ];
+            client.markModified('onboardingFiles');
         }
 
         // Mark as completed
@@ -417,11 +686,38 @@ exports.submitPublicOnboardingForm = async (req, res, next) => {
 
         await client.save();
 
+        // Auto-provision Client Portal Login Access (new emails only)
+        let portalAccess = null;
+        const clientEmail = (client.email || email || '').trim().toLowerCase();
+        if (clientEmail) {
+            try {
+                const existingClientUser = await User.findOne({ clientId: client._id.toString(), role: 'client' });
+                if (existingClientUser) {
+                    portalAccess = {
+                        enabled: false,
+                        existingAccount: true,
+                        email: existingClientUser.email,
+                        isNewUser: false,
+                        loginUrl: '/login',
+                        message: 'Portal access is already configured for this client. Use your existing credentials or request a reset from Admin.'
+                    };
+                } else {
+                    portalAccess = await provisionClientPortalUser(
+                        client,
+                        clientEmail,
+                        req.body.portalPassword || req.body.password
+                    );
+                }
+            } catch (uErr) {
+                console.error('Auto portal user creation error in submitPublicOnboardingForm:', uErr);
+            }
+        }
+
         // Trigger Notification for Admin & Team
         try {
             await Notification.create({
                 title: 'Client Onboarding Completed',
-                message: `${client.company || client.name} has submitted their custom onboarding details.`,
+                message: `${client.company || client.name} has submitted onboarding details${portalAccess?.enabled ? ' & Portal Account is active' : ''}.`,
                 type: 'client_onboarding',
                 relatedId: client._id
             });
@@ -437,7 +733,8 @@ exports.submitPublicOnboardingForm = async (req, res, next) => {
                 company: client.company,
                 onboardingStatus: client.onboardingStatus,
                 onboardingCompletedAt: client.onboardingCompletedAt
-            }
+            },
+            portalAccess
         });
     } catch (err) {
         next(err);
@@ -579,6 +876,143 @@ exports.deleteOnboardingTemplate = async (req, res, next) => {
         }
         await ClientOnboardingTemplate.findByIdAndDelete(id);
         res.json({ message: 'Template deleted successfully' });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Admin sets or updates login credentials for a client
+exports.setClientPortalAccess = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { email, password, name } = req.body;
+
+        const client = await Client.findById(id);
+        if (!client) return res.status(404).json({ message: 'Client not found' });
+
+        const access = await assertClientAccess(req, client);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
+        const loginEmail = (email || client.email || '').trim().toLowerCase();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!loginEmail || !emailRegex.test(loginEmail)) {
+            return res.status(400).json({ message: 'A valid email is required for portal login access.' });
+        }
+
+        const trimmedPassword = typeof password === 'string' ? password.trim() : '';
+        if (trimmedPassword && trimmedPassword.length < 6) {
+            return res.status(400).json({ message: 'Portal password must be at least 6 characters.' });
+        }
+
+        // Prevent hijacking existing staff/admin accounts or another client's portal user
+        const conflictUser = await User.findOne({ email: loginEmail });
+        if (conflictUser) {
+            if (conflictUser.role !== 'client') {
+                return res.status(409).json({
+                    message: `Cannot convert existing '${conflictUser.role}' account (${loginEmail}) into a client portal login. Use a dedicated client email.`
+                });
+            }
+            if (conflictUser.clientId && conflictUser.clientId !== client._id.toString()) {
+                return res.status(409).json({
+                    message: 'This email is already assigned to another client portal account.'
+                });
+            }
+        }
+
+        // Find existing client portal user linked to this client OR matching unused client email
+        let user = await User.findOne({ clientId: client._id.toString(), role: 'client' }) || conflictUser;
+
+        const plainPassword = trimmedPassword
+            ? trimmedPassword
+            : (!user ? generateSecurePassword('Client@') : null);
+
+        if (user) {
+            user.email = loginEmail;
+            user.clientId = client._id.toString();
+            user.role = 'client';
+            if (name) user.name = name.trim();
+            if (plainPassword) {
+                user.password = plainPassword;
+            }
+            await user.save();
+        } else {
+            user = new User({
+                name: (name || client.name).trim(),
+                email: loginEmail,
+                password: plainPassword,
+                role: 'client',
+                clientId: client._id.toString(),
+                phone: client.phone || ''
+            });
+            await user.save();
+        }
+
+        // Keep client email in sync
+        if (client.email !== loginEmail) {
+            client.email = loginEmail;
+            await client.save();
+        }
+
+        res.json({
+            message: 'Client portal credentials saved successfully',
+            credentials: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                clientId: user.clientId,
+                password: plainPassword || undefined
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Admin gets current portal access status for a client
+exports.getClientPortalAccess = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const client = await Client.findById(id);
+        if (!client) return res.status(404).json({ message: 'Client not found' });
+
+        const access = await assertClientAccess(req, client);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
+        const user = await User.findOne({
+            $or: [
+                { clientId: client._id.toString(), role: 'client' },
+                { email: (client.email || '').toLowerCase().trim(), role: 'client' }
+            ]
+        }).select('-password');
+
+        res.json({
+            hasAccess: !!user,
+            user: user || null
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Admin disables portal access for a client
+exports.disableClientPortalAccess = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const client = await Client.findById(id);
+        if (!client) return res.status(404).json({ message: 'Client not found' });
+
+        const access = await assertClientAccess(req, client);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
+        await User.deleteMany({
+            $or: [
+                { clientId: client._id.toString(), role: 'client' },
+                { email: (client.email || '').toLowerCase().trim(), role: 'client' }
+            ]
+        });
+
+        res.json({ message: 'Client portal access has been disabled' });
     } catch (err) {
         next(err);
     }

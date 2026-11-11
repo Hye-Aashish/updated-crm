@@ -19,6 +19,7 @@ interface ProjectBulkMilestonesDialogProps {
     onOpenChange: (open: boolean) => void
     projectBudget: number
     projectDeadline?: string
+    showPaymentFields?: boolean
     onSave: (milestonesData: Partial<Milestone>[]) => Promise<void>
 }
 
@@ -27,6 +28,7 @@ export function ProjectBulkMilestonesDialog({
     onOpenChange,
     projectBudget,
     projectDeadline,
+    showPaymentFields = false,
     onSave
 }: ProjectBulkMilestonesDialogProps) {
     const [items, setItems] = useState<BulkMilestoneItem[]>([
@@ -89,13 +91,15 @@ export function ProjectBulkMilestonesDialog({
         try {
             const formatted: Partial<Milestone>[] = validItems.map(item => ({
                 name: item.name.trim(),
-                amount: parseFloat(item.amount) || 0,
+                ...(showPaymentFields ? {
+                    amount: parseFloat(item.amount) || 0,
+                    paymentStatus: 'unpaid',
+                    paidAmount: 0
+                } : {}),
                 dueDate: item.dueDate ? new Date(item.dueDate) : undefined,
                 description: item.description.trim(),
                 status: 'pending',
                 completed: false,
-                paymentStatus: 'unpaid',
-                paidAmount: 0
             }))
             await onSave(formatted)
             onOpenChange(false)
@@ -115,40 +119,44 @@ export function ProjectBulkMilestonesDialog({
                             <Layers className="h-5 w-5 text-primary" /> Create Multiple Milestones (Bulk Add)
                         </DialogTitle>
                         <DialogDescription className="text-xs font-medium">
-                            Add multiple milestones at once, auto-calculate budget percentages, and set delivery dates.
+                            {showPaymentFields
+                                ? 'Add multiple milestones at once, auto-calculate budget percentages, and set delivery dates.'
+                                : 'Add multiple milestone stages at once and set delivery dates.'}
                         </DialogDescription>
 
                         {/* Quick Presets */}
-                        <div className="flex flex-wrap items-center gap-2 pt-3">
-                            <span className="text-[11px] font-bold text-muted-foreground uppercase">Auto Split Budget:</span>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleApplySplit([50, 50])}
-                                className="h-7 text-xs font-bold bg-muted/40"
-                            >
-                                <Sparkles className="mr-1 h-3 w-3 text-amber-500" /> 2 Stages (50/50)
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleApplySplit([30, 40, 30])}
-                                className="h-7 text-xs font-bold bg-muted/40"
-                            >
-                                <Sparkles className="mr-1 h-3 w-3 text-amber-500" /> 3 Stages (30/40/30)
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleApplySplit([25, 25, 25, 25])}
-                                className="h-7 text-xs font-bold bg-muted/40"
-                            >
-                                <Sparkles className="mr-1 h-3 w-3 text-amber-500" /> 4 Stages (25/25/25/25)
-                            </Button>
-                        </div>
+                        {showPaymentFields && (
+                            <div className="flex flex-wrap items-center gap-2 pt-3">
+                                <span className="text-[11px] font-bold text-muted-foreground uppercase">Auto Split Budget:</span>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleApplySplit([50, 50])}
+                                    className="h-7 text-xs font-bold bg-muted/40"
+                                >
+                                    <Sparkles className="mr-1 h-3 w-3 text-amber-500" /> 2 Stages (50/50)
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleApplySplit([30, 40, 30])}
+                                    className="h-7 text-xs font-bold bg-muted/40"
+                                >
+                                    <Sparkles className="mr-1 h-3 w-3 text-amber-500" /> 3 Stages (30/40/30)
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleApplySplit([25, 25, 25, 25])}
+                                    className="h-7 text-xs font-bold bg-muted/40"
+                                >
+                                    <Sparkles className="mr-1 h-3 w-3 text-amber-500" /> 4 Stages (25/25/25/25)
+                                </Button>
+                            </div>
+                        )}
                     </DialogHeader>
 
                     {/* Form List Body */}
@@ -184,7 +192,7 @@ export function ProjectBulkMilestonesDialog({
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                                        <div className="md:col-span-5 space-y-1">
+                                        <div className={`${showPaymentFields ? 'md:col-span-5' : 'md:col-span-7'} space-y-1`}>
                                             <Label className="text-xs font-bold">Milestone Title <span className="text-red-500">*</span></Label>
                                             <Input
                                                 placeholder="e.g. Milestone 1: Design & Architecture"
@@ -195,23 +203,25 @@ export function ProjectBulkMilestonesDialog({
                                             />
                                         </div>
 
-                                        <div className="md:col-span-3 space-y-1">
-                                            <Label className="text-xs font-bold">Amount ({getCurrencySymbol()})</Label>
-                                            <Input
-                                                type="number"
-                                                placeholder="e.g. 30000"
-                                                value={item.amount}
-                                                onChange={(e) => updateItem(index, 'amount', e.target.value)}
-                                                className="h-9 text-xs font-bold"
-                                            />
-                                            {projectBudget > 0 && numAmt > 0 && (
-                                                <p className="text-[10px] text-muted-foreground font-semibold">
-                                                    ~{pct}% of budget
-                                                </p>
-                                            )}
-                                        </div>
+                                        {showPaymentFields && (
+                                            <div className="md:col-span-3 space-y-1">
+                                                <Label className="text-xs font-bold">Amount ({getCurrencySymbol()})</Label>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="e.g. 30000"
+                                                    value={item.amount}
+                                                    onChange={(e) => updateItem(index, 'amount', e.target.value)}
+                                                    className="h-9 text-xs font-bold"
+                                                />
+                                                {projectBudget > 0 && numAmt > 0 && (
+                                                    <p className="text-[10px] text-muted-foreground font-semibold">
+                                                        ~{pct}% of budget
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
 
-                                        <div className="md:col-span-4 space-y-1">
+                                        <div className={`${showPaymentFields ? 'md:col-span-4' : 'md:col-span-5'} space-y-1`}>
                                             <Label className="text-xs font-bold">Target Due Date</Label>
                                             <Input
                                                 type="date"
@@ -242,17 +252,19 @@ export function ProjectBulkMilestonesDialog({
                                 <span className="text-muted-foreground">Total Created:</span>{' '}
                                 <span className="text-foreground">{items.length} Milestones</span>
                             </div>
-                            <div>
-                                <span className="text-muted-foreground">Total Amount:</span>{' '}
-                                <span className={totalAmount === projectBudget ? 'text-emerald-600' : 'text-primary'}>
-                                    {formatCurrency(totalAmount)}
-                                </span>
-                                {projectBudget > 0 && (
-                                    <span className="text-[10px] text-muted-foreground ml-1">
-                                        / Budget {formatCurrency(projectBudget)}
+                            {showPaymentFields && (
+                                <div>
+                                    <span className="text-muted-foreground">Total Amount:</span>{' '}
+                                    <span className={totalAmount === projectBudget ? 'text-emerald-600' : 'text-primary'}>
+                                        {formatCurrency(totalAmount)}
                                     </span>
-                                )}
-                            </div>
+                                    {projectBudget > 0 && (
+                                        <span className="text-[10px] text-muted-foreground ml-1">
+                                            / Budget {formatCurrency(projectBudget)}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-2">

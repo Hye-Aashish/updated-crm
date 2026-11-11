@@ -7,6 +7,7 @@ const Client = require('../models/Client');
 const Project = require('../models/Project');
 const Setting = require('../models/Setting');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const { assertProjectAccess } = require('../utils/assertAccess');
 
 function inRange(date, from, to) {
     const d = new Date(date);
@@ -118,6 +119,11 @@ router.get('/budget/:projectId', protect, async (req, res) => {
     try {
         const project = await Project.findById(req.params.projectId).lean();
         if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        const access = await assertProjectAccess(req, project);
+        if (!access.ok) {
+            return res.status(access.status).json({ message: access.message });
+        }
 
         const invoices = await Invoice.find({
             projectId: req.params.projectId,

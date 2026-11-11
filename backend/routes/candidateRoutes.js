@@ -5,8 +5,10 @@ const Candidate = require('../models/Candidate');
 const OnboardingForm = require('../models/OnboardingForm');
 const User = require('../models/User');
 const Setting = require('../models/Setting');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 const upload = require('../utils/multerConfig');
+const uploadPrivate = upload.uploadPrivate;
+const { escapeRegex, generateSecurePassword, signFileAccess } = require('../utils/securityHelpers');
 const sendEmail = require('../utils/sendEmail');
 const generateOfferLetterPDF = require('../utils/generateOfferLetterPDF');
 
@@ -142,7 +144,7 @@ const getDefaultFormConfig = () => ({
 
 // ── 1. FORM CONFIGURATION (HR / ADMIN) ──────────────────────────────────────
 
-router.get('/forms/config', protect, async (req, res) => {
+router.get('/forms/config', protect, checkPermission('offer_letters', 'view'), async (req, res) => {
     try {
         let config = await OnboardingForm.findOne();
         if (!config) {
@@ -178,7 +180,7 @@ router.put('/forms/config', protect, authorize('admin', 'owner'), async (req, re
 // ── 2. CANDIDATE MANAGEMENT (HR / ADMIN) ────────────────────────────────────
 
 // GET all candidates
-router.get('/', protect, async (req, res) => {
+router.get('/', protect, checkPermission('offer_letters', 'view'), async (req, res) => {
     try {
         const { status, search } = req.query;
         let query = {};
@@ -188,11 +190,12 @@ router.get('/', protect, async (req, res) => {
         }
 
         if (search) {
+            const safeSearch = escapeRegex(search);
             query.$or = [
-                { name: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } },
-                { designation: { $regex: search, $options: 'i' } },
-                { phone: { $regex: search, $options: 'i' } }
+                { name: { $regex: safeSearch, $options: 'i' } },
+                { email: { $regex: safeSearch, $options: 'i' } },
+                { designation: { $regex: safeSearch, $options: 'i' } },
+                { phone: { $regex: safeSearch, $options: 'i' } }
             ];
         }
 
@@ -209,7 +212,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // INVITE / CREATE a candidate
-router.post('/invite', protect, async (req, res) => {
+router.post('/invite', protect, checkPermission('offer_letters', 'create'), async (req, res) => {
     try {
         const { name, email, phone, designation, department, sendEmailInvite, ctcAnnual, joiningDate } = req.body;
 
@@ -246,8 +249,8 @@ router.post('/invite', protect, async (req, res) => {
 
         await candidate.save();
 
-        const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
-        const inviteLink = `${origin}/candidate-form/${token}`;
+        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+        const inviteLink = `${frontendBase}/candidate-form/${token}`;
 
         // Send Email if requested
         if (sendEmailInvite) {
@@ -285,7 +288,7 @@ router.post('/invite', protect, async (req, res) => {
 });
 
 // GET candidate by ID
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', protect, checkPermission('offer_letters', 'view'), async (req, res) => {
     try {
         const candidate = await Candidate.findById(req.params.id)
             .populate('approval.approvedBy', 'name email role')
@@ -301,12 +304,12 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // UPDATE candidate basic info / draft
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, checkPermission('offer_letters', 'edit'), async (req, res) => {
     try {
         const candidate = await Candidate.findById(req.params.id);
         if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-        const allowed = ['name', 'email', 'phone', 'designation', 'department', 'status', 'submittedData', 'offerLetter'];
+        const allowed = ['name', 'email', 'phone', 'designation', 'department', 'submittedData', 'offerLetter'];
         allowed.forEach(k => {
             if (req.body[k] !== undefined) candidate[k] = req.body[k];
         });
@@ -332,7 +335,7 @@ router.delete('/:id', protect, authorize('admin', 'owner'), async (req, res) => 
 // ── 3. OFFER LETTER GENERATION & ADMIN APPROVAL WORKFLOW ────────────────────
 
 // GET Default Offer Letter Template & Sections
-router.get('/templates/default', protect, async (req, res) => {
+router.get('/templates/default', protect, checkPermission('offer_letters', 'view'), async (req, res) => {
     try {
         res.json({
             letterHeading: 'EMPLOYEEMENT AGREEMENT',
@@ -347,7 +350,7 @@ router.get('/templates/default', protect, async (req, res) => {
 });
 
 // DRAFT / UPDATE OFFER LETTER
-router.post('/:id/generate-offer', protect, async (req, res) => {
+router.post('/:id/generate-offer', protect, checkPermission('offer_letters', 'edit'), async (req, res) => {
     try {
         const candidate = await Candidate.findById(req.params.id);
         if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
@@ -446,7 +449,7 @@ router.post('/:id/generate-offer', protect, async (req, res) => {
 });
 
 // DOWNLOAD OFFER LETTER PDF (Admin / HR)
-router.get('/:id/pdf', async (req, res) => {
+router.get('/:id/pdf', protect, checkPermission('offer_letters', 'view'), async (req, res) => {
     try {
         const candidate = await Candidate.findById(req.params.id);
         if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
@@ -468,7 +471,7 @@ router.get('/:id/pdf', async (req, res) => {
 });
 
 // SUBMIT OFFER LETTER FOR ADMIN APPROVAL
-router.post('/:id/request-approval', protect, async (req, res) => {
+router.post('/:id/request-approval', protect, checkPermission('offer_letters', 'edit'), async (req, res) => {
     try {
         const candidate = await Candidate.findById(req.params.id);
         if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
@@ -542,7 +545,7 @@ router.post('/:id/approve', protect, authorize('admin', 'owner'), async (req, re
 });
 
 // SEND APPROVED OFFER LETTER TO CANDIDATE (EMAIL + PDF)
-router.post('/:id/send-offer', protect, async (req, res) => {
+router.post('/:id/send-offer', protect, checkPermission('offer_letters', 'edit'), async (req, res) => {
     try {
         const candidate = await Candidate.findById(req.params.id);
         if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
@@ -558,8 +561,8 @@ router.post('/:id/send-offer', protect, async (req, res) => {
         // Generate PDF Buffer for attachment
         const pdfBuffer = await generateOfferLetterPDF(candidate, companyProfile);
 
-        const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
-        const offerPortalLink = `${origin}/offer/${candidate.token}`;
+        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+        const offerPortalLink = `${frontendBase}/offer/${candidate.token}`;
 
         let emailSent = false;
         let emailErrMessage = '';
@@ -632,9 +635,10 @@ router.post('/:id/convert-to-employee', protect, authorize('admin', 'owner'), as
         // Check if user already exists
         let user = await User.findOne({ email: candidate.email });
         if (!user) {
-            // Generate temporary password
-            const tempPassword = 'User@' + Math.floor(100000 + Math.random() * 900000);
-            
+            // Generate cryptographically secure temporary password
+            const tempPassword = generateSecurePassword('User@');
+            const backendBase = (process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+
             // Map documents
             const aadharDoc = candidate.documents?.find(d => d.documentId === 'aadhar_card' || d.name?.toLowerCase().includes('aadhar'))?.fileUrl;
             const panDoc = candidate.documents?.find(d => d.documentId === 'pan_card' || d.name?.toLowerCase().includes('pan'))?.fileUrl;
@@ -659,7 +663,7 @@ router.post('/:id/convert-to-employee', protect, authorize('admin', 'owner'), as
                 avatar: photoDoc || '',
                 documentAadhar: aadharDoc || '',
                 documentPan: panDoc || '',
-                documentOfferLetter: `${req.protocol}://${req.get('host')}/api/candidates/${candidate._id}/pdf`
+                documentOfferLetter: `${backendBase}/api/candidates/${candidate._id}/pdf`
             });
 
             await user.save();
@@ -725,8 +729,8 @@ router.get('/public/:token', async (req, res) => {
     }
 });
 
-// PUBLIC DOCUMENT UPLOAD (Multer)
-router.post('/public/:token/upload', upload.single('file'), async (req, res) => {
+// PUBLIC DOCUMENT UPLOAD (Multer — stored privately with HMAC capability URL)
+router.post('/public/:token/upload', uploadPrivate.single('file'), async (req, res) => {
     try {
         const candidate = await Candidate.findOne({ token: req.params.token });
         if (!candidate) {
@@ -737,7 +741,9 @@ router.post('/public/:token/upload', upload.single('file'), async (req, res) => 
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const fileUrl = `${req.protocol}://${req.get('host')}/public/uploads/${req.file.filename}`;
+        const backendBase = (process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+        const sig = signFileAccess(req.file.filename);
+        const fileUrl = `${backendBase}/api/files/secure/${encodeURIComponent(req.file.filename)}?access=${sig}`;
         const docId = req.body.documentId || 'doc_' + Date.now();
         const docName = req.body.name || req.file.originalname;
 

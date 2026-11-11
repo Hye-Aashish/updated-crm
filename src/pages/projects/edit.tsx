@@ -25,12 +25,15 @@ import {
 } from "@/components/ui/popover"
 import { mapProject, mapClient } from '@/lib/mappers'
 import { getCurrencySymbol, formatCurrency } from '@/lib/utils'
+import { isAdminOrOwnerRole, usePortalPrefix } from '@/lib/nav-utils'
 
 export function EditProjectPage() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const { projects, clients, updateProject, setProjects, currentUser } = useAppStore()
+    const canViewProjectPayments = isAdminOrOwnerRole(currentUser?.role)
     const [loading, setLoading] = useState(false)
 
     // Find project
@@ -145,7 +148,7 @@ export function EditProjectPage() {
             const formattedMilestones = milestones.map(m => ({
                 name: m.name,
                 dueDate: m.dueDate ? new Date(m.dueDate) : undefined,
-                amount: parseFloat(m.amount) || 0,
+                ...(canViewProjectPayments ? { amount: parseFloat(m.amount) || 0 } : {}),
                 description: m.description,
                 completed: m.completed || m.status === 'completed',
                 status: m.status || (m.completed ? 'completed' : 'pending')
@@ -156,12 +159,23 @@ export function EditProjectPage() {
             const newProgress = formattedMilestones.length > 0 ? Math.round((completedCount / formattedMilestones.length) * 100) : project.progress
 
             // Send data to Backend API
-            const response = await api.put(`/projects/${project.id}`, {
-                ...formData,
+            const updatePayload: any = {
+                name: formData.name,
+                description: formData.description,
+                clientId: formData.clientId,
+                status: formData.status,
                 dueDate: formData.deadline,
+                type: formData.type,
+                priority: formData.priority,
                 milestones: formattedMilestones,
                 progress: newProgress
-            })
+            }
+            if (canViewProjectPayments) {
+                updatePayload.budget = formData.budget
+                updatePayload.paymentModel = formData.paymentModel
+                updatePayload.autoInvoice = formData.autoInvoice
+            }
+            const response = await api.put(`/projects/${project.id}`, updatePayload)
 
             const updatedProject = mapProject(response.data)
 
@@ -173,7 +187,7 @@ export function EditProjectPage() {
                 description: `${formData.name} has been updated successfully.`,
             })
 
-            navigate(`/projects/${project.id}`)
+            navigate(`${portalPrefix}/projects/${project.id}`)
         } catch (error) {
             console.error(error)
             toast({
@@ -197,7 +211,7 @@ export function EditProjectPage() {
     return (
         <div className="space-y-6 max-w-2xl mx-auto p-6">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/projects')}>
+                <Button variant="ghost" size="icon" onClick={() => navigate(`${portalPrefix}/projects`)}>
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div>
@@ -273,7 +287,7 @@ export function EditProjectPage() {
                         </div>
 
                         <div className="grid gap-4 md:grid-cols-2">
-                            {['owner', 'admin'].includes(currentUser?.role) && (
+                            {canViewProjectPayments && (
                                 <div className="space-y-2">
                                     <Label htmlFor="budget">Budget ({getCurrencySymbol()})</Label>
                                     <Input
@@ -355,10 +369,12 @@ export function EditProjectPage() {
                                 <div>
                                     <h4 className="text-base font-semibold flex items-center gap-2">
                                         <Flag className="h-4 w-4 text-primary" />
-                                        Project Milestones & Payment Stages
+                                        {canViewProjectPayments ? 'Project Milestones & Payment Stages' : 'Project Milestones & Delivery Stages'}
                                     </h4>
                                     <p className="text-xs text-muted-foreground">
-                                        Configure deliverables, target dates, and payment amounts for each milestone stage.
+                                        {canViewProjectPayments
+                                            ? 'Configure deliverables, target dates, and payment amounts for each milestone stage.'
+                                            : 'Configure deliverables and target dates for each milestone stage.'}
                                     </p>
                                 </div>
                                 <Button
@@ -399,7 +415,7 @@ export function EditProjectPage() {
                                             </div>
 
                                             <div className="grid gap-3 sm:grid-cols-12">
-                                                <div className="sm:col-span-6 space-y-1">
+                                                <div className={`${canViewProjectPayments ? 'sm:col-span-6' : 'sm:col-span-8'} space-y-1`}>
                                                     <Label className="text-xs">Milestone Title</Label>
                                                     <Input
                                                         placeholder="e.g. Design & Wireframes"
@@ -409,7 +425,7 @@ export function EditProjectPage() {
                                                         required
                                                     />
                                                 </div>
-                                                <div className="sm:col-span-3 space-y-1">
+                                                <div className={`${canViewProjectPayments ? 'sm:col-span-3' : 'sm:col-span-4'} space-y-1`}>
                                                     <Label className="text-xs">Target Due Date</Label>
                                                     <Input
                                                         type="date"
@@ -419,59 +435,65 @@ export function EditProjectPage() {
                                                         required
                                                     />
                                                 </div>
-                                                <div className="sm:col-span-3 space-y-1">
-                                                    <Label className="text-xs">Amount ({getCurrencySymbol()})</Label>
-                                                    <Input
-                                                        type="number"
-                                                        placeholder="e.g. 25000"
-                                                        value={m.amount}
-                                                        onChange={(e) => updateMilestoneRow(idx, 'amount', e.target.value)}
-                                                        className="h-8 text-sm"
-                                                        min="0"
-                                                    />
-                                                </div>
+                                                {canViewProjectPayments && (
+                                                    <div className="sm:col-span-3 space-y-1">
+                                                        <Label className="text-xs">Amount ({getCurrencySymbol()})</Label>
+                                                        <Input
+                                                            type="number"
+                                                            placeholder="e.g. 25000"
+                                                            value={m.amount}
+                                                            onChange={(e) => updateMilestoneRow(idx, 'amount', e.target.value)}
+                                                            className="h-8 text-sm"
+                                                            min="0"
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
 
                                     {/* Milestone Total Tally */}
-                                    <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs">
-                                        <span className="font-medium text-foreground">
-                                            Total Milestone Sum: <strong>{formatCurrency(totalMilestoneSum)}</strong>
-                                        </span>
-                                        {parseFloat(formData.budget) > 0 && (
-                                            <span className={`font-semibold ${totalMilestoneSum === parseFloat(formData.budget) ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                                {Math.round((totalMilestoneSum / parseFloat(formData.budget)) * 100)}% of Project Budget ({formatCurrency(parseFloat(formData.budget))})
+                                    {canViewProjectPayments && (
+                                        <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs">
+                                            <span className="font-medium text-foreground">
+                                                Total Milestone Sum: <strong>{formatCurrency(totalMilestoneSum)}</strong>
                                             </span>
-                                        )}
-                                    </div>
+                                            {parseFloat(formData.budget) > 0 && (
+                                                <span className={`font-semibold ${totalMilestoneSum === parseFloat(formData.budget) ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                    {Math.round((totalMilestoneSum / parseFloat(formData.budget)) * 100)}% of Project Budget ({formatCurrency(parseFloat(formData.budget))})
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
 
-                        <div className="flex items-center justify-between p-4 rounded-lg border bg-slate-50/50">
-                            <div className="space-y-0.5">
-                                <div className="flex items-center gap-2">
-                                    <Label className="text-base">Auto-Generate Invoice</Label>
-                                    <Popover>
-                                        <PopoverTrigger>
-                                            <Info className="h-4 w-4 text-slate-400" />
-                                        </PopoverTrigger>
-                                        <PopoverContent className="text-xs">
-                                            When project matches 'Completed' status, an invoice will be automatically generated and sent to the client's email.
-                                        </PopoverContent>
-                                    </Popover>
+                        {canViewProjectPayments && (
+                            <div className="flex items-center justify-between p-4 rounded-lg border bg-slate-50/50">
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <Label className="text-base">Auto-Generate Invoice</Label>
+                                        <Popover>
+                                            <PopoverTrigger>
+                                                <Info className="h-4 w-4 text-slate-400" />
+                                            </PopoverTrigger>
+                                            <PopoverContent className="text-xs">
+                                                When project matches 'Completed' status, an invoice will be automatically generated and sent to the client's email.
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">Automatically bill the client upon completion</p>
                                 </div>
-                                <p className="text-sm text-muted-foreground">Automatically bill the client upon completion</p>
+                                <Switch
+                                    checked={formData.autoInvoice}
+                                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, autoInvoice: checked }))}
+                                />
                             </div>
-                            <Switch
-                                checked={formData.autoInvoice}
-                                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, autoInvoice: checked }))}
-                            />
-                        </div>
+                        )}
 
                         <div className="flex justify-end gap-3 pt-4">
-                            <Button type="button" variant="outline" onClick={() => navigate('/projects')}>
+                            <Button type="button" variant="outline" onClick={() => navigate(`${portalPrefix}/projects`)}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={loading}>

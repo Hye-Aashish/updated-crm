@@ -254,11 +254,20 @@ export function SalesFilterBar({
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all" className="text-xs font-semibold">All Stages</SelectItem>
-                            <SelectItem value="new" className="text-xs font-semibold">New Lead</SelectItem>
-                            <SelectItem value="contacted" className="text-xs font-semibold">Contacted</SelectItem>
-                            <SelectItem value="qualified" className="text-xs font-semibold">Qualified</SelectItem>
-                            <SelectItem value="pending-meeting" className="text-xs font-semibold">Pending Meeting</SelectItem>
-                            <SelectItem value="closed" className="text-xs font-semibold">Deals Won</SelectItem>
+                            {stages && stages.length > 0 ? (
+                                stages.map((st: any) => (
+                                    <SelectItem key={st.id} value={st.id} className="text-xs font-semibold">
+                                        {st.label}
+                                    </SelectItem>
+                                ))
+                            ) : (
+                                <>
+                                    <SelectItem value="new" className="text-xs font-semibold">New Lead</SelectItem>
+                                    <SelectItem value="discussion" className="text-xs font-semibold">In Discussion</SelectItem>
+                                    <SelectItem value="proposal" className="text-xs font-semibold">Proposal Sent</SelectItem>
+                                    <SelectItem value="closed" className="text-xs font-semibold">Closed / Won</SelectItem>
+                                </>
+                            )}
                         </SelectContent>
                     </Select>
                 </div>

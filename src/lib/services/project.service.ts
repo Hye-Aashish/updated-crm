@@ -23,6 +23,11 @@ export const ProjectService = {
         return mapProject(response.data);
     },
 
+    async updateDeliverables(id: string, deliverables: Partial<Project>): Promise<Project> {
+        const response = await api.put(`/projects/${id}/deliverables`, deliverables);
+        return mapProject(response.data);
+    },
+
     async delete(id: string): Promise<void> {
         await api.delete(`/projects/${id}`);
     }

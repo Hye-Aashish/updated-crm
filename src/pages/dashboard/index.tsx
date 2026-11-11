@@ -25,6 +25,7 @@ import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { LivePresenceBoard } from '@/components/attendance/live-presence-board'
 import { SalesDashboardSection } from '@/components/dashboard/sales-dashboard-section'
 import { UpcomingScheduleWidget } from '@/components/calendar/upcoming-schedule-widget'
+import { isAdminOrOwnerRole, usePortalPrefix } from '@/lib/nav-utils'
 
 type DashboardTab = 'all' | 'finance' | 'work' | 'operations'
 
@@ -32,7 +33,8 @@ const FUNNEL_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'] as
 
 export function DashboardPage() {
     const navigate = useNavigate()
-    const { currentUser, leads, setLeads, setExpenses, setProjects, setInvoices, setTasks, invoices, setTickets } = useAppStore()
+    const portalPrefix = usePortalPrefix()
+    const { currentUser, leads, tasks, projects, setLeads, setExpenses, setProjects, setInvoices, setTasks, invoices, setTickets } = useAppStore()
     const [settings, setSettings] = useState<any>(null)
     const [, setTodayAttendance] = useState<any[]>([])
     const [amcStats, setAmcStats] = useState<any>(null)
@@ -84,7 +86,18 @@ export function DashboardPage() {
         relevantInvoices
     } = useDashboardMetrics(settings)
 
-    const isAdmin = ['admin', 'owner'].includes(currentUser?.role)
+    const isAdmin = isAdminOrOwnerRole(currentUser?.role)
+    const isClientUser = currentUser?.role === 'client'
+
+    const myActiveTasks = useMemo(() => {
+        if (!userId || isClientUser) return []
+        return tasks.filter(
+            (t) =>
+                String(t.assigneeId || '') === String(userId) &&
+                String(t.status || '') !== 'done' &&
+                String(t.status || '') !== 'completed'
+        )
+    }, [tasks, userId, isClientUser])
 
     // Stable Greeting & Formatted Date (avoids 1-second interval re-render thrashing)
     const greeting = useMemo(() => {
@@ -243,7 +256,7 @@ export function DashboardPage() {
                     
                     {/* Executive Clay Greeting Banner */}
                     {currentLayout.includes('hero') && (
-                        <div className={`${currentLayout.includes('session') && currentUser.role !== 'client' ? 'lg:col-span-8' : 'lg:col-span-12'} clay-card p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden`}>
+                        <div className={`${currentLayout.includes('session') && currentUser.role !== 'client' ? 'lg:col-span-8' : 'lg:col-span-12'} clay-card p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden min-w-0`}>
                             {/* Decorative Clay Accent Glow */}
                             <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
                             <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/10 rounded-full blur-2xl pointer-events-none -ml-20 -mb-20" />
@@ -362,7 +375,7 @@ export function DashboardPage() {
 
                     {/* Clay Shift Session Card */}
                     {currentLayout.includes('session') && currentUser?.role !== 'client' && (
-                        <div className={`${currentLayout.includes('hero') ? 'lg:col-span-4' : 'lg:col-span-12'} clay-card p-5 sm:p-6 flex flex-col justify-between`}>
+                        <div className={`${currentLayout.includes('hero') ? 'lg:col-span-4' : 'lg:col-span-12'} clay-card p-5 sm:p-6 flex flex-col justify-between min-w-0`}>
                             <div className="flex items-center justify-between">
                                 <div>
                                     <span className="text-[10px] font-bold text-primary uppercase tracking-wider block">Shift Session</span>
@@ -638,25 +651,90 @@ export function DashboardPage() {
                             variant="ghost" 
                             size="sm"
                             className="h-8 rounded-xl text-xs font-bold px-3"
-                            onClick={() => navigate('/tasks')}
+                            onClick={() => navigate(`${portalPrefix}/tasks`)}
                         >
                             All Tasks <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
                         </Button>
                     </div>
                     <AutoGrid minWidth="160px" gap="gap-3">
                         {!hiddenSubItems.includes('todo') && (
-                            <StatCard label="To Do" value={todoTasks} icon={Layers} color="text-slate-600 dark:text-slate-400" bg="bg-slate-100 dark:bg-slate-900" onClick={() => navigate('/tasks?status=todo')} />
+                            <StatCard label="To Do" value={todoTasks} icon={Layers} color="text-slate-600 dark:text-slate-400" bg="bg-slate-100 dark:bg-slate-900" onClick={() => navigate(`${portalPrefix}/tasks?status=todo`)} />
                         )}
                         {!hiddenSubItems.includes('in_progress') && (
-                            <StatCard label="In Progress" value={inProgressTasks} icon={PlayCircle} color="text-blue-600 dark:text-blue-400" bg="bg-blue-100 dark:bg-blue-950/50" onClick={() => navigate('/tasks?status=in-progress')} />
+                            <StatCard label="In Progress" value={inProgressTasks} icon={PlayCircle} color="text-blue-600 dark:text-blue-400" bg="bg-blue-100 dark:bg-blue-950/50" onClick={() => navigate(`${portalPrefix}/tasks?status=in-progress`)} />
                         )}
                         {!hiddenSubItems.includes('review') && (
-                            <StatCard label="Review" value={reviewTasks} icon={Target} color="text-amber-600 dark:text-amber-400" bg="bg-amber-100 dark:bg-amber-950/50" onClick={() => navigate('/tasks?status=review')} />
+                            <StatCard label="Review" value={reviewTasks} icon={Target} color="text-amber-600 dark:text-amber-400" bg="bg-amber-100 dark:bg-amber-950/50" onClick={() => navigate(`${portalPrefix}/tasks?status=review`)} />
                         )}
                         {!hiddenSubItems.includes('done') && (
-                            <StatCard label="Completed" value={doneTasks} icon={CheckSquare} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950/50" onClick={() => navigate('/tasks?status=done')} />
+                            <StatCard label="Completed" value={doneTasks} icon={CheckSquare} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950/50" onClick={() => navigate(`${portalPrefix}/tasks?status=done`)} />
                         )}
                     </AutoGrid>
+                    {!isClientUser && (
+                        <div className="pt-3 border-t border-border/40 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-extrabold uppercase tracking-wider text-foreground">My Tasks</span>
+                                    <Badge variant="secondary" className="text-[10px] font-bold px-2 py-0.5">
+                                        {myActiveTasks.length}
+                                    </Badge>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 rounded-lg text-[11px] font-bold px-2.5 text-primary"
+                                    onClick={() => navigate(`${portalPrefix}/tasks`)}
+                                >
+                                    View My Tasks <ArrowUpRight className="ml-1 h-3 w-3" />
+                                </Button>
+                            </div>
+                            {myActiveTasks.length === 0 ? (
+                                <div className="text-xs text-muted-foreground font-medium py-3 text-center rounded-xl bg-muted/30">
+                                    No active tasks assigned to you right now.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                    {myActiveTasks.slice(0, 6).map((t) => {
+                                        const proj = projects.find((p) => p.id === t.projectId || (p as any)._id === t.projectId)
+                                        const dueObj = t.dueDate ? new Date(t.dueDate) : null
+                                        const dueLabel = dueObj && !isNaN(dueObj.getTime())
+                                            ? dueObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                                            : null
+                                        return (
+                                            <div
+                                                key={t.id}
+                                                onClick={() => navigate(`${portalPrefix}/tasks/${t.id}`)}
+                                                className="clay-card p-3 bg-card hover:bg-card/90 transition-all cursor-pointer flex items-center justify-between gap-3"
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <span
+                                                        className={`h-2 w-2 rounded-full shrink-0 ${
+                                                            t.priority === 'urgent'
+                                                                ? 'bg-rose-500'
+                                                                : t.priority === 'high'
+                                                                ? 'bg-orange-500'
+                                                                : t.priority === 'medium'
+                                                                ? 'bg-amber-500'
+                                                                : 'bg-slate-400'
+                                                        }`}
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-bold text-foreground truncate">{t.title}</p>
+                                                        <p className="text-[11px] text-muted-foreground truncate">
+                                                            {proj?.name || 'Project'}{dueLabel ? ` • Due ${dueLabel}` : ''}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Badge variant="outline" className="text-[10px] font-bold uppercase shrink-0">
+                                                    {(t.status || 'todo').replace('-', ' ')}
+                                                </Badge>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </Card>
             )}
 
@@ -693,15 +771,17 @@ export function DashboardPage() {
                                         <Progress value={project.progress || 0} className="h-2 rounded-full bg-background" />
                                     </div>
                                     <div className="flex items-center justify-between pt-3 border-t border-border/40 text-xs">
-                                        <div>
-                                            <span className="text-muted-foreground block text-[10px] font-bold uppercase">Budget</span>
-                                            <span className="font-extrabold text-foreground">{formatCurrency(project.budget || 0)}</span>
-                                        </div>
+                                        {isAdminOrOwnerRole(currentUser?.role) ? (
+                                            <div>
+                                                <span className="text-muted-foreground block text-[10px] font-bold uppercase">Budget</span>
+                                                <span className="font-extrabold text-foreground">{formatCurrency(project.budget || 0)}</span>
+                                            </div>
+                                        ) : <div />}
                                         <Button 
                                             variant="ghost" 
                                             size="sm" 
                                             className="h-8 text-xs font-bold rounded-xl" 
-                                            onClick={() => navigate(`/projects/${project.id || project._id}`)}
+                                            onClick={() => navigate(`${portalPrefix}/projects/${project.id || project._id}`)}
                                         >
                                             Details <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
                                         </Button>
@@ -942,7 +1022,7 @@ export function DashboardPage() {
                                     {!hiddenSubItems.includes('overdue') && relevantTasks.filter(t => t.status !== 'done').slice(0, 3).map((t, i) => (
                                         <div
                                             key={i}
-                                            onClick={() => navigate('/tasks')}
+                                            onClick={() => navigate(`${portalPrefix}/tasks/${t.id}`)}
                                             className="clay-card p-3 bg-card hover:bg-card/90 transition-all cursor-pointer flex items-center justify-between"
                                         >
                                             <span className="text-xs font-bold line-clamp-1 flex-1 mr-2 leading-snug" title={t.title}>{t.title}</span>

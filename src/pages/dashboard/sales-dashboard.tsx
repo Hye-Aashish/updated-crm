@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -51,9 +51,33 @@ export function SalesDashboardPage() {
 
     const [loading, setLoading] = useState<boolean>(true)
     const [data, setData] = useState<any>(null)
+    const [pipelineStages, setPipelineStages] = useState<any[]>([])
     const [analyticsOverview, setAnalyticsOverview] = useState<any>(null)
     const [searchQuery, setSearchQuery] = useState<string>('')
     const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false)
+
+    useEffect(() => {
+        api.get('/leads/stages').then(res => {
+            if (Array.isArray(res.data) && res.data.length > 0) {
+                setPipelineStages(res.data)
+            }
+        }).catch(() => {})
+    }, [])
+
+    const displayStages = useMemo(() => {
+        if (data?.pipelineStages && Array.isArray(data.pipelineStages) && data.pipelineStages.length > 0) {
+            return data.pipelineStages
+        }
+        if (pipelineStages.length > 0) {
+            return pipelineStages
+        }
+        return [
+            { id: 'new', label: 'New Leads', color: 'bg-blue-500' },
+            { id: 'discussion', label: 'In Discussion', color: 'bg-yellow-500' },
+            { id: 'proposal', label: 'Proposal Sent', color: 'bg-purple-500' },
+            { id: 'closed', label: 'Closed / Won', color: 'bg-green-500' },
+        ]
+    }, [data?.pipelineStages, pipelineStages])
 
     const fetchSalesData = async () => {
         try {
@@ -200,6 +224,7 @@ export function SalesDashboardPage() {
                 onReset={handleResetFilters}
                 onExport={handleExportReport}
                 agents={data?.allAgents || data?.agents || []}
+                stages={displayStages}
                 isPersonalView={isPersonal}
             />
 
@@ -524,31 +549,33 @@ export function SalesDashboardPage() {
                             </span>
                         </div>
 
-                        <div className="space-y-3 text-xs">
-                            {[
-                                { label: 'New Leads Inflow', count: (summary?.stageCounts?.['new'] || 0) + (summary?.stageCounts?.['new-lead'] || 0), color: 'bg-blue-500' },
-                                { label: 'Contacted Leads', count: summary?.stageCounts?.['contacted'] || 0, color: 'bg-amber-500' },
-                                { label: 'Qualified Leads', count: summary?.stageCounts?.['qualified'] || 0, color: 'bg-purple-500' },
-                                { label: 'Pending Meeting', count: summary?.stageCounts?.['pending-meeting'] || 0, color: 'bg-emerald-500' },
-                                { label: 'Deals Won & Closed', count: (summary?.stageCounts?.['closed'] || 0) + (summary?.stageCounts?.['won'] || 0), color: 'bg-green-600' },
-                            ].map((stage, idx) => {
-                                const total = summary?.totalLeads || 1
-                                const pct = Math.round((stage.count / total) * 100)
+                        <div className="space-y-3 text-xs max-h-[340px] overflow-y-auto pr-1 custom-scrollbar">
+                            {displayStages.map((stage: any, idx: number) => {
+                                const stageKey = (stage.id || '').toLowerCase()
+                                const stageLabelKey = (stage.label || '').toLowerCase()
+                                const count = summary?.stageCounts?.[stageKey]
+                                    ?? summary?.stageCounts?.[stageLabelKey]
+                                    ?? (stageKey === 'new' ? ((summary?.stageCounts?.['new'] || 0) + (summary?.stageCounts?.['new-lead'] || 0)) : 0)
+                                    ?? 0
+                                const total = summary?.totalLeads || 0
+                                const pct = total > 0 ? Math.round((count / total) * 100) : 0
+                                const colorClass = stage.color || 'bg-primary'
+
                                 return (
-                                    <div key={idx} className="space-y-1">
+                                    <div key={stage.id || idx} className="space-y-1">
                                         <div className="flex items-center justify-between text-[11px] font-semibold">
-                                            <span className="flex items-center gap-1.5 text-foreground">
-                                                <span className={`h-2 w-2 rounded-full ${stage.color}`} />
-                                                {stage.label}
+                                            <span className="flex items-center gap-1.5 text-foreground truncate max-w-[170px]" title={stage.label}>
+                                                <span className={`h-2 w-2 rounded-full ${colorClass} shrink-0`} />
+                                                <span className="truncate">{stage.label}</span>
                                             </span>
-                                            <span className="text-muted-foreground">
-                                                <strong className="text-foreground">{stage.count}</strong> ({pct}%)
+                                            <span className="text-muted-foreground shrink-0">
+                                                <strong className="text-foreground">{count}</strong> ({pct}%)
                                             </span>
                                         </div>
                                         <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden">
                                             <div 
-                                                className={`h-full ${stage.color} rounded-full transition-all duration-500`}
-                                                style={{ width: `${Math.max(3, pct)}%` }}
+                                                className={`h-full ${colorClass} rounded-full transition-all duration-500`}
+                                                style={{ width: `${Math.max(count > 0 ? 5 : 0, pct)}%` }}
                                             />
                                         </div>
                                     </div>

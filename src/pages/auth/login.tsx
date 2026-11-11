@@ -55,6 +55,7 @@ export function LoginPage() {
                 localStorage.setItem('token', userData.token)
             }
 
+            useAppStore.getState().resetWorkspaceData()
             setCurrentUser(userData)
             
             // Identify in Tracker if available
@@ -72,7 +73,14 @@ export function LoginPage() {
                     await registerWebAuthnUnlock(userData._id || userData.id || userData.email, userData.name || userData.email)
                 }
             } catch { /* optional — never block login */ }
-            navigate('/dashboard')
+
+            if (userData.role === 'client') {
+                navigate('/client/dashboard')
+            } else if (userData.role === 'employee') {
+                navigate('/employee/dashboard')
+            } else {
+                navigate('/dashboard')
+            }
         } catch (error: any) {
             const isInvalidCreds = error.status === 401 || (error.message && error.message.toLowerCase().includes('invalid'));
             toast({

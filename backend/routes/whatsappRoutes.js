@@ -1,9 +1,11 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const Lead = require('../models/Lead');
 const Setting = require('../models/Setting');
 const Notification = require('../models/Notification');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
+const { timingSafeEqualStr } = require('../utils/securityHelpers');
 
 /**
  * 1. GET /api/whatsapp/webhook
@@ -16,9 +18,13 @@ router.get('/webhook', async (req, res) => {
         const challenge = req.query['hub.challenge'];
 
         const settings = await Setting.findOne({ type: 'general' });
-        const expectedToken = settings?.whatsappSettings?.webhookVerifyToken || 'nexcrm_wa_secret';
+        const expectedToken = settings?.whatsappSettings?.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
 
-        if (mode === 'subscribe' && token === expectedToken) {
+        if (!expectedToken) {
+            return res.status(403).json({ message: 'Webhook verification token not configured' });
+        }
+
+        if (mode === 'subscribe' && timingSafeEqualStr(String(token || ''), String(expectedToken))) {
             console.log('✅ [WhatsApp Webhook] Verification successful!');
             return res.status(200).send(challenge);
         } else {
@@ -38,9 +44,36 @@ const { getSessionStatus, logoutClient } = require('../services/whatsappClient')
  * 2. POST /api/whatsapp/webhook
  * Receives incoming WhatsApp messages (Meta Cloud API or Generic Webhook)
  */
+const requireWhatsAppSender = async (req, res, next) => {
+    if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+    if (req.user.role === 'admin' || req.user.role === 'owner') return next();
+    if (req.user.role === 'client') {
+        return res.status(403).json({ message: 'Clients are not permitted to send WhatsApp messages' });
+    }
+    try {
+        const settings = await Setting.findOne({ type: 'general' }).lean();
+        const roleCfg = settings?.roles?.find(r => r.name === req.user.role);
+        const perms = roleCfg?.permissions || {};
+        const allowed = Boolean(
+            perms.leads?.edit ||
+            perms.leads?.create ||
+            perms.campaigns?.send ||
+            perms.invoices?.send_whatsapp ||
+            (!roleCfg && ['pm', 'sales'].includes(req.user.role))
+        );
+        if (!allowed) {
+            return res.status(403).json({ message: 'Access denied. Insufficient WhatsApp messaging permissions.' });
+        }
+        return next();
+    } catch (e) {
+        return res.status(500).json({ message: 'Permission verification error' });
+    }
+};
+
 router.post('/webhook', async (req, res) => {
     try {
         const body = req.body;
+        const settings = await Setting.findOne({ type: 'general' }).lean();
 
         let rawPhone = '';
         let senderName = '';
@@ -49,6 +82,24 @@ router.post('/webhook', async (req, res) => {
 
         // Check if Meta WhatsApp Cloud API Payload
         if (body.object === 'whatsapp_business_account' && body.entry?.[0]?.changes?.[0]?.value) {
+            const appSecret = settings?.whatsappSettings?.appSecret || process.env.META_APP_SECRET || process.env.WHATSAPP_APP_SECRET;
+            const signatureHeader = req.headers['x-hub-signature-256'];
+            const expectedToken = settings?.whatsappSettings?.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+            const fallbackHeaderToken = req.headers['x-webhook-token'] || req.query.secret || req.query.token;
+
+            let verified = false;
+            if (appSecret && signatureHeader && req.rawBody) {
+                const expectedSig = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
+                verified = timingSafeEqualStr(String(signatureHeader), expectedSig);
+            } else if (!appSecret && expectedToken && fallbackHeaderToken) {
+                verified = timingSafeEqualStr(String(fallbackHeaderToken), String(expectedToken));
+            }
+
+            if (!verified) {
+                console.warn('[SECURITY] Meta WhatsApp webhook rejected: missing or invalid signature/token');
+                return res.status(403).json({ message: 'Forbidden: Invalid WhatsApp webhook signature' });
+            }
+
             const value = body.entry[0].changes[0].value;
             const msg = value.messages?.[0];
             const contact = value.contacts?.[0];
@@ -63,12 +114,11 @@ router.post('/webhook', async (req, res) => {
             messageText = msg.text?.body || msg.caption || `[${msg.type} Attachment]`;
             notes = `Meta Message ID: ${msg.id}`;
         } else {
-            // Generic Webhook Payload (Verify token requirement)
-            const settings = await Setting.findOne({ type: 'general' });
-            const expectedToken = settings?.whatsappSettings?.webhookVerifyToken || 'nexcrm_wa_secret';
+            // Generic Webhook Payload (Strict verification required in all environments)
+            const expectedToken = settings?.whatsappSettings?.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
             const providedToken = req.headers['x-webhook-token'] || req.query.secret || req.query.token || body.secret || body.token;
 
-            if (providedToken !== expectedToken && process.env.NODE_ENV === 'production') {
+            if (!expectedToken || !timingSafeEqualStr(String(providedToken || ''), String(expectedToken))) {
                 console.warn('[SECURITY] Generic WhatsApp webhook rejected: Token mismatch');
                 return res.status(403).json({ message: 'Forbidden: Invalid webhook secret token' });
             }
@@ -105,7 +155,7 @@ router.post('/webhook', async (req, res) => {
  * 3. POST /api/whatsapp/test-webhook
  * Trigger test WhatsApp lead creation / comment from UI
  */
-router.post('/test-webhook', protect, async (req, res) => {
+router.post('/test-webhook', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const { phone, name, message, notes } = req.body;
         if (!phone) {
@@ -134,7 +184,7 @@ router.post('/test-webhook', protect, async (req, res) => {
  * 4. POST /api/whatsapp/send
  * Outbound WhatsApp message dispatcher
  */
-router.post('/send', protect, async (req, res) => {
+router.post('/send', protect, requireWhatsAppSender, async (req, res) => {
     try {
         const { phone, message, leadId } = req.body;
         if (!phone || !message) {
@@ -203,7 +253,7 @@ router.post('/send', protect, async (req, res) => {
  * 5. GET /api/whatsapp/qr-session
  * Fetch live WhatsApp QR Code & pairing status from local client
  */
-router.get('/qr-session', protect, async (req, res) => {
+router.get('/qr-session', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const sessionInfo = getSessionStatus();
         
@@ -224,7 +274,7 @@ router.get('/qr-session', protect, async (req, res) => {
  * 6. POST /api/whatsapp/pair-device
  * Removed simulation. Inform frontend to use QR code.
  */
-router.post('/pair-device', protect, async (req, res) => {
+router.post('/pair-device', protect, authorize('admin', 'owner'), async (req, res) => {
     return res.status(400).json({ message: 'Pairing simulation disabled. Please scan the real QR Code to connect.' });
 });
 
@@ -232,7 +282,7 @@ router.post('/pair-device', protect, async (req, res) => {
  * 7. POST /api/whatsapp/disconnect-device
  * Unlink / Disconnect WhatsApp Web Session
  */
-router.post('/disconnect-device', protect, async (req, res) => {
+router.post('/disconnect-device', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         await logoutClient();
 
@@ -250,7 +300,7 @@ router.post('/disconnect-device', protect, async (req, res) => {
  * 8. POST /api/whatsapp/sync-chats
  * Sync historical chats into CRM
  */
-router.post('/sync-chats', protect, async (req, res) => {
+router.post('/sync-chats', protect, authorize('admin', 'owner'), async (req, res) => {
     try {
         const { syncHistoricalChats } = require('../services/whatsappClient');
         const { chatLimit = 15, messageLimit = 10 } = req.body;

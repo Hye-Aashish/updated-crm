@@ -5,6 +5,49 @@ const ProjectBug = require('../models/ProjectBug');
 const ProjectActivity = require('../models/ProjectActivity');
 const ProjectFollowUp = require('../models/ProjectFollowUp');
 const { generateAutoInvoice } = require('../services/invoiceService');
+const { encryptSecret, decryptSecret } = require('../utils/securityHelpers');
+const { assertProjectAccess } = require('../utils/assertAccess');
+
+const isAdminOrOwnerUser = (user) => {
+    const role = String(user?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return role === 'admin' || role === 'owner';
+};
+
+const formatProjectForUser = (projectDoc, user) => {
+    const obj = projectDoc?.toObject ? projectDoc.toObject() : { ...projectDoc };
+    if (user?.role === 'client') {
+        obj.credentials = [];
+    } else if (Array.isArray(obj.credentials)) {
+        obj.credentials = obj.credentials.map(c => ({
+            ...c,
+            password: decryptSecret(c.password)
+        }));
+    }
+    if (!isAdminOrOwnerUser(user)) {
+        obj.budget = 0;
+        obj.advanceAmount = 0;
+        obj.milestoneAmount = 0;
+        obj.finalAmount = 0;
+        delete obj.paymentStatus;
+        delete obj.paymentModel;
+        delete obj.autoInvoice;
+        if (Array.isArray(obj.milestones)) {
+            obj.milestones = obj.milestones.map((m) => {
+                const clean = { ...(m?.toObject ? m.toObject() : m) };
+                delete clean.amount;
+                delete clean.paidAmount;
+                delete clean.paymentStatus;
+                delete clean.invoiceId;
+                delete clean.paidDate;
+                delete clean.paymentMethod;
+                delete clean.paymentReference;
+                delete clean.paymentNotes;
+                return clean;
+            });
+        }
+    }
+    return obj;
+};
 
 // Helper to log audit activity
 const logActivity = async (projectId, user, action, description) => {
@@ -107,7 +150,7 @@ exports.getProjects = async (req, res, next) => {
             recalculateProjectMetrics(p._id);
         }
 
-        res.json(projects);
+        res.json(projects.map(p => formatProjectForUser(p, req.user)));
     } catch (err) {
         next(err);
     }
@@ -120,7 +163,7 @@ exports.getProjectById = async (req, res, next) => {
         if (!project) return res.status(404).json({ message: 'Project not found' });
 
         if (req.user && req.user.role === 'client') {
-            if (project.clientId !== req.user.clientId) {
+            if (String(project.clientId || '') !== String(req.user.clientId || '')) {
                 return res.status(403).json({ message: 'Not authorized to view this project' });
             }
         } else if (req.user && req.user.role !== 'admin' && req.user.role !== 'owner') {
@@ -137,7 +180,7 @@ exports.getProjectById = async (req, res, next) => {
 
         await recalculateProjectMetrics(project._id);
         const updated = await Project.findById(req.params.id);
-        res.json(updated);
+        res.json(formatProjectForUser(updated, req.user));
     } catch (err) {
         next(err);
     }
@@ -150,6 +193,15 @@ exports.createProject = async (req, res, next) => {
             ...req.body,
             dueDate: req.body.deadline || req.body.dueDate
         };
+        if (!isAdminOrOwnerUser(req.user)) {
+            projectData.budget = 0;
+            projectData.advanceAmount = 0;
+            projectData.milestoneAmount = 0;
+            projectData.finalAmount = 0;
+            projectData.autoInvoice = false;
+            delete projectData.paymentStatus;
+            delete projectData.paymentModel;
+        }
         const project = new Project(projectData);
         const newProject = await project.save();
 
@@ -232,7 +284,7 @@ exports.createProject = async (req, res, next) => {
 
         await recalculateProjectMetrics(newProject._id);
         const finalProject = await Project.findById(newProject._id);
-        res.status(201).json(finalProject);
+        res.status(201).json(formatProjectForUser(finalProject, req.user));
     } catch (err) {
         next(err);
     }
@@ -247,6 +299,8 @@ exports.updateProject = async (req, res, next) => {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized to update this project' });
         }
+        const access = await assertProjectAccess(req, oldProject);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         // VALIDATION CHECK BEFORE MARKING COMPLETED
         if (req.body.status === 'completed' && oldProject.status !== 'completed') {
@@ -263,17 +317,61 @@ exports.updateProject = async (req, res, next) => {
             }
         }
 
+        const allowPaymentFields = isAdminOrOwnerUser(req.user);
+
         if (req.body.milestones && Array.isArray(req.body.milestones)) {
             const mongoose = require('mongoose');
-            req.body.milestones = req.body.milestones.map(m => {
+            const existingMilestones = Array.isArray(oldProject.milestones) ? oldProject.milestones : [];
+            req.body.milestones = req.body.milestones.map((m, idx) => {
                 const clean = { ...m };
                 if (clean._id && !mongoose.Types.ObjectId.isValid(clean._id)) delete clean._id;
                 if (clean.id && !mongoose.Types.ObjectId.isValid(clean.id)) delete clean.id;
+
+                // Preserve admin-only financial fields when non-admin staff updates milestone work progress
+                if (!allowPaymentFields) {
+                    const matched = existingMilestones.find((em) =>
+                        (clean._id && em._id && em._id.toString() === clean._id.toString()) ||
+                        (clean.id && em._id && em._id.toString() === clean.id.toString()) ||
+                        (clean.name && em.name === clean.name)
+                    ) || existingMilestones[idx];
+
+                    clean.amount = matched?.amount ?? 0;
+                    clean.paidAmount = matched?.paidAmount ?? 0;
+                    clean.paymentStatus = matched?.paymentStatus ?? 'unpaid';
+                    if (matched?.invoiceId !== undefined) clean.invoiceId = matched.invoiceId;
+                    if (matched?.paidDate !== undefined) clean.paidDate = matched.paidDate;
+                    if (matched?.paymentMethod !== undefined) clean.paymentMethod = matched.paymentMethod;
+                    if (matched?.paymentReference !== undefined) clean.paymentReference = matched.paymentReference;
+                    if (matched?.paymentNotes !== undefined) clean.paymentNotes = matched.paymentNotes;
+                }
                 return clean;
             });
         }
 
-        const updatedProject = await Project.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const baseAllowedProjectFields = [
+            'name', 'description', 'status', 'health', 'startDate', 'dueDate',
+            'clientId', 'pmId', 'members', 'developers', 'designers', 'clientProductId',
+            'type', 'progress', 'priority',
+            'websiteRequired', 'websiteStatus', 'domain', 'websiteUrl', 'stagingUrl', 'productionUrl',
+            'androidRequired', 'androidStatus', 'androidAppUrl', 'androidVersion', 'androidBuildNumber',
+            'iosRequired', 'iosStatus', 'iosAppUrl', 'iosVersion', 'iosBuildNumber',
+            'adminPanelRequired', 'adminPanelStatus', 'adminPanelUrl', 'adminPanelStagingUrl', 'adminPanelVersion',
+            'apiRequired', 'hostingRequired', 'maintenanceRequired',
+            'lastClientUpdate', 'lastCallDate', 'lastWhatsAppDate', 'lastEmailDate',
+            'clientResponse', 'nextFollowUpDate', 'followUpNotes',
+            'sourceCodeHandover', 'credentialsHandover', 'documentationHandover', 'clientApproved',
+            'milestones'
+        ];
+        const paymentAllowedFields = allowPaymentFields
+            ? ['budget', 'advanceAmount', 'milestoneAmount', 'finalAmount', 'paymentStatus', 'paymentModel', 'autoInvoice']
+            : [];
+
+        const safeUpdate = { updatedAt: new Date() };
+        for (const field of [...baseAllowedProjectFields, ...paymentAllowedFields]) {
+            if (req.body[field] !== undefined) safeUpdate[field] = req.body[field];
+        }
+
+        const updatedProject = await Project.findByIdAndUpdate(req.params.id, safeUpdate, { new: true });
 
         await logActivity(updatedProject._id, req.user, 'PROJECT_UPDATED', `Project details updated by ${req.user.name}.`);
 
@@ -286,7 +384,48 @@ exports.updateProject = async (req, res, next) => {
         }
 
         await recalculateProjectMetrics(updatedProject._id);
-        res.json(updatedProject);
+        res.json(formatProjectForUser(updatedProject, req.user));
+    } catch (err) {
+        next(err);
+    }
+};
+
+// --- UPDATE DELIVERABLES (Website, Admin Panel, Android, iOS) — accessible to all non-client project staff ---
+exports.updateDeliverables = async (req, res, next) => {
+    try {
+        const oldProject = await Project.findById(req.params.id);
+        if (!oldProject) return res.status(404).json({ message: 'Project not found' });
+
+        if (String(req.user?.role || '').trim().toLowerCase() === 'client') {
+            return res.status(403).json({ message: 'Not authorized to modify project deliverables' });
+        }
+
+        const access = await assertProjectAccess(req, oldProject);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
+        const allowedDeliverableFields = [
+            'websiteRequired', 'websiteStatus', 'domain', 'websiteUrl', 'stagingUrl', 'productionUrl',
+            'adminPanelRequired', 'adminPanelStatus', 'adminPanelUrl', 'adminPanelStagingUrl', 'adminPanelVersion',
+            'androidRequired', 'androidStatus', 'androidAppUrl', 'androidVersion', 'androidBuildNumber',
+            'iosRequired', 'iosStatus', 'iosAppUrl', 'iosVersion', 'iosBuildNumber'
+        ];
+
+        const safeUpdate = { updatedAt: new Date() };
+        for (const field of allowedDeliverableFields) {
+            if (req.body[field] !== undefined) {
+                safeUpdate[field] = req.body[field];
+            }
+        }
+
+        const updatedProject = await Project.findByIdAndUpdate(
+            req.params.id,
+            safeUpdate,
+            { new: true, runValidators: true }
+        );
+
+        await logActivity(updatedProject._id, req.user, 'DELIVERABLE_UPDATED', `Deliverable links/status updated by ${req.user.name}.`);
+        await recalculateProjectMetrics(updatedProject._id);
+        res.json(formatProjectForUser(updatedProject, req.user));
     } catch (err) {
         next(err);
     }
@@ -435,8 +574,20 @@ exports.createBug = async (req, res, next) => {
 
 exports.updateBug = async (req, res, next) => {
     try {
-        const updated = await ProjectBug.findByIdAndUpdate(req.params.bugId, req.body, { new: true });
-        if (!updated) return res.status(404).json({ message: 'Bug not found' });
+        if (req.user.role === 'client') return res.status(403).json({ message: 'Not authorized to update bugs' });
+        const existingBug = await ProjectBug.findById(req.params.bugId);
+        if (!existingBug) return res.status(404).json({ message: 'Bug not found' });
+        const project = await Project.findById(existingBug.projectId);
+        if (project) {
+            const access = await assertProjectAccess(req, project);
+            if (!access.ok) return res.status(access.status).json({ message: access.message });
+        }
+        const allowedBugFields = ['title', 'description', 'severity', 'priority', 'assignedDeveloper', 'status', 'attachment', 'resolution'];
+        const safeUpdate = { updatedAt: new Date() };
+        for (const field of allowedBugFields) {
+            if (req.body[field] !== undefined) safeUpdate[field] = req.body[field];
+        }
+        const updated = await ProjectBug.findByIdAndUpdate(req.params.bugId, safeUpdate, { new: true, runValidators: true });
         await logActivity(updated.projectId, req.user, 'BUG_UPDATED', `Bug "${updated.title}" status changed to ${updated.status}.`);
         res.json(updated);
     } catch (err) {
@@ -489,8 +640,20 @@ exports.createFollowUp = async (req, res, next) => {
 
 exports.updateFollowUp = async (req, res, next) => {
     try {
-        const updated = await ProjectFollowUp.findByIdAndUpdate(req.params.followUpId, req.body, { new: true });
-        if (!updated) return res.status(404).json({ message: 'Follow-up not found' });
+        if (req.user.role === 'client') return res.status(403).json({ message: 'Not authorized to update follow-ups' });
+        const existing = await ProjectFollowUp.findById(req.params.followUpId);
+        if (!existing) return res.status(404).json({ message: 'Follow-up not found' });
+        const project = await Project.findById(existing.projectId);
+        if (project) {
+            const access = await assertProjectAccess(req, project);
+            if (!access.ok) return res.status(access.status).json({ message: access.message });
+        }
+        const allowedFields = ['type', 'summary', 'clientResponse', 'followUpDate', 'status'];
+        const safeUpdate = { updatedAt: new Date() };
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) safeUpdate[field] = req.body[field];
+        }
+        const updated = await ProjectFollowUp.findByIdAndUpdate(req.params.followUpId, safeUpdate, { new: true, runValidators: true });
         res.json(updated);
     } catch (err) {
         next(err);
@@ -547,6 +710,7 @@ exports.checkCompletionReadiness = async (req, res, next) => {
             unresolvedCriticalBugsCount: criticalBugs.length,
             unresolvedCriticalBugsList: criticalBugs.map(b => ({ id: b._id, title: b.title })),
             websiteVerified: project.websiteRequired ? (project.websiteStatus === 'live' || !!project.websiteUrl) : true,
+            adminPanelVerified: project.adminPanelRequired ? (project.adminPanelStatus === 'live' || !!project.adminPanelUrl) : true,
             androidVerified: project.androidRequired ? (project.androidStatus === 'live' || !!project.androidAppUrl) : true,
             iosVerified: project.iosRequired ? (project.iosStatus === 'live' || !!project.iosAppUrl) : true
         };
@@ -566,7 +730,7 @@ exports.addNote = async (req, res, next) => {
         project.notes.push({ text: req.body.text, createdBy: req.user._id, creatorName: req.user.name });
         await project.save();
         await logActivity(project._id, req.user, 'NOTE_ADDED', `Note added: "${req.body.text.slice(0, 30)}..."`);
-        res.status(201).json(project);
+        res.status(201).json(formatProjectForUser(project, req.user));
     } catch (err) { next(err); }
 };
 
@@ -580,7 +744,7 @@ exports.updateNote = async (req, res, next) => {
         if (note.createdBy !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ message: 'Not authorized to edit this note' });
         note.text = req.body.text;
         await project.save();
-        res.json(project);
+        res.json(formatProjectForUser(project, req.user));
     } catch (err) { next(err); }
 };
 
@@ -594,7 +758,7 @@ exports.deleteNote = async (req, res, next) => {
         if (note.createdBy?.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner' && req.user.role !== 'pm') return res.status(403).json({ message: 'Not authorized to delete this note' });
         project.notes.pull(req.params.noteId);
         await project.save();
-        res.json(project);
+        res.json(formatProjectForUser(project, req.user));
     } catch (err) { next(err); }
 };
 
@@ -603,17 +767,20 @@ exports.addCredential = async (req, res, next) => {
         if (req.user.role === 'client') return res.status(403).json({ message: 'Clients are not allowed to add credentials' });
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: 'Project not found' });
+        const access = await assertProjectAccess(req, project);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         project.credentials.push({
             title: req.body.title,
             type: req.body.type,
             url: req.body.url,
             username: req.body.username,
-            password: req.body.password,
+            password: encryptSecret(req.body.password),
             createdBy: req.user._id
         });
         await project.save();
         await logActivity(project._id, req.user, 'CREDENTIAL_ADDED', `Credential "${req.body.title}" added.`);
-        res.status(201).json(project);
+        res.status(201).json(formatProjectForUser(project, req.user));
     } catch (err) { next(err); }
 };
 
@@ -622,6 +789,9 @@ exports.updateCredential = async (req, res, next) => {
         if (req.user.role === 'client') return res.status(403).json({ message: 'Clients are not allowed to edit credentials' });
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: 'Project not found' });
+        const access = await assertProjectAccess(req, project);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         const credential = project.credentials.id(req.params.credentialId);
         if (!credential) return res.status(404).json({ message: 'Credential not found' });
         if (credential.createdBy?.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner' && req.user.role !== 'pm') return res.status(403).json({ message: 'Not authorized to edit this credential' });
@@ -629,9 +799,9 @@ exports.updateCredential = async (req, res, next) => {
         credential.type = req.body.type;
         credential.url = req.body.url;
         credential.username = req.body.username;
-        if (req.body.password) credential.password = req.body.password;
+        if (req.body.password) credential.password = encryptSecret(req.body.password);
         await project.save();
-        res.json(project);
+        res.json(formatProjectForUser(project, req.user));
     } catch (err) { next(err); }
 };
 
@@ -640,11 +810,14 @@ exports.deleteCredential = async (req, res, next) => {
         if (req.user.role === 'client') return res.status(403).json({ message: 'Clients are not allowed to delete credentials' });
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: 'Project not found' });
+        const access = await assertProjectAccess(req, project);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         const credential = project.credentials.id(req.params.credentialId);
         if (!credential) return res.status(404).json({ message: 'Credential not found' });
         if (credential.createdBy?.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'owner' && req.user.role !== 'pm') return res.status(403).json({ message: 'Not authorized to delete this credential' });
         project.credentials.pull(req.params.credentialId);
         await project.save();
-        res.json(project);
+        res.json(formatProjectForUser(project, req.user));
     } catch (err) { next(err); }
 };

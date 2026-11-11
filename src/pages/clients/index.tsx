@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import {
     Plus, Users, UserCheck, UserX, Building2, Trash2, Edit, Eye,
-    Sparkles, Search, Copy, Check, ExternalLink, Globe, Clock, CheckCircle2, MessageCircle
+    Sparkles, Search, Copy, Check, ExternalLink, Globe, Clock, CheckCircle2, MessageCircle,
+    Phone, Mail, X, RotateCcw, Filter
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +24,7 @@ import { StatsCard } from '@/components/stats-card'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { usePermissions } from '@/hooks/use-permissions'
+import { usePortalPrefix } from '@/lib/nav-utils'
 import api from '@/lib/api-client'
 import type { Client } from '@/types'
 import { ClientHealthBadge } from '@/components/clients/client-health-badge'
@@ -31,6 +33,7 @@ import { appConfirm } from '@/lib/app-dialog'
 
 export function ClientsPage() {
     const navigate = useNavigate()
+    const portalPrefix = usePortalPrefix()
     const { toast } = useToast()
     const { clients, setClients } = useAppStore()
     const { canEdit, canDelete } = usePermissions()
@@ -40,6 +43,45 @@ export function ClientsPage() {
     const [selectedClientForOnboarding, setSelectedClientForOnboarding] = useState<Client | null>(null)
     const [clientSearchQuery, setClientSearchQuery] = useState('')
     const [copiedGeneralLink, setCopiedGeneralLink] = useState(false)
+    const [selectedGeneralTemplate, setSelectedGeneralTemplate] = useState('web_dev')
+    const [searchQuery, setSearchQuery] = useState('')
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'retainer'>('all')
+
+    const GENERAL_TEMPLATES = [
+        { id: 'web_dev', label: 'Web Design & Dev' },
+        { id: 'mobile_app', label: 'Mobile App' },
+        { id: 'ecommerce', label: 'E-Commerce' },
+        { id: 'marketing_seo', label: 'Marketing & SEO' },
+        { id: 'corporate_general', label: 'Corporate Intake' }
+    ]
+
+    const getGeneralOnboardingUrl = () => {
+        return `${window.location.origin}/client-onboarding?template=${selectedGeneralTemplate}`
+    }
+
+    // Filter clients by Name, Phone Number, Company, Email, and Status
+    const filteredClients = clients.filter(client => {
+        // Status filter
+        if (statusFilter === 'active' && client.status !== 'active') return false
+        if (statusFilter === 'inactive' && client.status !== 'inactive') return false
+        if (statusFilter === 'retainer' && client.type !== 'retainer') return false
+
+        // Search query filter
+        if (!searchQuery.trim()) return true
+        const q = searchQuery.toLowerCase().trim()
+        const digits = searchQuery.replace(/\D/g, '')
+
+        const matchName = client.name?.toLowerCase().includes(q)
+        const matchCompany = client.company?.toLowerCase().includes(q)
+        const matchEmail = client.email?.toLowerCase().includes(q)
+
+        // Phone search: direct string match or stripped digit matching
+        const clientPhoneDigits = (client.phone || '').replace(/\D/g, '')
+        const matchPhone = (client.phone || '').toLowerCase().includes(q) ||
+            (digits.length >= 3 && clientPhoneDigits.includes(digits))
+
+        return matchName || matchCompany || matchEmail || matchPhone
+    })
 
     // Fetch Clients
     useEffect(() => {
@@ -102,12 +144,12 @@ export function ClientsPage() {
                     <Button
                         variant="outline"
                         onClick={() => setIsGenerateModalOpen(true)}
-                        className="clay-btn bg-card hover:bg-muted text-foreground font-extrabold text-xs h-10 px-4 rounded-xl border border-border/60 gap-1.5 shadow-xs"
+                        className="clay-btn bg-card hover:bg-muted text-foreground font-extrabold text-xs h-10 px-4 rounded-xl border border-primary/40 text-primary gap-1.5 shadow-xs"
                     >
-                        <Sparkles className="h-4 w-4 text-primary" /> Generate Form
+                        <Sparkles className="h-4 w-4 text-primary" /> Onboarding Form Builder
                     </Button>
                     <Button
-                        onClick={() => navigate('/clients/new')}
+                        onClick={() => navigate(`${portalPrefix}/clients/new`)}
                         className="clay-btn bg-primary hover:bg-primary/95 text-white font-extrabold text-xs h-10 px-4 rounded-xl shadow-md gap-1.5"
                     >
                         <Plus className="h-4 w-4" /> Add Client
@@ -123,24 +165,121 @@ export function ClientsPage() {
                 <StatsCard title="Retainer" value={retainerClients} icon={Building2} color="#8b5cf6" bg="bg-purple-50" />
             </div>
 
+            {/* --- Search & Filters Bar --- */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border/40 shadow-xs">
+                {/* Search Input: Name or Phone */}
+                <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search client by name or phone number..."
+                        className="pl-10 pr-9 h-10 rounded-xl bg-background border-border/60 text-xs sm:text-sm focus-visible:ring-primary"
+                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted"
+                            title="Clear search"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Status Filter Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 shrink-0">
+                    {[
+                        { id: 'all', label: 'All', count: totalClients },
+                        { id: 'active', label: 'Active', count: activeClients },
+                        { id: 'inactive', label: 'Inactive', count: inactiveClients },
+                        { id: 'retainer', label: 'Retainer', count: retainerClients }
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setStatusFilter(tab.id as any)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shrink-0 flex items-center gap-1.5 ${
+                                statusFilter === tab.id
+                                    ? 'bg-primary text-white border-primary shadow-xs'
+                                    : 'bg-background text-muted-foreground border-border/40 hover:border-primary/40 hover:text-foreground'
+                            }`}
+                        >
+                            <span>{tab.label}</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                                statusFilter === tab.id
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-muted text-muted-foreground'
+                            }`}>
+                                {tab.count}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Results Count Info when searching/filtering */}
+            {(searchQuery || statusFilter !== 'all') && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                    <span>
+                        Showing <strong className="text-foreground">{filteredClients.length}</strong> of {totalClients} clients
+                        {searchQuery && <span> for &ldquo;{searchQuery}&rdquo;</span>}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSearchQuery('')
+                            setStatusFilter('all')
+                        }}
+                        className="text-primary hover:underline font-bold flex items-center gap-1"
+                    >
+                        <RotateCcw className="h-3 w-3" /> Reset
+                    </button>
+                </div>
+            )}
+
             {clients.length === 0 && !error ? (
                 <EmptyState
                     icon={Users}
                     title="No clients yet"
                     description="Get started by adding your first client"
                     action={
-                        <Button onClick={() => navigate('/clients/new')}>
+                        <Button onClick={() => navigate(`${portalPrefix}/clients/new`)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Client
                         </Button>
                     }
                 />
+            ) : filteredClients.length === 0 ? (
+                <div className="clay-card p-12 text-center rounded-3xl border border-dashed border-border/60 space-y-3">
+                    <div className="mx-auto h-12 w-12 rounded-2xl bg-muted/60 flex items-center justify-center text-muted-foreground">
+                        <Search className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1">
+                        <h3 className="font-extrabold text-base text-foreground">No matching clients found</h3>
+                        <p className="text-xs text-muted-foreground">
+                            {searchQuery ? `No client found matching "${searchQuery}". Try searching with a different name or phone number.` : 'No clients match the selected status filter.'}
+                        </p>
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setSearchQuery('')
+                            setStatusFilter('all')
+                        }}
+                        className="clay-btn text-xs font-bold rounded-xl mt-2"
+                    >
+                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Clear Filters
+                    </Button>
+                </div>
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {clients.map((client) => (
+                    {filteredClients.map((client) => (
                         <Card
                             key={client.id}
                             className="cursor-pointer hover:shadow-md transition-shadow flex flex-col justify-between"
-                            onClick={() => navigate(`/clients/${client.id}`)}
+                            onClick={() => navigate(`${portalPrefix}/clients/${client.id}`)}
                         >
                             <CardHeader>
                                 <div className="flex items-start justify-between">
@@ -155,39 +294,63 @@ export function ClientsPage() {
                                             {client.status}
                                         </Badge>
                                         <ClientHealthBadge clientId={client.id} />
+                                        {client.onboardingStatus === 'completed' ? (
+                                            <Badge className="bg-emerald-500/15 text-emerald-600 border-0 text-[10px] font-bold px-1.5 py-0 h-4">
+                                                Form Done
+                                            </Badge>
+                                        ) : client.onboardingStatus === 'sent' ? (
+                                            <Badge className="bg-blue-500/15 text-blue-600 border-0 text-[10px] font-bold px-1.5 py-0 h-4">
+                                                Link Sent
+                                            </Badge>
+                                        ) : null}
                                     </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-2 text-sm">
                                     <div className="flex items-center gap-2 text-muted-foreground">
-                                        <span>📧</span>
-                                        <span className="truncate">{client.email}</span>
+                                        <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                        <span className="truncate">{client.email || 'No email provided'}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        <span>📞</span>
-                                        <span>{client.phone}</span>
+                                    <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                                        <div className="flex items-center gap-2 truncate">
+                                            <Phone className="h-3.5 w-3.5 text-primary shrink-0" />
+                                            <span className="font-semibold text-foreground truncate">{client.phone || 'No phone'}</span>
+                                        </div>
+                                        {client.phone && (
+                                            <a
+                                                href={`https://wa.me/${client.phone.replace(/\D/g, '')}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors shrink-0"
+                                                title="Chat on WhatsApp"
+                                            >
+                                                <MessageCircle className="h-3 w-3" /> WhatsApp
+                                            </a>
+                                        )}
                                     </div>
                                     <div className="mt-3 pt-3 border-t flex items-center justify-between">
-                                        <Badge variant="outline" className="capitalize">
+                                        <Badge variant="outline" className="capitalize text-xs">
                                             {client.type}
                                         </Badge>
-                                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                             <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="h-8 w-8 text-primary hover:bg-primary/10"
-                                                title="Generate / Configure Onboarding Form"
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 text-[11px] font-bold gap-1 px-2.5 rounded-xl border-primary/30 text-primary hover:bg-primary/10 shadow-xs"
+                                                title="Build & Share Onboarding Intake Form"
                                                 onClick={() => setSelectedClientForOnboarding(client)}
                                             >
-                                                <Sparkles className="h-4 w-4" />
+                                                <Sparkles className="h-3 w-3" />
+                                                Onboarding Form
                                             </Button>
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
                                                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
                                                 title="View Client"
-                                                onClick={() => navigate(`/clients/${client.id}`)}
+                                                onClick={() => navigate(`${portalPrefix}/clients/${client.id}`)}
                                             >
                                                 <Eye className="h-4 w-4" />
                                             </Button>
@@ -197,7 +360,7 @@ export function ClientsPage() {
                                                     variant="ghost"
                                                     className="h-8 w-8 text-muted-foreground hover:text-primary"
                                                     title="Edit Client"
-                                                    onClick={() => navigate(`/clients/${client.id}/edit`)}
+                                                    onClick={() => navigate(`${portalPrefix}/clients/${client.id}/edit`)}
                                                 >
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
@@ -232,58 +395,97 @@ export function ClientsPage() {
                             </div>
                             <div>
                                 <DialogTitle className="text-xl font-extrabold text-foreground">
-                                    Generate Client Onboarding Form
+                                    Client Onboarding Form Builder Hub
                                 </DialogTitle>
                                 <DialogDescription className="text-xs text-muted-foreground font-medium">
-                                    Select a client to create a custom tailored intake form, or share the general intake link.
+                                    Build custom intake questions, generate branded client onboarding links, or share the public intake link.
                                 </DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
 
                     <div className="space-y-5 pt-3">
-                        {/* Option A: General Public Intake Link */}
-                        <div className="clay-card p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-2.5">
+                        {/* Option A: General Public Intake Link (Auto-Registration) */}
+                        <div className="clay-card p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                                    <Globe className="h-3.5 w-3.5" /> General New Client Intake Link
+                                    <Globe className="h-3.5 w-3.5" /> 1. Self-Registration Onboarding Link
                                 </span>
-                                <Badge className="clay-badge text-[10px] font-bold bg-primary/10 text-primary border-0">
-                                    For Any New Prospect
+                                <Badge className="clay-badge text-[10px] font-bold bg-primary/15 text-primary border-0">
+                                    Auto-Adds Client To CRM
                                 </Badge>
                             </div>
                             <p className="text-[11px] text-muted-foreground font-medium leading-relaxed">
-                                Share this generic link with prospective clients who haven't been added to the CRM yet. When they fill it, a new client profile is automatically registered.
+                                Naye clients ko yeh link bhejein. Form submit hote hi client profile <strong>CRM me automatically create ho jayegi</strong> (Active status &amp; Onboarding Completed ke saath). Koi details agar reh jayein toh baad me manually edit kar sakte hain.
                             </p>
-                            <div className="flex items-center gap-2">
+
+                            {/* Template Selector */}
+                            <div className="space-y-1.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Project Template Scope:</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {GENERAL_TEMPLATES.map((tpl) => (
+                                        <button
+                                            key={tpl.id}
+                                            type="button"
+                                            onClick={() => setSelectedGeneralTemplate(tpl.id)}
+                                            className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all border ${
+                                                selectedGeneralTemplate === tpl.id
+                                                    ? 'bg-primary text-white border-primary shadow-xs'
+                                                    : 'bg-card text-muted-foreground border-border/50 hover:border-primary/40 hover:text-foreground'
+                                            }`}
+                                        >
+                                            {tpl.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Link bar and action buttons */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
                                 <Input
                                     readOnly
-                                    value={`${window.location.origin}/client-onboarding`}
+                                    value={getGeneralOnboardingUrl()}
                                     className="text-xs font-mono bg-card h-8 rounded-lg select-all flex-1"
                                 />
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                        const url = `${window.location.origin}/client-onboarding`
-                                        navigator.clipboard.writeText(url)
-                                        setCopiedGeneralLink(true)
-                                        toast({ title: 'Link Copied', description: url })
-                                        setTimeout(() => setCopiedGeneralLink(false), 2000)
-                                    }}
-                                    className="clay-btn h-8 px-3 text-xs font-bold gap-1 shrink-0"
-                                >
-                                    {copiedGeneralLink ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                                    {copiedGeneralLink ? 'Copied' : 'Copy'}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => window.open(`${window.location.origin}/client-onboarding`, '_blank')}
-                                    className="clay-btn h-8 px-3 text-xs font-bold gap-1 shrink-0"
-                                >
-                                    <ExternalLink className="h-3.5 w-3.5" /> Preview
-                                </Button>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const url = getGeneralOnboardingUrl()
+                                            navigator.clipboard.writeText(url)
+                                            setCopiedGeneralLink(true)
+                                            toast({ title: 'Link Copied', description: url })
+                                            setTimeout(() => setCopiedGeneralLink(false), 2000)
+                                        }}
+                                        className="clay-btn h-8 px-3 text-xs font-bold gap-1 shrink-0"
+                                    >
+                                        {copiedGeneralLink ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                                        {copiedGeneralLink ? 'Copied' : 'Copy Link'}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const url = getGeneralOnboardingUrl()
+                                            const text = `Hello! Please complete your onboarding intake form here so we can register your account and kickstart your project: ${url}`
+                                            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank')
+                                        }}
+                                        className="clay-btn h-8 px-2.5 text-xs font-bold gap-1 text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 shrink-0"
+                                        title="Share on WhatsApp"
+                                    >
+                                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => window.open(getGeneralOnboardingUrl(), '_blank')}
+                                        className="clay-btn h-8 px-2.5 text-xs font-bold gap-1 shrink-0"
+                                        title="Preview Form"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
                             </div>
                         </div>
 
@@ -304,7 +506,7 @@ export function ClientsPage() {
                                 <Input
                                     value={clientSearchQuery}
                                     onChange={(e) => setClientSearchQuery(e.target.value)}
-                                    placeholder="Search client by name or company..."
+                                    placeholder="Search client by name, phone number, or company..."
                                     className="text-xs pl-8 h-9 rounded-xl"
                                 />
                             </div>
@@ -312,10 +514,19 @@ export function ClientsPage() {
                             {/* Client List */}
                             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                                 {clients
-                                    .filter(c =>
-                                        c.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-                                        c.company?.toLowerCase().includes(clientSearchQuery.toLowerCase())
-                                    )
+                                    .filter(c => {
+                                        if (!clientSearchQuery.trim()) return true
+                                        const q = clientSearchQuery.toLowerCase().trim()
+                                        const digits = clientSearchQuery.replace(/\D/g, '')
+                                        const phoneDigits = (c.phone || '').replace(/\D/g, '')
+
+                                        return (
+                                            c.name?.toLowerCase().includes(q) ||
+                                            c.company?.toLowerCase().includes(q) ||
+                                            (c.phone || '').toLowerCase().includes(q) ||
+                                            (digits.length >= 3 && phoneDigits.includes(digits))
+                                        )
+                                    })
                                     .map(c => {
                                         const isCompleted = c.onboardingStatus === 'completed'
                                         const isSent = c.onboardingStatus === 'sent'
@@ -359,7 +570,7 @@ export function ClientsPage() {
                                                     className="clay-btn bg-primary hover:bg-primary/95 text-white font-extrabold text-xs h-8 px-3 rounded-xl gap-1 shrink-0 shadow-xs"
                                                 >
                                                     <Sparkles className="h-3 w-3" />
-                                                    {c.onboardingToken ? 'Manage Form' : 'Generate Form'}
+                                                    {c.onboardingToken ? 'Manage / Send Form' : 'Build & Send Form'}
                                                 </Button>
                                             </div>
                                         )

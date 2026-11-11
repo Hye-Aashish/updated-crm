@@ -1,5 +1,6 @@
 const ProjectMessage = require('../models/ProjectMessage');
 const Project = require('../models/Project');
+const { assertProjectAccess } = require('../utils/assertAccess');
 
 // Get messages for a project
 exports.getProjectMessages = async (req, res) => {
@@ -8,18 +9,9 @@ exports.getProjectMessages = async (req, res) => {
         const project = await Project.findById(projectId);
         if (!project) return res.status(404).json({ message: 'Project not found' });
 
-        // RBAC Check
-        const userId = req.user._id.toString();
-        const role = req.user.role;
-
-        if (role === 'client') {
-            if (project.clientId !== req.user.clientId) {
-                return res.status(403).json({ message: 'Not authorized to view these messages' });
-            }
-        } else if (role !== 'admin' && role !== 'owner') {
-            if (project.pmId !== userId && (!project.members || !project.members.includes(userId))) {
-                return res.status(403).json({ message: 'Not authorized to view these messages' });
-            }
+        const access = await assertProjectAccess(req, project);
+        if (!access.ok) {
+            return res.status(access.status).json({ message: access.message });
         }
 
         const messages = await ProjectMessage.find({ projectId })
@@ -35,6 +27,14 @@ exports.getProjectMessages = async (req, res) => {
 exports.sendProjectMessage = async (req, res) => {
     try {
         const { projectId, message, attachments } = req.body;
+        const project = await Project.findById(projectId);
+        if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        const access = await assertProjectAccess(req, project);
+        if (!access.ok) {
+            return res.status(access.status).json({ message: access.message });
+        }
+
         const newMessage = new ProjectMessage({
             projectId,
             senderId: req.user._id,
@@ -60,12 +60,13 @@ exports.getChatProjects = async (req, res) => {
         if (role === 'client') {
             query = { clientId: req.user.clientId };
         } else if (role === 'admin' || role === 'owner') {
-            query = {}; // Admins can see all chats? or maybe only active ones
+            query = {};
         } else {
-            // Employee/PM: must be in members or pmId
             query = {
                 $or: [
                     { members: userId },
+                    { developers: userId },
+                    { designers: userId },
                     { pmId: userId }
                 ]
             };

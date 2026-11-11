@@ -4,6 +4,28 @@ const crypto = require('crypto');
 const Approval = require('../models/Approval');
 const Project = require('../models/Project');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { assertProjectAccess } = require('../utils/assertAccess');
+
+const assertApprovalAccess = async (req, approval) => {
+    if (!req.user || !approval) return { ok: false, status: 401, message: 'Not authorized' };
+    if (req.user.role === 'admin' || req.user.role === 'owner') return { ok: true };
+    if (req.user.role === 'client') {
+        const own = req.user.clientId?.toString?.() || '';
+        const appClient = approval.clientId?.toString?.() || '';
+        if (!own || own !== appClient) {
+            return { ok: false, status: 403, message: 'Not authorized to access this approval request' };
+        }
+        return { ok: true };
+    }
+    if (approval.projectId) {
+        const project = await Project.findById(approval.projectId);
+        if (project) return await assertProjectAccess(req, project);
+    }
+    if (String(approval.requestedBy || '') === req.user._id.toString()) {
+        return { ok: true };
+    }
+    return { ok: false, status: 403, message: 'Not authorized to access this approval request' };
+};
 
 // Helper to extract client IP
 const getClientIp = (req) => {
@@ -103,6 +125,9 @@ router.post('/public/:token/reject', async (req, res) => {
         const approval = await Approval.findOne({ publicToken: req.params.token });
         
         if (!approval) return res.status(404).json({ message: 'Approval request not found' });
+        if (approval.status === 'approved') {
+            return res.status(400).json({ message: 'This request has already been approved and signed.' });
+        }
 
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || '';
@@ -161,6 +186,9 @@ router.get('/', protect, async (req, res) => {
 // CREATE approval request
 router.post('/', protect, checkPermission('projects', 'edit'), async (req, res) => {
     try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients cannot create internal approval requests' });
+        }
         const { title, description, category, projectId, clientId, fileUrl, attachments, dueDate } = req.body;
         const publicToken = crypto.randomBytes(16).toString('hex');
 
@@ -205,6 +233,11 @@ router.post('/:id/sign', protect, async (req, res) => {
         const { signatureData, signatureType, typedFont, signedBy, signedByEmail, comments } = req.body;
         const approval = await Approval.findById(req.params.id);
         if (!approval) return res.status(404).json({ message: 'Approval request not found' });
+        const access = await assertApprovalAccess(req, approval);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        if (approval.status === 'approved') {
+            return res.status(400).json({ message: 'This request has already been approved and signed.' });
+        }
 
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || '';
@@ -252,6 +285,11 @@ router.post('/:id/reject', protect, async (req, res) => {
         const { rejectionReason } = req.body;
         const approval = await Approval.findById(req.params.id);
         if (!approval) return res.status(404).json({ message: 'Approval request not found' });
+        const access = await assertApprovalAccess(req, approval);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        if (approval.status === 'approved') {
+            return res.status(400).json({ message: 'This request has already been approved and signed.' });
+        }
 
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || '';
@@ -279,8 +317,14 @@ router.post('/:id/reject', protect, async (req, res) => {
 // DELETE approval request
 router.delete('/:id', protect, checkPermission('projects', 'edit'), async (req, res) => {
     try {
-        const approval = await Approval.findByIdAndDelete(req.params.id);
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+        const approval = await Approval.findById(req.params.id);
         if (!approval) return res.status(404).json({ message: 'Approval request not found' });
+        const access = await assertApprovalAccess(req, approval);
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        await Approval.findByIdAndDelete(req.params.id);
         res.json({ message: 'Approval request deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });

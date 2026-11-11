@@ -1,8 +1,10 @@
 const Visitor = require('../models/Visitor');
 const VisitSession = require('../models/VisitSession');
 const TrackingEvent = require('../models/TrackingEvent');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const uuidv4 = () => crypto.randomUUID();
 const geoip = require('geoip-lite');
+const { escapeRegex } = require('../utils/securityHelpers');
 
 // Helper to parse User Agent (simplified)
 const parseUserAgent = (ua) => {
@@ -529,7 +531,7 @@ exports.getHeatmapData = async (req, res) => {
         // Fetch click events for this URL
         const clicks = await TrackingEvent.find({
             type: 'click',
-            url: { $regex: url, $options: 'i' },
+            url: { $regex: escapeRegex(url), $options: 'i' },
             x: { $exists: true },
             y: { $exists: true }
         }).select('x y viewport_width viewport_height selector element_text').limit(2000);

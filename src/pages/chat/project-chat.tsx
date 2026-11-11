@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api-client';
 import { useAppStore } from '@/store';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/use-permissions';
 
 interface ProjectChat {
     _id: string;
@@ -41,7 +42,7 @@ export const ProjectChatPage = () => {
     const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
     const [lastMessages, setLastMessages] = useState<Record<string, Message>>({});
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [permissions, setPermissions] = useState<any>(null);
+    const { permissions, loading: permsLoading, canView, hasPermission } = usePermissions();
     const [loading, setLoading] = useState(true);
     const [stagedAttachments, setStagedAttachments] = useState<any[]>([]);
     const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -70,24 +71,15 @@ export const ProjectChatPage = () => {
     );
 
     useEffect(() => {
-        const fetchPermissions = async () => {
-            try {
-                const res = await api.get('/settings');
-                if (currentUser?.role && currentUser.role !== 'owner' && res.data.roles) {
-                    const role = res.data.roles.find((r: any) => r.name === currentUser.role);
-                    if (role) setPermissions(role.permissions);
-                }
-            } catch (err) {
-                console.error("Permissions fetch error", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchPermissions();
-    }, [currentUser]);
+        if (!permsLoading) {
+            setLoading(false);
+        }
+    }, [permsLoading]);
 
-    const hasViewPermission = currentUser?.role === 'owner' || (permissions ? !!permissions.project_chat?.view : true);
-    const hasMessagePermission = currentUser?.role === 'owner' || (permissions ? !!permissions.project_chat?.message : true);
+    const hasViewPermission = permsLoading ? true : canView('project_chat');
+    const hasMessagePermission = permsLoading
+        ? true
+        : (permissions ? (permissions.project_chat?.message !== undefined ? !!permissions.project_chat.message : true) : hasPermission('project_chat', 'message'));
 
     // Grouping logic
     const activeDiscussions = filteredProjects.filter(p => (unreadCounts[p._id] || unreadCounts[p.id || ''] || 0) > 0);

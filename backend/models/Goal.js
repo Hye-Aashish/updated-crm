@@ -17,7 +17,7 @@ const goalSchema = new mongoose.Schema({
     assignedToName: { type: String, default: 'Company Wide' },
     status: {
         type: String,
-        enum: ['in_progress', 'achieved', 'at_risk', 'missed'],
+        enum: ['in_progress', 'in-progress', 'achieved', 'at_risk', 'missed'],
         default: 'in_progress'
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

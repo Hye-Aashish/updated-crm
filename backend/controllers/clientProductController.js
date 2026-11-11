@@ -41,8 +41,9 @@ const sanitizeForStaff = (doc, user) => {
 exports.getAllClientProducts = async (req, res) => {
     try {
         let query = {};
-        // If user is employee/developer, they see products assigned to them or their tasks
-        if (req.user && (req.user.role === 'employee' || req.user.role === 'developer' || req.user.role === 'designer')) {
+        if (req.user && req.user.role === 'client') {
+            query = req.user.clientId ? { client: req.user.clientId } : { _id: null };
+        } else if (req.user && (req.user.role === 'employee' || req.user.role === 'developer' || req.user.role === 'designer')) {
             const userId = req.user._id;
             query = {
                 $or: [
@@ -72,6 +73,9 @@ exports.getAllClientProducts = async (req, res) => {
 exports.getClientProducts = async (req, res) => {
     try {
         const { clientId } = req.params;
+        if (req.user && req.user.role === 'client' && String(clientId) !== String(req.user.clientId || '')) {
+            return res.status(403).json({ message: 'Not authorized to view this client\'s products' });
+        }
         let query = { client: clientId };
 
         // If user is employee/developer, verify they are assigned or restrict query
@@ -112,6 +116,21 @@ exports.getClientProductById = async (req, res) => {
 
         if (!clientProduct) {
             return res.status(404).json({ message: 'Assigned product not found' });
+        }
+
+        if (req.user.role === 'client') {
+            const own = req.user.clientId?.toString?.() || '';
+            const cpClient = clientProduct.client?._id?.toString?.() || clientProduct.client?.toString?.() || '';
+            if (!own || own !== cpClient) {
+                return res.status(403).json({ message: 'Not authorized to view this assigned product' });
+            }
+        } else if (['employee', 'developer', 'designer'].includes(req.user.role)) {
+            const uid = req.user._id.toString();
+            const isAssigned = Array.isArray(clientProduct.assignedTo) && clientProduct.assignedTo.some(u => String(u._id || u) === uid);
+            const hasTask = Array.isArray(clientProduct.tasks) && clientProduct.tasks.some(t => String(t.assignedTo?._id || t.assignedTo) === uid);
+            if (!isAssigned && !hasTask) {
+                return res.status(403).json({ message: 'Not authorized to view this assigned product' });
+            }
         }
 
         const sanitized = sanitizeForStaff(clientProduct, req.user);

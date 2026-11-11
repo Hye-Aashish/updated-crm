@@ -5,12 +5,14 @@ const { protect, authorize, checkPermission } = require('../middleware/authMiddl
 const { assertClientAccess } = require('../utils/assertAccess');
 const upload = require('../utils/multerConfig');
 
-// Public route for legacy onboarding form
+// Public routes for onboarding & self-registration
 router.post('/public/onboarding', clientController.createPublicClient);
+router.get('/public/onboarding-config', clientController.getPublicGeneralOnboardingConfig);
+router.post('/public/onboarding/upload', upload.uploadPrivate.single('file'), clientController.uploadGeneralOnboardingFile);
 
 // Public routes for tailored client-specific onboarding forms
 router.get('/public/onboarding-form/:token', clientController.getPublicOnboardingForm);
-router.post('/public/onboarding-form/:token/upload', upload.single('file'), clientController.uploadOnboardingFile);
+router.post('/public/onboarding-form/:token/upload', upload.uploadPrivate.single('file'), clientController.uploadOnboardingFile);
 router.post('/public/onboarding-form/:token/submit', clientController.submitPublicOnboardingForm);
 
 const allowClientRoleOrPermission = (action) => (req, res, next) => {
@@ -28,6 +30,11 @@ router.delete('/onboarding-templates/:id', protect, checkPermission('clients', '
 router.post('/:id/onboarding/generate', protect, checkPermission('clients', 'edit'), clientController.generateOnboardingLink);
 router.put('/:id/onboarding/config', protect, checkPermission('clients', 'edit'), clientController.updateOnboardingConfig);
 router.post('/:id/onboarding/reset', protect, checkPermission('clients', 'edit'), clientController.resetOnboardingStatus);
+
+// Protected routes for managing client portal credentials (Admin ID/Password assignment)
+router.get('/:id/portal-access', protect, allowClientRoleOrPermission('view'), clientController.getClientPortalAccess);
+router.post('/:id/portal-access', protect, checkPermission('clients', 'edit'), clientController.setClientPortalAccess);
+router.delete('/:id/portal-access', protect, checkPermission('clients', 'edit'), clientController.disableClientPortalAccess);
 
 router.get('/', protect, allowClientRoleOrPermission('view'), clientController.getClients);
 

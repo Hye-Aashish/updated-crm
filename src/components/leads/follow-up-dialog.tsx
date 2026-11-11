@@ -153,7 +153,8 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
                 newStage: !hasNextFollowUp ? newStage : undefined
             }
 
-            const result = await onSaveFollowUp(lead.id, payload)
+            const targetId = lead.id || (lead as any)._id
+            const result = await onSaveFollowUp(targetId, payload)
             if (result) {
                 onClose()
             }

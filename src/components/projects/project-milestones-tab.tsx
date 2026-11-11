@@ -17,6 +17,7 @@ import { ProjectBulkMilestonesDialog } from './project-bulk-milestones-dialog'
 import { useAppStore } from '@/store'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '@/hooks/use-toast'
+import { isAdminOrOwnerRole, normalizeRoleKey } from '@/lib/nav-utils'
 import api from '@/lib/api-client'
 import type { Project, Milestone } from '@/types'
 
@@ -40,8 +41,8 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
     const [filterStatus, setFilterStatus] = useState<'all' | 'work_done' | 'payment_pending' | 'paid'>('all')
     const [isSaving, setIsSaving] = useState(false)
 
-    const canManageMilestones = ['owner', 'admin', 'pm'].includes(currentUser?.role)
-    const canViewFinances = ['owner', 'admin', 'client', 'pm'].includes(currentUser?.role)
+    const canViewFinances = isAdminOrOwnerRole(currentUser?.role)
+    const canManageMilestones = canViewFinances || normalizeRoleKey(currentUser?.role) === 'pm'
 
     const milestones = project.milestones || []
     const totalMilestones = milestones.length
@@ -181,28 +182,28 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
 
     // 1-Click Preset Setup
     const handleApplyPreset = async (presetType: 'standard' | 'web' | 'app') => {
-        const budget = project.budget || 100000
+        const budget = canViewFinances ? (project.budget || 100000) : 0
         const projectId = project.id || (project as any)._id
 
         let presetMilestones: Milestone[] = []
 
         if (presetType === 'standard') {
             presetMilestones = [
-                { id: 'm_1', name: 'Milestone 1: Project Setup & Advance Payment', amount: Math.round(budget * 0.30), completed: false, status: 'in-progress', paymentStatus: 'unpaid' },
-                { id: 'm_2', name: 'Milestone 2: Beta Development & Feature Demo', amount: Math.round(budget * 0.40), completed: false, status: 'pending', paymentStatus: 'unpaid' },
-                { id: 'm_3', name: 'Milestone 3: Final Delivery & Live Launch', amount: Math.round(budget * 0.30), completed: false, status: 'pending', paymentStatus: 'unpaid' }
+                { id: 'm_1', name: canViewFinances ? 'Milestone 1: Project Setup & Advance Payment' : 'Milestone 1: Project Setup & Kickoff', amount: canViewFinances ? Math.round(budget * 0.30) : 0, completed: false, status: 'in-progress', paymentStatus: 'unpaid' },
+                { id: 'm_2', name: 'Milestone 2: Beta Development & Feature Demo', amount: canViewFinances ? Math.round(budget * 0.40) : 0, completed: false, status: 'pending', paymentStatus: 'unpaid' },
+                { id: 'm_3', name: 'Milestone 3: Final Delivery & Live Launch', amount: canViewFinances ? Math.round(budget * 0.30) : 0, completed: false, status: 'pending', paymentStatus: 'unpaid' }
             ]
         } else if (presetType === 'web') {
             presetMilestones = [
-                { id: 'm_1', name: 'Milestone 1: UI/UX Wireframes & Design Approval', amount: Math.round(budget * 0.25), completed: false, status: 'in-progress', paymentStatus: 'unpaid' },
-                { id: 'm_2', name: 'Milestone 2: Frontend & Backend Coding', amount: Math.round(budget * 0.50), completed: false, status: 'pending', paymentStatus: 'unpaid' },
-                { id: 'm_3', name: 'Milestone 3: Deployment & Go-Live', amount: Math.round(budget * 0.25), completed: false, status: 'pending', paymentStatus: 'unpaid' }
+                { id: 'm_1', name: 'Milestone 1: UI/UX Wireframes & Design Approval', amount: canViewFinances ? Math.round(budget * 0.25) : 0, completed: false, status: 'in-progress', paymentStatus: 'unpaid' },
+                { id: 'm_2', name: 'Milestone 2: Frontend & Backend Coding', amount: canViewFinances ? Math.round(budget * 0.50) : 0, completed: false, status: 'pending', paymentStatus: 'unpaid' },
+                { id: 'm_3', name: 'Milestone 3: Deployment & Go-Live', amount: canViewFinances ? Math.round(budget * 0.25) : 0, completed: false, status: 'pending', paymentStatus: 'unpaid' }
             ]
         } else if (presetType === 'app') {
             presetMilestones = [
-                { id: 'm_1', name: 'Milestone 1: App Architecture & API Contracts', amount: Math.round(budget * 0.20), completed: false, status: 'in-progress', paymentStatus: 'unpaid' },
-                { id: 'm_2', name: 'Milestone 2: Core App Features & Integrations', amount: Math.round(budget * 0.50), completed: false, status: 'pending', paymentStatus: 'unpaid' },
-                { id: 'm_3', name: 'Milestone 3: PlayStore & AppStore Submission', amount: Math.round(budget * 0.30), completed: false, status: 'pending', paymentStatus: 'unpaid' }
+                { id: 'm_1', name: 'Milestone 1: App Architecture & API Contracts', amount: canViewFinances ? Math.round(budget * 0.20) : 0, completed: false, status: 'in-progress', paymentStatus: 'unpaid' },
+                { id: 'm_2', name: 'Milestone 2: Core App Features & Integrations', amount: canViewFinances ? Math.round(budget * 0.50) : 0, completed: false, status: 'pending', paymentStatus: 'unpaid' },
+                { id: 'm_3', name: 'Milestone 3: PlayStore & AppStore Submission', amount: canViewFinances ? Math.round(budget * 0.30) : 0, completed: false, status: 'pending', paymentStatus: 'unpaid' }
             ]
         }
 
@@ -436,7 +437,9 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-xs font-bold truncate">{m.name}</p>
-                                                <p className="text-[10px] opacity-80 font-semibold">{formatCurrency(m.amount || 0)}</p>
+                                                {canViewFinances && (
+                                                    <p className="text-[10px] opacity-80 font-semibold">{formatCurrency(m.amount || 0)}</p>
+                                                )}
                                             </div>
                                         </div>
                                         {idx < milestones.length - 1 && (
@@ -451,7 +454,7 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
             )}
 
             {/* KPI Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${canViewFinances ? 'sm:grid-cols-2 lg:grid-cols-4' : ''}`}>
                 <Card className="bg-card border border-border/60 shadow-xs">
                     <CardContent className="p-4">
                         <div className="flex justify-between items-start">
@@ -548,7 +551,9 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                             <Sparkles className="h-4 w-4 text-primary" />
                             <h4 className="text-xs font-bold uppercase tracking-wider text-primary">1-Click Quick Preset Setup</h4>
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-semibold">Auto-calculate percentage & stages</span>
+                        {canViewFinances && (
+                            <span className="text-[10px] text-muted-foreground font-semibold">Auto-calculate percentage & stages</span>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -557,7 +562,9 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                             className="p-3 bg-card hover:bg-primary/5 rounded-xl border border-border/60 hover:border-primary/40 text-left transition-all group"
                         >
                             <div className="font-bold text-xs text-foreground group-hover:text-primary">🚀 Standard 3-Stage Workflow</div>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">30% Advance • 40% Beta Demo • 30% Launch</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                                {canViewFinances ? '30% Advance • 40% Beta Demo • 30% Launch' : 'Setup • Beta Demo • Final Launch'}
+                            </div>
                         </button>
 
                         <button
@@ -565,7 +572,9 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                             className="p-3 bg-card hover:bg-primary/5 rounded-xl border border-border/60 hover:border-primary/40 text-left transition-all group"
                         >
                             <div className="font-bold text-xs text-foreground group-hover:text-primary">🌐 Web Redesign Project</div>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">25% UI Wireframes • 50% Coding • 25% Go-Live</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                                {canViewFinances ? '25% UI Wireframes • 50% Coding • 25% Go-Live' : 'UI Wireframes • Coding • Go-Live'}
+                            </div>
                         </button>
 
                         <button
@@ -573,7 +582,9 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                             className="p-3 bg-card hover:bg-primary/5 rounded-xl border border-border/60 hover:border-primary/40 text-left transition-all group"
                         >
                             <div className="font-bold text-xs text-foreground group-hover:text-primary">📱 Mobile App Build</div>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">20% Architecture • 50% Features • 30% Store Launch</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                                {canViewFinances ? '20% Architecture • 50% Features • 30% Store Launch' : 'Architecture • Features • Store Launch'}
+                            </div>
                         </button>
                     </div>
                 </div>
@@ -584,12 +595,12 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                 <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
                     <div>
                         <CardTitle className="text-lg font-bold">
-                            {currentUser?.role === 'client' ? 'Project Milestones & Payment Schedule' : 'Project Milestones & Delivery Checklist'}
+                            {canViewFinances ? 'Project Milestones & Payment Schedule' : 'Project Milestones & Delivery Checklist'}
                         </CardTitle>
                         <CardDescription className="text-xs font-medium">
-                            {currentUser?.role === 'client'
-                                ? 'Track project delivery milestones and invoice payment status.'
-                                : 'Manage work delivery checkpoints and client payment collection for each stage.'}
+                            {canViewFinances
+                                ? 'Manage work delivery checkpoints and client payment collection for each stage.'
+                                : 'Track work delivery stages and target deadlines for this project.'}
                         </CardDescription>
                     </div>
 
@@ -602,24 +613,28 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                             >
                                 All ({milestones.length})
                             </button>
-                            <button
-                                onClick={() => setFilterStatus('payment_pending')}
-                                className={`px-2.5 py-1 rounded-lg transition-colors font-semibold ${filterStatus === 'payment_pending' ? 'bg-background shadow-xs text-amber-600' : 'text-muted-foreground hover:text-foreground'}`}
-                            >
-                                Due
-                            </button>
+                            {canViewFinances && (
+                                <button
+                                    onClick={() => setFilterStatus('payment_pending')}
+                                    className={`px-2.5 py-1 rounded-lg transition-colors font-semibold ${filterStatus === 'payment_pending' ? 'bg-background shadow-xs text-amber-600' : 'text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    Due
+                                </button>
+                            )}
                             <button
                                 onClick={() => setFilterStatus('work_done')}
                                 className={`px-2.5 py-1 rounded-lg transition-colors font-semibold ${filterStatus === 'work_done' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 Done ({completedMilestones})
                             </button>
-                            <button
-                                onClick={() => setFilterStatus('paid')}
-                                className={`px-2.5 py-1 rounded-lg transition-colors font-semibold ${filterStatus === 'paid' ? 'bg-background shadow-xs text-emerald-600' : 'text-muted-foreground hover:text-foreground'}`}
-                            >
-                                Paid
-                            </button>
+                            {canViewFinances && (
+                                <button
+                                    onClick={() => setFilterStatus('paid')}
+                                    className={`px-2.5 py-1 rounded-lg transition-colors font-semibold ${filterStatus === 'paid' ? 'bg-background shadow-xs text-emerald-600' : 'text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    Paid
+                                </button>
+                            )}
                         </div>
 
                         {canManageMilestones && (
@@ -827,8 +842,8 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                                                         </Button>
                                                     )}
 
-                                                    {/* Quick Record Payment Button */}
-                                                    {canManageMilestones && (
+                                                    {/* Quick Record Payment Button (Admin/Owner only) */}
+                                                    {canViewFinances && (
                                                         <Button
                                                             variant={isExplicitlyPaid ? 'outline' : 'default'}
                                                             size="sm"
@@ -849,8 +864,8 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                                                         </Button>
                                                     )}
 
-                                                    {/* Create Invoice Action */}
-                                                    {canManageMilestones && !isExplicitlyPaid && milestone.amount > 0 && (
+                                                    {/* Create Invoice Action (Admin/Owner only) */}
+                                                    {canViewFinances && !isExplicitlyPaid && milestone.amount > 0 && (
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
@@ -918,16 +933,19 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                 onOpenChange={setIsDialogOpen}
                 milestone={selectedMilestone}
                 projectBudget={project.budget || 0}
+                showPaymentFields={canViewFinances}
                 onSave={handleSaveMilestone}
             />
 
-            {/* Record Client Payment Dialog */}
-            <ProjectMilestonePaymentDialog
-                open={isPaymentDialogOpen}
-                onOpenChange={setIsPaymentDialogOpen}
-                milestone={selectedMilestone}
-                onSavePayment={handleSaveMilestonePayment}
-            />
+            {/* Record Client Payment Dialog (Admin/Owner only) */}
+            {canViewFinances && (
+                <ProjectMilestonePaymentDialog
+                    open={isPaymentDialogOpen}
+                    onOpenChange={setIsPaymentDialogOpen}
+                    milestone={selectedMilestone}
+                    onSavePayment={handleSaveMilestonePayment}
+                />
+            )}
 
             {/* Bulk Create Milestones Dialog */}
             <ProjectBulkMilestonesDialog
@@ -935,6 +953,7 @@ export function ProjectMilestonesTab({ project, onProjectUpdate }: ProjectMilest
                 onOpenChange={setIsBulkDialogOpen}
                 projectBudget={project.budget || 0}
                 projectDeadline={project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : ''}
+                showPaymentFields={canViewFinances}
                 onSave={handleSaveBulkMilestones}
             />
         </div>
