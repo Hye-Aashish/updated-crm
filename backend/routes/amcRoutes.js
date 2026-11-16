@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Amc = require('../models/Amc');
 const Invoice = require('../models/Invoice');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope, assertCreatorAccess } = require('../utils/dataScope');
 
 // Helper: generate next invoice number
 const getNextInvoiceNumber = async () => {
@@ -53,7 +54,7 @@ const formatDurationLabel = (fromDate, toDate) => {
 };
 
 // GET AMC stats summary
-router.get('/stats/summary', protect, async (req, res, next) => {
+router.get('/stats/summary', protect, checkPermission('amc', 'view'), async (req, res, next) => {
     try {
         let baseFilter = {};
         if (req.user.role === 'client') {
@@ -61,6 +62,8 @@ router.get('/stats/summary', protect, async (req, res, next) => {
                 return res.json({ total: 0, active: 0, expiringSoon: 0, expired: 0, totalRevenue: 0 });
             }
             baseFilter = { clientId: new mongoose.Types.ObjectId(String(req.user.clientId)) };
+        } else {
+            baseFilter = await applyCreatorScope({}, req.user, 'amc');
         }
 
         const startOfToday = new Date();
@@ -97,11 +100,13 @@ router.get('/stats/summary', protect, async (req, res, next) => {
 // ─── CRUD Routes ─────────────────────────────────────────────────────────────
 
 // GET all AMCs
-router.get('/', protect, async (req, res, next) => {
+router.get('/', protect, checkPermission('amc', 'view'), async (req, res, next) => {
     try {
         let filter = {};
         if (req.user.role === 'client') {
             filter = { clientId: req.user.clientId };
+        } else {
+            filter = await applyCreatorScope({}, req.user, 'amc');
         }
         const amcs = await Amc.find(filter)
             .populate('projectId', 'name status')
@@ -195,13 +200,14 @@ router.get('/:id', protect, async (req, res, next) => {
             .populate('invoices', 'invoiceNumber total status date dueDate type')
             .populate('renewalHistory.invoiceId', 'invoiceNumber total status');
         if (!amc) return res.status(404).json({ message: 'AMC not found' });
-        if (req.user.role === 'client') {
-            const own = req.user.clientId?.toString?.() || '';
-            const amcClientId = amc.clientId?._id?.toString?.() || amc.clientId?.toString?.() || '';
-            if (!own || own !== amcClientId) {
-                return res.status(403).json({ message: 'Not authorized to view this AMC' });
+        const access = await assertCreatorAccess(req.user, amc, 'amc', {
+            clientCheck: (user, doc) => {
+                const own = user.clientId?.toString?.() || '';
+                const amcClientId = doc.clientId?._id?.toString?.() || doc.clientId?.toString?.() || '';
+                return !!own && own === amcClientId;
             }
-        }
+        });
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         const obj = amc.toObject();
         obj.status = Amc.computeStatus(obj.endDate, obj.status);
         res.json(obj);
@@ -227,6 +233,8 @@ router.put('/:id', protect, checkPermission('amc', 'edit'), async (req, res, nex
         }
         const existingAmc = await Amc.findById(req.params.id);
         if (!existingAmc) return res.status(404).json({ message: 'AMC not found' });
+        const access = await assertCreatorAccess(req.user, existingAmc, 'amc');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         const targetEndDate = safeUpdate.endDate ? new Date(safeUpdate.endDate) : existingAmc.endDate;
         const targetStatus = safeUpdate.status !== undefined ? safeUpdate.status : existingAmc.status;
@@ -251,8 +259,11 @@ router.delete('/:id', protect, checkPermission('amc', 'delete'), async (req, res
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
         }
-        const deleted = await Amc.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: 'AMC not found' });
+        const existing = await Amc.findById(req.params.id);
+        if (!existing) return res.status(404).json({ message: 'AMC not found' });
+        const access = await assertCreatorAccess(req.user, existing, 'amc');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        await Amc.findByIdAndDelete(req.params.id);
         res.json({ message: 'AMC deleted successfully' });
     } catch (err) {
         next(err);

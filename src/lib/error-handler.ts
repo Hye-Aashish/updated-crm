@@ -30,10 +30,13 @@ export function handleApiError(
         title = 'Network Error';
     }
 
-    if (toast) {
+    // Skip duplicate toast when api-client already showed Permission Denied
+    if (toast && !(isPermissionError && error?.__permissionToastShown)) {
         toast({
             title,
-            description: message,
+            description: isPermissionError && !message.toLowerCase().includes('permission')
+                ? `Permission Denied: ${message}`
+                : message,
             variant: 'destructive',
         });
     }

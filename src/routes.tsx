@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { PageSkeleton } from './components/ui/page-skeleton'
 
 // Layouts
@@ -16,6 +16,7 @@ const PublicCandidateForm = lazy(() => import('./pages/public/candidate-form').t
 const PublicOfferView = lazy(() => import('./pages/public/offer-view'))
 const PublicApprovalSignPage = lazy(() => import('./pages/public/approval-sign'))
 const PublicClientOnboarding = lazy(() => import('./pages/public/client-onboarding').then(m => ({ default: m.PublicClientOnboarding })))
+const PublicClientForm = lazy(() => import('./pages/public/client-form').then(m => ({ default: m.PublicClientForm })))
 
 // Dashboard Pages
 const DashboardPage = lazy(() => import('./pages/dashboard').then(m => ({ default: m.DashboardPage })))
@@ -86,52 +87,22 @@ const GstReportPage = lazy(() => import('./pages/finance/gst-report'))
 const CreditNotesPage = lazy(() => import('./pages/finance/credit-notes'))
 const CalendarPage = lazy(() => import('./pages/calendar').then(m => ({ default: m.CalendarPage })))
 const WorkAuditPage = lazy(() => import('./pages/work-audit').then(m => ({ default: m.WorkAuditPage })))
+const ProfitabilityPage = lazy(() => import('./pages/reports/profitability').then(m => ({ default: m.ProfitabilityPage })))
+const RetainersPage = lazy(() => import('./pages/retainers').then(m => ({ default: m.RetainersPage })))
+const KnowledgeBasePage = lazy(() => import('./pages/knowledge').then(m => ({ default: m.KnowledgeBasePage })))
 
 import { usePermissions } from './hooks/use-permissions'
-import { useAppStore } from './store'
-import { normalizeRoleKey, isAdminOrOwnerRole } from './lib/nav-utils'
+import { PermissionDenied } from './components/permission-denied'
 
 function PermissionGuard({ module, children }: { module: string; children: React.ReactNode }) {
     const { canView, loading } = usePermissions()
-    const { currentUser } = useAppStore()
-    const location = useLocation()
 
     if (loading) {
         return <PageSkeleton />
     }
 
     if (!canView(module)) {
-        const roleKey = normalizeRoleKey(currentUser?.role)
-        if (roleKey === 'client') {
-            return <Navigate to="/client/dashboard" replace />
-        }
-        if (roleKey === 'employee' || location.pathname.startsWith('/employee')) {
-            return <Navigate to="/employee/dashboard" replace />
-        }
-        return <Navigate to="/dashboard" replace />
-    }
-
-    return <>{children}</>
-}
-
-function AdminOnlyGuard({ children }: { children: React.ReactNode }) {
-    const { loading } = usePermissions()
-    const { currentUser } = useAppStore()
-    const location = useLocation()
-
-    if (loading || !currentUser) {
-        return <PageSkeleton />
-    }
-
-    if (!isAdminOrOwnerRole(currentUser?.role)) {
-        const roleKey = normalizeRoleKey(currentUser?.role)
-        if (roleKey === 'client') {
-            return <Navigate to="/client/dashboard" replace />
-        }
-        if (roleKey === 'employee' || location.pathname.startsWith('/employee')) {
-            return <Navigate to="/employee/dashboard" replace />
-        }
-        return <Navigate to="/dashboard" replace />
+        return <PermissionDenied module={module} />
     }
 
     return <>{children}</>
@@ -145,6 +116,7 @@ export function AppRoutes() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/f/:id" element={<PublicLeadForm />} />
+                <Route path="/cf/:id" element={<PublicClientForm />} />
                 <Route path="/q/:id" element={<PublicQuotationView />} />
                 <Route path="/candidate-form/:token" element={<PublicCandidateForm />} />
                 <Route path="/offer/:token" element={<PublicOfferView />} />
@@ -202,6 +174,8 @@ export function AppRoutes() {
                     <Route path="credit-notes" element={<PermissionGuard module="credit_notes"><CreditNotesPage /></PermissionGuard>} />
                     <Route path="vendor-bills" element={<PermissionGuard module="vendor_bills"><VendorBillsPage /></PermissionGuard>} />
                     <Route path="reports/gst" element={<PermissionGuard module="gst_reports"><GstReportPage /></PermissionGuard>} />
+                    <Route path="reports/profitability" element={<PermissionGuard module="profitability"><ProfitabilityPage /></PermissionGuard>} />
+                    <Route path="retainers" element={<PermissionGuard module="retainers"><RetainersPage /></PermissionGuard>} />
                     <Route path="expenses" element={<PermissionGuard module="expenses"><ExpensesPage /></PermissionGuard>} />
                     <Route path="salary" element={<PermissionGuard module="payroll"><SalaryPage /></PermissionGuard>} />
                     <Route path="amc" element={<PermissionGuard module="amc"><AmcPage /></PermissionGuard>} />
@@ -217,7 +191,8 @@ export function AppRoutes() {
                     <Route path="user-tracker" element={<PermissionGuard module="user_tracker"><UserTrackerPage /></PermissionGuard>} />
                     <Route path="screen-monitoring" element={<PermissionGuard module="screen_monitoring"><ScreenMonitoringPage /></PermissionGuard>} />
                     <Route path="reports" element={<PermissionGuard module="reports"><ReportsPage /></PermissionGuard>} />
-                    <Route path="work-audit" element={<AdminOnlyGuard><WorkAuditPage /></AdminOnlyGuard>} />
+                    <Route path="knowledge" element={<PermissionGuard module="knowledge_base"><KnowledgeBasePage /></PermissionGuard>} />
+                    <Route path="work-audit" element={<PermissionGuard module="work_audit"><WorkAuditPage /></PermissionGuard>} />
 
                     <Route path="files" element={<PermissionGuard module="files"><FilesPage /></PermissionGuard>} />
                     <Route path="settings" element={<PermissionGuard module="settings"><SettingsPage /></PermissionGuard>} />
@@ -280,6 +255,8 @@ export function AppRoutes() {
                     <Route path="credit-notes" element={<PermissionGuard module="credit_notes"><CreditNotesPage /></PermissionGuard>} />
                     <Route path="vendor-bills" element={<PermissionGuard module="vendor_bills"><VendorBillsPage /></PermissionGuard>} />
                     <Route path="reports/gst" element={<PermissionGuard module="gst_reports"><GstReportPage /></PermissionGuard>} />
+                    <Route path="reports/profitability" element={<PermissionGuard module="profitability"><ProfitabilityPage /></PermissionGuard>} />
+                    <Route path="retainers" element={<PermissionGuard module="retainers"><RetainersPage /></PermissionGuard>} />
                     <Route path="expenses" element={<PermissionGuard module="expenses"><ExpensesPage /></PermissionGuard>} />
                     <Route path="salary" element={<PermissionGuard module="payroll"><SalaryPage /></PermissionGuard>} />
 
@@ -305,6 +282,7 @@ export function AppRoutes() {
                     <Route path="chat/widgets" element={<PermissionGuard module="chat"><ChatWidgetsPage /></PermissionGuard>} />
 
                     <Route path="reports" element={<PermissionGuard module="reports"><ReportsPage /></PermissionGuard>} />
+                    <Route path="knowledge" element={<PermissionGuard module="knowledge_base"><KnowledgeBasePage /></PermissionGuard>} />
                     <Route path="files" element={<PermissionGuard module="files"><FilesPage /></PermissionGuard>} />
                     <Route path="ai-assistant" element={<PermissionGuard module="ai_assistant"><AIAssistantPage /></PermissionGuard>} />
                     <Route path="workspace-settings" element={<PermissionGuard module="settings"><SettingsPage /></PermissionGuard>} />

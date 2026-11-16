@@ -38,9 +38,9 @@ export function BreakCheck({ open, onStartBreak, onClose }: BreakCheckProps) {
                     <div className="mx-auto bg-blue-100 p-3 rounded-full w-fit mb-4">
                         <Timer className="h-8 w-8 text-blue-600 animate-pulse" />
                     </div>
-                    <DialogTitle className="text-center text-xl">Are you on break?</DialogTitle>
+                    <DialogTitle className="text-center text-xl">Taking a short break?</DialogTitle>
                     <DialogDescription className="text-center">
-                        We've detected no activity for over 5 minutes.
+                        Your keyboard has been quiet for a few minutes. Update your workspace status for the team.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col items-center justify-center p-6 space-y-4">
@@ -48,15 +48,15 @@ export function BreakCheck({ open, onStartBreak, onClose }: BreakCheckProps) {
                         {secondsLeft}s
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Your status will automatically switch to <span className="font-semibold text-orange-500">"On Break"</span> soon.
+                        Status will switch to <span className="font-semibold text-orange-500">On break</span> if there’s no reply.
                     </p>
                 </div>
                 <DialogFooter className="sm:justify-center gap-2">
                     <Button variant="outline" onClick={onClose}>
-                        No, I'm working
+                        I’m here
                     </Button>
                     <Button onClick={onStartBreak} className="bg-orange-600 hover:bg-orange-700">
-                        <Coffee className="h-4 w-4 mr-2" /> Start Break Now
+                        <Coffee className="h-4 w-4 mr-2" /> Start break
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -76,8 +76,8 @@ export function BreakOverlay({ open, onResume }: { open: boolean, onResume: () =
                 </div>
                 
                 <div className="space-y-4">
-                    <h1 className="text-5xl font-black tracking-tighter">YOU ARE ON BREAK</h1>
-                    <p className="text-xl text-white/60">Take your time. Your activity is currently not being monitored.</p>
+                    <h1 className="text-5xl font-black tracking-tighter">ON BREAK</h1>
+                    <p className="text-xl text-white/60">Enjoy your break. Come back when you’re ready to continue work.</p>
                 </div>
 
                 <div className="pt-10">
@@ -86,11 +86,11 @@ export function BreakOverlay({ open, onResume }: { open: boolean, onResume: () =
                         size="lg" 
                         className="h-16 px-10 text-xl font-bold bg-white text-black hover:bg-gray-200 transition-all rounded-full shadow-2xl hover:scale-105"
                     >
-                        <PlayCircle className="h-6 w-6 mr-3" /> Resume Working
+                        <PlayCircle className="h-6 w-6 mr-3" /> Back to work
                     </Button>
                 </div>
                 
-                <p className="text-sm text-white/30 tracking-widest uppercase">Nexprism Productivity Manager</p>
+                <p className="text-sm text-white/30 tracking-widest uppercase">Nexprism Workspace</p>
             </div>
         </div>
     );

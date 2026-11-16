@@ -3,10 +3,10 @@ const router = express.Router();
 const PipelineRule = require('../models/PipelineRule');
 const { FollowUpSequence, LeadSequenceEnrollment } = require('../models/FollowUpSequence');
 const Lead = require('../models/Lead');
-const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // ── Pipeline Rules ──────────────────────────────────────────
-router.get('/pipeline-rules', protect, checkPermission('leads', 'view'), async (req, res) => {
+router.get('/pipeline-rules', protect, checkPermission('sales_automations', 'view'), async (req, res) => {
     try {
         const rules = await PipelineRule.find().sort({ createdAt: -1 });
         res.json(rules);
@@ -15,7 +15,7 @@ router.get('/pipeline-rules', protect, checkPermission('leads', 'view'), async (
     }
 });
 
-router.post('/pipeline-rules', protect, authorize('admin', 'owner'), async (req, res) => {
+router.post('/pipeline-rules', protect, checkPermission('sales_automations', 'create'), async (req, res) => {
     try {
         const rule = await PipelineRule.create({
             name: req.body.name,
@@ -29,7 +29,7 @@ router.post('/pipeline-rules', protect, authorize('admin', 'owner'), async (req,
     }
 });
 
-router.put('/pipeline-rules/:id', protect, authorize('admin', 'owner'), async (req, res) => {
+router.put('/pipeline-rules/:id', protect, checkPermission('sales_automations', 'edit'), async (req, res) => {
     try {
         const rule = await PipelineRule.findByIdAndUpdate(
             req.params.id,
@@ -43,7 +43,7 @@ router.put('/pipeline-rules/:id', protect, authorize('admin', 'owner'), async (r
     }
 });
 
-router.delete('/pipeline-rules/:id', protect, authorize('admin', 'owner'), async (req, res) => {
+router.delete('/pipeline-rules/:id', protect, checkPermission('sales_automations', 'delete'), async (req, res) => {
     try {
         await PipelineRule.findByIdAndDelete(req.params.id);
         res.json({ message: 'Deleted' });
@@ -53,7 +53,7 @@ router.delete('/pipeline-rules/:id', protect, authorize('admin', 'owner'), async
 });
 
 // ── Follow-up Sequences ─────────────────────────────────────
-router.get('/sequences', protect, checkPermission('leads', 'view'), async (req, res) => {
+router.get('/sequences', protect, checkPermission('sales_automations', 'view'), async (req, res) => {
     try {
         const sequences = await FollowUpSequence.find().sort({ createdAt: -1 });
         res.json(sequences);
@@ -62,7 +62,7 @@ router.get('/sequences', protect, checkPermission('leads', 'view'), async (req, 
     }
 });
 
-router.post('/sequences', protect, authorize('admin', 'owner'), async (req, res) => {
+router.post('/sequences', protect, checkPermission('sales_automations', 'create'), async (req, res) => {
     try {
         const seq = await FollowUpSequence.create({
             name: req.body.name,
@@ -75,7 +75,7 @@ router.post('/sequences', protect, authorize('admin', 'owner'), async (req, res)
     }
 });
 
-router.put('/sequences/:id', protect, authorize('admin', 'owner'), async (req, res) => {
+router.put('/sequences/:id', protect, checkPermission('sales_automations', 'edit'), async (req, res) => {
     try {
         const seq = await FollowUpSequence.findByIdAndUpdate(
             req.params.id,
@@ -89,7 +89,7 @@ router.put('/sequences/:id', protect, authorize('admin', 'owner'), async (req, r
     }
 });
 
-router.delete('/sequences/:id', protect, authorize('admin', 'owner'), async (req, res) => {
+router.delete('/sequences/:id', protect, checkPermission('sales_automations', 'delete'), async (req, res) => {
     try {
         await FollowUpSequence.findByIdAndDelete(req.params.id);
         await LeadSequenceEnrollment.deleteMany({ sequenceId: req.params.id });

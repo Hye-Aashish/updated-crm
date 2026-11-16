@@ -7,36 +7,37 @@ const Client = require('../models/Client');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope } = require('../utils/dataScope');
 
 // GET all expiring items (AMC, Domain/Hosting, Overdue Invoices)
-router.get('/', protect, authorize('admin', 'owner'), async (req, res) => {
+router.get('/', protect, checkPermission('expiry_alerts', 'view'), async (req, res) => {
     try {
         const now = new Date();
         const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
         const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
+        const amcScope = await applyCreatorScope({ status: { $in: ['expiring-soon', 'expired'] } }, req.user, 'amc');
+        const domainScope = await applyCreatorScope({ status: { $in: ['expiring-soon', 'expired'] } }, req.user, 'domains');
+        const invoiceScope = await applyCreatorScope({
+            status: { $in: ['pending', 'overdue'] },
+            dueDate: { $lt: now }
+        }, req.user, 'invoices');
+
         // 1. Expiring & Expired AMCs
-        const expiringAmcs = await Amc.find({
-            status: { $in: ['expiring-soon', 'expired'] }
-        })
+        const expiringAmcs = await Amc.find(amcScope)
             .populate('clientId', 'name email company phone')
             .populate('projectId', 'name')
             .sort({ endDate: 1 });
 
         // 2. Expiring & Expired Domains/Hosting
-        const expiringDomains = await Domain.find({
-            status: { $in: ['expiring-soon', 'expired'] }
-        })
+        const expiringDomains = await Domain.find(domainScope)
             .populate('clientId', 'name email company phone')
             .populate('projectId', 'name')
             .sort({ expiryDate: 1 });
 
         // 3. Overdue Invoices
-        const overdueInvoices = await Invoice.find({
-            status: { $in: ['pending', 'overdue'] },
-            dueDate: { $lt: now }
-        }).sort({ dueDate: 1 });
+        const overdueInvoices = await Invoice.find(invoiceScope).sort({ dueDate: 1 });
 
         // Attach client info to invoices
         const invoicesWithClients = await Promise.all(
@@ -131,7 +132,7 @@ router.get('/', protect, authorize('admin', 'owner'), async (req, res) => {
 });
 
 // POST - Send expiry notification to client via email + in-app notification for admins
-router.post('/send-reminder', protect, authorize('admin', 'owner'), async (req, res) => {
+router.post('/send-reminder', protect, checkPermission('expiry_alerts', 'manage'), async (req, res) => {
     try {
         const { alertId, alertType, clientEmail, clientName, itemName, expiryDate, amount } = req.body;
 
@@ -256,7 +257,7 @@ router.post('/send-reminder', protect, authorize('admin', 'owner'), async (req, 
 });
 
 // POST - Send bulk reminders for all critical/expired items
-router.post('/send-bulk', protect, authorize('admin', 'owner'), async (req, res) => {
+router.post('/send-bulk', protect, checkPermission('expiry_alerts', 'manage'), async (req, res) => {
     try {
         const { alertIds } = req.body; // Array of { id, type, clientEmail, clientName, itemName, expiryDate, amount }
 

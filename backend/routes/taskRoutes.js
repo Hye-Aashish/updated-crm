@@ -3,7 +3,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const Task = require('../models/Task');
 const Project = require('../models/Project');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 const { assertProjectAccess } = require('../utils/assertAccess');
 
 const normalizeTaskRole = (role) => String(role || '').trim().toLowerCase();
@@ -173,7 +173,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // GET team resource capacity & workload distribution
-router.get('/capacity', protect, async (req, res) => {
+router.get('/capacity', protect, checkPermission('capacity_planning', 'view'), async (req, res) => {
     try {
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Clients cannot access team capacity' });

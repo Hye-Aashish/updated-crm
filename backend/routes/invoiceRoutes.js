@@ -6,35 +6,33 @@ const Project = require('../models/Project');
 const sendEmail = require('../utils/sendEmail');
 const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 const { assertInvoiceAccess } = require('../utils/assertAccess');
+const { applyCreatorScope, canViewAllRecords } = require('../utils/dataScope');
 const { timingSafeEqualStr } = require('../utils/securityHelpers');
 const axios = require('axios');
 const crypto = require('crypto');
 
 // GET all invoices
-router.get('/', protect, async (req, res) => {
+router.get('/', protect, checkPermission('invoices', 'view'), async (req, res) => {
     try {
         let filter = {};
         if (req.user.role === 'client') {
             filter = { clientId: req.user.clientId };
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        } else if (!(await canViewAllRecords(req.user, 'invoices'))) {
             const userId = req.user._id.toString();
-
-            // Invoices for clients assigned to me
             const myClients = await Client.find({ assignedTo: userId }).select('_id');
             const myClientIds = myClients.map(c => c._id.toString());
-
-            // Invoices for projects I manage or belong to
             const myProjects = await Project.find({
                 $or: [{ pmId: userId }, { members: userId }]
             }).select('_id');
             const myProjectIds = myProjects.map(p => p._id.toString());
 
-            filter = {
-                $or: [
+            // Own creations + invoices tied to assigned clients/projects
+            filter = await applyCreatorScope({}, req.user, 'invoices', {
+                extraOr: [
                     { clientId: { $in: myClientIds } },
                     { projectId: { $in: myProjectIds } }
                 ]
-            };
+            });
         }
         const invoices = await Invoice.find(filter).sort({ createdAt: -1 });
         res.json(invoices);
@@ -136,7 +134,8 @@ router.post('/', protect, checkPermission('invoices', 'create'), async (req, res
         paidDate: req.body.paidDate,
         autoSend: req.body.autoSend,
         frequency: req.body.frequency,
-        termsAndConditions: req.body.termsAndConditions
+        termsAndConditions: req.body.termsAndConditions,
+        createdBy: req.user._id
     });
 
     try {

@@ -73,8 +73,11 @@
   }
 
   html {
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
+    max-width: 100%;
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -85,10 +88,36 @@
     font-feature-settings: "cv02", "cv05", "cv08", "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
     letter-spacing: -0.015em;
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
     background-color: hsl(var(--background));
     transition: background-color 0.25s ease;
+    touch-action: manipulation;
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 100%;
+    min-height: 100dvh;
+  }
+
+  /* Flex/grid children must be allowed to shrink so content doesn't force page-wide overflow */
+  .min-w-0-safe,
+  main,
+  main > * {
+    min-width: 0;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -98,19 +127,16 @@
     line-height: 1.25;
   }
 
-  /* Sleek Clay Scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  /* Hide all scrollbars — scrolling still works */
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/25 rounded-full hover:bg-muted-foreground/45 transition-colors;
-    box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.4);
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 }
 
@@ -305,6 +331,42 @@
     display: none;
   }
 
+  /* Smooth scroll panes — bars hidden, swipe/wheel still work */
+  .custom-scrollbar,
+  .app-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar,
+  .app-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* Leads kanban: side scroll without visible bar */
+  .kanban-h-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .kanban-h-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .kanban-h-scroll [data-kanban-column-scroll] {
+    touch-action: pan-y;
+  }
+
   /* Mobile shell helpers */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -320,23 +382,65 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    max-width: 100%;
+  }
+
+  /* Forms/cards that used fixed wide grids must wrap on small screens */
+  .form-grid-safe {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    width: 100%;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .form-grid-safe {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* Page toolbars: wrap on PC so the page never slides sideways */
+  .page-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .page-toolbar > * {
+    max-width: 100%;
+    min-width: 0;
   }
 
   @media (max-width: 767px) {
     .mobile-table-wrap {
       width: 100%;
+      max-width: 100%;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
     }
 
     .mobile-table-wrap table {
       min-width: 640px;
     }
 
-    /* Prefer stacked headers on small screens when pages use flex toolbars */
-    .page-toolbar {
-      flex-wrap: wrap;
-      gap: 0.75rem;
+    /* Mobile: allow horizontal swipe on dense chip rows only */
+    .page-toolbar.page-toolbar-scroll-mobile {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+    }
+
+    .page-toolbar.page-toolbar-scroll-mobile > * {
+      min-width: max-content;
+      max-width: none;
     }
   }
 }

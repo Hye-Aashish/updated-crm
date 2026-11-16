@@ -57,13 +57,6 @@ export function LeadsPage() {
     const [searchQuery, setSearchQuery] = useState<string>('')
     const [selectedAgentFilter, setSelectedAgentFilter] = useState<string>('all')
     const [selectedFormFilter, setSelectedFormFilter] = useState<string>('all')
-    const [telecallerTab, setTelecallerTab] = useState<'all' | 'my' | 'coverage'>('all')
-
-    // Count fallback leads
-    const fallbackLeadsCount = useMemo(() => {
-        return leads.filter(l => l.isFallbackFollowUp).length
-    }, [leads])
-
     // Strict Multi-User Isolation & Granular Permission Scoping:
     // Admin / Owner or 'all' scope sees all leads to supervise.
     // 'custom' scope sees own leads + explicitly permitted agents' leads.
@@ -372,21 +365,21 @@ export function LeadsPage() {
     }
 
     return (
-        <div className="space-y-5 h-[calc(100vh-100px)] flex flex-col font-sans pb-6">
-            {/* 1. Header Navigation */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0">
-                <div className="space-y-1">
-                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
-                        <span>Lead Pipeline & Follow-ups</span>
+        <div className="flex flex-col gap-3 md:gap-4 min-h-0 font-sans max-md:pb-2 md:h-[calc(100dvh-5.25rem)] md:overflow-hidden">
+            {/* 1. Header Navigation — stacks/wraps on PC (no horizontal page slide) */}
+            <div className="flex flex-col gap-3 md:gap-4 shrink-0 min-w-0 w-full">
+                <div className="space-y-0.5 min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
+                        Lead Pipeline & Follow-ups
                     </h1>
-                    <p className="text-sm text-muted-foreground font-medium">
+                    <p className="hidden sm:block text-sm text-muted-foreground font-medium">
                         Intelligent follow-up priority tracking and sales management
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 sm:gap-3 w-full lg:w-auto overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
+                <div className="page-toolbar flex flex-wrap items-center gap-2 sm:gap-3 w-full min-w-0 max-md:overflow-x-auto max-md:flex-nowrap max-md:pb-1">
                     {/* Search Bar */}
-                    <div className="relative w-[160px] sm:w-[200px] shrink-0">
+                    <div className="relative w-full sm:w-[200px] sm:min-w-[160px] sm:max-w-[240px] sm:flex-1 lg:flex-none shrink-0 max-md:min-w-[160px]">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search lead or phone..."
@@ -398,9 +391,9 @@ export function LeadsPage() {
 
                     {/* Agent / Telecaller Filter (Admin / Owner view) */}
                     {isAdminOrOwner && (
-                        <div className="w-[170px] sm:w-[200px] shrink-0">
+                        <div className="w-full sm:w-[180px] sm:min-w-[150px] sm:max-w-[220px] sm:flex-1 lg:flex-none shrink-0 max-md:min-w-[150px]">
                             <Select value={selectedAgentFilter} onValueChange={setSelectedAgentFilter}>
-                                <SelectTrigger className="h-9 rounded-xl border-border/60 text-xs font-semibold bg-card">
+                                <SelectTrigger className="h-9 rounded-xl border-border/60 text-xs font-semibold bg-card w-full">
                                     <div className="flex items-center gap-1.5 truncate">
                                         <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
                                         <SelectValue placeholder="All Agents / Telecallers" />
@@ -421,9 +414,9 @@ export function LeadsPage() {
                     )}
 
                     {/* Web Lead Form Filter */}
-                    <div className="w-[160px] sm:w-[195px] shrink-0">
+                    <div className="w-full sm:w-[180px] sm:min-w-[150px] sm:max-w-[220px] sm:flex-1 lg:flex-none shrink-0 max-md:min-w-[150px]">
                         <Select value={selectedFormFilter} onValueChange={setSelectedFormFilter}>
-                            <SelectTrigger className="h-9 rounded-xl border-border/60 text-xs font-semibold bg-card">
+                            <SelectTrigger className="h-9 rounded-xl border-border/60 text-xs font-semibold bg-card w-full">
                                 <div className="flex items-center gap-1.5 truncate">
                                     <FileText className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
                                     <SelectValue placeholder="All Sources & Forms" />
@@ -435,20 +428,19 @@ export function LeadsPage() {
                                 </SelectItem>
                                 {totalWebFormLeads > 0 && (
                                     <SelectItem value="any_form" className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                                        ⚡ All Web Forms ({totalWebFormLeads})
+                                        All Web Forms ({totalWebFormLeads})
                                     </SelectItem>
                                 )}
                                 {formFilterList.map(f => (
                                     <SelectItem key={f.id} value={f.title} className="text-xs font-semibold">
-                                        📝 {f.title} ({f.count})
+                                        {f.title} ({f.count})
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
 
-
-                    <div className="flex bg-muted/40 rounded-xl p-1 border border-border/40">
+                    <div className="flex bg-muted/40 rounded-xl p-1 border border-border/40 shrink-0">
                         <Button
                             variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
                             size="sm"
@@ -469,7 +461,7 @@ export function LeadsPage() {
                         </Button>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 shrink-0">
                         {isAdminOrOwner && (
                             <Button
                                 variant="outline"
@@ -621,15 +613,17 @@ export function LeadsPage() {
 
 
             {/* 2. Interactive Follow-up Counter Header Cards */}
-            <LeadsKPI
-                allLeads={userScopedLeads}
-                selectedFollowUpFilter={selectedFollowUpFilter}
-                onSelectFollowUpFilter={setSelectedFollowUpFilter}
-            />
+            <div className="shrink-0">
+                <LeadsKPI
+                    allLeads={userScopedLeads}
+                    selectedFollowUpFilter={selectedFollowUpFilter}
+                    onSelectFollowUpFilter={setSelectedFollowUpFilter}
+                />
+            </div>
 
             {/* Active Filter Indicators Banner */}
             {(selectedFormFilter !== 'all' || (isAdminOrOwner && selectedAgentFilter !== 'all')) && (
-                <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs">
+                <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="font-extrabold text-foreground flex items-center gap-1.5">
                             <Filter className="h-3.5 w-3.5 text-indigo-600" />
@@ -682,8 +676,8 @@ export function LeadsPage() {
                 </div>
             )}
 
-            {/* 3. Operational Viewport */}
-            <div className="flex-1 min-h-0">
+            {/* 3. Board viewport: mobile gets guaranteed height; desktop fills remaining space */}
+            <div className="min-h-0 flex flex-col overflow-hidden h-[min(72dvh,640px)] md:h-auto md:flex-1">
                 {viewMode === 'kanban' ? (
                     <KanbanBoard
                         stages={stages}

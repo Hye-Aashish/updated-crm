@@ -57,6 +57,14 @@ export function LoginPage() {
 
             useAppStore.getState().resetWorkspaceData()
             setCurrentUser(userData)
+            try {
+                const { syncElectronAuthState } = await import('@/lib/electron-auth-sync')
+                syncElectronAuthState({
+                    loggedIn: true,
+                    email: userData.email,
+                    name: userData.name,
+                })
+            } catch { /* web-only */ }
             
             // Identify in Tracker if available
             try {
@@ -94,7 +102,7 @@ export function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen grid lg:grid-cols-2">
+        <div className="min-h-[100dvh] grid lg:grid-cols-2 overflow-x-clip">
             {/* Left: Branding / Visual */}
             <div className="hidden lg:flex flex-col bg-muted text-foreground p-10 pt-16 pb-8 justify-between relative overflow-hidden">
                 <div className="z-10">
@@ -245,7 +253,7 @@ export function LoginPage() {
             </div>
 
             {/* Right: Login Form */}
-            <div className="flex items-center justify-center p-6 bg-background relative overflow-hidden">
+            <div className="flex items-center justify-center p-4 sm:p-6 bg-background relative overflow-x-clip overflow-y-auto min-h-[100dvh] lg:min-h-0">
                 {/* Subtle background grid pattern */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
                 
@@ -256,7 +264,7 @@ export function LoginPage() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="w-full max-w-md z-10 px-4"
+                    className="w-full max-w-md z-10 px-1 sm:px-4 min-w-0"
                 >
                     <div className="relative group">
                         {/* Glowing backdrop decorative border behind the card */}

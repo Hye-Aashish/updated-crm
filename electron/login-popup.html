@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a1c1e;
+      --muted: #5c6570;
+      --line: #d7dce2;
+      --panel: #f7f5f1;
+      --panel-2: #ffffff;
+      --accent: #1d4f91;
+      --accent-deep: #163a6b;
+      --soft: #e8eef7;
+      --shadow: 0 18px 40px rgba(26, 28, 30, 0.16);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden; background: transparent;
+      font-family: "DM Sans", "Segoe UI", sans-serif; color: var(--ink); user-select: none;
+    }
+    .shell { height: 100%; padding: 10px; -webkit-app-region: drag; }
+    .card {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+    .card::before {
+      content: "";
+      position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent);
+    }
+    .rail {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+      background: #eef1f4; border-right: 1px solid var(--line); padding: 14px 8px;
+    }
+    .mark {
+      width: 46px; height: 46px; border-radius: 10px;
+      background: var(--soft); border: 1px solid #c9d6ea;
+      display: grid; place-items: center;
+      color: var(--accent); font-weight: 700; font-size: 18px; letter-spacing: -0.04em;
+    }
+    .pulse {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+      box-shadow: 0 0 0 0 rgba(29, 79, 145, 0.4);
+      animation: pulse 1.8s ease-out infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(29, 79, 145, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(29, 79, 145, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(29, 79, 145, 0); }
+    }
+    .body { display: flex; flex-direction: column; padding: 14px 14px 12px 16px; min-width: 0; }
+    .meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .brand { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+    .badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--accent); background: var(--soft); border: 1px solid #c9d6ea;
+      padding: 3px 7px; border-radius: 999px;
+    }
+    h1 { font-size: 19px; line-height: 1.2; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 6px; }
+    .copy { font-size: 12.5px; line-height: 1.45; color: var(--muted); max-width: 30ch; }
+    .copy strong { color: var(--ink); font-weight: 600; }
+    .actions {
+      display: grid; grid-template-columns: 1fr 1.15fr; gap: 8px; margin-top: auto; padding-top: 14px;
+      -webkit-app-region: no-drag;
+    }
+    button {
+      height: 36px; border-radius: 3px; border: 1px solid transparent;
+      font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+    }
+    button:active { transform: translateY(1px); }
+    .btn-later { background: var(--panel-2); color: var(--ink); border-color: var(--line); }
+    .btn-later:hover { background: #f0f2f5; }
+    .btn-login { background: var(--accent); color: #f5f8fc; border-color: var(--accent-deep); }
+    .btn-login:hover { background: var(--accent-deep); }
+    .hint {
+      margin-top: 8px; font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 10px; color: #8a939e;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card">
+      <aside class="rail" aria-hidden="true">
+        <div class="mark">N</div>
+        <div class="pulse" title="Sign in"></div>
+      </aside>
+      <section class="body">
+        <div class="meta">
+          <div class="brand">Nexprism · CRM</div>
+          <div class="badge">Workspace</div>
+        </div>
+        <h1>Sign in to continue</h1>
+        <p class="copy">
+          Open <strong>Nexprism</strong> to access projects, tasks, and your
+          company workspace for the day.
+        </p>
+        <div class="actions">
+          <button type="button" class="btn-later" id="btnLater">Not now</button>
+          <button type="button" class="btn-login" id="btnLogin">Open Nexprism</button>
+        </div>
+        <div class="hint">We’ll nudge you again later if you’re still signed out.</div>
+      </section>
+    </div>
+  </div>
+  <script>
+    document.getElementById('btnLater').onclick = () => window.loginPopupAPI?.dismiss();
+    document.getElementById('btnLogin').onclick = () => window.loginPopupAPI?.openLogin();
+  </script>
+</body>
+</html>

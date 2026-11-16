@@ -6,7 +6,7 @@ const VendorBill = require('../models/VendorBill');
 const Client = require('../models/Client');
 const Project = require('../models/Project');
 const Setting = require('../models/Setting');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 const { assertProjectAccess } = require('../utils/assertAccess');
 
 function inRange(date, from, to) {
@@ -25,7 +25,7 @@ function convertAmount(amount, currency, rates, base = 'INR') {
 }
 
 // GST-style report from invoice tax lines
-router.get('/gst', protect, authorize('admin', 'owner'), async (req, res) => {
+router.get('/gst', protect, checkPermission('gst_reports', 'view'), async (req, res) => {
     try {
         const { from, to } = req.query;
         const invoices = await Invoice.find({
@@ -63,7 +63,7 @@ router.get('/gst', protect, authorize('admin', 'owner'), async (req, res) => {
 });
 
 // P&L by client / project / month
-router.get('/pnl', protect, authorize('admin', 'owner'), async (req, res) => {
+router.get('/pnl', protect, checkPermission('gst_reports', 'view'), async (req, res) => {
     try {
         const { from, to, groupBy = 'month' } = req.query;
         const settings = await Setting.findOne({ type: 'general' }).lean();

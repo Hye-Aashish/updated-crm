@@ -41,8 +41,15 @@ export function TeamPage() {
     const navigate = useNavigate()
     const location = useLocation()
     const { toast } = useToast()
-    const { users, setUsers, tasks } = useAppStore()
+    const { users, setUsers, tasks, settings } = useAppStore()
     const [loading, setLoading] = useState(true)
+    const [availableRoles, setAvailableRoles] = useState<{ name: string; label: string }[]>([
+        { name: 'employee', label: 'Employee' },
+        { name: 'developer', label: 'Developer' },
+        { name: 'pm', label: 'Project Manager' },
+        { name: 'sales', label: 'Sales Agent' },
+        { name: 'admin', label: 'Admin' },
+    ])
 
     // UI State
     const [activeTab, setActiveTab] = useState<'members' | 'attendance'>('members')
@@ -92,6 +99,31 @@ export function TeamPage() {
             setActiveTab('members')
         }
     }, [location.search])
+
+    // Load assignable roles from Roles & Permissions settings (includes custom roles)
+    useEffect(() => {
+        const loadRoles = async () => {
+            try {
+                const fromStore = settings?.roles
+                const rolesData = fromStore || (await api.get('/settings')).data?.roles
+                if (Array.isArray(rolesData) && rolesData.length > 0) {
+                    const mapped = rolesData
+                        .filter((r: any) => {
+                            const key = String(r.name || '').toLowerCase()
+                            return key !== 'client' && key !== 'owner'
+                        })
+                        .map((r: any) => ({
+                            name: r.name,
+                            label: r.label || r.name
+                        }))
+                    if (mapped.length > 0) setAvailableRoles(mapped)
+                }
+            } catch {
+                // keep fallback list
+            }
+        }
+        loadRoles()
+    }, [settings])
 
     // Fetch Users
     useEffect(() => {
@@ -242,7 +274,7 @@ export function TeamPage() {
                                     <Plus className="mr-1.5 sm:mr-2 h-4 w-4" /> Add Member
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0">
+                            <DialogContent className="max-w-5xl w-[calc(100%-1rem)] sm:w-[95vw] h-[min(85vh,100dvh)] max-h-[min(92dvh,900px)] flex flex-col p-0 overflow-hidden">
                                 <DialogHeader className="p-6 border-b">
                                     <DialogTitle className="text-xl">Account Details</DialogTitle>
                                     <DialogDescription>Enter the employee's information.</DialogDescription>
@@ -358,14 +390,12 @@ export function TeamPage() {
                                                 <div className="space-y-2">
                                                     <Label>User Role</Label>
                                                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
-                                                        <option value="employee">Employee</option>
-                                                        <option value="developer">Developer</option>
-                                                        <option value="pm">Project Manager</option>
-                                                        <option value="sales">Sales Agent</option>
-                                                        <option value="admin">Admin</option>
+                                                        {availableRoles.map((r) => (
+                                                            <option key={r.name} value={r.name}>{r.label}</option>
+                                                        ))}
                                                     </select>
                                                     <p className="text-[11px] text-muted-foreground">
-                                                        Client portal accounts are created in the Clients section.
+                                                        Roles come from Settings → Roles & Permissions. Client portal accounts are created in Clients.
                                                     </p>
                                                 </div>
                                             </div>
@@ -534,7 +564,7 @@ export function TeamPage() {
                                                     <span className="font-medium text-xs">{user.phone || '-'}</span>
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4 w-full pt-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full pt-4">
                                                 <div className="bg-secondary/20 p-3 rounded-lg">
                                                     <div className="text-2xl font-bold text-primary">{stats.activeTasks}</div>
                                                     <div className="text-xs text-muted-foreground flex items-center justify-center gap-1"><Briefcase className="h-3 w-3" /> Active</div>

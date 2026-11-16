@@ -82,7 +82,7 @@ export function LeadsKPI({ allLeads, selectedFollowUpFilter, onSelectFollowUpFil
     ]
 
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-shrink-0 animate-in fade-in duration-500">
+        <div className="flex max-md:overflow-x-auto max-md:mobile-scroll-x max-md:pb-1 md:grid md:grid-cols-3 lg:grid-cols-5 gap-2.5 shrink-0 min-w-0 w-full animate-in fade-in duration-500">
             {cards.map((c) => {
                 const Icon = c.icon
                 const isSelected = selectedFollowUpFilter === c.id
@@ -91,23 +91,23 @@ export function LeadsKPI({ allLeads, selectedFollowUpFilter, onSelectFollowUpFil
                     <Card
                         key={c.id}
                         onClick={() => onSelectFollowUpFilter(c.id)}
-                        className={`cursor-pointer transition-all duration-200 border rounded-2xl shadow-sm hover:shadow-md ${
+                        className={`cursor-pointer transition-all duration-200 border rounded-2xl shadow-sm hover:shadow-md min-w-[148px] md:min-w-0 shrink-0 md:shrink ${
                             isSelected ? c.activeColor : c.inactiveColor
                         }`}
                     >
-                        <CardContent className="p-3.5 flex items-center justify-between">
-                            <div className="space-y-1 overflow-hidden">
-                                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        <CardContent className="p-3 flex items-center justify-between gap-2">
+                            <div className="space-y-0.5 overflow-hidden min-w-0">
+                                <div className="flex items-center gap-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                     <span>{c.indicator}</span>
                                     <span className="truncate">{c.title}</span>
                                 </div>
                                 <div className="flex items-baseline gap-1.5">
-                                    <h3 className="text-xl font-extrabold tracking-tight">{c.count}</h3>
+                                    <h3 className="text-lg sm:text-xl font-extrabold tracking-tight">{c.count}</h3>
                                     <span className="text-[10px] font-semibold text-muted-foreground">leads</span>
                                 </div>
                             </div>
-                            <div className={`p-2 rounded-xl border ${c.badgeBg} ${c.iconColor} shrink-0`}>
-                                <Icon className="h-4 w-4" />
+                            <div className={`p-1.5 sm:p-2 rounded-xl border ${c.badgeBg} ${c.iconColor} shrink-0`}>
+                                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </div>
                         </CardContent>
                     </Card>

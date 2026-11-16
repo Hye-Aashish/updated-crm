@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { useAppStore } from '@/store';
 import { useToast } from '@/hooks/use-toast';
 import { playMessageSound } from '@/lib/sound-notification';
+import { showDesktopNotification } from '@/lib/notifications';
 import api from '@/lib/api-client';
 
 const getSocketURL = () => {
@@ -46,10 +47,17 @@ export function ChatNotificationListener() {
             // Only notify if message is sent by someone else
             if (senderId && currentUserId && senderId.toString() !== currentUserId.toString()) {
                 playMessageSound();
+                const title = `New message from ${msg.senderName || 'Team Member'}`;
+                const body = msg.message || 'Sent an attachment';
                 toast({
-                    title: `💬 New Message from ${msg.senderName || 'Team Member'}`,
-                    description: msg.message || 'Sent an attachment',
+                    title: `💬 ${title}`,
+                    description: body,
                     duration: 5000
+                });
+                void showDesktopNotification({
+                    title,
+                    body,
+                    tag: `chat-${msg._id || msg.id || Date.now()}`,
                 });
             }
         });
@@ -58,10 +66,17 @@ export function ChatNotificationListener() {
         socket.on('message_received', (msg: any) => {
             if (msg.sender_type === 'visitor') {
                 playMessageSound();
+                const title = 'New live chat message';
+                const body = msg.message || 'A visitor sent a new message';
                 toast({
-                    title: `💬 New Live Chat Message`,
-                    description: msg.message || 'A visitor sent a new message',
+                    title: `💬 ${title}`,
+                    description: body,
                     duration: 5000
+                });
+                void showDesktopNotification({
+                    title,
+                    body,
+                    tag: `livechat-${msg._id || msg.id || Date.now()}`,
                 });
             }
         });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Hosting = require('../models/Hosting');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope, assertCreatorAccess } = require('../utils/dataScope');
 
 // Auto status updater helper
 const updateHostingStatuses = async (servers) => {
@@ -31,11 +32,13 @@ const updateHostingStatuses = async (servers) => {
 };
 
 // GET all hosting servers
-router.get('/', protect, async (req, res) => {
+router.get('/', protect, checkPermission('hosting', 'view'), async (req, res) => {
     try {
         let filter = {};
         if (req.user.role === 'client') {
             filter.clientId = req.user.clientId;
+        } else {
+            filter = await applyCreatorScope({}, req.user, 'hosting');
         }
 
         const servers = await Hosting.find(filter)
@@ -51,11 +54,13 @@ router.get('/', protect, async (req, res) => {
 });
 
 // GET stats summary
-router.get('/stats/summary', protect, async (req, res) => {
+router.get('/stats/summary', protect, checkPermission('hosting', 'view'), async (req, res) => {
     try {
         let filter = {};
         if (req.user.role === 'client') {
             filter.clientId = req.user.clientId;
+        } else {
+            filter = await applyCreatorScope({}, req.user, 'hosting');
         }
 
         const servers = await Hosting.find(filter);
@@ -84,12 +89,20 @@ router.get('/stats/summary', protect, async (req, res) => {
 });
 
 // GET single server
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', protect, checkPermission('hosting', 'view'), async (req, res) => {
     try {
         const server = await Hosting.findById(req.params.id)
             .populate('clientId', 'name email company')
             .populate('projectId', 'name status');
         if (!server) return res.status(404).json({ message: 'Server not found' });
+        const access = await assertCreatorAccess(req.user, server, 'hosting', {
+            clientCheck: (user, doc) => {
+                const own = user.clientId?.toString?.() || '';
+                const cid = doc.clientId?._id?.toString?.() || doc.clientId?.toString?.() || '';
+                return !!own && own === cid;
+            }
+        });
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         res.json(server);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -97,9 +110,12 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // CREATE server
-router.post('/', protect, checkPermission('settings', 'edit'), async (req, res) => {
+router.post('/', protect, checkPermission('hosting', 'create'), async (req, res) => {
     try {
-        const payload = { ...req.body };
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Clients cannot create hosting records' });
+        }
+        const payload = { ...req.body, createdBy: req.user._id };
         if (!payload.clientId || payload.clientId === 'none') delete payload.clientId;
         if (!payload.projectId || payload.projectId === 'none') delete payload.projectId;
 
@@ -117,9 +133,18 @@ router.post('/', protect, checkPermission('settings', 'edit'), async (req, res) 
 });
 
 // UPDATE server
-router.put('/:id', protect, checkPermission('settings', 'edit'), async (req, res) => {
+router.put('/:id', protect, checkPermission('hosting', 'edit'), async (req, res) => {
     try {
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+        const existing = await Hosting.findById(req.params.id);
+        if (!existing) return res.status(404).json({ message: 'Server not found' });
+        const access = await assertCreatorAccess(req.user, existing, 'hosting');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         const payload = { ...req.body };
+        delete payload.createdBy;
         if (!payload.clientId || payload.clientId === 'none') payload.clientId = null;
         if (!payload.projectId || payload.projectId === 'none') payload.projectId = null;
 
@@ -135,10 +160,16 @@ router.put('/:id', protect, checkPermission('settings', 'edit'), async (req, res
 });
 
 // DELETE server
-router.delete('/:id', protect, checkPermission('settings', 'delete'), async (req, res) => {
+router.delete('/:id', protect, checkPermission('hosting', 'delete'), async (req, res) => {
     try {
-        const server = await Hosting.findByIdAndDelete(req.params.id);
-        if (!server) return res.status(404).json({ message: 'Server not found' });
+        if (req.user.role === 'client') {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+        const existing = await Hosting.findById(req.params.id);
+        if (!existing) return res.status(404).json({ message: 'Server not found' });
+        const access = await assertCreatorAccess(req.user, existing, 'hosting');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        await Hosting.findByIdAndDelete(req.params.id);
         res.json({ message: 'Server deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const Task = require('../models/Task');
@@ -14,16 +14,6 @@ const Lead = require('../models/Lead');
 const SalesActivityAudit = require('../models/SalesActivityAudit');
 const CalendarEvent = require('../models/CalendarEvent');
 const Ticket = require('../models/Ticket');
-
-const normalizeRole = (role) => String(role || '').trim().toLowerCase();
-
-const requireAdminOrOwner = (req, res, next) => {
-    const role = normalizeRole(req.user?.role);
-    if (role !== 'admin' && role !== 'owner') {
-        return res.status(403).json({ message: 'Access denied. Admin or Owner access required.' });
-    }
-    next();
-};
 
 const parseLocalDateBounds = (startStr, endStr, preset) => {
     const now = new Date();
@@ -85,7 +75,7 @@ const isDoneStatus = (s) => ['done', 'completed', 'closed', 'resolved'].includes
  * projects/checkpoints/bugs, sales follow-ups, tickets, and calendar events,
  * plus missed work / inactive employees for the selected date range.
  */
-router.get('/', protect, requireAdminOrOwner, async (req, res) => {
+router.get('/', protect, checkPermission('work_audit', 'view'), async (req, res) => {
     try {
         const { startDate, endDate, preset = 'today', userId = 'all', category = 'all' } = req.query;
         const { start, end, startStr, endStr } = parseLocalDateBounds(startDate, endDate, preset);

@@ -7,8 +7,7 @@ import { Switch } from '@/components/ui/switch'
 import { 
     Plus, Save, Shield, Loader2, Building2, 
     FolderKanban, Trash2, Users, CreditCard, Globe, MessageSquare,
-    LayoutDashboard, Briefcase, Target, Search, CheckCheck, XCircle,
-    Check, X
+    LayoutDashboard, Briefcase, Target, Search, CheckCheck, XCircle
 } from 'lucide-react'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
@@ -28,6 +27,7 @@ const MODULE_LABELS: Record<string, string> = {
 
     // Work & Clients
     clients: 'Clients',
+    client_forms: 'Client Forms',
     projects: 'Projects',
     products: 'Digital Products',
     tasks: 'Tasks',
@@ -47,6 +47,8 @@ const MODULE_LABELS: Record<string, string> = {
     credit_notes: 'Credit Notes',
     vendor_bills: 'Vendor Bills',
     gst_reports: 'GST & P&L',
+    profitability: 'Project Profitability',
+    retainers: 'Retainers',
     expenses: 'Expenses',
     payroll: 'Payroll',
     billing_settings: 'Billing Settings',
@@ -73,10 +75,12 @@ const MODULE_LABELS: Record<string, string> = {
 
     // System & Intelligence
     reports: 'Reports',
+    knowledge_base: 'Knowledge Base / SOP',
     files: 'Files',
     ai_assistant: 'AI Assistant',
     roles: 'Roles & Permissions',
-    settings: 'Settings'
+    settings: 'Settings',
+    work_audit: 'Employee Activity Log'
 }
 
 // Per-module granular actions covering all operations
@@ -89,34 +93,38 @@ const MODULE_ACTIONS: Record<string, string[]> = {
     screen_monitoring:  ['view', 'view_history', 'delete_logs', 'realtime_watch'],
 
     // Work & Clients
-    clients:            ['view', 'create', 'edit', 'delete'],
-    projects:           ['view', 'create', 'edit', 'delete', 'view_budget', 'manage_team'],
-    products:           ['view', 'create', 'edit', 'delete'],
-    tasks:              ['view', 'create', 'edit', 'delete', 'assign_others', 'change_priority'],
+    // view_all = see everyone's records; without it users only see what they created
+    clients:            ['view', 'view_all', 'create', 'edit', 'delete'],
+    client_forms:       ['view', 'view_all', 'create', 'edit', 'delete'],
+    projects:           ['view', 'view_all', 'create', 'edit', 'delete', 'view_budget', 'manage_team'],
+    products:           ['view', 'view_all', 'create', 'edit', 'delete'],
+    tasks:              ['view', 'view_all', 'create', 'edit', 'delete', 'assign_others', 'change_priority'],
     my_day:             ['view', 'manage'],
-    templates:          ['view', 'create', 'edit', 'delete'],
+    templates:          ['view', 'view_all', 'create', 'edit', 'delete'],
 
     // Sales & Pipeline
-    leads:              ['view', 'create', 'edit', 'delete', 'claim', 'change_stage', 'transfer'],
-    leads_form:         ['view', 'create', 'edit', 'delete'],
+    leads:              ['view', 'view_all', 'create', 'edit', 'delete', 'claim', 'change_stage', 'transfer'],
+    leads_form:         ['view', 'view_all', 'create', 'edit', 'delete'],
     sales_automations:  ['view', 'create', 'edit', 'delete'],
-    contracts:          ['view', 'create', 'edit', 'delete', 'download'],
-    quotations:         ['view', 'create', 'edit', 'delete'],
-    campaigns:          ['view', 'create', 'edit', 'delete', 'send'],
+    contracts:          ['view', 'view_all', 'create', 'edit', 'delete', 'download'],
+    quotations:         ['view', 'view_all', 'create', 'edit', 'delete'],
+    campaigns:          ['view', 'view_all', 'create', 'edit', 'delete', 'send'],
 
     // Financial Hub
-    invoices:           ['view', 'create', 'edit', 'delete', 'mark_paid', 'send_whatsapp', 'send_email'],
-    credit_notes:       ['view', 'create', 'edit', 'delete'],
-    vendor_bills:       ['view', 'create', 'edit', 'delete', 'mark_paid'],
+    invoices:           ['view', 'view_all', 'create', 'edit', 'delete', 'mark_paid', 'send_whatsapp', 'send_email'],
+    credit_notes:       ['view', 'view_all', 'create', 'edit', 'delete'],
+    vendor_bills:       ['view', 'view_all', 'create', 'edit', 'delete', 'mark_paid'],
     gst_reports:        ['view', 'export'],
-    expenses:           ['view', 'create', 'edit', 'delete'],
+    profitability:      ['view', 'export'],
+    retainers:          ['view', 'view_all', 'create', 'edit', 'delete'],
+    expenses:           ['view', 'view_all', 'create', 'edit', 'delete'],
     payroll:            ['view', 'manage', 'generate_slips', 'set_salaries'],
     billing_settings:   ['view', 'edit'],
 
     // Operations & Assets
-    amc:                ['view', 'create', 'edit', 'delete'],
-    domains:            ['view', 'create', 'edit', 'delete'],
-    hosting:            ['view', 'create', 'edit', 'delete'],
+    amc:                ['view', 'view_all', 'create', 'edit', 'delete'],
+    domains:            ['view', 'view_all', 'create', 'edit', 'delete'],
+    hosting:            ['view', 'view_all', 'create', 'edit', 'delete'],
     expiry_alerts:      ['view', 'manage'],
 
     // Team & HR
@@ -125,24 +133,27 @@ const MODULE_ACTIONS: Record<string, string[]> = {
     time_tracking:      ['view', 'manage', 'manage_all', 'edit_entries'],
     capacity_planning:  ['view', 'manage'],
     approvals:          ['view', 'approve', 'reject'],
-    offer_letters:      ['view', 'create', 'edit', 'delete', 'download'],
-    goals:              ['view', 'create', 'edit', 'delete'],
+    offer_letters:      ['view', 'view_all', 'create', 'edit', 'delete', 'download'],
+    goals:              ['view', 'view_all', 'create', 'edit', 'delete'],
 
     // Communications
-    tickets:            ['view', 'create', 'edit', 'delete'],
+    tickets:            ['view', 'view_all', 'create', 'edit', 'delete'],
     project_chat:       ['view', 'message', 'view_others'],
     chat:               ['view', 'reply', 'delete_history'],
 
     // System & Intelligence
     reports:            ['view', 'export', 'view_financial_reports'],
+    knowledge_base:     ['view', 'create', 'edit', 'delete'],
     files:              ['view', 'upload', 'delete', 'download'],
     ai_assistant:       ['use', 'manage_keys', 'view_logs'],
     roles:              ['view', 'create', 'edit', 'delete'],
-    settings:           ['view', 'edit', 'edit_profile', 'edit_smtp', 'edit_api', 'manage_billing']
+    settings:           ['view', 'edit', 'edit_profile', 'edit_smtp', 'edit_api', 'manage_billing'],
+    work_audit:         ['view']
 }
 
 const ACTION_LABELS: Record<string, string> = {
     view: 'View',
+    view_all: 'View All Data',
     create: 'Create',
     edit: 'Edit',
     delete: 'Delete',
@@ -247,7 +258,7 @@ export function RolesPermissionsPage() {
             group: 'System & Intelligence',
             icon: <Shield className="h-4 w-4" />,
             description: 'Analytics reports, asset files, AI assistant, role permissions, and global settings',
-            items: ['reports', 'files', 'ai_assistant', 'roles', 'settings']
+            items: ['reports', 'files', 'ai_assistant', 'work_audit', 'roles', 'settings']
         }
     ], [])
 
@@ -498,7 +509,18 @@ export function RolesPermissionsPage() {
                             })}
                         </div>
                         <Button variant="outline" className="w-full border-dashed rounded-xl text-xs" onClick={() => {
-                            setRoles([...roles, { name: `custom_role_${roles.length}`, label: 'New Role', permissions: {} }])
+                            const emptyPerms: Record<string, Record<string, boolean>> = {}
+                            Object.keys(MODULE_ACTIONS).forEach((mod) => {
+                                emptyPerms[mod] = {}
+                                MODULE_ACTIONS[mod].forEach((action) => {
+                                    emptyPerms[mod][action] = false
+                                })
+                            })
+                            setRoles([...roles, {
+                                name: `custom_role_${roles.length + 1}`,
+                                label: 'New Role',
+                                permissions: emptyPerms
+                            }])
                             setSelectedRoleIndex(roles.length)
                         }}>
                             <Plus className="mr-2 h-3.5 w-3.5" /> Add Role
@@ -734,7 +756,7 @@ export function RolesPermissionsPage() {
                                         <div className="flex items-center justify-between">
                                             <div className="space-y-0.5">
                                                 <h4 className="font-bold text-sm">Full System Visibility</h4>
-                                                <p className="text-[10px] text-slate-400">See all users' data, projects, and financials across the entire workspace.</p>
+                                                <p className="text-[10px] text-slate-400">See all users&apos; data across every module (same as granting View All Data on each module). Without this, users only see records they created.</p>
                                             </div>
                                             <Switch
                                                 checked={selectedRole?.permissions?.dashboard?.scope?.view_all || false}

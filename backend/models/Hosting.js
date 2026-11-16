@@ -77,6 +77,10 @@ const hostingSchema = new mongoose.Schema({
     notes: {
         type: String,
         default: ''
+    },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
     }
 }, {
     timestamps: true

@@ -321,7 +321,7 @@ export function OfferLettersPage() {
                             />
                         </div>
 
-                        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto no-scrollbar">
+                        <div className="page-toolbar page-toolbar-scroll-mobile w-full sm:w-auto gap-1.5">
                             {[
                                 { id: 'all', label: 'All' },
                                 { id: 'invited', label: 'Invited' },

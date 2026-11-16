@@ -1,17 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
-router.use(protect); // Secure all product routes
+router.use(protect);
 
 router.route('/')
-    .get(productController.getProducts)
-    .post(authorize('admin', 'owner'), productController.createProduct);
+    .get(checkPermission('products', 'view'), productController.getProducts)
+    .post(checkPermission('products', 'create'), productController.createProduct);
 
 router.route('/:id')
-    .get(productController.getProductById)
-    .put(authorize('admin', 'owner'), productController.updateProduct)
-    .delete(authorize('admin', 'owner'), productController.deleteProduct);
+    .get(checkPermission('products', 'view'), productController.getProductById)
+    .put(checkPermission('products', 'edit'), productController.updateProduct)
+    .delete(checkPermission('products', 'delete'), productController.deleteProduct);
 
 module.exports = router;

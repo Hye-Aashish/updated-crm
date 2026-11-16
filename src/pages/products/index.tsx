@@ -361,7 +361,7 @@ export function ProductsPage() {
                     </span>
                 </div>
 
-                <div className="clay-inset p-1.5 bg-muted/40 flex items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 rounded-2xl">
+                <div className="clay-inset p-1.5 bg-muted/40 page-toolbar page-toolbar-scroll-mobile rounded-2xl">
                     {allCategories.map(cat => {
                         const Icon = getCategoryIcon(cat)
                         const isSelected = selectedCategory === cat

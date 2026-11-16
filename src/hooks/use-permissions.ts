@@ -27,6 +27,10 @@ export async function performAppLogout(
     invalidatePermissionsCache()
     const store = useAppStore.getState()
     store.resetWorkspaceData()
+    try {
+        const { syncElectronAuthState } = await import('@/lib/electron-auth-sync')
+        syncElectronAuthState({ loggedIn: false })
+    } catch { /* web-only */ }
     navigate('/login', { replace: true })
 }
 

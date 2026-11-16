@@ -529,6 +529,25 @@ export interface LeadForm {
     createdAt: Date
 }
 
+export interface ClientFormField {
+    id: string
+    label: string
+    type: string
+    required: boolean
+    placeholder?: string
+    options?: string[]
+}
+
+export interface ClientForm {
+    _id: string
+    title: string
+    description?: string
+    fields: ClientFormField[]
+    isActive: boolean
+    successMessage?: string
+    createdAt: Date
+}
+
 
 // Notification Types
 export interface Notification {

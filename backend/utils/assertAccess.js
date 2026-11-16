@@ -13,6 +13,10 @@ async function assertInvoiceAccess(req, invoice) {
         return { ok: false, status: 401, message: 'Not authorized' };
     }
     if (isPrivileged(req.user)) return { ok: true };
+    try {
+        const { canViewAllRecords } = require('./dataScope');
+        if (await canViewAllRecords(req.user, 'invoices')) return { ok: true };
+    } catch (_) { /* ignore */ }
 
     const userId = req.user._id.toString();
     const invoiceClientId = invoice.clientId?.toString?.() || String(invoice.clientId || '');
@@ -24,6 +28,11 @@ async function assertInvoiceAccess(req, invoice) {
         }
         return { ok: true };
     }
+
+    const creatorId = invoice.createdBy?._id
+        ? invoice.createdBy._id.toString()
+        : String(invoice.createdBy || '');
+    if (creatorId && creatorId === userId) return { ok: true };
 
     const client = await Client.findById(invoice.clientId);
     const project = invoice.projectId ? await Project.findById(invoice.projectId) : null;

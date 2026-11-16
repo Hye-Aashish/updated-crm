@@ -1,4 +1,8 @@
 import axios from 'axios';
+import { toast } from '@/hooks/use-toast';
+
+let lastPermissionToastAt = 0;
+let lastPermissionToastMsg = '';
 
 const getBaseURL = () => {
     // 1. Try VITE_API_URL from environment
@@ -45,17 +49,30 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         const status = error.response?.status;
-        const currentHash = window.location.hash;
-        const isLoginPage = currentHash.includes('/login') || error.config?.url?.includes('/auth/login');
+        const currentHash = window.location.hash || '';
+        const currentPath = window.location.pathname || '';
+        const isElectron = !!(window as any).electronAPI || /Electron/i.test(navigator.userAgent);
+        const isLoginPage =
+            currentHash.includes('/login') ||
+            currentPath.includes('/login') ||
+            error.config?.url?.includes('/auth/login');
 
         // Handle 401 — token expired or invalid (outside of login page)
         if (status === 401 && !isLoginPage) {
             console.warn('🔒 Session expired — redirecting to login');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            
-            // For HashRouter, we must only change the hash
-            window.location.hash = '#/login';
+
+            try {
+                const api = (window as any).electronAPI;
+                api?.syncAuthState?.({ loggedIn: false });
+            } catch { /* ignore */ }
+
+            if (isElectron) {
+                window.location.hash = '#/login';
+            } else {
+                window.location.href = '/login';
+            }
             return new Promise(() => { }); // Prevent further error handling
         }
 
@@ -93,6 +110,25 @@ api.interceptors.response.use(
         
         // OVERRIDE error.message so that any catch block reading error.message gets cleanMessage instead of "Request failed with status code 403/500"
         error.message = cleanMessage;
+
+        // Always surface Permission Denied clearly for blocked API actions
+        if (status === 403 && !isLoginPage) {
+            const now = Date.now();
+            const dedupe =
+                cleanMessage === lastPermissionToastMsg && now - lastPermissionToastAt < 2500;
+            if (!dedupe) {
+                lastPermissionToastAt = now;
+                lastPermissionToastMsg = cleanMessage;
+                toast({
+                    title: 'Permission Denied',
+                    description: cleanMessage.startsWith('Permission Denied')
+                        ? cleanMessage
+                        : `Permission Denied: ${cleanMessage}`,
+                    variant: 'destructive',
+                });
+                error.__permissionToastShown = true;
+            }
+        }
 
         return Promise.reject(error);
     }

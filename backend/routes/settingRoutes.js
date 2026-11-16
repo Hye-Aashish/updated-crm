@@ -16,6 +16,7 @@ const defaultRoles = [
             
             // Work & Clients
             clients: { view: true, create: true, edit: true, delete: true },
+            client_forms: { view: true, create: true, edit: true, delete: true },
             projects: { view: true, create: true, edit: true, delete: true, view_budget: true, manage_team: true },
             products: { view: true, create: true, edit: true, delete: true },
             tasks: { view: true, create: true, edit: true, delete: true, assign_others: true, change_priority: true },
@@ -35,6 +36,8 @@ const defaultRoles = [
             credit_notes: { view: true, create: true, edit: true, delete: true },
             vendor_bills: { view: true, create: true, edit: true, delete: true, mark_paid: true },
             gst_reports: { view: true, export: true },
+            profitability: { view: true, export: true },
+            retainers: { view: true, create: true, edit: true, delete: true },
             expenses: { view: true, create: true, edit: true, delete: true },
             payroll: { view: true, manage: true, generate_slips: true, set_salaries: true },
             billing_settings: { view: true, edit: true },
@@ -61,10 +64,12 @@ const defaultRoles = [
 
             // System & Intelligence
             reports: { view: true, export: true, view_financial_reports: true },
+            knowledge_base: { view: true, create: true, edit: true, delete: true },
             files: { view: true, upload: true, delete: true, download: true },
             ai_assistant: { use: true, manage_keys: true, view_logs: true },
             settings: { view: true, edit: true, edit_profile: true, edit_smtp: true, edit_api: true, manage_billing: true },
-            roles: { view: true, create: true, edit: true, delete: true }
+            roles: { view: true, create: true, edit: true, delete: true },
+            work_audit: { view: true }
         }
     },
     {
@@ -76,6 +81,7 @@ const defaultRoles = [
             user_tracker: { view: true, manage: false },
             screen_monitoring: { view: false },
             clients: { view: true, create: true, edit: true, delete: false },
+            client_forms: { view: true, create: true, edit: true, delete: false },
             projects: { view: true, create: true, edit: true, delete: false, view_budget: true, manage_team: true },
             products: { view: true, create: false, edit: false, delete: false },
             tasks: { view: true, create: true, edit: true, delete: true, assign_others: true, change_priority: true },

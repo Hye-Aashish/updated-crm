@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useAppStore } from '@/store'
 import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api-client'
+import { ensureNotificationPermission, showDesktopNotification } from '@/lib/notifications'
 
 // Helper: Get & Save notified keys in localStorage to prevent repeat toasts across page refreshes
 const getNotifiedKeys = (): Set<string> => {
@@ -17,18 +18,27 @@ const saveNotifiedKey = (key: string) => {
     try {
         const set = getNotifiedKeys()
         set.add(key)
-        const keysArr = Array.from(set).slice(-300) // Keep last 300 keys max
+        const keysArr = Array.from(set).slice(-400) // Keep last 400 keys max
         localStorage.setItem('crm_notified_toast_keys', JSON.stringify(keysArr))
     } catch (e) {
         console.error(e)
     }
 }
 
+async function pingDesktop(title: string, body: string, tag?: string) {
+    await showDesktopNotification({ title, body, tag })
+}
+
 export function ReminderManager() {
     const { leads, notifications, addNotification } = useAppStore()
     const { toast } = useToast()
 
-    // 1. Fetch real-time system notifications (poll every 60s)
+    // Ask OS for notification permission once (Windows / browser)
+    useEffect(() => {
+        void ensureNotificationPermission()
+    }, [])
+
+    // 1. Fetch real-time system notifications (poll every 30s)
     useEffect(() => {
         let isMounted = true
         const fetchSystemNotifications = async () => {
@@ -52,14 +62,14 @@ export function ReminderManager() {
         }
 
         fetchSystemNotifications()
-        const interval = setInterval(fetchSystemNotifications, 60000)
+        const interval = setInterval(fetchSystemNotifications, 30000)
         return () => {
             isMounted = false
             clearInterval(interval)
         }
-    }, [])
+    }, [addNotification])
 
-    // 1b. Calendar event reminders (poll every 30s)
+    // 1b. Calendar / meeting reminders (poll every 30s)
     useEffect(() => {
         let alive = true
         const pollCalendar = async () => {
@@ -69,25 +79,20 @@ export function ReminderManager() {
                 const due = res.data?.due || []
                 if (!alive) return
                 const notifiedKeys = getNotifiedKeys()
-                due.forEach((ev: any) => {
+                for (const ev of due) {
                     const key = `cal-${ev._id}-${ev.startAt}`
-                    if (notifiedKeys.has(key)) return
+                    if (notifiedKeys.has(key)) continue
                     saveNotifiedKey(key)
                     new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => {})
-                    toast({
-                        title: `Meeting reminder: ${ev.title}`,
-                        description: [
-                            ev.clientName ? `Client: ${ev.clientName}` : null,
-                            ev.ownerName ? `With: ${ev.ownerName}` : null,
-                            new Date(ev.startAt).toLocaleString()
-                        ].filter(Boolean).join(' · ')
-                    })
-                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                        new Notification(`Meeting: ${ev.title}`, {
-                            body: ev.clientName ? `Client ${ev.clientName}` : 'Starting soon'
-                        })
-                    }
-                })
+                    const title = `Meeting: ${ev.title}`
+                    const description = [
+                        ev.clientName ? `Client: ${ev.clientName}` : null,
+                        ev.ownerName ? `With: ${ev.ownerName}` : null,
+                        new Date(ev.startAt).toLocaleString()
+                    ].filter(Boolean).join(' · ')
+                    toast({ title: `Meeting reminder: ${ev.title}`, description })
+                    await pingDesktop(title, description || 'Starting soon', key)
+                }
             } catch { /* ignore */ }
         }
         pollCalendar()
@@ -95,22 +100,22 @@ export function ReminderManager() {
         return () => { alive = false; clearInterval(interval) }
     }, [toast])
 
-    // 2. Check Lead Reminders and Brand-New System Notifications
+    // 2. Lead follow-up reminders + brand-new system notifications
     useEffect(() => {
-        const checkReminders = () => {
+        const checkReminders = async () => {
             const now = new Date()
             const notifiedKeys = getNotifiedKeys()
 
-            // A. Check Lead Reminders (local time based)
-            leads.forEach(lead => {
+            // A. Lead follow-up / reminder due
+            for (const lead of leads) {
                 if (lead.reminder && lead.reminder.date && !lead.reminder.completed) {
                     const reminderDate = new Date(lead.reminder.date)
                     const leadId = lead.id
                     const reminderKey = `reminder-${leadId}-${reminderDate.getTime()}`
-                    
+
                     const diffMs = now.getTime() - reminderDate.getTime()
 
-                    // Trigger toast ONLY if reminder date reached in last 2 mins AND never notified before
+                    // Trigger ONLY if reminder date reached in last 2 mins AND never notified before
                     if (diffMs >= 0 && diffMs < 120000 && !notifiedKeys.has(reminderKey)) {
                         saveNotifiedKey(reminderKey)
 
@@ -120,23 +125,27 @@ export function ReminderManager() {
 
                         new Audio(soundUrl).play().catch(() => { })
 
+                        const title = 'Follow-up reminder'
+                        const description = `${lead.company || lead.name || 'Lead'}${lead.reminder.note ? ` — ${lead.reminder.note}` : ''}`
+
                         toast({
-                            title: "Lead Reminder!",
-                            description: `Follow-up for ${lead.company}`,
-                            variant: lead.reminder.tone === 'urgent' ? "destructive" : "default",
+                            title: 'Lead Reminder!',
+                            description: `Follow-up for ${lead.company || lead.name}`,
+                            variant: lead.reminder.tone === 'urgent' ? 'destructive' : 'default',
                         })
+                        await pingDesktop(title, description, reminderKey)
                     }
                 }
-            })
+            }
 
-            // B. Check System Notifications (ONLY toast brand new ones created in last 3 minutes)
-            notifications.forEach(notif => {
+            // B. System notifications (follow-ups, calls, deals, assignments, etc.)
+            for (const notif of notifications) {
                 const notifKey = `system-${notif.id}`
                 const createdTime = notif.createdAt ? new Date(notif.createdAt).getTime() : 0
                 const ageMs = now.getTime() - createdTime
 
-                // Only show toast if unread, never notified before, AND created in the last 3 minutes
-                if (!notif.read && !notifiedKeys.has(notifKey) && ageMs < 180000 && ageMs >= 0) {
+                // Only toast + Windows notify if unread, never notified, AND created in last 5 minutes
+                if (!notif.read && !notifiedKeys.has(notifKey) && ageMs < 300000 && ageMs >= 0) {
                     saveNotifiedKey(notifKey)
 
                     new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3').play().catch(() => { })
@@ -145,14 +154,15 @@ export function ReminderManager() {
                         title: notif.title,
                         description: notif.message,
                     })
+                    await pingDesktop(notif.title || 'Nexprism', notif.message || '', notifKey)
                 }
-            })
+            }
         }
 
-        const interval = setInterval(checkReminders, 10000)
+        const interval = setInterval(() => { void checkReminders() }, 10000)
+        void checkReminders()
         return () => clearInterval(interval)
     }, [leads, notifications, toast])
 
     return null
 }
-

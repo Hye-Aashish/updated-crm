@@ -6,6 +6,7 @@ const Client = require('../models/Client');
 const User = require('../models/User');
 const sendEmail = require('../utils/sendEmail');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope, assertCreatorAccess } = require('../utils/dataScope');
 
 // Helper to replace personalization merge tags
 const personalizeText = (text, data = {}) => {
@@ -18,9 +19,10 @@ const personalizeText = (text, data = {}) => {
 };
 
 // GET all campaigns
-router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
+router.get('/', protect, checkPermission('campaigns', 'view'), async (req, res) => {
     try {
-        const campaigns = await Campaign.find().sort({ createdAt: -1 });
+        const filter = await applyCreatorScope({}, req.user, 'campaigns');
+        const campaigns = await Campaign.find(filter).sort({ createdAt: -1 });
         res.json(campaigns);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -28,7 +30,7 @@ router.get('/', protect, checkPermission('leads', 'view'), async (req, res) => {
 });
 
 // CREATE campaign
-router.post('/', protect, checkPermission('leads', 'create'), async (req, res) => {
+router.post('/', protect, checkPermission('campaigns', 'create'), async (req, res) => {
     try {
         const campaign = new Campaign({
             ...req.body,
@@ -42,10 +44,12 @@ router.post('/', protect, checkPermission('leads', 'create'), async (req, res) =
 });
 
 // UPDATE campaign
-router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) => {
+router.put('/:id', protect, checkPermission('campaigns', 'edit'), async (req, res) => {
     try {
         const campaign = await Campaign.findById(req.params.id);
         if (!campaign) return res.status(404).json({ message: 'Campaign not found' });
+        const access = await assertCreatorAccess(req.user, campaign, 'campaigns');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         
         if (campaign.status === 'sending' || campaign.status === 'sent') {
             return res.status(400).json({ message: 'Cannot edit an already sent or sending campaign.' });
@@ -60,7 +64,7 @@ router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) =
 });
 
 // TEST SEND single preview email
-router.post('/:id/test-send', protect, checkPermission('leads', 'edit'), async (req, res) => {
+router.post('/:id/test-send', protect, checkPermission('campaigns', 'edit'), async (req, res) => {
     try {
         const { testEmail } = req.body;
         const recipientEmail = testEmail || req.user.email;
@@ -68,6 +72,8 @@ router.post('/:id/test-send', protect, checkPermission('leads', 'edit'), async (
 
         const campaign = await Campaign.findById(req.params.id);
         if (!campaign) return res.status(404).json({ message: 'Campaign not found' });
+        const access = await assertCreatorAccess(req.user, campaign, 'campaigns');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         const testData = { name: req.user.name || 'Test User', company: 'Test Company Inc.', email: recipientEmail };
         const personalizedSubject = `[TEST] ${personalizeText(campaign.subject, testData)}`;
@@ -81,10 +87,12 @@ router.post('/:id/test-send', protect, checkPermission('leads', 'edit'), async (
 });
 
 // DUPLICATE campaign
-router.post('/:id/duplicate', protect, checkPermission('leads', 'create'), async (req, res) => {
+router.post('/:id/duplicate', protect, checkPermission('campaigns', 'create'), async (req, res) => {
     try {
         const original = await Campaign.findById(req.params.id);
         if (!original) return res.status(404).json({ message: 'Campaign not found' });
+        const access = await assertCreatorAccess(req.user, original, 'campaigns');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         const clone = new Campaign({
             title: `${original.title} (Copy)`,
@@ -105,10 +113,12 @@ router.post('/:id/duplicate', protect, checkPermission('leads', 'create'), async
 });
 
 // BROADCAST / SEND campaign
-router.post('/:id/send', protect, checkPermission('leads', 'edit'), async (req, res) => {
+router.post('/:id/send', protect, checkPermission('campaigns', 'send'), async (req, res) => {
     try {
         const campaign = await Campaign.findById(req.params.id);
         if (!campaign) return res.status(404).json({ message: 'Campaign not found' });
+        const access = await assertCreatorAccess(req.user, campaign, 'campaigns');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         let recipients = []; // [{ email, name, company }]
 
@@ -186,8 +196,12 @@ router.post('/:id/send', protect, checkPermission('leads', 'edit'), async (req, 
 });
 
 // DELETE campaign
-router.delete('/:id', protect, checkPermission('leads', 'delete'), async (req, res) => {
+router.delete('/:id', protect, checkPermission('campaigns', 'delete'), async (req, res) => {
     try {
+        const existing = await Campaign.findById(req.params.id);
+        if (!existing) return res.status(404).json({ message: 'Campaign not found' });
+        const access = await assertCreatorAccess(req.user, existing, 'campaigns');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         await Campaign.findByIdAndDelete(req.params.id);
         res.json({ message: 'Campaign deleted successfully' });
     } catch (err) {

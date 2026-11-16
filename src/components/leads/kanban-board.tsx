@@ -1,8 +1,9 @@
+import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Trash2, ExternalLink, Users, Star, Clock, Folder, PhoneCall, UserCheck, UserPlus, MessageSquare, PhoneOff, CheckCircle2 } from 'lucide-react'
+import { MoreHorizontal, Trash2, ExternalLink, Users, Clock, Folder, PhoneCall, UserCheck, PhoneOff, ChevronLeft, ChevronRight, MoveHorizontal } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { getLeadFollowUpInfo } from '@/lib/followup-utils'
 import { format } from 'date-fns'
@@ -31,11 +32,92 @@ export function KanbanBoard({
     isAdminOrOwner = false,
     onOpenAssignLead
 }: KanbanBoardProps) {
+    const scrollerRef = useRef<HTMLDivElement>(null)
+    const [canScrollLeft, setCanScrollLeft] = useState(false)
+    const [canScrollRight, setCanScrollRight] = useState(false)
+
+    const updateScrollState = () => {
+        const el = scrollerRef.current
+        if (!el) return
+        const max = el.scrollWidth - el.clientWidth
+        setCanScrollLeft(el.scrollLeft > 4)
+        setCanScrollRight(el.scrollLeft < max - 4)
+    }
+
+    const scrollByAmount = (dx: number) => {
+        scrollerRef.current?.scrollBy({ left: dx, behavior: 'smooth' })
+    }
+
+    useEffect(() => {
+        const el = scrollerRef.current
+        if (!el) return
+        updateScrollState()
+        const onScroll = () => updateScrollState()
+        el.addEventListener('scroll', onScroll, { passive: true })
+        window.addEventListener('resize', onScroll)
+
+        // Mouse wheel / trackpad: convert vertical wheel to horizontal stage scroll
+        const onWheel = (e: WheelEvent) => {
+            if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+            // Don't hijack when user is scrolling inside a column's card list
+            const target = e.target as HTMLElement | null
+            if (target?.closest('[data-kanban-column-scroll]')) return
+            e.preventDefault()
+            el.scrollLeft += e.deltaY
+        }
+        el.addEventListener('wheel', onWheel, { passive: false })
+
+        return () => {
+            el.removeEventListener('scroll', onScroll)
+            el.removeEventListener('wheel', onWheel)
+            window.removeEventListener('resize', onScroll)
+        }
+    }, [stages.length])
+
     const handleDragOver = (e: React.DragEvent) => e.preventDefault()
 
     return (
-        <div className="flex-1 overflow-x-auto overflow-y-hidden pb-6">
-            <div className="flex h-full gap-4 px-4" style={{ minWidth: `${stages.length * 300}px` }}>
+        <div className="relative flex h-full min-h-[420px] min-w-0 flex-col gap-2">
+            {/* Side-scroll controls — always visible so mobile users know how to move */}
+            <div className="flex shrink-0 items-center justify-between gap-2 px-0.5">
+                <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+                    <MoveHorizontal className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="truncate">Side scroll: swipe board / arrows se next stages</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-lg"
+                        disabled={!canScrollLeft}
+                        onClick={() => scrollByAmount(-300)}
+                        aria-label="Previous stages"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-lg"
+                        disabled={!canScrollRight}
+                        onClick={() => scrollByAmount(300)}
+                        aria-label="Next stages"
+                    >
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+
+            <div
+                ref={scrollerRef}
+                className="kanban-h-scroll relative min-h-0 flex-1 w-full overflow-x-scroll overflow-y-hidden rounded-xl border border-border/40 bg-background/40"
+            >
+            <div
+                className="flex h-full min-h-0 gap-3 sm:gap-4 px-2 sm:px-3 pt-2 pb-4"
+                style={{ width: `${Math.max(stages.length, 1) * 300}px`, minWidth: '100%', height: '100%' }}
+            >
                 {stages.map((stage) => {
                     const stageLeads = leads.filter(l => l.stage === stage.id)
                     const stageValue = stageLeads.reduce((sum, l) => sum + (l.value || 0), 0)
@@ -43,24 +125,27 @@ export function KanbanBoard({
                     return (
                         <div
                             key={stage.id}
-                            className="w-[290px] flex flex-col h-full bg-muted/20 rounded-2xl border border-border/40 transition-colors"
+                            className="w-[min(280px,82vw)] sm:w-[290px] shrink-0 flex flex-col h-full min-h-0 bg-muted/20 rounded-2xl border border-border/40 transition-colors"
                             onDragOver={handleDragOver}
                             onDrop={() => onDrop(stage.id)}
                         >
                             {/* Stage Header */}
-                            <div className="p-4 border-b border-border/20 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-2.5 h-2.5 rounded-full ${stage.color}`} />
-                                    <h3 className="font-bold text-xs uppercase tracking-wider">{stage.label}</h3>
+                            <div className="p-3 sm:p-4 border-b border-border/20 flex items-center justify-between shrink-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${stage.color}`} />
+                                    <h3 className="font-bold text-xs uppercase tracking-wider truncate">{stage.label}</h3>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 shrink-0">
                                     <span className="text-[10px] font-bold text-muted-foreground">{formatCurrency(stageValue)}</span>
                                     <Badge variant="secondary" className="text-[10px] font-extrabold px-2 py-0.5 rounded-full">{stageLeads.length}</Badge>
                                 </div>
                             </div>
 
-                            {/* Cards Container */}
-                            <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar">
+                            {/* Cards scroll inside column; board itself only scrolls horizontally */}
+                            <div
+                                data-kanban-column-scroll
+                                className="p-3 flex-1 min-h-0 overflow-y-auto space-y-3 custom-scrollbar overscroll-contain touch-pan-y"
+                            >
                                 {stageLeads.map((lead) => {
                                     const followUpInfo = getLeadFollowUpInfo(lead.reminder)
                                     const borderClass = followUpInfo.borderLeft
@@ -267,6 +352,7 @@ export function KanbanBoard({
                         </div>
                     )
                 })}
+            </div>
             </div>
         </div>
     )

@@ -52,10 +52,8 @@ async function provisionClientPortalUser(client, rawEmail, requestedPassword) {
 exports.getClients = async (req, res, next) => {
     try {
         let filter = {};
-        const Setting = require('../models/Setting');
-        const settings = await Setting.findOne({ type: 'general' });
-        const userRole = settings?.roles?.find(r => r.name === req.user.role);
-        const canViewAll = userRole?.permissions?.clients?.view_all || req.user.role === 'owner' || req.user.role === 'admin';
+        const { canViewAllRecords } = require('../utils/dataScope');
+        const canViewAll = await canViewAllRecords(req.user, 'clients');
 
         if (req.user && req.user.role === 'client') {
             filter = { _id: req.user.clientId };
@@ -87,10 +85,8 @@ exports.getClientById = async (req, res, next) => {
         const client = await Client.findById(req.params.id);
         if (!client) return res.status(404).json({ message: 'Client not found' });
 
-        const Setting = require('../models/Setting');
-        const settings = await Setting.findOne({ type: 'general' });
-        const userRole = settings?.roles?.find(r => r.name === req.user.role);
-        const canViewAll = userRole?.permissions?.clients?.view_all || req.user.role === 'owner' || req.user.role === 'admin';
+        const { canViewAllRecords } = require('../utils/dataScope');
+        const canViewAll = await canViewAllRecords(req.user, 'clients');
 
         if (req.user && req.user.role === 'client') {
             if (client._id.toString() !== req.user.clientId) {

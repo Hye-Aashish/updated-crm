@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, Trash2, ExternalLink, Star, Clock, Phone, MessageSquare, AlertCircle, CalendarClock, PhoneCall, UserCheck, UserPlus, CheckSquare, Square, Layers } from 'lucide-react'
+import { MoreHorizontal, Trash2, ExternalLink, Clock, MessageSquare, PhoneCall, UserCheck, UserPlus, Layers } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatCurrency } from '@/lib/utils'
 import { getLeadFollowUpInfo } from '@/lib/followup-utils'
@@ -22,6 +22,103 @@ interface LeadsListProps {
     users?: User[]
 }
 
+function FollowUpCell({ lead }: { lead: Lead }) {
+    const followUpInfo = getLeadFollowUpInfo(lead.reminder)
+    if (lead.reminder?.date && !lead.reminder.completed) {
+        return (
+            <div className="flex flex-col gap-1 items-start">
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${followUpInfo.badgeBg} ${followUpInfo.badgeText} ${followUpInfo.badgeBorder}`}>
+                    <Clock className="h-3 w-3 shrink-0" />
+                    <span>{followUpInfo.label}</span>
+                </div>
+                <span className="text-[10px] font-bold text-muted-foreground ml-0.5">
+                    {followUpInfo.overdueText ? (
+                        <strong className="text-red-600 dark:text-red-400">{followUpInfo.overdueText}</strong>
+                    ) : (
+                        format(new Date(lead.reminder.date), 'MMM d, h:mm a')
+                    )}
+                </span>
+            </div>
+        )
+    }
+    return (
+        <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground italic font-medium">
+            <span>No Next Follow-up</span>
+        </div>
+    )
+}
+
+function RowActions({
+    lead,
+    onLeadClick,
+    onOpenFollowUp,
+    onDeleteLead,
+    isAdminOrOwner,
+    onOpenAssignLead,
+}: {
+    lead: Lead
+    onLeadClick: (lead: Lead) => void
+    onOpenFollowUp: (lead: Lead) => void
+    onDeleteLead: (id: string) => void
+    isAdminOrOwner: boolean
+    onOpenAssignLead?: (lead: Lead) => void
+}) {
+    return (
+        <div className="flex justify-end items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <Button
+                size="sm"
+                onClick={() => onOpenFollowUp(lead)}
+                className="h-8 px-3 rounded-lg font-bold text-[11px] bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                title="Log Follow-up & Outcome"
+            >
+                <PhoneCall className="mr-1.5 h-3.5 w-3.5" />
+                Follow-up
+            </Button>
+
+            {isAdminOrOwner && onOpenAssignLead && (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onOpenAssignLead(lead)}
+                    className="hidden sm:inline-flex h-8 px-2.5 rounded-lg font-bold text-[11px] border-primary/30 text-primary hover:bg-primary/10 shadow-xs"
+                    title="Assign Lead to Telecaller"
+                >
+                    <UserCheck className="mr-1 h-3.5 w-3.5" />
+                    Assign
+                </Button>
+            )}
+
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"
+                onClick={() => onLeadClick(lead)}
+                title="View Lead Details"
+            >
+                <ExternalLink className="h-4 w-4" />
+            </Button>
+
+            <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg">
+                        <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-xl">
+                    {isAdminOrOwner && onOpenAssignLead && (
+                        <DropdownMenuItem className="text-xs font-semibold cursor-pointer" onClick={() => onOpenAssignLead(lead)}>
+                            <UserCheck className="mr-2 h-4 w-4 text-primary" /> Assign to Telecaller
+                        </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem className="text-xs font-semibold text-destructive" onClick={() => onDeleteLead(lead.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete Lead
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+    )
+}
+
 export function LeadsList({
     leads,
     stages,
@@ -34,16 +131,14 @@ export function LeadsList({
     onToggleSelectLead,
     onToggleSelectAll,
     onOpenBulkAssign,
-    users = []
 }: LeadsListProps) {
     const isAllSelected = leads.length > 0 && selectedLeadIds.length === leads.length
     const hasSelection = selectedLeadIds.length > 0
 
     return (
-        <div className="flex-1 bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm flex flex-col relative">
-            {/* Bulk Actions Floating Bar */}
+        <div className="h-full min-h-0 bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm flex flex-col relative">
             {isAdminOrOwner && hasSelection && (
-                <div className="bg-primary text-primary-foreground px-4 py-2.5 flex items-center justify-between border-b border-primary/20 animate-in fade-in slide-in-from-top duration-200">
+                <div className="bg-primary text-primary-foreground px-4 py-2.5 flex items-center justify-between border-b border-primary/20 animate-in fade-in slide-in-from-top duration-200 shrink-0">
                     <div className="flex items-center gap-2 text-xs font-bold">
                         <Layers className="h-4 w-4" />
                         <span>{selectedLeadIds.length} lead{selectedLeadIds.length > 1 ? 's' : ''} selected</span>
@@ -58,7 +153,7 @@ export function LeadsList({
                                 className="h-7 px-3 rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5"
                             >
                                 <UserCheck className="h-3.5 w-3.5" />
-                                Assign to Telecaller
+                                Assign
                             </Button>
                         )}
                         {onToggleSelectAll && (
@@ -75,12 +170,115 @@ export function LeadsList({
                 </div>
             )}
 
-            <div className="overflow-x-auto flex-1">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-muted/40 text-[11px] uppercase font-bold tracking-wider text-muted-foreground border-b border-border/40">
+            {/* Mobile: stacked cards — no broken wide table */}
+            <div className="md:hidden flex-1 min-h-0 overflow-y-auto custom-scrollbar overscroll-contain p-3 space-y-2.5">
+                {isAdminOrOwner && onToggleSelectAll && leads.length > 0 && (
+                    <label className="flex items-center gap-2 px-1 pb-1 text-[11px] font-bold text-muted-foreground">
+                        <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            onChange={onToggleSelectAll}
+                            className="rounded border-border/60 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                        />
+                        Select all
+                    </label>
+                )}
+
+                {leads.map((lead) => {
+                    const isSelected = selectedLeadIds.includes(lead.id)
+                    const stage = stages.find(s => s.id === lead.stage)
+                    const followUpInfo = getLeadFollowUpInfo(lead.reminder)
+                    const followUpCount = (lead.activities || []).filter(a => a.outcome || a.type === 'call').length
+
+                    return (
+                        <div
+                            key={lead.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => onLeadClick(lead)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') onLeadClick(lead) }}
+                            className={`rounded-xl border border-border/50 p-3 space-y-2.5 cursor-pointer transition-colors ${
+                                isSelected ? 'bg-primary/5 border-primary/30' : followUpInfo.cardBg || 'bg-background'
+                            }`}
+                        >
+                            <div className="flex items-start gap-2.5">
+                                {isAdminOrOwner && onToggleSelectLead && (
+                                    <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => onToggleSelectLead(lead.id)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="mt-1 rounded border-border/60 text-primary focus:ring-primary h-4 w-4 cursor-pointer shrink-0"
+                                    />
+                                )}
+                                <span
+                                    className={`mt-1 w-2.5 h-2.5 rounded-full shrink-0 ${
+                                        followUpInfo.status === 'overdue' ? 'bg-red-500 animate-pulse' :
+                                        followUpInfo.status === 'today' ? 'bg-amber-500' :
+                                        followUpInfo.status === 'future' ? 'bg-emerald-500' : 'bg-slate-400'
+                                    }`}
+                                />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-sm text-foreground truncate">{lead.company}</p>
+                                            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                                                {lead.name}
+                                                {lead.phone ? ` · ${lead.phone}` : ''}
+                                            </p>
+                                        </div>
+                                        <Badge variant="secondary" className={`shrink-0 rounded-md font-bold text-[9px] uppercase tracking-wider ${stage?.color?.replace('bg-', 'text-') || ''} bg-opacity-15 border-none`}>
+                                            {stage?.label || lead.stage}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                        <span className="text-[10px] text-muted-foreground">
+                                            Source: <strong className="text-foreground">{lead.source}</strong>
+                                        </span>
+                                        {followUpCount > 0 && (
+                                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                                {followUpCount} {followUpCount === 1 ? 'call' : 'calls'}
+                                            </span>
+                                        )}
+                                        <span className="text-[11px] font-bold text-foreground ml-auto">
+                                            {formatCurrency(lead.value)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pl-7">
+                                <FollowUpCell lead={lead} />
+                            </div>
+
+                            <div className="pl-7">
+                                <RowActions
+                                    lead={lead}
+                                    onLeadClick={onLeadClick}
+                                    onOpenFollowUp={onOpenFollowUp}
+                                    onDeleteLead={onDeleteLead}
+                                    isAdminOrOwner={isAdminOrOwner}
+                                    onOpenAssignLead={onOpenAssignLead}
+                                />
+                            </div>
+                        </div>
+                    )
+                })}
+
+                {leads.length === 0 && (
+                    <div className="px-4 py-12 text-center text-muted-foreground font-medium text-sm">
+                        No leads found for the selected filter.
+                    </div>
+                )}
+            </div>
+
+            {/* Desktop / tablet: proper table with sticky header cells */}
+            <div className="hidden md:block flex-1 min-h-0 overflow-auto custom-scrollbar overscroll-contain">
+                <table className="w-full min-w-[900px] text-left border-collapse">
+                    <thead className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground border-b border-border/40">
                         <tr>
                             {isAdminOrOwner && onToggleSelectAll && (
-                                <th className="px-3 py-3.5 w-10 text-center">
+                                <th className="px-3 py-3.5 w-10 text-center sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">
                                     <input
                                         type="checkbox"
                                         checked={isAllSelected}
@@ -90,14 +288,14 @@ export function LeadsList({
                                     />
                                 </th>
                             )}
-                            <th className="px-5 py-3.5">Company & Lead</th>
-                            <th className="hidden md:table-cell px-5 py-3.5">Contact Details</th>
-                            <th className="hidden xl:table-cell px-5 py-3.5">Agent / Telecaller</th>
-                            <th className="px-5 py-3.5">Follow-up Priority</th>
-                            <th className="hidden lg:table-cell px-5 py-3.5">Last Outcome</th>
-                            <th className="hidden sm:table-cell px-5 py-3.5">Value</th>
-                            <th className="px-5 py-3.5">Stage</th>
-                            <th className="px-5 py-3.5 text-right">Actions</th>
+                            <th className="px-5 py-3.5 sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">Company & Lead</th>
+                            <th className="px-5 py-3.5 sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">Contact Details</th>
+                            <th className="hidden xl:table-cell px-5 py-3.5 sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">Agent / Telecaller</th>
+                            <th className="px-5 py-3.5 sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">Follow-up Priority</th>
+                            <th className="hidden lg:table-cell px-5 py-3.5 sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">Last Outcome</th>
+                            <th className="px-5 py-3.5 sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">Value</th>
+                            <th className="px-5 py-3.5 sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">Stage</th>
+                            <th className="px-5 py-3.5 text-right sticky top-0 z-20 bg-muted/95 backdrop-blur-sm">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border/30 text-xs font-sans">
@@ -125,7 +323,6 @@ export function LeadsList({
                                             />
                                         </td>
                                     )}
-                                    {/* Company & Name */}
                                     <td className="px-5 py-4">
                                         <div className="flex items-center gap-2.5">
                                             <span
@@ -140,21 +337,21 @@ export function LeadsList({
                                                 <div className="font-bold text-foreground text-sm group-hover:text-primary transition-colors flex items-center gap-1.5">
                                                     <span>{lead.company}</span>
                                                     {followUpCount > 0 && (
-                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                                                             {followUpCount} {followUpCount === 1 ? 'call' : 'calls'}
                                                         </span>
                                                     )}
                                                     {lead.isFallbackFollowUp && (
                                                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                                                            ⚡ Coverage
+                                                            Coverage
                                                         </span>
                                                     )}
                                                 </div>
                                                 <div className="text-[11px] font-medium text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1.5">
                                                     <span>Source: <strong className="font-semibold text-foreground">{lead.source}</strong></span>
                                                     {(lead.formTitle || (lead.source && lead.source.startsWith('Form: '))) && (
-                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
-                                                            📝 Form: {lead.formTitle || lead.source.replace('Form: ', '')}
+                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
+                                                            Form: {lead.formTitle || lead.source.replace('Form: ', '')}
                                                         </span>
                                                     )}
                                                     {lead.project ? ` • ${lead.project}` : ''}
@@ -173,8 +370,7 @@ export function LeadsList({
                                         )}
                                     </td>
 
-                                    {/* Contact */}
-                                    <td className="hidden md:table-cell px-5 py-4">
+                                    <td className="px-5 py-4">
                                         <div className="font-bold text-foreground">{lead.name}</div>
                                         <div className="flex items-center gap-2 mt-0.5">
                                             <span className="text-[11px] font-medium text-muted-foreground">{lead.phone || '-'}</span>
@@ -194,15 +390,14 @@ export function LeadsList({
                                         </div>
                                     </td>
 
-                                    {/* Agent / Telecaller */}
                                     <td className="hidden xl:table-cell px-5 py-4">
                                         {(() => {
                                             const isAssignedByAdmin = Boolean(
-                                                lead.assignedToName && 
-                                                ((lead.createdByName && lead.createdByName.toLowerCase().includes('admin')) || 
+                                                lead.assignedToName &&
+                                                ((lead.createdByName && lead.createdByName.toLowerCase().includes('admin')) ||
                                                  (lead.assignedToName !== lead.createdByName))
-                                            );
-                                            const managingAgent = lead.assignedToName || lead.createdByName || 'Direct';
+                                            )
+                                            const managingAgent = lead.assignedToName || lead.createdByName || 'Direct'
 
                                             return (
                                                 <div className="space-y-1.5">
@@ -214,15 +409,15 @@ export function LeadsList({
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         {lead.isFallbackFollowUp ? (
                                                             <span className="font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[9px] border border-amber-500/30">
-                                                                ⚡ Coverage ({lead.absentTelecallerName})
+                                                                Coverage ({lead.absentTelecallerName})
                                                             </span>
                                                         ) : isAssignedByAdmin ? (
                                                             <span className="font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 text-[9px] border border-blue-500/30">
-                                                                🎯 Admin Assigned
+                                                                Admin Assigned
                                                             </span>
                                                         ) : (
                                                             <span className="font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[9px] border border-emerald-500/30">
-                                                                ✍️ Agent Created
+                                                                Agent Created
                                                             </span>
                                                         )}
 
@@ -250,30 +445,10 @@ export function LeadsList({
                                         })()}
                                     </td>
 
-                                    {/* Follow-up Priority Badge */}
                                     <td className="px-5 py-4">
-                                        {lead.reminder?.date && !lead.reminder.completed ? (
-                                            <div className="flex flex-col gap-1 items-start">
-                                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${followUpInfo.badgeBg} ${followUpInfo.badgeText} ${followUpInfo.badgeBorder}`}>
-                                                    <Clock className="h-3 w-3 shrink-0" />
-                                                    <span>{followUpInfo.label}</span>
-                                                </div>
-                                                <span className="text-[10px] font-bold text-muted-foreground ml-0.5">
-                                                    {followUpInfo.overdueText ? (
-                                                        <strong className="text-red-600 dark:text-red-400">{followUpInfo.overdueText}</strong>
-                                                    ) : (
-                                                        format(new Date(lead.reminder.date), 'MMM d, h:mm a')
-                                                    )}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground italic font-medium">
-                                                <span>⚪ No Next Follow-up</span>
-                                            </div>
-                                        )}
+                                        <FollowUpCell lead={lead} />
                                     </td>
 
-                                    {/* Last Outcome */}
                                     <td className="hidden lg:table-cell px-5 py-4">
                                         {(lead.lastFollowUpOutcome || lead.lastNote || (lead.activities && lead.activities.length > 0)) ? (
                                             <div className="space-y-0.5">
@@ -291,72 +466,25 @@ export function LeadsList({
                                         )}
                                     </td>
 
-                                    {/* Deal Value */}
-                                    <td className="hidden sm:table-cell px-5 py-4">
+                                    <td className="px-5 py-4">
                                         <div className="font-bold text-foreground text-sm">{formatCurrency(lead.value)}</div>
                                     </td>
 
-                                    {/* Stage */}
                                     <td className="px-5 py-4">
                                         <Badge variant="secondary" className={`rounded-md font-bold text-[9px] uppercase tracking-wider ${stage?.color?.replace('bg-', 'text-') || ''} bg-opacity-15 border-none`}>
                                             {stage?.label || lead.stage}
                                         </Badge>
                                     </td>
 
-                                    {/* Actions */}
-                                    <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex justify-end items-center gap-1.5">
-                                            <Button
-                                                size="sm"
-                                                onClick={() => onOpenFollowUp(lead)}
-                                                className="h-8 px-3 rounded-lg font-bold text-[11px] bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                                                title="Log Follow-up & Outcome"
-                                            >
-                                                <PhoneCall className="mr-1.5 h-3.5 w-3.5" />
-                                                Follow-up
-                                            </Button>
-
-                                            {isAdminOrOwner && onOpenAssignLead && (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => onOpenAssignLead(lead)}
-                                                    className="h-8 px-2.5 rounded-lg font-bold text-[11px] border-primary/30 text-primary hover:bg-primary/10 shadow-xs"
-                                                    title="Assign Lead to Telecaller"
-                                                >
-                                                    <UserCheck className="mr-1 h-3.5 w-3.5" />
-                                                    Assign
-                                                </Button>
-                                            )}
-
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"
-                                                onClick={() => onLeadClick(lead)}
-                                                title="View Lead Details"
-                                            >
-                                                <ExternalLink className="h-4 w-4" />
-                                            </Button>
-
-                                            <DropdownMenu modal={false}>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="rounded-xl">
-                                                    {isAdminOrOwner && onOpenAssignLead && (
-                                                        <DropdownMenuItem className="text-xs font-semibold cursor-pointer" onClick={() => onOpenAssignLead(lead)}>
-                                                            <UserCheck className="mr-2 h-4 w-4 text-primary" /> Assign to Telecaller
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    <DropdownMenuItem className="text-xs font-semibold text-destructive" onClick={() => onDeleteLead(lead.id)}>
-                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Lead
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
+                                    <td className="px-5 py-4 text-right">
+                                        <RowActions
+                                            lead={lead}
+                                            onLeadClick={onLeadClick}
+                                            onOpenFollowUp={onOpenFollowUp}
+                                            onDeleteLead={onDeleteLead}
+                                            isAdminOrOwner={isAdminOrOwner}
+                                            onOpenAssignLead={onOpenAssignLead}
+                                        />
                                     </td>
                                 </tr>
                             )

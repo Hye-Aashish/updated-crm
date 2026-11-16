@@ -50,7 +50,8 @@ const invoiceSchema = new mongoose.Schema({
     frequency: { type: String, default: 'once' },
     cashfreeOrderId: { type: String },
     cashfreePaymentSessionId: { type: String },
-    termsAndConditions: { type: String }
+    termsAndConditions: { type: String },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);

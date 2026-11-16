@@ -12,6 +12,7 @@ const leadFormSchema = new mongoose.Schema({
         options: [String]
     }],
     isActive: { type: Boolean, default: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now }
 });
 

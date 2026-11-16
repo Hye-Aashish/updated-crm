@@ -93,7 +93,11 @@ const isAuthorizedForLead = async (user, lead) => {
     try {
         const Setting = require('../models/Setting');
         const settings = await Setting.findOne({ type: 'general' });
-        const userRoleConfig = settings?.roles?.find(r => r.name === user.role);
+        const normalizeRoleKey = (r) => (r || '').toLowerCase().replace(/[\s_-]+/g, '');
+        const norm = normalizeRoleKey(user.role);
+        const userRoleConfig = settings?.roles?.find(r =>
+            normalizeRoleKey(r.name) === norm || normalizeRoleKey(r.label) === norm
+        );
         if (userRoleConfig?.permissions?.leads?.view_all || userRoleConfig?.permissions?.dashboard?.scope?.view_all) {
             return true;
         }

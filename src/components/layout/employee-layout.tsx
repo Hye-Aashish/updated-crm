@@ -80,8 +80,8 @@ export function EmployeeLayout() {
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 w-full max-w-full scroll-smooth pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
-                    <div className="mx-auto max-w-[1560px] w-full min-w-0">
+                <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain app-scroll p-3 sm:p-4 md:p-6 w-full max-w-full pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
+                    <div className="mx-auto max-w-[1560px] w-full min-w-0 mobile-page">
                         <Outlet />
                     </div>
                 </main>

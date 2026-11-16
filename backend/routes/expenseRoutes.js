@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const Expense = require('../models/Expense');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { canViewAllRecords } = require('../utils/dataScope');
 
 // Get all expenses
-router.get('/', protect, async (req, res) => {
+router.get('/', protect, checkPermission('expenses', 'view'), async (req, res) => {
     try {
         let filter = {};
-        // If not admin/owner, only show own expenses
-        if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+        // Without view_all / admin, only own expenses
+        if (!(await canViewAllRecords(req.user, 'expenses'))) {
             filter = { paidById: req.user._id.toString() };
         }
 

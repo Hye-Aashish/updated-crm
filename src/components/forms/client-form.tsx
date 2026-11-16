@@ -376,7 +376,7 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                                 )}
                             />
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
                                     name="phone"
@@ -531,7 +531,7 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                             <CardTitle>Business Details</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
                                     name="industry"
@@ -624,7 +624,7 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                                     <FormLabel>Interested Services</FormLabel>
                                     <FormDescription>Select all services the client is interested in.</FormDescription>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                                     {servicesList.map((service) => (
                                         <div
                                             key={service}
@@ -778,7 +778,7 @@ export function ClientForm({ mode, initialData, clientId }: ClientFormProps) {
                             <CardTitle>Assignment & Notes</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
                                     name="assignedTo"

@@ -7,11 +7,18 @@ const Project = require('../models/Project');
 const Task = require('../models/Task');
 const User = require('../models/User');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope, assertCreatorAccess } = require('../utils/dataScope');
 
 // GET all goals + recalculate auto stats
 router.get('/', protect, checkPermission('goals', 'view'), async (req, res) => {
     try {
-        const goals = await Goal.find().sort({ createdAt: -1 });
+        const filter = await applyCreatorScope({}, req.user, 'goals', {
+            extraOr: [
+                { assignedTo: req.user._id },
+                { assignedTo: req.user._id.toString() }
+            ]
+        });
+        const goals = await Goal.find(filter).sort({ createdAt: -1 });
 
         const now = new Date();
 
@@ -143,7 +150,15 @@ router.post('/', protect, checkPermission('goals', 'create'), async (req, res) =
 // UPDATE goal
 router.put('/:id', protect, checkPermission('goals', 'edit'), async (req, res) => {
     try {
+        const existing = await Goal.findById(req.params.id);
+        if (!existing) return res.status(404).json({ message: 'Goal not found' });
+        const access = await assertCreatorAccess(req.user, existing, 'goals', {
+            extraCheck: (user, doc) => String(doc.assignedTo || '') === user._id.toString()
+        });
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         const updates = { ...req.body };
+        delete updates.createdBy;
         if (updates.status === 'in-progress') updates.status = 'in_progress';
 
         if (updates.assignedTo === '' || updates.assignedTo === 'none' || updates.assignedTo === 'all') {
@@ -166,6 +181,10 @@ router.put('/:id', protect, checkPermission('goals', 'edit'), async (req, res) =
 // DELETE goal
 router.delete('/:id', protect, checkPermission('goals', 'delete'), async (req, res) => {
     try {
+        const existing = await Goal.findById(req.params.id);
+        if (!existing) return res.status(404).json({ message: 'Goal not found' });
+        const access = await assertCreatorAccess(req.user, existing, 'goals');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         await Goal.findByIdAndDelete(req.params.id);
         res.json({ message: 'Goal deleted' });
     } catch (err) {

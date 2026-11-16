@@ -2,7 +2,7 @@
     "name": "nexprism-agency-management",
     "private": true,
     "version": "1.0.0",
-    "description": "Nexprism Agency Management System with Employee Monitoring",
+    "description": "Nexprism Agency CRM & Project Management System",
     "author": "Nexprism",
     "type": "module",
     "main": "electron/main.cjs",
@@ -17,8 +17,8 @@
         "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
     },
     "build": {
-        "appId": "com.nexprism.employee.monitor",
-        "productName": "Nexprism Employee Monitor",
+        "appId": "com.nexprism.workspace",
+        "productName": "Nexprism",
         "asar": true,
         "directories": {
             "output": "dist-electron"
@@ -29,15 +29,32 @@
             "public/**/*"
         ],
         "win": {
-            "target": "nsis",
-            "publish": null
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": ["x64"]
+                },
+                {
+                    "target": "portable",
+                    "arch": ["x64"]
+                }
+            ],
+            "publish": null,
+            "signAndEditExecutable": false
         },
         "nsis": {
             "oneClick": false,
             "allowToChangeInstallationDirectory": true,
             "createDesktopShortcut": true,
-            "perMachine": true,
-            "runAfterFinish": true
+            "createStartMenuShortcut": true,
+            "perMachine": false,
+            "runAfterFinish": true,
+            "differentialPackage": false,
+            "deleteAppDataOnUninstall": false,
+            "artifactName": "${productName}-Setup-${version}.${ext}"
+        },
+        "portable": {
+            "artifactName": "${productName}-Portable-${version}.${ext}"
         }
     },
     "dependencies": {

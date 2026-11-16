@@ -3,12 +3,14 @@ const router = express.Router();
 const CreditNote = require('../models/CreditNote');
 const Invoice = require('../models/Invoice');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope, assertCreatorAccess } = require('../utils/dataScope');
 
-router.get('/', protect, checkPermission('invoices', 'view'), async (req, res) => {
+router.get('/', protect, checkPermission('credit_notes', 'view'), async (req, res) => {
     try {
-        const filter = {};
+        let filter = {};
         if (req.query.clientId) filter.clientId = req.query.clientId;
         if (req.query.invoiceId) filter.invoiceId = req.query.invoiceId;
+        filter = await applyCreatorScope(filter, req.user, 'credit_notes');
         const notes = await CreditNote.find(filter).sort({ createdAt: -1 });
         res.json(notes);
     } catch (err) {
@@ -16,7 +18,7 @@ router.get('/', protect, checkPermission('invoices', 'view'), async (req, res) =
     }
 });
 
-router.post('/', protect, checkPermission('invoices', 'create'), async (req, res) => {
+router.post('/', protect, checkPermission('credit_notes', 'create'), async (req, res) => {
     try {
         const count = await CreditNote.countDocuments();
         const creditNoteNumber = req.body.creditNoteNumber || `CN-${String(count + 1).padStart(5, '0')}`;
@@ -36,10 +38,12 @@ router.post('/', protect, checkPermission('invoices', 'create'), async (req, res
     }
 });
 
-router.post('/:id/apply', protect, checkPermission('invoices', 'edit'), async (req, res) => {
+router.post('/:id/apply', protect, checkPermission('credit_notes', 'edit'), async (req, res) => {
     try {
         const note = await CreditNote.findById(req.params.id);
         if (!note) return res.status(404).json({ message: 'Credit note not found' });
+        const access = await assertCreatorAccess(req.user, note, 'credit_notes');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         if (note.status === 'applied' || note.status === 'void') {
             return res.status(400).json({ message: 'Credit note already applied or void' });
         }
@@ -82,10 +86,12 @@ router.post('/:id/apply', protect, checkPermission('invoices', 'edit'), async (r
     }
 });
 
-router.delete('/:id', protect, checkPermission('invoices', 'delete'), async (req, res) => {
+router.delete('/:id', protect, checkPermission('credit_notes', 'delete'), async (req, res) => {
     try {
         const note = await CreditNote.findById(req.params.id);
         if (!note) return res.status(404).json({ message: 'Not found' });
+        const access = await assertCreatorAccess(req.user, note, 'credit_notes');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         if (note.status === 'applied') {
             note.status = 'void';
             await note.save();

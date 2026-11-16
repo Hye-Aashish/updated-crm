@@ -14,8 +14,18 @@ const ticketSchema = new mongoose.Schema({
     screenshot: { type: String }, // Base64 or URL
     taskId: { type: String }, // Linked Task model ID
     taskTitle: { type: String }, // Title of linked Task
+    // SLA tracking
+    slaDueAt: { type: Date },
+    firstResponseAt: { type: Date },
+    resolvedAt: { type: Date },
+    slaBreached: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
+
+/** Default response SLA hours by priority */
+ticketSchema.statics.slaHoursForPriority = function (priority) {
+    return { critical: 4, high: 8, medium: 24, low: 72 }[priority] || 24;
+};
 
 module.exports = mongoose.model('Ticket', ticketSchema);

@@ -34,7 +34,20 @@ router.get('/', protect, async (req, res) => {
             };
         }
         const tickets = await Ticket.find(filter).select('-screenshot').sort({ createdAt: -1 });
-        res.json(tickets);
+        const now = Date.now();
+        const enriched = tickets.map((t) => {
+            const obj = t.toObject();
+            if (!obj.slaDueAt && obj.createdAt) {
+                const hours = Ticket.slaHoursForPriority(obj.priority);
+                obj.slaDueAt = new Date(new Date(obj.createdAt).getTime() + hours * 60 * 60 * 1000);
+            }
+            const done = ['resolved', 'closed', 'live', 'declined'].includes(obj.status);
+            if (obj.slaDueAt && !done) {
+                obj.slaBreached = now > new Date(obj.slaDueAt).getTime();
+            }
+            return obj;
+        });
+        res.json(enriched);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -64,16 +77,21 @@ router.post('/', protect, checkPermission('tickets', 'create'), async (req, res)
         }
     }
 
+    const priority = req.body.priority || 'medium';
+    const slaHours = Ticket.slaHoursForPriority(priority);
     const ticket = new Ticket({
         subject: req.body.subject,
         description: req.body.description,
-        priority: req.body.priority,
+        priority,
         clientName: req.user.role === 'client' ? req.user.name : req.body.clientName,
         clientId: req.user.role === 'client' ? req.user.clientId : req.body.clientId,
         projectId: req.body.projectId,
         assignedTo: assignedTo,
         screenshot: req.body.screenshot,
-        createdBy: req.user._id.toString()
+        createdBy: req.user._id.toString(),
+        slaDueAt: req.body.slaDueAt
+            ? new Date(req.body.slaDueAt)
+            : new Date(Date.now() + slaHours * 60 * 60 * 1000)
     });
     try {
         const newTicket = await ticket.save();
@@ -144,6 +162,7 @@ router.put('/:id', protect, checkPermission('tickets', 'edit'), async (req, res)
             return res.status(403).json({ message: 'Not authorized' });
         }
 
+        const prevStatus = ticket.status;
         if (req.body.subject) ticket.subject = req.body.subject;
         if (req.body.projectId !== undefined) ticket.projectId = req.body.projectId;
         if (req.body.clientName !== undefined) ticket.clientName = req.body.clientName;
@@ -154,6 +173,30 @@ router.put('/:id', protect, checkPermission('tickets', 'edit'), async (req, res)
         if (req.body.discussionNote !== undefined) ticket.discussionNote = req.body.discussionNote;
         if (req.body.taskId !== undefined) ticket.taskId = req.body.taskId;
         if (req.body.taskTitle !== undefined) ticket.taskTitle = req.body.taskTitle;
+        if (req.body.slaDueAt !== undefined) ticket.slaDueAt = req.body.slaDueAt ? new Date(req.body.slaDueAt) : null;
+
+        // Recalculate SLA due when priority changes and no custom override
+        if (req.body.priority && !req.body.slaDueAt && !ticket.firstResponseAt) {
+            const hours = Ticket.slaHoursForPriority(req.body.priority);
+            ticket.slaDueAt = new Date(ticket.createdAt.getTime() + hours * 60 * 60 * 1000);
+        }
+
+        // First response when leaving open
+        if (prevStatus === 'open' && ticket.status && ticket.status !== 'open' && !ticket.firstResponseAt) {
+            ticket.firstResponseAt = new Date();
+        }
+
+        // Resolution timestamp
+        if (['resolved', 'closed', 'live'].includes(ticket.status) && !ticket.resolvedAt) {
+            ticket.resolvedAt = new Date();
+        }
+
+        // Breach flag: past SLA and still not resolved
+        if (ticket.slaDueAt && !['resolved', 'closed', 'live', 'declined'].includes(ticket.status)) {
+            ticket.slaBreached = new Date() > new Date(ticket.slaDueAt);
+        } else if (ticket.resolvedAt && ticket.slaDueAt) {
+            ticket.slaBreached = new Date(ticket.resolvedAt) > new Date(ticket.slaDueAt);
+        }
 
         ticket.updatedAt = Date.now();
         const updatedTicket = await ticket.save();

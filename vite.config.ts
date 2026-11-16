@@ -17,4 +17,10 @@ export default defineConfig({
             '@': path.resolve(__dirname, './src'),
         },
     },
+    server: {
+        // Electron packaging locks binaries under dist-electron; watching them crashes Vite (EBUSY).
+        watch: {
+            ignored: ['**/dist-electron/**', '**/dist/**', '**/backend/**'],
+        },
+    },
 })

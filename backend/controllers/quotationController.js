@@ -9,24 +9,13 @@ const nodemailer = require('nodemailer');
 
 async function assertQuotationAccess(user, quotation) {
     if (!user || !quotation) return { ok: false, status: 401, message: 'Not authorized' };
-    if (user.role === 'admin' || user.role === 'owner') return { ok: true };
 
+    const { assertCreatorAccess } = require('../utils/dataScope');
     const qClientId = quotation.clientId?._id ? quotation.clientId._id.toString() : String(quotation.clientId || '');
-    if (user.role === 'client') {
-        if (!user.clientId || qClientId !== String(user.clientId)) {
-            return { ok: false, status: 403, message: 'Not authorized to access this quotation' };
-        }
-        return { ok: true };
-    }
 
-    const creatorId = quotation.createdBy?._id ? quotation.createdBy._id.toString() : String(quotation.createdBy || '');
-    if (creatorId === user._id.toString()) return { ok: true };
-
-    if (qClientId) {
-        const client = await Client.findById(qClientId).select('assignedTo');
-        if (client && client.assignedTo === user._id.toString()) return { ok: true };
-    }
-    return { ok: false, status: 403, message: 'Not authorized to access this quotation' };
+    return assertCreatorAccess(user, quotation, 'quotations', {
+        clientCheck: (u) => !!(u.clientId && qClientId === String(u.clientId))
+    });
 }
 
 async function resolvePublicQuotation(idOrToken, queryToken) {
@@ -80,22 +69,12 @@ exports.getAllQuotations = async (req, res) => {
             { status: 'expired' }
         );
 
+        const { applyCreatorScope } = require('../utils/dataScope');
         let filter = {};
         if (req.user.role === 'client') {
             filter = { clientId: req.user.clientId };
-        } else if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-            filter = {
-                $or: [
-                    { createdBy: req.user._id },
-                ]
-            };
-
-            // Find clients assigned to this user
-            const myClients = await Client.find({ assignedTo: req.user._id.toString() }).select('_id');
-            const myClientIds = myClients.map(c => c._id);
-            if (myClientIds.length > 0) {
-                filter.$or.push({ clientId: { $in: myClientIds } });
-            }
+        } else {
+            filter = await applyCreatorScope({}, req.user, 'quotations');
         }
 
         const quotations = await Quotation.find(filter)

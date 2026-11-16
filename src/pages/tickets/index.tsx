@@ -30,6 +30,10 @@ type Ticket = {
     createdBy?: string
     taskId?: string
     taskTitle?: string
+    slaDueAt?: string
+    firstResponseAt?: string
+    resolvedAt?: string
+    slaBreached?: boolean
 }
 
 export function TicketsPage() {
@@ -407,6 +411,29 @@ export function TicketsPage() {
         }
     }
 
+    const getSlaInfo = (ticket: Ticket) => {
+        if (!ticket.slaDueAt) return null
+        const due = new Date(ticket.slaDueAt).getTime()
+        const done = ['resolved', 'closed', 'live', 'declined'].includes(ticket.status)
+        const breached = ticket.slaBreached || (!done && Date.now() > due)
+        const hoursLeft = Math.round((due - Date.now()) / (60 * 60 * 1000))
+        if (done) {
+            return {
+                label: breached ? 'SLA missed' : 'SLA met',
+                className: breached
+                    ? 'bg-red-500/15 text-red-700 border-red-500/30'
+                    : 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
+            }
+        }
+        if (breached) {
+            return { label: 'SLA breached', className: 'bg-red-500 text-white border-red-600' }
+        }
+        if (hoursLeft <= 4) {
+            return { label: `SLA ${hoursLeft}h left`, className: 'bg-amber-500/15 text-amber-800 border-amber-500/30' }
+        }
+        return { label: `SLA ${hoursLeft}h`, className: 'bg-muted text-muted-foreground border-border/50' }
+    }
+
     const getStatusStyle = (s: string) => {
         switch (s) {
             case 'open':
@@ -629,7 +656,7 @@ export function TicketsPage() {
             </div>
 
             {/* 2. Large Easy Status Filter Tabs */}
-            <div className="flex overflow-x-auto gap-2 p-1.5 bg-muted/40 rounded-2xl border border-border/60 custom-scrollbar">
+            <div className="page-toolbar page-toolbar-scroll-mobile gap-2 p-1.5 bg-muted/40 rounded-2xl border border-border/60">
                 <button
                     onClick={() => setActiveTab('all')}
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap ${
@@ -738,6 +765,7 @@ export function TicketsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredTickets.map(ticket => {
                         const prio = getPriorityDisplay(ticket.priority)
+                        const sla = getSlaInfo(ticket)
                         return (
                             <Card
                                 key={ticket._id}
@@ -755,6 +783,11 @@ export function TicketsPage() {
                                                 #{ticket._id.slice(-5).toUpperCase()}
                                             </span>
                                         </div>
+                                        {sla && (
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${sla.className}`}>
+                                                <Clock className="h-3 w-3" /> {sla.label}
+                                            </span>
+                                        )}
 
                                         {/* Subject Title */}
                                         <h3 className="font-bold text-base text-foreground leading-snug line-clamp-2 hover:text-primary transition-colors" title={ticket.subject}>
@@ -881,6 +914,21 @@ export function TicketsPage() {
                                 </div>
                                 <h2 className="text-lg font-extrabold text-foreground">{selectedTicket.subject}</h2>
                                 <p className="text-[11px] text-muted-foreground">Created: {new Date(selectedTicket.createdAt).toLocaleString()}</p>
+                                {selectedTicket.slaDueAt && (
+                                    <div className="flex flex-wrap gap-2 pt-1">
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${getSlaInfo(selectedTicket)?.className || ''}`}>
+                                            <Clock className="h-3 w-3" /> {getSlaInfo(selectedTicket)?.label}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground font-medium">
+                                            Due: {new Date(selectedTicket.slaDueAt).toLocaleString()}
+                                        </span>
+                                        {selectedTicket.firstResponseAt && (
+                                            <span className="text-[10px] text-muted-foreground font-medium">
+                                                First response: {new Date(selectedTicket.firstResponseAt).toLocaleString()}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Task Assignment Card / Action */}

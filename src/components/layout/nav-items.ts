@@ -31,6 +31,9 @@ import {
     UserCheck,
     KeyRound,
     ClipboardList,
+    TrendingUp,
+    Repeat,
+    BookOpen,
 } from 'lucide-react'
 import { canViewWithPermissions } from '@/hooks/use-permissions'
 import { isAdminOrOwnerRole, normalizeRoleKey } from '@/lib/nav-utils'
@@ -121,6 +124,8 @@ export function buildStaffNavItems(baseUrl: '' | '/employee'): SidebarNavItem[] 
         { name: 'Credit Notes', href: p('/credit-notes'), icon: FileText, category: 'Financial Hub', module: 'credit_notes' },
         { name: 'Vendor Bills', href: p('/vendor-bills'), icon: Wallet, category: 'Financial Hub', module: 'vendor_bills' },
         { name: 'GST & P&L', href: p('/reports/gst'), icon: BarChart, category: 'Financial Hub', module: 'gst_reports' },
+        { name: 'Project Profitability', href: p('/reports/profitability'), icon: TrendingUp, category: 'Financial Hub', module: 'profitability' },
+        { name: 'Retainers', href: p('/retainers'), icon: Repeat, category: 'Financial Hub', module: 'retainers' },
         { name: 'Expenses', href: p('/expenses'), icon: Wallet, category: 'Financial Hub', module: 'expenses' },
         { name: isEmployee ? 'My Payroll' : 'Payroll', href: p('/salary'), icon: Wallet, category: 'Financial Hub', module: 'payroll' },
 
@@ -142,13 +147,14 @@ export function buildStaffNavItems(baseUrl: '' | '/employee'): SidebarNavItem[] 
         { name: 'Live Chat', href: p('/chat'), icon: MessageSquare, category: 'Communications', module: 'chat' },
 
         { name: 'Reports', href: p('/reports'), icon: BarChart, category: 'System & Intelligence', module: 'reports' },
+        { name: 'Knowledge Base', href: p('/knowledge'), icon: BookOpen, category: 'System & Intelligence', module: 'knowledge_base' },
         { name: isEmployee ? 'My Files' : 'Files', href: p('/files'), icon: FolderOpen, category: 'System & Intelligence', module: 'files' },
         { name: 'AI Assistant', href: p('/ai-assistant'), icon: Brain, category: 'System & Intelligence', module: 'ai_assistant' },
     ]
 
     if (!isEmployee) {
         items.push(
-            { name: 'Employee Activity Log', href: '/work-audit', icon: ClipboardList, category: 'System & Intelligence', module: '__admin_audit__' },
+            { name: 'Employee Activity Log', href: '/work-audit', icon: ClipboardList, category: 'System & Intelligence', module: 'work_audit' },
             { name: 'Roles & Permissions', href: '/settings/roles', icon: Shield, category: 'System & Intelligence', module: 'roles' },
             { name: 'Settings', href: '/settings', icon: Settings, category: 'System & Intelligence', module: 'settings' },
             { name: 'Profile Settings', href: '/profile', icon: KeyRound, category: 'Account', module: '__profile__', alwaysVisible: true }
@@ -186,10 +192,6 @@ export function filterNavItems(
     const canViewSystemSettings = canViewWithPermissions(permissions, role, 'settings')
 
     return items.filter((item) => {
-        if (item.module === '__admin_audit__') {
-            return adminOrOwner
-        }
-
         // Hide redundant personal Profile Settings item on admin sidebar when full Workspace Settings is already shown
         if (item.module === '__profile__' && canViewSystemSettings && item.href === '/profile') {
             return false

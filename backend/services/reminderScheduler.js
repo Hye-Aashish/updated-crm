@@ -54,10 +54,20 @@ function startReminderScheduler() {
                 }
 
                 if (notify) {
-                    // Fetch admins & owners
+                    // Admins/owners + assigned agent (deduped)
                     const receivers = await User.find({ role: { $in: ['admin', 'owner'] } });
-                    
-                    // Create Notification records
+                    const receiverIds = new Set(receivers.map((u) => u._id.toString()));
+                    if (lead.assignedTo) {
+                        const agentId = lead.assignedTo.toString();
+                        if (!receiverIds.has(agentId)) {
+                            const agent = await User.findById(lead.assignedTo);
+                            if (agent) {
+                                receivers.push(agent);
+                                receiverIds.add(agentId);
+                            }
+                        }
+                    }
+
                     for (const receiver of receivers) {
                         await Notification.create({
                             userId: receiver._id,

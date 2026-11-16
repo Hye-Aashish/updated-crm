@@ -199,7 +199,7 @@ export function ResourceCapacityPage() {
                         className="pl-9 bg-background/80 rounded-xl border-none text-xs sm:text-sm"
                     />
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                <div className="page-toolbar page-toolbar-scroll-mobile w-full sm:w-auto">
                     {['all', 'overloaded', 'optimal', 'available'].map((f) => (
                         <button
                             key={f}

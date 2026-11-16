@@ -11,6 +11,7 @@ const productSchema = new mongoose.Schema({
         enum: ['active', 'inactive'],
         default: 'active'
     },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

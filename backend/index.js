@@ -219,7 +219,11 @@ const routes = {
     'vendor-bills': require('./routes/vendorBillRoutes'),
     'finance-reports': require('./routes/financeReportRoutes'),
     calendar: require('./routes/calendarRoutes'),
-    'work-audit': require('./routes/workAuditRoutes')
+    'work-audit': require('./routes/workAuditRoutes'),
+    profitability: require('./routes/profitabilityRoutes'),
+    retainers: require('./routes/retainerRoutes'),
+    knowledge: require('./routes/knowledgeRoutes'),
+    'client-forms': require('./routes/clientFormRoutes')
 };
 
 Object.entries(routes).forEach(([path, handler]) => {

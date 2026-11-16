@@ -42,6 +42,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
         user_tracker: { view: true, manage: true },
         screen_monitoring: { view: true, view_history: true, delete_logs: true, realtime_watch: true },
         clients: { view: true, create: true, edit: true, delete: true },
+        client_forms: { view: true, create: true, edit: true, delete: true },
         projects: { view: true, create: true, edit: true, delete: true, view_budget: true, manage_team: true },
         products: { view: true, create: true, edit: true, delete: true },
         tasks: { view: true, create: true, edit: true, delete: true, assign_others: true, change_priority: true },
@@ -57,6 +58,8 @@ const DEFAULT_ROLE_PERMISSIONS = {
         credit_notes: { view: true, create: true, edit: true, delete: true },
         vendor_bills: { view: true, create: true, edit: true, delete: true, mark_paid: true },
         gst_reports: { view: true, export: true },
+        profitability: { view: true, export: true },
+        retainers: { view: true, create: true, edit: true, delete: true },
         expenses: { view: true, create: true, edit: true, delete: true },
         payroll: { view: true, manage: true, generate_slips: true, set_salaries: true },
         billing_settings: { view: true, edit: true },
@@ -75,10 +78,12 @@ const DEFAULT_ROLE_PERMISSIONS = {
         project_chat: { view: true, message: true, view_others: true },
         chat: { view: true, reply: true, delete_history: true },
         reports: { view: true, export: true, view_financial_reports: true },
+        knowledge_base: { view: true, create: true, edit: true, delete: true },
         files: { view: true, upload: true, delete: true, download: true },
         ai_assistant: { use: true, manage_keys: true, view_logs: true },
         settings: { view: true, edit: true, edit_profile: true, edit_smtp: true, edit_api: true, manage_billing: true },
-        roles: { view: true, create: true, edit: true, delete: true }
+        roles: { view: true, create: true, edit: true, delete: true },
+        work_audit: { view: true }
     },
     pm: {
         dashboard: { view: true, view_revenue: false, view_stats: true },
@@ -87,6 +92,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
         user_tracker: { view: true, manage: false },
         screen_monitoring: { view: false },
         clients: { view: true, create: true, edit: true, delete: false },
+        client_forms: { view: true, create: true, edit: true, delete: false },
         projects: { view: true, create: true, edit: true, delete: false, view_budget: true, manage_team: true },
         products: { view: true, create: false, edit: false, delete: false },
         tasks: { view: true, create: true, edit: true, delete: true, assign_others: true, change_priority: true },
@@ -120,6 +126,9 @@ const DEFAULT_ROLE_PERMISSIONS = {
         project_chat: { view: true, message: true, view_others: true },
         chat: { view: true, reply: true },
         reports: { view: true, export: true },
+        knowledge_base: { view: true, create: true, edit: true, delete: false },
+        profitability: { view: true },
+        retainers: { view: true, create: false, edit: false, delete: false },
         files: { view: true, upload: true, delete: false, download: true },
         ai_assistant: { use: true, manage_keys: false },
         settings: { view: true, edit: false },
@@ -165,6 +174,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
         project_chat: { view: true, message: true },
         chat: { view: true, reply: true },
         reports: { view: false },
+        knowledge_base: { view: true, create: false, edit: false, delete: false },
         files: { view: true, upload: true, delete: false, download: true },
         ai_assistant: { use: true, manage_keys: false },
         settings: { view: false },
@@ -350,7 +360,7 @@ const authorize = (...roles) => {
         }
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({
-                message: 'Access denied. Insufficient permissions.'
+                message: 'Permission Denied: Aapke paas is action ke liye sufficient permission nahi hai.'
             });
         }
         next();
@@ -381,8 +391,18 @@ const checkPermission = (module, action) => {
                     const perms = roleConfig.permissions || {};
                     const modulePerms = perms[module] || {};
                     if (modulePerms[action]) return next();
+                    // Legacy aliases: credit_notes / vendor_bills → invoices; campaigns → leads
+                    const aliasModule =
+                        module === 'credit_notes' || module === 'vendor_bills'
+                            ? 'invoices'
+                            : module === 'campaigns'
+                              ? 'leads'
+                              : module === 'leads_form' || module === 'sales_automations'
+                                ? 'leads'
+                                : null;
+                    if (aliasModule && (perms[aliasModule] || {})[action]) return next();
                     return res.status(403).json({
-                        message: `Permission Denied: No '${action}' access for '${module}'.`
+                        message: `Permission Denied: Aapke paas '${module}' ke liye '${action}' permission nahi hai.`
                     });
                 }
             }
@@ -392,13 +412,24 @@ const checkPermission = (module, action) => {
             if (defaultPerms) {
                 const modulePerms = defaultPerms[module] || {};
                 if (modulePerms[action]) return next();
+                const aliasModule =
+                    module === 'credit_notes' || module === 'vendor_bills'
+                        ? 'invoices'
+                        : module === 'campaigns'
+                          ? 'leads'
+                          : module === 'leads_form' || module === 'sales_automations'
+                            ? 'leads'
+                            : null;
+                if (aliasModule && (defaultPerms[aliasModule] || {})[action]) return next();
                 return res.status(403).json({
-                    message: `Permission Denied: No '${action}' access for '${module}'.`
+                    message: `Permission Denied: Aapke paas '${module}' ke liye '${action}' permission nahi hai.`
                 });
             }
 
             // 3. Unknown role — deny
-            return res.status(403).json({ message: `Role '${userRole}' is not recognized.` });
+            return res.status(403).json({
+                message: `Permission Denied: Role '${userRole}' is not recognized.`
+            });
         } catch (error) {
             console.error('Permission check error:', error);
             res.status(500).json({ message: 'Internal Server Error during permission check' });
@@ -406,4 +437,11 @@ const checkPermission = (module, action) => {
     };
 };
 
-module.exports = { protect, authorize, checkPermission, clearPermissionCache };
+module.exports = {
+    protect,
+    authorize,
+    checkPermission,
+    clearPermissionCache,
+    getSettingsPermissions,
+    DEFAULT_ROLE_PERMISSIONS
+};

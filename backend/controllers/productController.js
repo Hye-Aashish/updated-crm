@@ -1,9 +1,11 @@
 const Product = require('../models/Product');
+const { applyCreatorScope, assertCreatorAccess } = require('../utils/dataScope');
 
 // Get all products
 exports.getProducts = async (req, res) => {
     try {
-        const products = await Product.find().sort({ createdAt: -1 });
+        const filter = await applyCreatorScope({}, req.user, 'products');
+        const products = await Product.find(filter).sort({ createdAt: -1 });
         res.status(200).json(products);
     } catch (err) {
         console.error('Error fetching products:', err);
@@ -18,6 +20,8 @@ exports.getProductById = async (req, res) => {
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
+        const access = await assertCreatorAccess(req.user, product, 'products');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         res.status(200).json(product);
     } catch (err) {
         console.error('Error fetching product:', err);
@@ -35,7 +39,8 @@ exports.createProduct = async (req, res) => {
             description,
             features: features || [],
             basePrice: basePrice || 0,
-            status
+            status,
+            createdBy: req.user._id
         });
         const savedProduct = await newProduct.save();
         res.status(201).json(savedProduct);
@@ -48,6 +53,13 @@ exports.createProduct = async (req, res) => {
 // Update product
 exports.updateProduct = async (req, res) => {
     try {
+        const existing = await Product.findById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        const access = await assertCreatorAccess(req.user, existing, 'products');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         const { name, category, description, features, basePrice, status } = req.body;
         const updatedProduct = await Product.findByIdAndUpdate(
             req.params.id,
@@ -76,6 +88,12 @@ exports.updateProduct = async (req, res) => {
 // Delete product
 exports.deleteProduct = async (req, res) => {
     try {
+        const existing = await Product.findById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        const access = await assertCreatorAccess(req.user, existing, 'products');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         const product = await Product.findByIdAndDelete(req.params.id);
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });

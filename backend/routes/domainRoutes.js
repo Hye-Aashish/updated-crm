@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Domain = require('../models/Domain');
 const Invoice = require('../models/Invoice');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope, assertCreatorAccess } = require('../utils/dataScope');
 
 // Helper: generate next invoice number
 const getNextInvoiceNumber = async () => {
@@ -14,7 +15,7 @@ const getNextInvoiceNumber = async () => {
 };
 
 // GET Domain & Hosting stats summary
-router.get('/stats/summary', protect, async (req, res, next) => {
+router.get('/stats/summary', protect, checkPermission('domains', 'view'), async (req, res, next) => {
     try {
         let baseFilter = {};
         if (req.user.role === 'client') {
@@ -22,6 +23,8 @@ router.get('/stats/summary', protect, async (req, res, next) => {
                 return res.json({ total: 0, active: 0, expiringSoon: 0, expired: 0, totalCost: 0 });
             }
             baseFilter = { clientId: new mongoose.Types.ObjectId(String(req.user.clientId)) };
+        } else {
+            baseFilter = await applyCreatorScope({}, req.user, 'domains');
         }
 
         const [total, active, expiringSoon, expired] = await Promise.all([
@@ -49,11 +52,13 @@ router.get('/stats/summary', protect, async (req, res, next) => {
 });
 
 // GET all domains
-router.get('/', protect, async (req, res, next) => {
+router.get('/', protect, checkPermission('domains', 'view'), async (req, res, next) => {
     try {
         let filter = {};
         if (req.user.role === 'client') {
             filter = { clientId: req.user.clientId };
+        } else {
+            filter = await applyCreatorScope({}, req.user, 'domains');
         }
         const domains = await Domain.find(filter)
             .populate('projectId', 'name status')
@@ -117,13 +122,14 @@ router.get('/:id', protect, async (req, res, next) => {
             .populate('clientId', 'name email phone company')
             .populate('invoices', 'invoiceNumber total status date dueDate type');
         if (!domainRecord) return res.status(404).json({ message: 'Record not found' });
-        if (req.user.role === 'client') {
-            const own = req.user.clientId?.toString?.() || '';
-            const recClientId = domainRecord.clientId?._id?.toString?.() || domainRecord.clientId?.toString?.() || '';
-            if (!own || own !== recClientId) {
-                return res.status(403).json({ message: 'Not authorized to view this domain record' });
+        const access = await assertCreatorAccess(req.user, domainRecord, 'domains', {
+            clientCheck: (user, doc) => {
+                const own = user.clientId?.toString?.() || '';
+                const recClientId = doc.clientId?._id?.toString?.() || doc.clientId?.toString?.() || '';
+                return !!own && own === recClientId;
             }
-        }
+        });
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         res.json(domainRecord);
     } catch (err) {
         next(err);
@@ -136,6 +142,11 @@ router.put('/:id', protect, checkPermission('domains', 'edit'), async (req, res,
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
         }
+        const existing = await Domain.findById(req.params.id);
+        if (!existing) return res.status(404).json({ message: 'Record not found' });
+        const access = await assertCreatorAccess(req.user, existing, 'domains');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+
         const allowedFields = [
             'domainName', 'type', 'provider', 'clientId', 'projectId',
             'purchaseDate', 'expiryDate', 'amount', 'status', 'autoRenew', 'notes'
@@ -161,8 +172,11 @@ router.delete('/:id', protect, checkPermission('domains', 'delete'), async (req,
         if (req.user.role === 'client') {
             return res.status(403).json({ message: 'Not authorized' });
         }
-        const deleted = await Domain.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: 'Record not found' });
+        const existing = await Domain.findById(req.params.id);
+        if (!existing) return res.status(404).json({ message: 'Record not found' });
+        const access = await assertCreatorAccess(req.user, existing, 'domains');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        await Domain.findByIdAndDelete(req.params.id);
         res.json({ message: 'Record deleted successfully' });
     } catch (err) {
         next(err);

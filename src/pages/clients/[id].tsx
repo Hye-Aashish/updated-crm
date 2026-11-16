@@ -14,14 +14,14 @@ import {
 import { formatCurrency, getInitials, generatePortalPassword } from '@/lib/utils'
 import api from '@/lib/api-client'
 import { VisitorSessionsTimeline } from '@/components/contacts/visitor-sessions-timeline'
+import { Client360Timeline } from '@/components/clients/client-360-timeline'
 import { ClientProductForm } from '@/components/clients/client-product-dialog'
 import { ClientProductManagerDialog } from '@/components/clients/client-product-manager-dialog'
-import { ClientOnboardingDialog } from '@/components/clients/client-onboarding-dialog'
 import { mapClient } from '@/lib/mappers'
 import { usePermissions } from '@/hooks/use-permissions'
 import { isAdminOrOwnerRole, usePortalPrefix } from '@/lib/nav-utils'
 import { Progress } from '@/components/ui/progress'
-import { Package, Plus, FolderOpen, Copy, Share2, MessageCircle, Download, CheckCircle2, FileCheck, RefreshCw, Globe, Send, User, Building2, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Package, Plus, FolderOpen, Copy, MessageCircle, Download, CheckCircle2, FileCheck, Building2, Eye, EyeOff, Loader2 } from 'lucide-react'
 import type { ClientProduct } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -65,9 +65,6 @@ export function ClientDetailPage() {
     const [selectedManagerCP, setSelectedManagerCP] = useState<ClientProduct | null>(null)
     const [isManagerOpen, setIsManagerOpen] = useState(false)
 
-    // Client Onboarding State
-    const [isOnboardingDialogOpen, setIsOnboardingDialogOpen] = useState(false)
-    const [copiedOnboardingLink, setCopiedOnboardingLink] = useState(false)
 
     // Always fetch latest client data and portal access status on load
     useEffect(() => {
@@ -303,37 +300,7 @@ export function ClientDetailPage() {
         }
     }
 
-    const onboardingPublicUrl = client?.onboardingToken
-        ? `${window.location.origin}/client-onboarding/${client.onboardingToken}`
-        : ''
-
-    const handleCopyOnboardingLink = () => {
-        if (!onboardingPublicUrl) return
-        navigator.clipboard.writeText(onboardingPublicUrl)
-        setCopiedOnboardingLink(true)
-        toast({ title: 'Link Copied', description: onboardingPublicUrl })
-        setTimeout(() => setCopiedOnboardingLink(false), 2500)
-    }
-
-    const handleWhatsAppInvite = () => {
-        if (!onboardingPublicUrl || !client) return
-        const text = `Hello ${client.name},\n\nPlease fill out your onboarding form so we can configure your account and begin your project:\n${onboardingPublicUrl}\n\nThank you!`
-        const waUrl = `https://wa.me/${(client.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`
-        window.open(waUrl, '_blank')
-    }
-
-    const handleResetOnboarding = async () => {
-        if (!client) return
-        if (!await appConfirm("Reopen onboarding form for this client? They will be able to resubmit their details.")) return
-        try {
-            const res = await api.post(`/clients/${client.id}/onboarding/reset`, { status: 'sent' })
-            const updated = res.data.client || { ...client, onboardingStatus: 'sent' }
-            setClients(clients.map(c => c.id === client.id ? { ...c, ...updated } : c))
-            toast({ title: 'Onboarding Reopened', description: 'Client can now resubmit their form.' })
-        } catch (err) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to reset onboarding.' })
-        }
-    }
+    const intakeFormTitle = (client?.onboardingData as any)?._formTitle as string | undefined
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -391,14 +358,6 @@ export function ClientDetailPage() {
                                 <Lock className="h-3.5 w-3.5" /> Setup Client Login
                             </Button>
                         )}
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="clay-btn gap-1.5 font-bold border-primary/40 text-primary hover:bg-primary/10 shadow-xs h-9 rounded-xl"
-                            onClick={() => setIsOnboardingDialogOpen(true)}
-                        >
-                            <Sparkles className="h-4 w-4 text-primary" /> Onboarding Form Builder
-                        </Button>
                         <Button variant="outline" size="sm" className="clay-btn font-bold h-9 rounded-xl" onClick={() => navigate(`${portalPrefix}/clients/${client.id}/edit`)}>
                             <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit Profile
                         </Button>
@@ -457,19 +416,15 @@ export function ClientDetailPage() {
                 <TabsList className="flex flex-wrap h-auto gap-1">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="onboarding" className="gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-primary" />
-                        Onboarding
+                        <FileText className="h-3.5 w-3.5 text-primary" />
+                        Intake
                         {client.onboardingStatus === 'completed' && (
                             <Badge className="clay-badge ml-1 bg-emerald-500/15 text-emerald-600 border-0 text-[10px] px-1.5 py-0 h-4">
                                 Done
                             </Badge>
                         )}
-                        {client.onboardingStatus === 'sent' && (
-                            <Badge className="clay-badge ml-1 bg-blue-500/15 text-blue-600 border-0 text-[10px] px-1.5 py-0 h-4">
-                                Sent
-                            </Badge>
-                        )}
                     </TabsTrigger>
+                    <TabsTrigger value="timeline">360 Timeline</TabsTrigger>
                     <TabsTrigger value="projects">Projects ({clientProjects.length})</TabsTrigger>
                     <TabsTrigger value="invoices">Invoices ({clientInvoices.length})</TabsTrigger>
                     <TabsTrigger value="products">Products</TabsTrigger>
@@ -607,6 +562,10 @@ export function ClientDetailPage() {
                             )}
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="timeline" className="space-y-4">
+                    {id && <Client360Timeline clientId={id} />}
                 </TabsContent>
 
                 <TabsContent value="projects">
@@ -1035,120 +994,30 @@ export function ClientDetailPage() {
                 </TabsContent>
 
                 <TabsContent value="onboarding" className="space-y-6">
-                    {/* Hero Status Banner */}
-                    <Card className="p-6 rounded-3xl border border-border/40 space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className={`clay-icon h-12 w-12 rounded-2xl flex items-center justify-center ${client.onboardingStatus === 'completed'
-                                        ? 'bg-emerald-500/15 text-emerald-600'
-                                        : client.onboardingStatus === 'sent'
-                                            ? 'bg-blue-500/15 text-blue-600'
-                                            : 'bg-primary/10 text-primary'
-                                    }`}>
-                                    {client.onboardingStatus === 'completed' ? (
-                                        <CheckCircle2 className="h-6 w-6" />
-                                    ) : client.onboardingStatus === 'sent' ? (
-                                        <Clock className="h-6 w-6" />
-                                    ) : (
-                                        <Sparkles className="h-6 w-6" />
-                                    )}
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-lg font-black text-foreground">
-                                            {client.onboardingStatus === 'completed'
-                                                ? 'Client Onboarding Completed'
-                                                : client.onboardingStatus === 'sent'
-                                                    ? 'Onboarding Form Sent - Awaiting Client Response'
-                                                    : 'Client Onboarding Not Initiated'}
-                                        </h2>
-                                        {client.onboardingStatus === 'completed' ? (
-                                            <Badge className="clay-badge bg-emerald-500/15 text-emerald-600 font-bold px-2 py-0.5">
-                                                Active / Synced
-                                            </Badge>
-                                        ) : client.onboardingStatus === 'sent' ? (
-                                            <Badge className="clay-badge bg-blue-500/15 text-blue-600 font-bold px-2 py-0.5">
-                                                Link Active
-                                            </Badge>
-                                        ) : (
-                                            <Badge className="clay-badge bg-muted text-muted-foreground font-bold px-2 py-0.5">
-                                                Pending Form
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-                                        {client.onboardingStatus === 'completed'
-                                            ? `Form successfully submitted by client on ${client.onboardingCompletedAt ? new Date(client.onboardingCompletedAt).toLocaleString() : 'recently'}. All details synced below.`
-                                            : client.onboardingStatus === 'sent'
-                                                ? `Form generated and link issued on ${client.onboardingSentAt ? new Date(client.onboardingSentAt).toLocaleDateString() : 'recently'}. Client can fill it anytime.`
-                                                : 'Create a tailored onboarding questionnaire for this client to collect brand assets, business details, and technical scope.'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <Button
-                                    onClick={() => setIsOnboardingDialogOpen(true)}
-                                    className="clay-btn bg-primary hover:bg-primary/95 text-white font-extrabold text-xs h-9 px-4 rounded-xl shadow-md gap-1.5"
-                                >
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                    {client.onboardingToken ? 'Configure Questions' : 'Generate Onboarding Form'}
-                                </Button>
-                                {client.onboardingStatus === 'completed' && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleResetOnboarding}
-                                        className="clay-btn text-xs font-bold h-9 rounded-xl gap-1.5"
-                                        title="Allow client to resubmit"
-                                    >
-                                        <RefreshCw className="h-3.5 w-3.5" /> Re-open Form
-                                    </Button>
+                    <Card className="p-6 rounded-3xl border border-border/40 space-y-3">
+                        <div className="flex items-center gap-3">
+                            <div className={`clay-icon h-12 w-12 rounded-2xl flex items-center justify-center ${
+                                client.onboardingStatus === 'completed'
+                                    ? 'bg-emerald-500/15 text-emerald-600'
+                                    : 'bg-muted text-muted-foreground'
+                            }`}>
+                                {client.onboardingStatus === 'completed' ? (
+                                    <CheckCircle2 className="h-6 w-6" />
+                                ) : (
+                                    <FileText className="h-6 w-6" />
                                 )}
                             </div>
-                        </div>
-
-                        {/* Shareable Link Bar (if token exists) */}
-                        {onboardingPublicUrl && (
-                            <div className="clay-inset p-3 rounded-2xl bg-muted/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground shrink-0 flex items-center gap-1">
-                                        <Globe className="h-3.5 w-3.5 text-primary" /> Public URL:
-                                    </span>
-                                    <Input
-                                        readOnly
-                                        value={onboardingPublicUrl}
-                                        className="text-xs font-mono h-8 bg-card select-all rounded-lg flex-1"
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={handleCopyOnboardingLink}
-                                        className="clay-btn h-8 px-3 text-xs font-bold gap-1 rounded-xl"
-                                    >
-                                        {copiedOnboardingLink ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                                        {copiedOnboardingLink ? 'Copied' : 'Copy'}
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => window.open(onboardingPublicUrl, '_blank')}
-                                        className="clay-btn h-8 px-3 text-xs font-bold gap-1 rounded-xl"
-                                    >
-                                        <ExternalLink className="h-3.5 w-3.5" /> Preview
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        onClick={handleWhatsAppInvite}
-                                        className="clay-btn bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3 text-xs font-bold gap-1 rounded-xl"
-                                    >
-                                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                                    </Button>
-                                </div>
+                            <div>
+                                <h2 className="text-lg font-black text-foreground">
+                                    {client.onboardingStatus === 'completed' ? 'Intake Form Submitted' : 'No Form Intake Yet'}
+                                </h2>
+                                <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                                    {client.onboardingStatus === 'completed'
+                                        ? `Submitted${intakeFormTitle ? ` via “${intakeFormTitle}”` : ''}${client.onboardingCompletedAt ? ` on ${new Date(client.onboardingCompletedAt).toLocaleString()}` : ''}.`
+                                        : 'Share a Client Form from the Clients page — when they submit, answers appear here and the client is created automatically.'}
+                                </p>
                             </div>
-                        )}
+                        </div>
                     </Card>
 
                     {/* Standard Client Business Details Sync View */}
@@ -1239,19 +1108,20 @@ export function ClientDetailPage() {
                                 </div>
                             </div>
                             <Badge className="clay-badge text-[10px] font-bold px-2 py-0.5">
-                                {client.onboardingData ? Object.keys(client.onboardingData).length : 0} Questions Answered
+                                {client.onboardingData
+                                    ? Object.keys(client.onboardingData).filter((k) => !k.startsWith('_')).length
+                                    : 0} Questions Answered
                             </Badge>
                         </div>
 
-                        {client.onboardingData && Object.keys(client.onboardingData).length > 0 ? (
+                        {client.onboardingData && Object.keys(client.onboardingData).filter((k) => !k.startsWith('_')).length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                                {Object.entries(client.onboardingData).map(([key, value]) => {
-                                    // Try to match field label from config if available
-                                    const fieldConfig = client.customOnboardingConfig?.customFields?.find((f: any) => f.id === key)
-                                    const label = fieldConfig?.label || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-
-                                    // Don't show file URLs as raw text here if already in files section
+                                {Object.entries(client.onboardingData)
+                                    .filter(([key]) => !key.startsWith('_'))
+                                    .map(([key, value]) => {
+                                    const label = key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
                                     const isFileUrl = typeof value === 'string' && (value.startsWith('/public/uploads') || value.startsWith('/api/files/secure') || value.startsWith('http'))
+                                    const display = Array.isArray(value) ? value.join(', ') : String(value ?? '')
 
                                     return (
                                         <div key={key} className="clay-inset p-3.5 rounded-2xl bg-card/60 space-y-1.5 border border-border/30">
@@ -1260,7 +1130,7 @@ export function ClientDetailPage() {
                                             </span>
                                             {isFileUrl ? (
                                                 <a
-                                                    href={value}
+                                                    href={String(value)}
                                                     target="_blank"
                                                     rel="noreferrer"
                                                     className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
@@ -1269,7 +1139,7 @@ export function ClientDetailPage() {
                                                 </a>
                                             ) : (
                                                 <p className="text-xs font-semibold text-foreground whitespace-pre-wrap leading-relaxed">
-                                                    {String(value) || <span className="text-muted-foreground italic">No response</span>}
+                                                    {display || <span className="text-muted-foreground italic">No response</span>}
                                                 </p>
                                             )}
                                         </div>
@@ -1279,9 +1149,7 @@ export function ClientDetailPage() {
                         ) : (
                             <div className="text-center py-8 space-y-2">
                                 <p className="text-xs text-muted-foreground italic">
-                                    {client.onboardingStatus === 'sent'
-                                        ? 'Waiting for client to submit the questionnaire responses.'
-                                        : 'No questionnaire responses yet. Configure questions and send the link to the client.'}
+                                    No form answers yet. Share a Client Form link from the Clients page.
                                 </p>
                             </div>
                         )}
@@ -1525,17 +1393,6 @@ export function ClientDetailPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Client Onboarding Form Customizer & Generator Dialog */}
-            {client && (
-                <ClientOnboardingDialog
-                    client={client}
-                    isOpen={isOnboardingDialogOpen}
-                    onClose={() => setIsOnboardingDialogOpen(false)}
-                    onUpdated={(updated) => {
-                        setClients(clients.map(c => c.id === updated.id ? { ...c, ...updated } : c))
-                    }}
-                />
-            )}
         </div>
     )
 }
