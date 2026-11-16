@@ -4,6 +4,7 @@ const Retainer = require('../models/Retainer');
 const Invoice = require('../models/Invoice');
 const Client = require('../models/Client');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope, assertCreatorAccess } = require('../utils/dataScope');
 
 function addBillingPeriod(date, frequency) {
     const next = new Date(date);
@@ -36,9 +37,10 @@ async function nextInvoiceNumber() {
 
 router.get('/', protect, checkPermission('retainers', 'view'), async (req, res) => {
     try {
-        const filter = {};
+        let filter = {};
         if (req.query.status) filter.status = req.query.status;
         if (req.query.clientId) filter.clientId = req.query.clientId;
+        filter = await applyCreatorScope(filter, req.user, 'retainers');
         const retainers = await Retainer.find(filter)
             .populate('clientId', 'name company email')
             .populate('projectId', 'name status')
@@ -57,6 +59,8 @@ router.get('/:id', protect, checkPermission('retainers', 'view'), async (req, re
             .populate('projectId', 'name status')
             .populate('invoices', 'invoiceNumber total status date dueDate amountPaid');
         if (!retainer) return res.status(404).json({ message: 'Retainer not found' });
+        const access = await assertCreatorAccess(req.user, retainer, 'retainers');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         res.json(retainer);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -108,6 +112,8 @@ router.put('/:id', protect, checkPermission('retainers', 'edit'), async (req, re
     try {
         const retainer = await Retainer.findById(req.params.id);
         if (!retainer) return res.status(404).json({ message: 'Retainer not found' });
+        const access = await assertCreatorAccess(req.user, retainer, 'retainers');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
 
         const fields = [
             'name', 'clientId', 'projectId', 'amount', 'currency', 'frequency',
@@ -130,8 +136,11 @@ router.put('/:id', protect, checkPermission('retainers', 'edit'), async (req, re
 
 router.delete('/:id', protect, checkPermission('retainers', 'delete'), async (req, res) => {
     try {
-        const retainer = await Retainer.findByIdAndDelete(req.params.id);
+        const retainer = await Retainer.findById(req.params.id);
         if (!retainer) return res.status(404).json({ message: 'Retainer not found' });
+        const access = await assertCreatorAccess(req.user, retainer, 'retainers');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
+        await Retainer.findByIdAndDelete(req.params.id);
         res.json({ message: 'Retainer deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -143,6 +152,8 @@ router.post('/:id/generate-invoice', protect, checkPermission('retainers', 'crea
     try {
         const retainer = await Retainer.findById(req.params.id);
         if (!retainer) return res.status(404).json({ message: 'Retainer not found' });
+        const access = await assertCreatorAccess(req.user, retainer, 'retainers');
+        if (!access.ok) return res.status(access.status).json({ message: access.message });
         if (retainer.status !== 'active') {
             return res.status(400).json({ message: 'Only active retainers can be billed' });
         }

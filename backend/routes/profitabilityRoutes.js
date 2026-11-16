@@ -7,6 +7,8 @@ const TimeEntry = require('../models/TimeEntry');
 const Client = require('../models/Client');
 const User = require('../models/User');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
+const { applyCreatorScope, canViewAllRecords } = require('../utils/dataScope');
+const { assertProjectAccess } = require('../utils/assertAccess');
 
 const WORKING_HOURS_PER_MONTH = 176; // 22 days * 8 hours
 
@@ -15,11 +17,30 @@ function hourlyCostFromSalary(salary) {
     return salary / WORKING_HOURS_PER_MONTH;
 }
 
-// GET /api/profitability — all projects margin rollup
+function projectScopeOptions(user) {
+    const uid = user?._id;
+    const uidStr = uid?.toString?.() || '';
+    return {
+        extraOr: [
+            { pmId: uidStr },
+            { pmId: uid },
+            { members: uidStr },
+            { members: uid },
+            { developers: uidStr },
+            { developers: uid },
+            { designers: uidStr },
+            { designers: uid }
+        ]
+    };
+}
+
+// GET /api/profitability — scoped projects margin rollup
 router.get('/', protect, checkPermission('profitability', 'view'), async (req, res) => {
     try {
-        const projects = await Project.find({}).sort({ updatedAt: -1 }).lean();
+        const filter = await applyCreatorScope({}, req.user, 'profitability', projectScopeOptions(req.user));
+        const projects = await Project.find(filter).sort({ updatedAt: -1 }).lean();
         const projectIds = projects.map((p) => p._id.toString());
+        const clientIds = [...new Set(projects.map((p) => String(p.clientId || '')).filter(Boolean))];
 
         const [invoices, timeEntries, clients, users] = await Promise.all([
             Invoice.find({
@@ -29,7 +50,7 @@ router.get('/', protect, checkPermission('profitability', 'view'), async (req, r
             TimeEntry.find({
                 projectId: { $in: projects.map((p) => p._id) }
             }).lean(),
-            Client.find({}).select('name company').lean(),
+            Client.find(clientIds.length ? { _id: { $in: clientIds } } : { _id: null }).select('name company').lean(),
             User.find({}).select('salary name').lean()
         ]);
 
@@ -129,6 +150,11 @@ router.get('/:projectId', protect, checkPermission('profitability', 'view'), asy
         }
         const project = await Project.findById(req.params.projectId).lean();
         if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        if (!(await canViewAllRecords(req.user, 'profitability'))) {
+            const access = await assertProjectAccess(req, project);
+            if (!access.ok) return res.status(access.status).json({ message: access.message });
+        }
 
         const [invoices, timeEntries, client, users] = await Promise.all([
             Invoice.find({ projectId: req.params.projectId, status: { $ne: 'cancelled' } }).sort({ date: -1 }).lean(),

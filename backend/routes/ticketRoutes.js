@@ -44,6 +44,8 @@ router.get('/', protect, async (req, res) => {
             const done = ['resolved', 'closed', 'live', 'declined'].includes(obj.status);
             if (obj.slaDueAt && !done) {
                 obj.slaBreached = now > new Date(obj.slaDueAt).getTime();
+            } else {
+                obj.slaBreached = false;
             }
             return obj;
         });
@@ -191,11 +193,13 @@ router.put('/:id', protect, checkPermission('tickets', 'edit'), async (req, res)
             ticket.resolvedAt = new Date();
         }
 
-        // Breach flag: past SLA and still not resolved
+        // Breach flag: compare epoch ms consistently (same as list enrichment)
         if (ticket.slaDueAt && !['resolved', 'closed', 'live', 'declined'].includes(ticket.status)) {
-            ticket.slaBreached = new Date() > new Date(ticket.slaDueAt);
+            ticket.slaBreached = Date.now() > new Date(ticket.slaDueAt).getTime();
         } else if (ticket.resolvedAt && ticket.slaDueAt) {
-            ticket.slaBreached = new Date(ticket.resolvedAt) > new Date(ticket.slaDueAt);
+            ticket.slaBreached = new Date(ticket.resolvedAt).getTime() > new Date(ticket.slaDueAt).getTime();
+        } else {
+            ticket.slaBreached = false;
         }
 
         ticket.updatedAt = Date.now();

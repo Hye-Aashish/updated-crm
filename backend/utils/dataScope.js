@@ -99,6 +99,8 @@ async function applyCreatorScope(baseFilter, user, module, options = {}) {
  */
 async function assertCreatorAccess(user, doc, module, options = {}) {
     if (!user || !doc) return { ok: false, status: 401, message: 'Not authorized' };
+    // Privileged roles bypass before any module-permission resolution
+    if (isAdminOrOwner(user)) return { ok: true };
     if (await canViewAllRecords(user, module)) return { ok: true };
 
     if (user.role === 'client' && typeof options.clientCheck === 'function') {

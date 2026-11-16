@@ -9,6 +9,8 @@ const nodemailer = require('nodemailer');
 
 async function assertQuotationAccess(user, quotation) {
     if (!user || !quotation) return { ok: false, status: 401, message: 'Not authorized' };
+    // Admin/owner always bypass (keep explicit — do not rely only on nested helpers)
+    if (user.role === 'admin' || user.role === 'owner') return { ok: true };
 
     const { assertCreatorAccess } = require('../utils/dataScope');
     const qClientId = quotation.clientId?._id ? quotation.clientId._id.toString() : String(quotation.clientId || '');
