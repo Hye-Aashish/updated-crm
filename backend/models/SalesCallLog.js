@@ -44,7 +44,11 @@ const salesCallLogSchema = new mongoose.Schema({
     meetingId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesMeeting' },
     followUpRequired: { type: Boolean, default: false },
     nextFollowUpAt: { type: Date },
-    source: { type: String, enum: ['manual', 'telephony'], default: 'manual' },
+    source: { type: String, enum: ['manual', 'telephony', 'callmetrics'], default: 'manual' },
+    callMetricsCallLogId: { type: String, index: true, sparse: true },
+    hasRecording: { type: Boolean, default: false },
+    recordingUrl: { type: String, default: '' },
+    disposition: { type: String, default: '' },
     verificationStatus: { 
         type: String, 
         enum: ['unverified', 'agent_reported', 'provider_confirmed'], 

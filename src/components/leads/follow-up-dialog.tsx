@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import {
     Phone, PhoneOff, PhoneCall, MessageSquare, Mail, Calendar,
     CheckCircle2, XCircle, Clock, AlertTriangle, Loader2, UserCheck,
-    Timer, Play, Square
+    Timer, Play, Square, Smartphone
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { Lead, PipelineStage } from '@/types'
 import { addDays, setHours, setMinutes, format } from 'date-fns'
 
@@ -45,6 +46,7 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
     const [followUpType, setFollowUpType] = useState<string>('call')
     const [newStage, setNewStage] = useState<string>('')
     const [saving, setSaving] = useState<boolean>(false)
+    const [sendToApp, setSendToApp] = useState<boolean>(false)
 
     // Call Duration tracking (Minutes & Seconds + Live call timer)
     const [durationMinutes, setDurationMinutes] = useState<number>(2)
@@ -86,6 +88,7 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
             setDurationSeconds(0)
             setIsTimerRunning(false)
             setTimerSeconds(120)
+            setSendToApp(false)
 
             // Default next follow-up: Tomorrow 11:30 AM
             const defaultNext = setMinutes(setHours(addDays(new Date(), 1), 11), 30)
@@ -101,6 +104,7 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
         if (selectedId === 'call_not_answered' || selectedId === 'busy' || selectedId === 'call_back_later') {
             setHasNextFollowUp(true)
             setFollowUpType('call')
+            setSendToApp(true)
             // Pre-fill tomorrow 11:30 AM for call not answered
             const tomorrow1130 = setMinutes(setHours(addDays(new Date(), 1), 11), 30)
             const localIso = new Date(tomorrow1130.getTime() - (tomorrow1130.getTimezoneOffset() * 60000)).toISOString().slice(0, 16)
@@ -150,7 +154,10 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
                 reminderMinutes,
                 reminderTone,
                 noNextFollowUp: !hasNextFollowUp,
-                newStage: !hasNextFollowUp ? newStage : undefined
+                newStage: !hasNextFollowUp ? newStage : undefined,
+                sendToApp: Boolean(
+                    sendToApp && hasNextFollowUp && followUpType === 'call' && nextDate
+                )
             }
 
             const targetId = lead.id || (lead as any)._id
@@ -400,6 +407,25 @@ export function FollowUpDialog({ lead, isOpen, onClose, stages, onSaveFollowUp }
                                     </Select>
                                 </div>
                             </div>
+
+                            {followUpType === 'call' && nextDate ? (
+                                <label className="flex items-start gap-2.5 pt-2 cursor-pointer">
+                                    <Checkbox
+                                        checked={sendToApp}
+                                        onCheckedChange={(v) => setSendToApp(v === true)}
+                                        className="mt-0.5"
+                                    />
+                                    <span className="text-xs leading-snug">
+                                        <span className="font-semibold flex items-center gap-1">
+                                            <Smartphone className="h-3.5 w-3.5" />
+                                            Send to Call Metrics app
+                                        </span>
+                                        <span className="text-muted-foreground block mt-0.5">
+                                            Queue an outbound call for the assigned employee in the mobile app.
+                                        </span>
+                                    </span>
+                                </label>
+                            ) : null}
                         </div>
                     ) : (
                         <div className="space-y-2 bg-muted/30 p-4 rounded-xl border border-border/50 animate-in fade-in duration-200">

@@ -221,28 +221,37 @@ router.get('/:id/timeline', protect, checkPermission('leads', 'view'), async (re
             ]
         }).sort({ createdAt: -1 }).limit(50).lean().catch(() => []);
 
-        const activityItems = (lead.activities || []).map(a => ({
-            kind: 'activity',
-            at: a.createdAt,
-            type: a.type,
-            content: a.content,
-            outcome: a.outcome,
-            createdByName: a.createdByName
-        }));
+        const activityItems = (lead.activities || [])
+            .filter((a) => !String(a.content || '').includes('[cm:'))
+            .map(a => ({
+                kind: 'activity',
+                at: a.createdAt,
+                type: a.type,
+                content: a.content,
+                outcome: a.outcome,
+                createdByName: a.createdByName
+            }));
         const callItems = (callLogs || []).map(c => ({
+            id: c._id,
             kind: 'call',
-            at: c.createdAt || c.startedAt,
+            at: c.callStartedAt || c.createdAt || c.startedAt,
             type: 'call',
-            content: c.notes || c.outcome || 'Call logged',
-            outcome: c.outcome || c.status,
-            duration: c.duration,
-            createdByName: c.agentName || c.userName
+            title: c.outcomeLabel || (c.direction === 'inbound' ? 'Incoming call' : 'Outgoing call'),
+            content: c.notes || c.outcomeLabel || c.outcome || 'Call logged',
+            outcome: c.outcomeLabel || c.outcome || c.status,
+            duration: c.durationSeconds ?? c.duration ?? 0,
+            direction: c.direction || 'outbound',
+            createdByName: c.agentName || c.userName,
+            source: c.source,
+            hasRecording: Boolean(c.hasRecording && c.recordingUrl),
+            recordingUrl: c.recordingUrl || '',
+            verificationStatus: c.verificationStatus
         }));
 
         const timeline = [...activityItems, ...callItems]
             .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
 
-        res.json({ timeline, leadId: lead._id });
+        res.json({ timeline, calls: callItems, leadId: lead._id });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -1467,6 +1476,15 @@ router.put('/:id', protect, checkPermission('leads', 'edit'), async (req, res) =
 
         const updatedLead = await Lead.findByIdAndUpdate(req.params.id, updateQuery, { new: true });
 
+        if (updatedLead && safeData.reminder) {
+            try {
+                const { notifyFollowUp } = require('../utils/callMetricsIntegration');
+                await notifyFollowUp(updatedLead, User, { sendToApp: Boolean(req.body.sendToApp) });
+            } catch (integrationErr) {
+                console.error('[callMetricsIntegration]', integrationErr.message);
+            }
+        }
+
         // Pipeline automation (additive; no-op if no rules)
         if (isStageChanged && updatedLead) {
             try {
@@ -1595,7 +1613,8 @@ router.post('/:id/followups', protect, async (req, res) => {
             reminderTone,
             followUpType,
             noNextFollowUp,
-            newStage
+            newStage,
+            sendToApp
         } = req.body;
 
         const userName = req.user ? req.user.name : 'Sales Team';
@@ -1695,6 +1714,15 @@ router.post('/:id/followups', protect, async (req, res) => {
         } catch (aiErr) { }
 
         const savedLead = await lead.save();
+
+        try {
+            const { notifyFollowUp } = require('../utils/callMetricsIntegration');
+            const shouldSend = Boolean(sendToApp) && (followUpType || 'call') === 'call' && savedLead.reminder?.date;
+            await notifyFollowUp(savedLead, User, { sendToApp: shouldSend, followUpType: followUpType || 'call' });
+        } catch (integrationErr) {
+            console.error('[callMetricsIntegration]', integrationErr.message);
+        }
+
         res.json(savedLead);
     } catch (err) {
         console.error('Follow-up Save Error:', err);

@@ -7,14 +7,32 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
     Bell, Trash2, Edit2, Check, X, Star, MessageSquare, PhoneCall,
-    Clock, Calendar, UserCheck, AlertTriangle, PhoneOff, Mail, CheckCircle2, Loader2
+    Clock, Calendar, UserCheck, AlertTriangle, PhoneOff, Mail, CheckCircle2, Loader2,
+    Mic, Smartphone
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { formatCurrency } from '@/lib/utils'
 import type { Lead, PipelineStage, User } from '@/types'
 import api from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 import { mapLead } from '@/lib/mappers'
 import { format } from 'date-fns'
+
+const formatCallDuration = (seconds: number) => {
+    const total = Math.max(0, Number(seconds) || 0)
+    const mins = Math.floor(total / 60)
+    const secs = total % 60
+    return `${mins}:${String(secs).padStart(2, '0')}`
+}
+
+const formatCallDateTime = (value?: string | Date) => {
+    if (!value) return '—'
+    try {
+        return format(new Date(value), 'MMM d, yyyy · h:mm a')
+    } catch {
+        return '—'
+    }
+}
 
 interface LeadDetailsPanelProps {
     lead: Lead
@@ -116,6 +134,7 @@ export function LeadDetailsPanel({
     const [newActivityOutcome, setNewActivityOutcome] = useState('Note Added')
     const [reminderDate, setReminderDate] = useState('')
     const [reminderTone, setReminderTone] = useState('default')
+    const [sendReminderToApp, setSendReminderToApp] = useState(false)
     const [newTagInput, setNewTagInput] = useState('')
     const [savingNote, setSavingNote] = useState(false)
     
@@ -152,11 +171,16 @@ export function LeadDetailsPanel({
                     date: new Date(reminderDate),
                     tone: reminderTone,
                     completed: false
-                }
+                },
+                sendToApp: Boolean(sendReminderToApp)
             }
             await api.put(`/leads/${targetId}`, payload)
             onUpdate({ ...lead, reminder: payload.reminder })
-            toast({ description: "Reminder set successfully" })
+            toast({
+                description: sendReminderToApp
+                    ? 'Reminder saved and queued to Call Metrics (if integration is configured).'
+                    : 'Reminder set successfully'
+            })
         } catch (error) {
             console.error("Set Reminder Error:", error)
             toast({ title: "Error", description: "Failed to set reminder", variant: "destructive" })
@@ -244,6 +268,8 @@ export function LeadDetailsPanel({
 
     const [duplicates, setDuplicates] = useState<any[]>([])
     const [timeline, setTimeline] = useState<any[] | null>(null)
+    const [callLogs, setCallLogs] = useState<any[]>([])
+    const [expandedRecording, setExpandedRecording] = useState<string | null>(null)
     const [sequences, setSequences] = useState<any[]>([])
     const [referredBy, setReferredBy] = useState((lead as any).referredBy || '')
 
@@ -255,8 +281,14 @@ export function LeadDetailsPanel({
             .then(res => setDuplicates(res.data?.duplicates || []))
             .catch(() => setDuplicates([]))
         api.get(`/leads/${id}/timeline`)
-            .then(res => setTimeline(res.data?.timeline || []))
-            .catch(() => setTimeline(null))
+            .then(res => {
+                setTimeline(res.data?.timeline || [])
+                setCallLogs(res.data?.calls || (res.data?.timeline || []).filter((row: any) => row.kind === 'call'))
+            })
+            .catch(() => {
+                setTimeline(null)
+                setCallLogs([])
+            })
         api.get('/sales-automation/sequences').then(res => setSequences(res.data || [])).catch(() => setSequences([]))
     }, [lead?.id, (lead as any)?._id, lead.email, lead.phone])
 
@@ -459,6 +491,74 @@ export function LeadDetailsPanel({
                 </div>
             </div>
 
+            <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Calls &amp; recordings</h4>
+                {callLogs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground rounded-xl border border-dashed p-4 text-center">
+                        No synced calls yet. Calls from the Call Metrics app appear here with duration and recordings.
+                    </p>
+                ) : (
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
+                        {callLogs.map((call) => {
+                            const rowKey = String(call.id || call.at)
+                            const isOutbound = call.direction !== 'inbound'
+                            return (
+                                <div key={rowKey} className="rounded-xl border border-border/60 bg-card p-3 shadow-xs space-y-2">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0 space-y-1">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <span className="text-sm font-bold text-foreground">
+                                                    {call.title || (isOutbound ? 'Outgoing call' : 'Incoming call')}
+                                                </span>
+                                                {call.source === 'callmetrics' ? (
+                                                    <Badge variant="secondary" className="text-[9px] h-4 px-1.5">Call Metrics</Badge>
+                                                ) : null}
+                                                {call.verificationStatus === 'provider_confirmed' ? (
+                                                    <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-emerald-500/40 text-emerald-700">Verified</Badge>
+                                                ) : null}
+                                            </div>
+                                            <p className="text-[11px] text-muted-foreground">{formatCallDateTime(call.at)}</p>
+                                            <p className="text-[11px] text-muted-foreground">
+                                                {call.createdByName || 'Agent'} · {formatCallDuration(call.duration)} talk time
+                                            </p>
+                                        </div>
+                                        {call.hasRecording && call.recordingUrl ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 text-[11px] font-bold shrink-0"
+                                                onClick={() => setExpandedRecording(expandedRecording === rowKey ? null : rowKey)}
+                                            >
+                                                <Mic className="h-3.5 w-3.5 mr-1" />
+                                                {expandedRecording === rowKey ? 'Hide' : 'Play'}
+                                            </Button>
+                                        ) : (
+                                            <span className="text-[10px] text-muted-foreground shrink-0 pt-1">No recording</span>
+                                        )}
+                                    </div>
+                                    {expandedRecording === rowKey && call.recordingUrl ? (
+                                        <audio controls preload="metadata" className="w-full h-9" src={call.recordingUrl}>
+                                            <a href={call.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">
+                                                Open recording
+                                            </a>
+                                        </audio>
+                                    ) : null}
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {lead.reminder?.date && !lead.reminder.completed ? (
+                <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-3 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-sky-800 dark:text-sky-300">Scheduled follow-up (Call Metrics)</p>
+                    <p className="text-sm font-bold text-foreground">{formatCallDateTime(lead.reminder.date)}</p>
+                    <p className="text-[11px] text-muted-foreground">Tone: {lead.reminder.tone || 'default'} · synced when you save or log a follow-up</p>
+                </div>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">
                 {isEditing && isAdminOrOwner && users.length > 0 && (
                     <div className="col-span-2">
@@ -632,19 +732,22 @@ export function LeadDetailsPanel({
                 )}
             </div>
 
-            {timeline && timeline.length > 0 && (
+            {timeline && timeline.filter((item) => item.kind !== 'call').length > 0 ? (
                 <div className="space-y-2 pt-4 border-t">
-                    <h4 className="font-bold text-sm">Call + Activity Timeline</h4>
+                    <h4 className="font-bold text-sm">Activity timeline</h4>
                     <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
-                        {timeline.slice(0, 12).map((item, idx) => (
+                        {timeline.filter((item) => item.kind !== 'call').slice(0, 12).map((item, idx) => (
                             <div key={idx} className="text-[11px] p-2 rounded-lg border bg-muted/20 flex justify-between gap-2">
-                                <span className="truncate"><Badge variant="outline" className="text-[9px] mr-1">{item.kind}</Badge>{item.content}</span>
-                                <span className="text-muted-foreground shrink-0">{item.at ? format(new Date(item.at), 'MMM d') : ''}</span>
+                                <span className="truncate">
+                                    <Badge variant="outline" className="text-[9px] mr-1">{item.kind}</Badge>
+                                    {item.content}
+                                </span>
+                                <span className="text-muted-foreground shrink-0">{item.at ? format(new Date(item.at), 'MMM d, h:mm a') : ''}</span>
                             </div>
                         ))}
                     </div>
                 </div>
-            )}
+            ) : null}
 
             {/* Next Follow-up Quick Setter */}
             <div className="space-y-4 pt-4 border-t">
@@ -671,6 +774,22 @@ export function LeadDetailsPanel({
                         </Select>
                     </div>
                 </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox
+                        checked={sendReminderToApp}
+                        onCheckedChange={(v) => setSendReminderToApp(v === true)}
+                        className="mt-0.5"
+                    />
+                    <span className="text-xs">
+                        <span className="font-semibold flex items-center gap-1">
+                            <Smartphone className="h-3.5 w-3.5" />
+                            Send to Call Metrics app
+                        </span>
+                        <span className="text-muted-foreground block mt-0.5">
+                            Requires <code className="text-[10px]">CALL_METRICS_API_URL</code> on the CRM server.
+                        </span>
+                    </span>
+                </label>
                 <div className="flex justify-end">
                     <Button size="sm" onClick={handleSetReminder} variant="outline" className="h-8 font-semibold text-xs rounded-lg">
                         Set Next Date
